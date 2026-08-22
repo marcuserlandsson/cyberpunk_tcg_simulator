@@ -64,4 +64,102 @@ describe('cardDb', () => {
       expect(legend.ramLimit).not.toBeNull()
     }
   })
+
+  describe('strictness against extra/typo keys', () => {
+    const validCard = {
+      id: 'test-strict-card',
+      name: 'Test',
+      color: 'Red',
+      type: 'unit',
+      cost: 1,
+      power: 1,
+      ram: { color: 'Red', value: 1 },
+      ramLimit: null,
+      sellTag: false,
+      keywords: [],
+      text: '',
+      effects: [],
+    }
+
+    it('accepts the valid card as a baseline sanity check', () => {
+      const result = cardDbSchema.safeParse([validCard])
+      expect(result.success).toBe(true)
+    })
+
+    it('rejects a card with an extra unknown key', () => {
+      const result = cardDbSchema.safeParse([{ ...validCard, notARealField: 'oops' }])
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects a card with a typo\'d optional key (subtitel instead of subtitle)', () => {
+      const result = cardDbSchema.safeParse([{ ...validCard, subtitel: 'Typo' }])
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects a card whose ram object has a stray key', () => {
+      const result = cardDbSchema.safeParse([
+        { ...validCard, ram: { color: 'Red', value: 1, extra: true } },
+      ])
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects an effect def with a stray key', () => {
+      const cardWithBadEffect = {
+        ...validCard,
+        effects: [
+          {
+            trigger: 'onPlay',
+            effect: { kind: 'draw', count: 1 },
+            strayKey: 'oops',
+          },
+        ],
+      }
+      const result = cardDbSchema.safeParse([cardWithBadEffect])
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects an effect def whose cost sub-object has a stray key', () => {
+      const cardWithBadEffectCost = {
+        ...validCard,
+        effects: [
+          {
+            trigger: 'onPlay',
+            cost: { eddies: 1, strayKey: 'oops' },
+            effect: { kind: 'draw', count: 1 },
+          },
+        ],
+      }
+      const result = cardDbSchema.safeParse([cardWithBadEffectCost])
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects an effect def whose condition sub-object has a stray key', () => {
+      const cardWithBadEffectCondition = {
+        ...validCard,
+        effects: [
+          {
+            trigger: 'onPlay',
+            condition: { streetCredAtLeast: 1, strayKey: 'oops' },
+            effect: { kind: 'draw', count: 1 },
+          },
+        ],
+      }
+      const result = cardDbSchema.safeParse([cardWithBadEffectCondition])
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects an effect node with a stray key', () => {
+      const cardWithBadEffectNode = {
+        ...validCard,
+        effects: [
+          {
+            trigger: 'onPlay',
+            effect: { kind: 'draw', count: 1, strayKey: 'oops' },
+          },
+        ],
+      }
+      const result = cardDbSchema.safeParse([cardWithBadEffectNode])
+      expect(result.success).toBe(false)
+    })
+  })
 })

@@ -21,40 +21,40 @@ const whoseSchema = z.enum(['friendly', 'rival'])
 
 export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
   z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('draw'), count: z.number() }),
-    z.object({ kind: z.literal('discardRandomRival'), count: z.number() }),
-    z.object({
+    z.strictObject({ kind: z.literal('draw'), count: z.number() }),
+    z.strictObject({ kind: z.literal('discardRandomRival'), count: z.number() }),
+    z.strictObject({
       kind: z.literal('buffPower'),
       amount: z.number(),
       target: targetSpecSchema,
       duration: z.enum(['turn', 'permanent']),
     }),
-    z.object({ kind: z.literal('staticPower'), amount: z.number() }),
-    z.object({ kind: z.literal('defeat'), target: targetSpecSchema }),
-    z.object({ kind: z.literal('bounce'), target: targetSpecSchema }),
-    z.object({ kind: z.literal('readyCard'), target: targetSpecSchema }),
-    z.object({ kind: z.literal('spendCard'), target: targetSpecSchema }),
-    z.object({ kind: z.literal('stealGig'), count: z.number() }),
-    z.object({ kind: z.literal('returnGig'), count: z.number() }),
-    z.object({ kind: z.literal('rerollGig'), whose: whoseSchema }),
-    z.object({ kind: z.literal('trashFromDeck'), whose: whoseSchema, count: z.number() }),
-    z.object({ kind: z.literal('bottomDeck'), target: targetSpecSchema }),
-    z.object({ kind: z.literal('gainEddieFromTopDeck'), count: z.number() }),
-    z.object({ kind: z.literal('sequence'), effects: z.array(effectNodeSchema) }),
-    z.object({ kind: z.literal('scripted'), name: z.string() }),
+    z.strictObject({ kind: z.literal('staticPower'), amount: z.number() }),
+    z.strictObject({ kind: z.literal('defeat'), target: targetSpecSchema }),
+    z.strictObject({ kind: z.literal('bounce'), target: targetSpecSchema }),
+    z.strictObject({ kind: z.literal('readyCard'), target: targetSpecSchema }),
+    z.strictObject({ kind: z.literal('spendCard'), target: targetSpecSchema }),
+    z.strictObject({ kind: z.literal('stealGig'), count: z.number() }),
+    z.strictObject({ kind: z.literal('returnGig'), count: z.number() }),
+    z.strictObject({ kind: z.literal('rerollGig'), whose: whoseSchema }),
+    z.strictObject({ kind: z.literal('trashFromDeck'), whose: whoseSchema, count: z.number() }),
+    z.strictObject({ kind: z.literal('bottomDeck'), target: targetSpecSchema }),
+    z.strictObject({ kind: z.literal('gainEddieFromTopDeck'), count: z.number() }),
+    z.strictObject({ kind: z.literal('sequence'), effects: z.array(effectNodeSchema) }),
+    z.strictObject({ kind: z.literal('scripted'), name: z.string() }),
   ])
 )
 
-const effectDefSchema: z.ZodType<EffectDef> = z.object({
+const effectDefSchema: z.ZodType<EffectDef> = z.strictObject({
   trigger: triggerSchema,
   cost: z
-    .object({
+    .strictObject({
       selfSpend: z.boolean().optional(),
       eddies: z.number().optional(),
     })
     .optional(),
   condition: z
-    .object({
+    .strictObject({
       streetCredAtLeast: z.number().optional(),
     })
     .optional(),
@@ -66,9 +66,9 @@ const effectDefSchema: z.ZodType<EffectDef> = z.object({
 // Card schema
 // ---------------------------------------------------------------------------
 
-const ramSchema = z.object({ color: z.string(), value: z.number() })
+const ramSchema = z.strictObject({ color: z.string(), value: z.number() })
 
-const cardSchema: z.ZodType<CardDef> = z.object({
+const cardSchema: z.ZodType<CardDef> = z.strictObject({
   id: z.string(),
   name: z.string(),
   subtitle: z.string().optional(),
