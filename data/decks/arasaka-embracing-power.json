@@ -1,0 +1,21 @@
+{
+  "name": "Arasaka — Embracing Power",
+  "legends": [
+    "goro-takemura-hands-unclean",
+    "yorinobu-arasaka-embracing-destruction",
+    "saburo-arasaka-stubborn-patriarch"
+  ],
+  "cards": {
+    "minotaur": 1,
+    "swordwise-huscle": 2,
+    "mantis-blades": 3,
+    "satori-sword-of-saburo": 3,
+    "industrial-assembly": 3,
+    "over-the-edge": 2,
+    "corpo-security": 3,
+    "emergency-atlus": 3,
+    "field-operator": 3,
+    "goro-takemura-losing-his-way": 1,
+    "corporate-surveillance": 3
+  }
+}

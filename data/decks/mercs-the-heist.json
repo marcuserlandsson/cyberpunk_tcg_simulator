@@ -1,0 +1,22 @@
+{
+  "name": "Mercs — The Heist",
+  "legends": [
+    "v-corporate-exile",
+    "viktor-vektor-sit-down-and-relax",
+    "jackie-welles-pour-one-out-for-me"
+  ],
+  "cards": {
+    "dexter-deshawn-one-last-chance": 1,
+    "dying-night-v-s-pistol": 2,
+    "secondhand-bombus": 2,
+    "kiroshi-optics": 3,
+    "mandibular-upgrade": 2,
+    "afterparty-at-lizzie-s": 2,
+    "delamain-cab": 3,
+    "evelyn-parker-scheming-siren": 3,
+    "mt0d12-flathead": 1,
+    "psycho-squad": 3,
+    "floor-it": 3,
+    "reboot-optics": 2
+  }
+}
