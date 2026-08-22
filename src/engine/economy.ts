@@ -9,6 +9,12 @@
 
 import type { GameState, PlayerId } from './types'
 
+/**
+ * Call a Legend costs 1 €$ (guide p10/p11/glossary CALL A LEGEND) — the same
+ * price in the main phase and as a reaction to an attack.
+ */
+export const CALL_A_LEGEND_COST = 1
+
 /** The payer's own ready eddies + legends — every uid worth 1 €$ right now. */
 function readyPaymentUids(state: GameState, player: PlayerId): number[] {
   const p = state.players[player]
@@ -55,6 +61,22 @@ export function canonicalPayment(
   const combined = [...readyEddies, ...readyLegends]
   if (combined.length < cost) return null
   return combined.slice(0, cost)
+}
+
+/**
+ * The canonical payment for `player`'s Call a Legend right now, or null when
+ * they may not call at all: the once-per-turn gate is already used (that gate
+ * is *shared* between the main-phase action and the react-window reaction —
+ * docs/rulings.md §26), every Legend is already face-up so there is nothing
+ * to flip, or nothing ready is left to pay the 1 €$. Used by both
+ * `legalActions` slices (main phase and react window) so the two can never
+ * drift apart.
+ */
+export function legendCallPayment(state: GameState, player: PlayerId): number[] | null {
+  const p = state.players[player]
+  if (p.calledLegendThisTurn) return null
+  if (!p.legends.some((uid) => !state.cards[uid].faceUp)) return null
+  return canonicalPayment(state, player, CALL_A_LEGEND_COST)
 }
 
 /**

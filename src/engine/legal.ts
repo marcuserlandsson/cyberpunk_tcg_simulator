@@ -4,15 +4,18 @@
 //
 // Task 4 scope: setup decisions, the gig-die choice and `endTurn`. Task 5
 // adds sellCard/playCard/callLegend for the main phase (vanilla cards only —
-// effects/targeting for effects arrive in Task 7). Attacking and reactions
-// are still out of scope; until Task 6/7 land they are never emitted, so
-// `applyAction` rejects them.
+// effects/targeting for effects arrive in Task 7). Task 6 adds combat: the
+// `attack` entries of the main phase and the whole of the `react` and
+// `chooseGig` windows, all enumerated by combat.ts. Card effects
+// (activateAbility, and the `quick`/`quickAbility` reactions) are still out of
+// scope; until Task 7 lands they are never emitted, so `applyAction` rejects
+// them.
 
-import { canonicalPayment } from './economy'
+import { attackActions, chooseGigActions, reactActions } from './combat'
+import { canonicalPayment, legendCallPayment } from './economy'
 import type { Action, CardDb, DieSize, GameState, PlayerId } from './types'
 
 const D20: DieSize = 20
-const CALL_A_LEGEND_COST = 1
 
 /**
  * One `chooseGigDie` per distinct die size in the acting player's fixer,
@@ -44,12 +47,13 @@ function friendlyGearTargets(state: GameState, player: PlayerId): number[] {
 }
 
 /**
- * Main-phase economy actions (Task 5): sell (once/turn, sellTag cards only),
- * play (one entry per affordable hand card, with one entry per legal target
- * for gear instead of a single targets:[] entry), and call a legend
- * (once/turn, 1 €$, only while a face-down legend remains). Each entry's
- * `payment` is the *canonical* payment (see economy.ts); `applyAction`
- * accepts any payment satisfying `canPayWith`, not just this one.
+ * Main-phase actions: the Task 5 economy ones — sell (once/turn, sellTag
+ * cards only), play (one entry per affordable hand card, with one entry per
+ * legal target for gear instead of a single targets:[] entry), and call a
+ * legend (once/turn, 1 €$, only while a face-down legend remains) — plus
+ * Task 6's attacks (combat.ts). Each entry's `payment` is the *canonical*
+ * payment (see economy.ts); `applyAction` accepts any payment satisfying
+ * `canPayWith`, not just this one.
  */
 function mainPhaseActions(db: CardDb, state: GameState): Action[] {
   const player = state.activePlayer
@@ -79,10 +83,10 @@ function mainPhaseActions(db: CardDb, state: GameState): Action[] {
     }
   }
 
-  if (!p.calledLegendThisTurn && p.legends.some((uid) => !state.cards[uid].faceUp)) {
-    const payment = canonicalPayment(state, player, CALL_A_LEGEND_COST)
-    if (payment !== null) actions.push({ type: 'callLegend', payment })
-  }
+  const legendPayment = legendCallPayment(state, player)
+  if (legendPayment !== null) actions.push({ type: 'callLegend', payment: legendPayment })
+
+  actions.push(...attackActions(db, state))
 
   actions.push({ type: 'endTurn' })
   return actions
@@ -109,12 +113,16 @@ export function legalActions(db: CardDb, state: GameState): Action[] {
       return gigDieChoices(state)
 
     case 'main':
-      // Task 6/7 add activateAbility/attack here.
+      // Task 7 adds activateAbility here.
       return mainPhaseActions(db, state)
 
     case 'react':
+      // The defender's reactions (combat.ts) — note `actingPlayer(state)` is
+      // the *rival* of `activePlayer` for the whole of this window.
+      return reactActions(db, state)
+
     case 'chooseGig':
-      // Task 6 (combat) owns these windows.
-      return []
+      // The attacker picking the dice a successful steal takes.
+      return chooseGigActions(state)
   }
 }

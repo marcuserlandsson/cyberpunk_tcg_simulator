@@ -37,11 +37,13 @@ export function startedGame(seed = 1): GameState {
  * until `stop` returns true or the game ends. `maxActions` guards runaway loops.
  *
  * Since Task 5, `main` phase can also offer sellCard/playCard/callLegend
- * once a hand card is sellable/affordable or a legend can be called — those
- * are real, exercised elsewhere (tests/engine/economy.test.ts). This driver
- * still prefers `endTurn` whenever it's legal (which is unconditionally, in
- * `main`) so every pre-Task-5 test here keeps advancing turns exactly as
- * before, rather than incidentally selling/playing/calling along the way.
+ * once a hand card is sellable/affordable or a legend can be called, and since
+ * Task 6 it offers `attack` once a unit can attack something — those are real,
+ * exercised elsewhere (tests/engine/economy.test.ts, combat.test.ts). This
+ * driver still prefers `endTurn` whenever it's legal (which is
+ * unconditionally, in `main`) so every pre-Task-5 test here keeps advancing
+ * turns exactly as before, rather than incidentally selling/playing/calling/
+ * attacking along the way.
  */
 export function drive(
   state: GameState,

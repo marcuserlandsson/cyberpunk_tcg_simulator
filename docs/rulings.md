@@ -479,3 +479,127 @@ rolls, shuffles), so the flip is fully deterministic from the game's seed and
 replayable. `legalActions` only offers `callLegend` while at least one
 face-down legend remains for that player (an empty list would make `nextInt`
 undefined behaviour) and the player hasn't already called this turn.
+
+---
+
+# Task 6 rulings (combat & reactions)
+
+## 24 — Attacking an empty rival Gig area is illegal
+
+The guide (p10/p11) offers exactly two targets: "a spent rival Unit" or "the
+rival Gig area". It never says the Gig area must be non-empty — the STEAL step
+just says "Choose a rival Gig die and move it to your friendly Gig area".
+
+**Ruling:** `combat.ts`'s `attackTargets` omits `'gigArea'` whenever the rival's
+Gig area is empty, so `legalActions` never offers the attack and `applyAction`
+rejects it.
+
+**Rationale:** with no dice to take, such an attack has no effect whatsoever
+except spending the attacker — it cannot steal, cannot fight, and cannot be
+blocked into a fight either (a block would produce one, but the defender would
+simply never block). Allowing it would put a strictly self-harming, no-op action
+in the legal-action list, which every consumer of `legalActions` (the AI in
+Task 9, the UI, random-play simulations) would then have to filter out again.
+Forbidding it loses no strategic option. It *is* a deliberate narrowing of the
+guide's silence rather than a rule the guide states, hence this entry.
+
+Note the asymmetry with the 0-power case (§25): a 0-power Unit attacking a
+*non-empty* Gig area is legal — the guide explicitly contemplates it ("and 0
+Gigs at power 0") and the defender may still choose to block it, which makes it
+a real, if strange, play.
+
+## 25 — A steal of 0 dice resolves immediately and never enters `chooseGig`
+
+Guide p11: a Unit steals "0 Gigs at power 0". The steal count is capped by the
+victim's Gig area size, so it can also come out at 0 if an effect empties the
+Gig area during the react window.
+
+**Ruling:** when the computed steal count is 0, `resolveAttack` clears
+`pendingAttack`, leaves `pendingSteal` null and returns the game straight to
+`main`. The `chooseGig` phase is only ever entered with `remaining >= 1`, so
+`legalActions` can never be empty in that phase (an empty legal-action list
+would deadlock the game) and no consumer has to special-case a zero-die steal.
+The attacker is still spent — see §28.
+
+`stealCount` also returns 0 for *negative* effective power, which Task 7's
+debuff effects can produce; `1 + floor(power/10)` would otherwise go
+nonsensical there.
+
+## 26 — Call a Legend's once-per-turn gate is one shared gate per player
+
+Guide glossary CALL A LEGEND: "Each turn, you may spend 1 €$ to flip a Legend
+face-up. You can do this during your main phase, **or as a reaction when a
+rival Unit attacks**." Both the main-phase list (p10) and the reactions list
+(p11) are headed "CALL A LEGEND (ONCE PER TURN)".
+
+**Ruling:** there is exactly one gate per player — the existing
+`PlayerState.calledLegendThisTurn` flag — shared by the main-phase action and
+the react-window reaction. Calling in either place blocks the other, and both
+routes run the same handler (`reduce.ts`'s `callLegend`, now parameterised by
+player) so the RNG flip and the payment rules cannot diverge. `legalActions`
+asks `economy.ts`'s `legendCallPayment` in both places, so the availability
+test cannot diverge either.
+
+**Known deviation, flagged for a later task.** The flag is cleared by
+`resetTurnState` at the start of its *owner's* turn (Task 4), so a player who
+called during their own main phase cannot react-call during the rival's
+following turn: in effect one call per player per own-turn *cycle*. The other
+defensible reading of "each turn" is one call per player per turn *including
+the rival's*, which would require clearing both players' flags at every turn
+start. Task 6 deliberately did not change Task 4's turn machinery for this;
+if the stricter reading is wanted, the one-line fix is in `resetTurnState`
+and this engine's react window needs no change at all.
+
+## 27 — A block closes the react window and resolves the attack at once, stealing nothing
+
+Guide p11: "When a Unit redirects your attempt to attack your Rival directly, a
+fight plays out as though your Unit attacked the blocking Unit instead. Even if
+you defeat it, you don't steal any Gigs for that attack. In general, if an
+effect redirects or stops a direct attack on your Rival, you don't get to steal
+a Gig."
+
+**Ruling:** `block` sets `pendingAttack.redirectedTo`, spends the blocker, and
+then resolves the attack immediately as a fight against the blocker — the
+react window does *not* stay open after a block, and no steal happens even
+when the attacker wins the fight (and even if the original target was a spent
+Unit rather than the Gig area, in which case the original target is left
+untouched). Every other reaction (`callLegend` today; `quick` /
+`quickAbility` from Task 7) leaves the window open, matching "The attacked
+Rival may take **any number** of these reactions" — so a defender can call a
+legend and *then* block, but nothing can follow a block.
+
+**Rationale:** the fight the guide describes is the attack's step 04, i.e. the
+resolution; once the attack has resolved there is nothing left to react to. A
+second blocker cannot block an attack that has already been redirected and
+fought.
+
+## 28 — The attacker is spent up front, whatever the attack achieves
+
+Guide p10/p11 step 01 is "SPEND THE ATTACKING UNIT", before the target is even
+declared and long before the rival reacts.
+
+**Ruling:** `declareAttack` spends the attacker as its first act, and nothing
+in the resolution path ever readies it. A blocked attack, a lost fight, a
+fizzled attack and a 0-die steal all leave the attacker spent — the tap is the
+price of *declaring*, not of succeeding. Consequences worth naming:
+
+- attacking is exactly what makes a Unit attackable next turn ("ready Units
+  can't be attacked", p11), which is the risk the guide talks about;
+- a blocker must be **ready** to block and is spent by blocking (p11: "Spend a
+  Unit with the {blocker} keyword"), so it cannot block twice in one turn;
+- only field **Units** with the {blocker} keyword can block. Of the 13 cards in
+  the pool carrying `blocker`, four are not Units: the Gear cards
+  `mandibular-upgrade` and `riot-shield`, and the Legends
+  `goro-takemura-hands-unclean` and `goro-takemura-vengeful-bodyguard`. The
+  engine only ever scans the defender's `field`, so none of the four can block
+  on its own today: Gear sits in `attachedGear`, and a Legend sits in the
+  `legends` zone (a Go-Solo Legend played as a Unit *would* be on the field —
+  Task 7). Whether equipped Gear *grants* {blocker} (and other keywords) to its
+  host is likewise Task 7's call; today's answer is no, consistent with Gear
+  power bonuses also not applying yet (`query.ts`'s `effectivePower`).
+
+A related consequence of the phase machine, and of "Each Unit attacks
+individually, and completes all the attacking steps before another Unit can
+attack" (p10): no second attack, and no other main-phase action, is legal until
+the current attack has fully resolved, because `legalActions` returns only
+reactions in `react` and only `chooseGig` entries in `chooseGig`.

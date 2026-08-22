@@ -9,9 +9,12 @@
 //
 // Handlers are one small function per action type, dispatched from a single
 // switch. Later tasks add their action types as new cases + functions without
-// touching the ones below.
+// touching the ones below. The combat handlers (`attack`, `react`,
+// `chooseGig`) delegate every mechanic to combat.ts and keep only the
+// dispatch here.
 
-import { canPayWith, pay } from './economy'
+import { blockAttack, declareAttack, resolveAttack, takeStolenGig } from './combat'
+import { CALL_A_LEGEND_COST, canPayWith, pay } from './economy'
 import {
   beginTurn,
   checkOvertimeWin,
@@ -21,11 +24,9 @@ import {
   OPENING_HAND_SIZE,
 } from './game'
 import { legalActions } from './legal'
-import { opponentOf } from './query'
+import { actingPlayer, opponentOf } from './query'
 import { nextInt, rollDie, shuffle } from './rng'
-import type { Action, CardDb, GameState, PlayerId } from './types'
-
-const CALL_A_LEGEND_COST = 1
+import type { Action, CardDb, GameState, PlayerId, Reaction } from './types'
 
 export class IllegalActionError extends Error {
   constructor(message: string) {
@@ -59,16 +60,27 @@ function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
- * `playCard` and `callLegend` carry a `payment` field that `legalActions`
- * fills in with one canonical payment (economy.ts), but the caller may pay
- * with any valid combination of ready eddies/legends totalling the same
- * cost (Task 5 brief). So legality for these two action types is checked in
- * two parts: the action *shape* (ignoring `payment`) must match some entry
- * in `legalActions`, and the *supplied* payment must independently satisfy
- * `canPayWith` for that action's cost. Every other action type still goes
- * through a plain structural `deepEqual` against the legal list.
+ * `playCard`, `callLegend` and the `callLegend` *reaction* carry a `payment`
+ * field that `legalActions` fills in with one canonical payment (economy.ts),
+ * but the caller may pay with any valid combination of ready eddies/legends
+ * totalling the same cost (Task 5 brief). So legality for these action types
+ * is checked in two parts: the action *shape* (ignoring `payment`) must match
+ * some entry in `legalActions`, and the *supplied* payment must independently
+ * satisfy `canPayWith` for that action's cost. Every other action type — every
+ * other reaction included — still goes through a plain structural `deepEqual`
+ * against the legal list.
  */
 function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action): boolean {
+  if (action.type === 'react' && action.reaction.type === 'callLegend') {
+    const shapeMatches = legal.some(
+      (candidate) => candidate.type === 'react' && candidate.reaction.type === 'callLegend'
+    )
+    if (!shapeMatches) return false
+    // The payer is the defender, not the active player (guide p11: Call a
+    // Legend is one of the attacked Rival's reactions).
+    return canPayWith(state, actingPlayer(state), action.reaction.payment, CALL_A_LEGEND_COST)
+  }
+
   if (action.type === 'playCard') {
     const shapeMatches = legal.some(
       (candidate) =>
@@ -230,11 +242,13 @@ function playCard(
 
 /**
  * Call a Legend (guide p10/p11/glossary; docs/rulings.md §23): spend 1 €$,
- * then flip a uniformly random face-down legend of the acting player's own
- * face up, via the seeded RNG so the choice is deterministic and replayable.
+ * then flip a uniformly random face-down legend of `player`'s own face up, via
+ * the seeded RNG so the choice is deterministic and replayable. `player` is
+ * the active player in the main phase and the *defender* when this runs as a
+ * reaction (guide p11), and the once-per-turn gate is the same
+ * `calledLegendThisTurn` flag either way (docs/rulings.md §26).
  */
-function callLegend(draft: GameState, payment: number[]): void {
-  const player = draft.activePlayer
+function callLegend(draft: GameState, player: PlayerId, payment: number[]): void {
   const p = draft.players[player]
   pay(draft, payment)
 
@@ -245,6 +259,34 @@ function callLegend(draft: GameState, payment: number[]): void {
   draft.cards[target].faceUp = true
   p.calledLegendThisTurn = true
   draft.events.push({ type: 'legendCalled', player, uid: target })
+}
+
+/**
+ * A reaction inside the react window (guide p10 step 03 / p11). The window
+ * stays open across every reaction that does not resolve the attack, so the
+ * defender may take "any number of these reactions" before deciding:
+ *   * `pass`  — closes the window; the attack resolves (fight or steal);
+ *   * `block` — spends the blocker, redirects, and resolves at once, because a
+ *               redirected direct attack steals nothing (docs/rulings.md §27);
+ *   * `callLegend` — flips a legend and leaves the window open.
+ * `quick` / `quickAbility` arrive in Task 7; `legalActions` never offers them
+ * yet, so they are unreachable here.
+ */
+function react(draft: GameState, db: CardDb, reaction: Reaction): void {
+  switch (reaction.type) {
+    case 'pass':
+      resolveAttack(draft, db)
+      break
+    case 'block':
+      blockAttack(draft, db, reaction.blocker)
+      break
+    case 'callLegend':
+      callLegend(draft, opponentOf(draft.activePlayer), reaction.payment)
+      break
+    case 'quick':
+    case 'quickAbility':
+      throw new IllegalActionError(`Reaction "${reaction.type}" is not implemented yet.`)
+  }
 }
 
 /** Pass the turn; the rival's start-of-turn sequence runs immediately. */
@@ -293,15 +335,23 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
       playCard(draft, db, action.card, action.payment, action.targets)
       break
     case 'callLegend':
-      callLegend(draft, action.payment)
+      callLegend(draft, draft.activePlayer, action.payment)
+      break
+    case 'attack':
+      declareAttack(draft, action.attacker, action.target)
+      break
+    case 'react':
+      react(draft, db, action.reaction)
+      break
+    case 'chooseGig':
+      takeStolenGig(draft, action.dieIndex)
       break
     case 'endTurn':
       endTurn(draft)
       break
     default:
-      // activateAbility / attack / chooseGig / react arrive in Tasks 6-7.
-      // They are never legal yet, so this is only reachable if legalActions
-      // and this switch disagree.
+      // activateAbility arrives in Task 7. It is never legal yet, so this is
+      // only reachable if legalActions and this switch disagree.
       throw new IllegalActionError(`Action type "${action.type}" is not implemented yet.`)
   }
 
