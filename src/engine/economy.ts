@@ -31,9 +31,11 @@ export function canPayWith(
   state: GameState,
   player: PlayerId,
   payment: number[],
-  cost: number
+  cost: number,
+  exclude?: number
 ): boolean {
   if (payment.length !== cost) return false
+  if (exclude !== undefined && payment.includes(exclude)) return false
   const eligible = new Set(readyPaymentUids(state, player))
   const seen = new Set<number>()
   for (const uid of payment) {
@@ -48,17 +50,19 @@ export function canPayWith(
  * The payment `legalActions` offers for a given cost: ready eddies first (in
  * zone order), then ready legends left-to-right (index 0 = leftmost, per
  * game.ts's zone-order convention), taking only as many uids as `cost`
- * needs. Returns null if the player cannot afford `cost` at all.
+ * needs. Returns null if the player cannot afford `cost` at all. `exclude`
+ * bars one uid from paying — see `canPayWith`.
  */
 export function canonicalPayment(
   state: GameState,
   player: PlayerId,
-  cost: number
+  cost: number,
+  exclude?: number
 ): number[] | null {
   const p = state.players[player]
   const readyEddies = p.eddies.filter((uid) => state.cards[uid].ready)
   const readyLegends = p.legends.filter((uid) => state.cards[uid].ready)
-  const combined = [...readyEddies, ...readyLegends]
+  const combined = [...readyEddies, ...readyLegends].filter((uid) => uid !== exclude)
   if (combined.length < cost) return null
   return combined.slice(0, cost)
 }

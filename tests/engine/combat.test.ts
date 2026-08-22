@@ -70,6 +70,7 @@ function putUnit(state: GameState, player: PlayerId, defId: string, opts: UnitOp
     faceUp: true,
     attachedGear: [],
     tempPower: opts.tempPower ?? 0,
+    permPower: 0,
   }
   state.players[player].field.push(uid)
   return uid
@@ -87,6 +88,7 @@ function attachGear(state: GameState, player: PlayerId, defId: string, host: num
     faceUp: true,
     attachedGear: [],
     tempPower: 0,
+    permPower: 0,
   }
   state.cards[host].attachedGear.push(uid)
   return uid
@@ -822,20 +824,35 @@ describe('the react window', () => {
     expect(resolved.players[1].trash).toContain(target)
   })
 
-  it('offers no quick / quickAbility reactions yet (Task 7)', () => {
+  it('offers pass + callLegend only, until a {quick} card gives the defender more (Task 7)', () => {
     const s = base()
     const attacker = putUnit(s, 0, 'psycho-squad')
     s.players[1].gigArea = dice(6)
-    // Put a {quick} card in the defender's hand to be sure it is not offered.
-    const quickUid = s.players[1].deck.find((u) => db[s.cards[u].defId].keywords.includes('quick'))
-    if (quickUid !== undefined) {
-      s.players[1].deck = s.players[1].deck.filter((u) => u !== quickUid)
-      s.players[1].hand.push(quickUid)
-    }
 
-    const reactions = reactionOptions(declare(s, attacker, 'gigArea'))
-    expect(reactions.some((r) => r.type === 'quick' || r.type === 'quickAbility')).toBe(false)
-    expect(reactions.map((r) => r.type).sort()).toEqual(['callLegend', 'pass'])
+    const bare = reactionOptions(declare(s, attacker, 'gigArea'))
+    expect(bare.some((r) => r.type === 'quick' || r.type === 'quickAbility')).toBe(false)
+    expect(bare.map((r) => r.type).sort()).toEqual(['callLegend', 'pass'])
+
+    // `floor-it` is a cost-1 {quick} Program; the defender's ready legends can
+    // pay for it, so it shows up as a `quick` reaction (Task 7, effects.test.ts
+    // covers the mechanics).
+    const withQuick = structuredClone(s)
+    const quickUid = withQuick.nextUid++
+    withQuick.cards[quickUid] = {
+      uid: quickUid,
+      defId: 'floor-it',
+      owner: 1,
+      ready: true,
+      lag: false,
+      faceUp: true,
+      attachedGear: [],
+      tempPower: 0,
+      permPower: 0,
+    }
+    withQuick.players[1].hand.push(quickUid)
+
+    const reactions = reactionOptions(declare(withQuick, attacker, 'gigArea'))
+    expect(reactions.some((r) => r.type === 'quick' && r.card === quickUid)).toBe(true)
   })
 
   it('is closed to the attacker: only react actions, chosen by the defender, are legal', () => {

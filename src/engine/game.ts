@@ -58,7 +58,17 @@ interface Built {
 }
 
 function makeInstance(uid: number, defId: string, owner: PlayerId, faceUp: boolean): CardInstance {
-  return { uid, defId, owner, ready: true, lag: false, faceUp, attachedGear: [], tempPower: 0 }
+  return {
+    uid,
+    defId,
+    owner,
+    ready: true,
+    lag: false,
+    faceUp,
+    attachedGear: [],
+    tempPower: 0,
+    permPower: 0,
+  }
 }
 
 /**
@@ -127,6 +137,7 @@ export function newGame(db: CardDb, config: NewGameConfig): GameState {
       legends: shuffledLegends,
       eddies: [],
       trash: [],
+      removed: [],
       gigArea: [],
       fixer: freshFixer(),
       soldThisTurn: false,
@@ -173,6 +184,7 @@ function clonePlayer(player: PlayerState): PlayerState {
     legends: player.legends.slice(),
     eddies: player.eddies.slice(),
     trash: player.trash.slice(),
+    removed: player.removed.slice(),
     gigArea: player.gigArea.map((die) => ({ ...die })),
     fixer: player.fixer.map((die) => ({ ...die })),
   }
@@ -247,7 +259,22 @@ function readySpentCards(draft: GameState, player: PlayerId, turnNumber: number)
 }
 
 /**
- * Clears the once-per-turn flags and the until-end-of-turn card state.
+ * Clears every card's until-end-of-turn power buff, for BOTH players, at the
+ * end of the game turn (docs/rulings.md §20). "Until end of turn" on card text
+ * means the ongoing *game* turn: a buff a defender grants during a react window
+ * must not survive into that defender's own next turn, which is what clearing
+ * `tempPower` at the owner's turn start would do. `permPower` (duration
+ * 'permanent') is deliberately untouched.
+ */
+export function clearTurnBuffs(draft: GameState): void {
+  for (const key of Object.keys(draft.cards)) {
+    draft.cards[Number(key)].tempPower = 0
+  }
+}
+
+/**
+ * Clears the once-per-turn flags and the lag of the player whose turn is
+ * starting.
  *
  * The two once-per-turn flags have deliberately different scopes, because the
  * actions they gate do (docs/rulings.md §26):
@@ -274,7 +301,6 @@ function resetTurnState(draft: GameState, player: PlayerId): void {
     const card = draft.cards[Number(key)]
     if (card.owner !== player) continue
     card.lag = false
-    card.tempPower = 0
   }
 }
 
@@ -285,7 +311,8 @@ function resetTurnState(draft: GameState, player: PlayerId): void {
  *      happens (guide p3/p4: "at the start of their turn ... before taking one
  *      from the fixer area");
  *   2. ready spent cards;
- *   3. clear per-turn flags, lag and temporary power;
+ *   3. clear per-turn flags and lag (turn buffs are cleared by `endTurn`
+ *      instead — see `clearTurnBuffs` and docs/rulings.md §20);
  *   4. draw 1 (empty deck = immediate loss);
  *   5. gain a gig — needs a `chooseGigDie` decision, so the turn stops in the
  *      `start` phase; when the fixer is empty (from turn 7 on) it goes

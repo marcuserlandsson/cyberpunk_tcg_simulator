@@ -15,8 +15,7 @@
 // mutates combat state only through the functions exported here. Nothing here
 // imports legal.ts or reduce.ts, so there is no import cycle.
 //
-// TRIGGER SEAMS for Task 7 (card effects) — three, each marked
-// `[trigger seam]` in the code below:
+// TRIGGER SEAMS (wired in Task 7, each marked `[trigger seam]` below):
 //   * on-attack, in `declareAttack`, after the attacker is spent and before
 //     the react window opens (guide step 01: "Spend the attacking Unit.
 //     Resolve any [on-attack] effects on the Unit.");
@@ -24,11 +23,13 @@
 //     (guide step 04: "Move defeated Units to the trash and resolve any
 //     [on-defeat] effects on them.");
 //   * quick / quickAbility reactions, in `reactActions` — the react window
-//     already stays open across every non-resolving reaction, so Task 7 adds
-//     the entries here and their handlers in reduce.ts and nothing else.
+//     already stays open across every non-resolving reaction.
+// The card layer (src/cards/effects.ts) is imported for those three; see the
+// import-cycle note at the top of that file.
 
+import { fireTriggerOnDraft, quickReactionActions } from '../cards/effects'
 import { legendCallPayment } from './economy'
-import { effectivePower, opponentOf } from './query'
+import { cantAttack, effectivePower, hasKeyword, opponentOf } from './query'
 import type { Action, CardDb, GameState, PlayerId } from './types'
 
 /** Keyword: "this Unit can attack the turn it's played" (docs/rulings.md §2). */
@@ -59,13 +60,17 @@ export function stealCount(power: number): number {
  * READY) and "Units with Lag can't attack" (glossary LAG) — except Units with
  * {adrenaline}, which "can attack the turn they're played" and so ignore Lag.
  * Being spent is never ignorable: a spent card "can't be spent again until it
- * readies" (glossary SPEND), and attacking spends the attacker.
+ * readies" (glossary SPEND), and attacking spends the attacker. A static
+ * `cantAttack` effect ("This Unit can't attack", e.g. corpo-security) vetoes
+ * everything (docs/rulings.md §35), and {adrenaline} may be printed on the Unit
+ * *or* granted by its Gear (docs/rulings.md §30).
  */
 function canAttack(db: CardDb, state: GameState, uid: number): boolean {
   const card = state.cards[uid]
   if (!card.ready) return false
+  if (cantAttack(db, state, uid)) return false
   if (!card.lag) return true
-  return db[card.defId].keywords.includes(ADRENALINE)
+  return hasKeyword(db, state, uid, ADRENALINE)
 }
 
 /**
@@ -103,9 +108,10 @@ export function attackActions(db: CardDb, state: GameState): Action[] {
  *
  * `block` needs no payment — the cost of blocking is the blocker itself being
  * spent (guide p11: "Spend a Unit with the {blocker} keyword"). Only field
- * Units are considered, so a Gear card that happens to carry the {blocker}
- * classification tag (e.g. `mandibular-upgrade`) can never block by itself;
- * whether equipped Gear *grants* the keyword to its host is Task 7's call.
+ * Units are considered, so a Gear card that carries {blocker}
+ * (`mandibular-upgrade`, `riot-shield`) can never block by itself — it grants
+ * the keyword to the Unit or Legend wearing it instead (docs/rulings.md §30),
+ * which is why the test below is `hasKeyword`, not the printed keyword list.
  */
 export function reactActions(db: CardDb, state: GameState): Action[] {
   const defender = opponentOf(state.activePlayer)
@@ -115,14 +121,15 @@ export function reactActions(db: CardDb, state: GameState): Action[] {
   for (const uid of p.field) {
     const card = state.cards[uid]
     if (!card.ready) continue
-    if (!db[card.defId].keywords.includes(BLOCKER)) continue
+    if (!hasKeyword(db, state, uid, BLOCKER)) continue
     actions.push({ type: 'react', reaction: { type: 'block', blocker: uid } })
   }
 
   const payment = legendCallPayment(state, defender)
   if (payment !== null) actions.push({ type: 'react', reaction: { type: 'callLegend', payment } })
 
-  // [trigger seam] Task 7 adds `quick` / `quickAbility` reactions here.
+  // [trigger seam] {quick} programs from hand and {quick} activated abilities.
+  actions.push(...quickReactionActions(db, state, defender))
   return actions
 }
 
@@ -165,40 +172,82 @@ function endAttack(draft: GameState): void {
  */
 export function declareAttack(
   draft: GameState,
+  db: CardDb,
   attacker: number,
   target: number | 'gigArea'
 ): void {
   draft.cards[attacker].ready = false
   draft.events.push({ type: 'attackDeclared', attacker, target })
 
-  // [trigger seam] Task 7: on-attack effects on the attacking Unit resolve
-  // here — after it is spent (guide step 01) and before the rival reacts.
+  // [trigger seam] on-attack effects on the attacking Unit resolve here — after
+  // it is spent (guide step 01) and before the rival reacts, so a Unit this
+  // defeats never gets to block (guide: "before your Rival reacts").
+  fireTriggerOnDraft(db, draft, 'onAttack', attacker, [])
 
   draft.pendingAttack = { attacker, target }
   draft.phase = 'react'
 }
 
+/** Where a card goes when it leaves the field. */
+export type FieldExit = 'trash' | 'hand' | 'deckBottom'
+
 /**
- * Moves a defeated Unit and everything equipped to it to the trash (guide
- * p11 step 04). Attached Gear goes to *its own* owner's trash, which matters
- * for the one card that can equip to a rival Unit (docs/rulings.md §8).
+ * Moves a card off the field to `exit`, dropping everything equipped to it
+ * (guide p11 step 04). Details, all shared by every exit route (defeat, bounce,
+ * bottom-deck) so they cannot drift apart:
+ *   * attached Gear goes to *its own* owner's trash, which matters for the one
+ *     card that can equip to a rival Unit (docs/rulings.md §8);
+ *   * power buffs die with the field exit — a bounced Unit replayed later is a
+ *     fresh, unbuffed card (docs/rulings.md §29);
+ *   * a Legend on the field is a {go-solo} Legend, and "if it leaves the field,
+ *     remove it from the game" — whatever the exit (docs/rulings.md §31).
  */
-export function defeatUnit(draft: GameState, uid: number): void {
+export function leaveField(draft: GameState, db: CardDb, uid: number, exit: FieldExit): void {
   const card = draft.cards[uid]
   const owner = draft.players[card.owner]
   owner.field = owner.field.filter((u) => u !== uid)
-  owner.trash.push(uid)
-  draft.events.push({ type: 'unitDefeated', uid })
-  draft.events.push({ type: 'cardTrashed', uid })
 
   const gear = card.attachedGear
   card.attachedGear = []
+  card.tempPower = 0
+  card.permPower = 0
+
+  if (db[card.defId].type === 'legend') {
+    owner.removed.push(uid)
+    draft.events.push({ type: 'cardRemoved', uid })
+  } else {
+    switch (exit) {
+      case 'trash':
+        owner.trash.push(uid)
+        draft.events.push({ type: 'cardTrashed', uid })
+        break
+      case 'hand':
+        owner.hand.push(uid)
+        break
+      case 'deckBottom':
+        owner.deck.push(uid)
+        draft.events.push({ type: 'cardBottomDecked', uid })
+        break
+    }
+  }
+
   for (const gearUid of gear) {
     draft.players[draft.cards[gearUid].owner].trash.push(gearUid)
     draft.events.push({ type: 'cardTrashed', uid: gearUid })
   }
+}
 
-  // [trigger seam] Task 7: on-defeat effects on `uid` resolve here.
+/**
+ * Defeats a Unit: `unitDefeated`, then the field exit to the trash, then its
+ * on-defeat effects.
+ */
+export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
+  draft.events.push({ type: 'unitDefeated', uid })
+  leaveField(draft, db, uid, 'trash')
+
+  // [trigger seam] on-defeat effects resolve once the Unit and its Gear have
+  // left the field (guide step 04).
+  fireTriggerOnDraft(db, draft, 'onDefeat', uid, [])
 }
 
 /**
@@ -214,7 +263,12 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   const defeated: number[] = []
   if (attackPower >= defendPower) defeated.push(defender)
   if (defendPower >= attackPower) defeated.push(attacker)
-  for (const uid of defeated) defeatUnit(draft, uid)
+  for (const uid of defeated) {
+    // An on-defeat effect from the first casualty could already have removed
+    // the second one from the field; never defeat a card twice.
+    if (!onField(draft, uid)) continue
+    defeatUnit(draft, db, uid)
+  }
 }
 
 /**

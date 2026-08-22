@@ -42,6 +42,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
     z.strictObject({ kind: z.literal('gainEddieFromTopDeck'), count: z.number() }),
     z.strictObject({ kind: z.literal('sequence'), effects: z.array(effectNodeSchema) }),
     z.strictObject({ kind: z.literal('scripted'), name: z.string() }),
+    z.strictObject({ kind: z.literal('cantAttack') }),
   ])
 )
 

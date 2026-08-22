@@ -3,17 +3,19 @@
 // authority on legality — reducers may assume their action was legal.
 //
 // Task 4 scope: setup decisions, the gig-die choice and `endTurn`. Task 5
-// adds sellCard/playCard/callLegend for the main phase (vanilla cards only —
-// effects/targeting for effects arrive in Task 7). Task 6 adds combat: the
+// adds sellCard/playCard/callLegend for the main phase. Task 6 adds combat: the
 // `attack` entries of the main phase and the whole of the `react` and
-// `chooseGig` windows, all enumerated by combat.ts. Card effects
-// (activateAbility, and the `quick`/`quickAbility` reactions) are still out of
-// scope; until Task 7 lands they are never emitted, so `applyAction` rejects
-// them.
+// `chooseGig` windows, all enumerated by combat.ts. Task 7 adds the effect
+// system's decisions: per-effect target tuples on `playCard`, `activateAbility`,
+// {go-solo} Legend plays, and (via combat.ts's `reactActions`) the
+// `quick`/`quickAbility` reactions. Enumerating those is delegated to
+// src/cards/effects.ts + src/cards/targets.ts, which own the effect vocabulary;
+// this file stays the single authority on *which* slices are legal *when*.
 
+import { activatedAbilityActions, goSoloPayment, playCardTargetChoices } from '../cards/effects'
 import { attackActions, chooseGigActions, reactActions } from './combat'
 import { canonicalPayment, legendCallPayment } from './economy'
-import type { Action, CardDb, DieSize, GameState, PlayerId } from './types'
+import type { Action, CardDb, DieSize, GameState } from './types'
 
 const D20: DieSize = 20
 
@@ -31,29 +33,17 @@ function gigDieChoices(state: GameState): Action[] {
 }
 
 /**
- * Legal gear-equip targets: a friendly field Unit (any readiness) or a
- * friendly face-up Legend. Every one of the 141-card pool's gear reminder
- * lines reads "friendly Unit or face-up Legend" (docs/rulings.md §8 is the
- * sole, narrower, exception on the *Unit* side only — its own Legend clause
- * still says "friendly face-up Legend" — so this generic, card-text-blind
- * rule is exactly right for every vanilla gear card in this task's scope;
- * per-card overrides, if ever needed, are Task 7/8's concern). Legends stay
- * ineligible while face-down: nothing can be equipped to a hidden identity.
- */
-function friendlyGearTargets(state: GameState, player: PlayerId): number[] {
-  const p = state.players[player]
-  const faceUpLegends = p.legends.filter((uid) => state.cards[uid].faceUp)
-  return [...p.field, ...faceUpLegends]
-}
-
-/**
  * Main-phase actions: the Task 5 economy ones — sell (once/turn, sellTag
- * cards only), play (one entry per affordable hand card, with one entry per
- * legal target for gear instead of a single targets:[] entry), and call a
- * legend (once/turn, 1 €$, only while a face-down legend remains) — plus
- * Task 6's attacks (combat.ts). Each entry's `payment` is the *canonical*
- * payment (see economy.ts); `applyAction` accepts any payment satisfying
- * `canPayWith`, not just this one.
+ * cards only), play (one entry per affordable hand card x legal target tuple),
+ * and call a legend (once/turn, 1 €$, only while a face-down legend remains) —
+ * plus Task 6's attacks (combat.ts) and Task 7's activated abilities and
+ * {go-solo} Legend plays. Each entry's `payment` is the *canonical* payment
+ * (see economy.ts); `applyAction` accepts any payment satisfying `canPayWith`,
+ * not just this one.
+ *
+ * A `playCard` action's `targets` is: the Gear equip target first (Gear only),
+ * then one uid per fillable onPlay target slot (docs/rulings.md §34). Gear with
+ * no legal host produces no entries at all — it may not be played.
  */
 function mainPhaseActions(db: CardDb, state: GameState): Action[] {
   const player = state.activePlayer
@@ -72,19 +62,25 @@ function mainPhaseActions(db: CardDb, state: GameState): Action[] {
     const def = db[state.cards[uid].defId]
     const payment = canonicalPayment(state, player, def.cost)
     if (payment === null) continue
-    if (def.type === 'gear') {
-      for (const target of friendlyGearTargets(state, player)) {
-        actions.push({ type: 'playCard', card: uid, payment, targets: [target] })
-      }
-    } else {
-      // Legends never sit in hand (Task 5 scope excludes go-solo legend
-      // play), so only 'unit' and 'program' reach here.
-      actions.push({ type: 'playCard', card: uid, payment, targets: [] })
+    for (const targets of playCardTargetChoices(db, state, uid)) {
+      actions.push({ type: 'playCard', card: uid, payment, targets })
+    }
+  }
+
+  // {go-solo}: "Pay this Legend's cost to play it as a ready Unit" — a play
+  // from the legends zone, not from hand (docs/rulings.md §31).
+  for (const uid of p.legends) {
+    const payment = goSoloPayment(db, state, player, uid)
+    if (payment === null) continue
+    for (const targets of playCardTargetChoices(db, state, uid)) {
+      actions.push({ type: 'playCard', card: uid, payment, targets })
     }
   }
 
   const legendPayment = legendCallPayment(state, player)
   if (legendPayment !== null) actions.push({ type: 'callLegend', payment: legendPayment })
+
+  actions.push(...activatedAbilityActions(db, state, player))
 
   actions.push(...attackActions(db, state))
 
@@ -113,7 +109,6 @@ export function legalActions(db: CardDb, state: GameState): Action[] {
       return gigDieChoices(state)
 
     case 'main':
-      // Task 7 adds activateAbility here.
       return mainPhaseActions(db, state)
 
     case 'react':

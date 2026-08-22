@@ -13,11 +13,17 @@
 // `chooseGig`) delegate every mechanic to combat.ts and keep only the
 // dispatch here.
 
+import {
+  activateAbilityOnDraft,
+  fireTriggerOnDraft,
+  playCardOnDraft,
+} from '../cards/effects'
 import { blockAttack, declareAttack, resolveAttack, takeStolenGig } from './combat'
 import { CALL_A_LEGEND_COST, canPayWith, pay } from './economy'
 import {
   beginTurn,
   checkOvertimeWin,
+  clearTurnBuffs,
   draftState,
   drawCards,
   endGame,
@@ -60,17 +66,33 @@ function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
- * `playCard`, `callLegend` and the `callLegend` *reaction* carry a `payment`
- * field that `legalActions` fills in with one canonical payment (economy.ts),
- * but the caller may pay with any valid combination of ready eddies/legends
- * totalling the same cost (Task 5 brief). So legality for these action types
- * is checked in two parts: the action *shape* (ignoring `payment`) must match
- * some entry in `legalActions`, and the *supplied* payment must independently
- * satisfy `canPayWith` for that action's cost. Every other action type — every
- * other reaction included — still goes through a plain structural `deepEqual`
- * against the legal list.
+ * `playCard`, `callLegend`, the `callLegend` reaction and the `quick` reaction
+ * carry a `payment` field that `legalActions` fills in with one canonical
+ * payment (economy.ts), but the caller may pay with any valid combination of
+ * ready eddies/legends totalling the same cost (Task 5 brief). So legality for
+ * these action types is checked in two parts: the action *shape* (ignoring
+ * `payment`) must match some entry in `legalActions`, and the *supplied*
+ * payment must independently satisfy `canPayWith` for that action's cost. Every
+ * other action type — `activateAbility` included, whose €$ cost the engine pays
+ * from the canonical payment because the action carries none — still goes
+ * through a plain structural `deepEqual` against the legal list.
  */
 function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action): boolean {
+  if (action.type === 'react' && action.reaction.type === 'quick') {
+    const reaction = action.reaction
+    const shapeMatches = legal.some(
+      (candidate) =>
+        candidate.type === 'react' &&
+        candidate.reaction.type === 'quick' &&
+        candidate.reaction.card === reaction.card &&
+        deepEqual(candidate.reaction.targets, reaction.targets)
+    )
+    if (!shapeMatches) return false
+    // The payer is the defender, not the active player.
+    const cost = db[state.cards[reaction.card].defId].cost
+    return canPayWith(state, actingPlayer(state), reaction.payment, cost)
+  }
+
   if (action.type === 'react' && action.reaction.type === 'callLegend') {
     const shapeMatches = legal.some(
       (candidate) => candidate.type === 'react' && candidate.reaction.type === 'callLegend'
@@ -89,8 +111,10 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
         deepEqual(candidate.targets, action.targets)
     )
     if (!shapeMatches) return false
-    const cost = db[state.cards[action.card].defId].cost
-    return canPayWith(state, state.activePlayer, action.payment, cost)
+    const def = db[state.cards[action.card].defId]
+    // A {go-solo} Legend can never help pay its own cost (docs/rulings.md §31).
+    const exclude = def.type === 'legend' ? action.card : undefined
+    return canPayWith(state, state.activePlayer, action.payment, def.cost, exclude)
   }
 
   if (action.type === 'callLegend') {
@@ -198,11 +222,11 @@ function sellCard(draft: GameState, cardUid: number): void {
 }
 
 /**
- * Play (guide p10/p7; Task 5 scope is vanilla cards only — no on-play
- * effects yet, and legends never reach this handler since they can't be in
- * hand). Units enter the field ready with Lag; Programs resolve (nothing to
- * resolve yet) and go straight to the trash; Gear is equipped to the chosen
- * target (already validated as legal by `legalActions`/`isLegal`).
+ * Play (guide p10/p7). The mechanics — where the card goes, in what state, and
+ * firing its onPlay effects — live in `playCardOnDraft` (src/cards/effects.ts)
+ * so the main-phase action and the {quick} reaction share one implementation.
+ * A Legend reaching here is a {go-solo} play from the legends zone
+ * (docs/rulings.md §31).
  */
 function playCard(
   draft: GameState,
@@ -211,33 +235,23 @@ function playCard(
   payment: number[],
   targets: number[]
 ): void {
-  const player = draft.activePlayer
-  const p = draft.players[player]
-  const card = draft.cards[cardUid]
-  const def = db[card.defId]
+  playCardOnDraft(db, draft, draft.activePlayer, cardUid, payment, targets)
+}
 
-  p.hand = p.hand.filter((uid) => uid !== cardUid)
-  pay(draft, payment)
-  draft.events.push({ type: 'cardPlayed', player, uid: cardUid })
-
-  switch (def.type) {
-    case 'unit':
-      card.ready = true
-      card.lag = true
-      p.field.push(cardUid)
-      break
-    case 'program':
-      p.trash.push(cardUid)
-      draft.events.push({ type: 'cardTrashed', uid: cardUid })
-      break
-    case 'gear':
-      draft.cards[targets[0]].attachedGear.push(cardUid)
-      break
-    case 'legend':
-      // Unreachable in this task: legends never sit in hand (go-solo play is
-      // Task 7 scope).
-      break
-  }
+/**
+ * Activate an ability (guide's {Spend}/€$ ability costs). The action carries no
+ * `payment`, so the engine spends the source (for a `selfSpend` cost) and pays
+ * any €$ from the canonical payment — see `activateAbilityOnDraft`.
+ */
+function activateAbility(
+  draft: GameState,
+  db: CardDb,
+  player: PlayerId,
+  cardUid: number,
+  abilityIndex: number,
+  targets: number[]
+): void {
+  activateAbilityOnDraft(db, draft, player, cardUid, abilityIndex, targets)
 }
 
 /**
@@ -248,7 +262,7 @@ function playCard(
  * reaction (guide p11), and the once-per-turn gate is the same
  * `calledLegendThisTurn` flag either way (docs/rulings.md §26).
  */
-function callLegend(draft: GameState, player: PlayerId, payment: number[]): void {
+function callLegend(draft: GameState, db: CardDb, player: PlayerId, payment: number[]): void {
   const p = draft.players[player]
   pay(draft, payment)
 
@@ -259,6 +273,12 @@ function callLegend(draft: GameState, player: PlayerId, payment: number[]): void
   draft.cards[target].faceUp = true
   p.calledLegendThisTurn = true
   draft.events.push({ type: 'legendCalled', player, uid: target })
+
+  // [trigger] on-call effects resolve as the Legend turns face-up, in the main
+  // phase and in the react window alike. The flip is random, so the action
+  // carries no targets — any the effect needs are auto-chosen
+  // (docs/rulings.md §32).
+  fireTriggerOnDraft(db, draft, 'onCall', target, [])
 }
 
 /**
@@ -268,11 +288,15 @@ function callLegend(draft: GameState, player: PlayerId, payment: number[]): void
  *   * `pass`  — closes the window; the attack resolves (fight or steal);
  *   * `block` — spends the blocker, redirects, and resolves at once, because a
  *               redirected direct attack steals nothing (docs/rulings.md §27);
- *   * `callLegend` — flips a legend and leaves the window open.
- * `quick` / `quickAbility` arrive in Task 7; `legalActions` never offers them
- * yet, so they are unreachable here.
+ *   * `callLegend` — flips a legend and leaves the window open;
+ *   * `quick` — plays a {quick} Program from the defender's hand (paid like any
+ *               other play) and leaves the window open;
+ *   * `quickAbility` — activates a {quick} ability and leaves the window open.
+ * A quick effect may defeat or bounce either combatant; `resolveAttack` already
+ * fizzles an attack whose attacker or target has vanished.
  */
 function react(draft: GameState, db: CardDb, reaction: Reaction): void {
+  const defender = opponentOf(draft.activePlayer)
   switch (reaction.type) {
     case 'pass':
       resolveAttack(draft, db)
@@ -281,18 +305,26 @@ function react(draft: GameState, db: CardDb, reaction: Reaction): void {
       blockAttack(draft, db, reaction.blocker)
       break
     case 'callLegend':
-      callLegend(draft, opponentOf(draft.activePlayer), reaction.payment)
+      callLegend(draft, db, defender, reaction.payment)
       break
     case 'quick':
+      playCardOnDraft(db, draft, defender, reaction.card, reaction.payment, reaction.targets)
+      break
     case 'quickAbility':
-      throw new IllegalActionError(`Reaction "${reaction.type}" is not implemented yet.`)
+      activateAbility(draft, db, defender, reaction.card, reaction.abilityIndex, reaction.targets)
+      break
   }
 }
 
-/** Pass the turn; the rival's start-of-turn sequence runs immediately. */
+/**
+ * Pass the turn: clear every until-end-of-turn buff (both players — the buff
+ * lasts to the end of the *game* turn, docs/rulings.md §20), then the rival's
+ * start-of-turn sequence runs immediately.
+ */
 function endTurn(draft: GameState): void {
   const player = draft.activePlayer
   draft.events.push({ type: 'turnEnded', player })
+  clearTurnBuffs(draft)
   const next = opponentOf(player)
   // turnNumber counts each player's own turns and advances when the first
   // player begins a turn — see the comment at the top of game.ts.
@@ -335,10 +367,20 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
       playCard(draft, db, action.card, action.payment, action.targets)
       break
     case 'callLegend':
-      callLegend(draft, draft.activePlayer, action.payment)
+      callLegend(draft, db, draft.activePlayer, action.payment)
+      break
+    case 'activateAbility':
+      activateAbility(
+        draft,
+        db,
+        draft.activePlayer,
+        action.card,
+        action.abilityIndex,
+        action.targets
+      )
       break
     case 'attack':
-      declareAttack(draft, action.attacker, action.target)
+      declareAttack(draft, db, action.attacker, action.target)
       break
     case 'react':
       react(draft, db, action.reaction)
@@ -349,10 +391,6 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
     case 'endTurn':
       endTurn(draft)
       break
-    default:
-      // activateAbility arrives in Task 7. It is never legal yet, so this is
-      // only reachable if legalActions and this switch disagree.
-      throw new IllegalActionError(`Action type "${action.type}" is not implemented yet.`)
   }
 
   checkOvertimeWin(draft)

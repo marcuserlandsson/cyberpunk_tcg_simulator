@@ -47,6 +47,9 @@ export type EffectNode =
   | { kind: 'gainEddieFromTopDeck'; count: number }
   | { kind: 'sequence'; effects: EffectNode[] }
   | { kind: 'scripted'; name: string }
+  // Static restriction: "This Unit can't attack" (e.g. corpo-security,
+  // misty-olszewski-...). Only meaningful with `trigger: 'static'`.
+  | { kind: 'cantAttack' }
 
 export interface EffectDef {
   trigger: Trigger
@@ -96,7 +99,12 @@ export interface CardInstance {
   lag: boolean
   faceUp: boolean // faceUp for legends/eddies; true otherwise
   attachedGear: number[]
-  tempPower: number // until-end-of-turn power delta
+  // Until-end-of-turn power delta. Cleared for EVERY card of BOTH players when
+  // the game turn ends (docs/rulings.md §20), not at the owner's next turn.
+  tempPower: number
+  // Power delta that outlives the turn (`buffPower` with duration
+  // 'permanent'). Both deltas are wiped when the card leaves the field.
+  permPower: number
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +118,9 @@ export interface PlayerState {
   legends: number[] // order preserved, index 0 = leftmost
   eddies: number[]
   trash: number[]
+  // Removed from the game: a {go-solo} Legend that left the field goes here
+  // instead of the trash and can never come back (docs/rulings.md §31).
+  removed: number[]
   gigArea: GigDie[]
   fixer: GigDie[]
   soldThisTurn: boolean
@@ -181,5 +192,7 @@ export type GameEvent =
   | { type: 'effectResolved'; sourceUid: number; description: string }
   | { type: 'cardTrashed'; uid: number }
   | { type: 'cardBottomDecked'; uid: number }
+  | { type: 'cardRemoved'; uid: number }
+  | { type: 'abilityActivated'; player: PlayerId; uid: number; abilityIndex: number }
   | { type: 'turnEnded'; player: PlayerId }
   | { type: 'gameEnded'; winner: PlayerId; reason: 'sevenGigs' | 'overtimeMajority' | 'deckout' | 'concede' }

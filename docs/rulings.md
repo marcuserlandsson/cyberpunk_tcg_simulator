@@ -397,22 +397,37 @@ on turns 1-6) the sequence skips straight to `main` and no die is gained. The
 engine keys this off `fixer.length === 0`, not off a turn number, so future
 effects that return dice to a fixer behave sensibly.
 
-## 20 — Known simplification: `lag` and `tempPower` clear at the *owner's* next turn start
+## 20 — `lag` clears at the owner's next turn start; turn buffs clear at the end of the game turn
+
+**Settled in Task 7** (this section supersedes the Task-4 simplification it
+originally described).
 
 The guide says lag and until-end-of-turn effects last "until the end of the
-turn". The engine clears `lag` and `tempPower` on a player's own cards during
-that player's start-of-turn sequence instead.
+turn". Those two are cleared in two different places, on purpose:
 
-For `lag` this is exactly equivalent: lag only ever gates the owner's own
-attacks and self-spend costs, which can only happen on the owner's turn.
+- `lag` is cleared in the start-of-turn sequence (`game.ts`'s
+  `resetTurnState`), on the starting player's own cards. This is exactly
+  equivalent to clearing it at end of turn: lag only ever gates the owner's own
+  attacks and self-spend costs, which can only happen on the owner's turn.
+- `tempPower` (`buffPower` with `duration: 'turn'`) is cleared in `endTurn`
+  (`game.ts`'s `clearTurnBuffs`), for **every card of both players**, before the
+  next player's turn begins.
 
-For `tempPower` it is a **real, deliberate deviation**: a +X/turn buff granted
-on your turn currently persists through your rival's turn (so it applies while
-your unit defends) and is only cleared when your next turn begins. The task-4
-brief specifies this ordering explicitly, and no card in the skeleton can grant
-`tempPower` yet. Flagged for Task 7 (effects): if buff timing matters there,
-move the `tempPower` clear into `endTurn` (clearing *all* cards) and keep the
-`lag` clear where it is.
+**Ruling:** "until end of turn" on card text means the ongoing *game* turn, not
+"until the buffed card's controller starts their next turn". Task 4 deliberately
+deferred this; Task 7 needed it settled because effects can now buff during a
+react window. Clearing `tempPower` at the owner's own turn start would mean a
+buff a *defender* grants itself while blocking survives that defender's entire
+next turn — a full extra turn of value the card never promised. Clearing at the
+end of the turn gives the natural reading: the buff wins the fight it was played
+for and is gone when the turn ends.
+
+`permPower` (`buffPower` with `duration: 'permanent'`) is deliberately untouched
+by both clears. Both deltas are wiped when a card leaves the field (see §29),
+so a bounced and replayed Unit is a fresh card.
+
+Tested in `tests/engine/effects.test.ts` ("tempPower lifetime", plus the
+react-window buff that wins the current fight and is gone next turn).
 
 ---
 
@@ -456,12 +471,10 @@ widens the *Unit* side, to "any Unit" instead of "friendly Unit" — its Legend
 clause is unchanged, still face-up-only). A face-down Legend has no revealed
 identity to equip anything to, which matches this being unanimous across the
 whole pool rather than a per-card effect. `kiroshi-optics`'s wider Unit-side
-exception is out of this task's "vanilla" scope (it needs a target spec wider
-than `friendlyUnitOrLegend`, i.e. any Unit, friendly or rival) and is left for
-Task 7/8's per-card effect/target parsing; until then it is playable like any
-other gear card, just with a narrower-than-printed target set (friendly
-Unit/face-up Legend only) rather than a wider one — an under- rather than
-over-approximation of legality.
+exception was out of Task 5's "vanilla" scope and is **settled in Task 7**: it
+is registered in `src/cards/targets.ts`'s `gearTargetOverrides` and may equip to
+any Unit, friendly or rival (§34). The generic rule in this section is unchanged
+for the other 16 gear cards.
 
 ## 23 — Call a Legend's random flip draws only from the acting player's own legends, uniformly
 
@@ -611,13 +624,204 @@ price of *declaring*, not of succeeding. Consequences worth naming:
   `goro-takemura-hands-unclean` and `goro-takemura-vengeful-bodyguard`. The
   engine only ever scans the defender's `field`, so none of the four can block
   on its own today: Gear sits in `attachedGear`, and a Legend sits in the
-  `legends` zone (a Go-Solo Legend played as a Unit *would* be on the field —
-  Task 7). Whether equipped Gear *grants* {blocker} (and other keywords) to its
-  host is likewise Task 7's call; today's answer is no, consistent with Gear
-  power bonuses also not applying yet (`query.ts`'s `effectivePower`).
+  `legends` zone. **Updated by Task 7:** a Go-Solo Legend played as a Unit *is*
+  on the field and blocks like any other Unit (§31), and equipped Gear now
+  *grants* {blocker} (and its other keywords) to its host (§30), so a Unit
+  wearing `riot-shield` or `mandibular-upgrade` can block — the Gear card itself
+  still never can.
 
 A related consequence of the phase machine, and of "Each Unit attacks
 individually, and completes all the attacking steps before another Unit can
 attack" (p10): no second attack, and no other main-phase action, is legal until
 the current attack has fully resolved, because `legalActions` returns only
 reactions in `react` and only `chooseGig` entries in `chooseGig`.
+
+---
+
+# Task 7 rulings (effect system, triggers, keywords, activated abilities)
+
+## 29 — A Gear card's printed power is the bonus it hands its host, and buffs die with a field exit
+
+Gear cards print a power box (0-4) but never fight on their own — they sit in
+`CardInstance.attachedGear`. Every gear card's power line only makes sense as
+the bonus it grants: `mandibular-upgrade` prints power **0** and grants only
+{blocker}, while `gorilla-arms` prints **3**.
+
+**Ruling:** `query.ts`'s `effectivePower` adds each attached Gear card's
+*printed* power to its host, on top of the host's own printed power,
+`tempPower`, `permPower` and every active `staticPower` node (the host's own
+static defs while it is in play, plus its Gear's). Task 8 therefore does **not**
+have to restate a gear card's power box as a `staticPower` effect; it adds
+`staticPower` nodes only for *conditional* or non-printed bonuses (e.g. "+2
+power for each equipped Gear").
+
+Two corollaries:
+
+- a card's own `static` defs apply only while it is "in play" — on the field, or
+  a **face-up** Legend in the legends zone. A face-down Legend has no revealed
+  identity, so none of its statics are live;
+- when a card leaves the field by any route (defeat, bounce, bottom-deck) both
+  `tempPower` and `permPower` are reset and its Gear falls off, to the Gear's
+  *own* owner's trash (§8). `combat.ts`'s `leaveField` is the single
+  implementation of that exit, so the three routes cannot drift apart.
+
+Static defs may carry a `condition`, evaluated live: a gated `staticPower`
+contributes only while the condition holds (a Gear card's condition is judged
+from *its own* owner's street cred, which matters for the one card that can
+equip to a rival Unit).
+
+## 30 — A Unit or Legend gains the keywords of its attached Gear — except {go-solo}
+
+Four of the pool's {blocker} cards are not Units (§28): the Gear cards
+`mandibular-upgrade` and `riot-shield`, and two Legends. Gear cannot act by
+itself, so a printed keyword on Gear can only mean one thing.
+
+**Ruling:** the wearer gains its Gear's keywords. `query.ts`'s
+`effectiveKeywords(db, state, uid)` unions the card's printed keywords with
+those of every attached Gear card, and every engine keyword test now goes
+through it (`combat.ts`'s `canAttack` for {adrenaline}, `reactActions` for
+{blocker}) instead of reading `def.keywords` directly. So a Unit wearing
+`riot-shield` can block, and a lagged Unit wearing `adrenaline-converter` can
+attack.
+
+**Exception — {go-solo} is never granted.** It is a property of a Legend card
+itself ("pay *this Legend's* cost to play it as a ready Unit"), and the pool
+contains a data trap: `riot-shield`'s keyword list includes `go-solo` because
+its rules text *mentions* the keyword ("Rivals must pay +2 €$ to use {Go
+Solo}"). Granting it would let a Legend in the legends zone be played as a Unit
+just for wearing a shield. `goSoloPayment` therefore tests the *printed*
+keyword list of the Legend def.
+
+Two known over-approximations, both left for Task 8 to narrow with real card
+data, and neither reachable today because every card in `data/cards.json` still
+has `effects: []`:
+
+- `adrenaline-converter` grants {adrenaline} unconditionally here, though its
+  text gates it on "a Rival controls at least 2 more Gigs than you";
+- `overwatch-panam-s-gift` grants {quick} to its host, which is inert — {quick}
+  is only ever read off a Program in hand or off an activated ability.
+
+## 31 — {go-solo}: a play from the legends zone, face-up and ready, removed from the game on any field exit
+
+Printed reminder: "{Go Solo} (Pay this Legend's cost to play it as a ready Unit.
+It can attack this turn. If it leaves the field, remove it from the game.)" —
+8 of the 141 cards.
+
+**Rulings:**
+
+- **Where from.** A {go-solo} Legend gains a `playCard` entry in `legalActions`
+  from the **legends zone** (never from hand — Legends are never in hand), at
+  its printed cost. On resolution it moves `legends -> field`, `ready = true`,
+  `lag = false`, so it can attack the same turn.
+- **Face-up only.** The Legend must already be face-up. A face-down Legend's
+  identity is unknown even to its controller (guide p10: "Don't peek
+  beforehand, choom!"), so there is no legal way to *choose* to Go Solo one, and
+  no cost the player could know they were paying.
+- **Ready only.** A spent Legend cannot Go Solo. "A spent card can't be spent
+  again until it readies" (glossary SPEND), and this closes an obvious exploit:
+  spend the Legend for 1 €$, then play it as a ready Unit for free value.
+- **It cannot pay for itself.** Legends are worth 1 €$ each when spent, and the
+  Legend being played is (until it moves) a ready Legend in the payment pool.
+  `canonicalPayment`/`canPayWith` take an `exclude` uid for exactly this.
+- **Removed from the game.** A Legend that leaves the field goes to a new
+  per-player zone, `PlayerState.removed`, and emits `cardRemoved` — never the
+  trash, never back to the legends zone. This holds for **every** exit, not just
+  defeat: a bounce or a bottom-deck of a fielded Legend also removes it, because
+  the card says "if it leaves the field". A dedicated zone (rather than a flag,
+  or dropping the uid from every zone) keeps the invariant that every card
+  instance is in exactly one zone, which the UI and state dumps rely on.
+- **Still a Legend for RAM.** RAM/RAM-limit is a deck-construction constraint
+  only (`deck.ts`), so a fielded Legend needs no runtime bookkeeping: it fights
+  as a Unit while on the field and stays a Legend card everywhere else. It is
+  no longer in the legends zone, so while fielded it can neither be flipped by
+  Call a Legend nor spent for €$.
+
+## 32 — Triggered effects auto-target uniformly at random; only *chosen* actions carry targets
+
+`playCard` and `activateAbility` carry a `targets` array that `legalActions`
+enumerates, so a player picks those. The other three triggers fire from actions
+that carry no target field at all: `onCall` (the flip is random), `onAttack`
+(the `attack` action names only attacker and target) and `onDefeat` (nobody
+takes an action at all).
+
+**Ruling:** when an effect needs a target and none was supplied, the interpreter
+draws one **uniformly at random from the legal candidates through `state.rng`**,
+exactly like Call a Legend's random flip (§23). Fizzling instead would silently
+drop half of a card's printed text; a fixed "first candidate" choice would bias
+play in a way replays could not justify. Determinism and replayability are
+preserved because the choice comes off the seeded rng.
+
+Related target rules, all in `src/cards/effects.ts`:
+
+- target slots are bound **once**, before the def's first node runs, so a node
+  that empties the field cannot shift the targets of the nodes after it;
+- a slot with no legal candidate is *skipped*, and only the node that wanted it
+  fizzles — "defeat a rival Unit, then draw 1" still draws against an empty
+  rival field;
+- a supplied target that is no longer legal when the effect resolves fizzles
+  that node rather than throwing;
+- an **activated** ability whose target slot has no candidate is not offered at
+  all — paying a cost for nothing is never a decision worth enumerating;
+- an unknown `scripted` name throws. That is a card-data bug, and card data
+  cannot be schema-checked against the script registry.
+
+This is the one place where a real decision is taken away from the player.
+Nothing is lost today (no card in `data/cards.json` has effects yet), and
+promoting on-attack/on-defeat targets to explicit choices later means adding a
+targets field to those actions, not reworking the interpreter.
+
+## 33 — An ability printed on Gear is activated by the Gear but spends its *host*
+
+`overwatch-panam-s-gift` reads "{Quick} 1 €$, {Spend} Discard 1. ...". The
+`{Spend}` in a Gear card's cost cannot mean the Gear: Gear sits in
+`attachedGear`, is never readied by the start-of-turn sequence, and has no
+meaningful spent state.
+
+**Ruling:** activated abilities are enumerated for the player's field cards,
+their face-up Legends, **and the Gear attached to either**. The action names the
+Gear (`activateAbility.card` = the gear uid) but a `selfSpend` cost tests and
+spends the Gear's **host** — which also means the host's Lag blocks the ability,
+and a host Legend being self-spent cannot also be spent for the €$ half of the
+same cost (`abilityHost` + `canonicalPayment`'s `exclude`).
+
+`abilityIndex` indexes the card def's **`effects` array**, not a filtered list of
+activated abilities, so an index is stable no matter what else the card does.
+A `quick: true` activated ability is offered in *both* the main phase and the
+react window: {quick} adds the react-window timing, it never removes the normal
+one.
+
+## 34 — A `playCard` action's targets are: equip target first, then effect targets
+
+`playCard` needs both kinds of target for a Gear card with an on-play effect.
+
+**Ruling:** `targets[0]` is the Gear equip target (Gear only), and the remaining
+entries are the on-play effect's target slots in resolution order. Units and
+Programs have no equip target, so their `targets` are purely effect targets.
+Gear with no legal host is still unplayable (no entries at all), but a card
+whose *effect* has no legal target stays playable — the effect just fizzles.
+
+Gear equip targets come from `src/cards/targets.ts`'s `gearEquipTargets`, which
+applies the pool-wide rule (§22) unless the card id has an entry in the
+`gearTargetOverrides` registry. `kiroshi-optics` is the sole entry, per §8: its
+printed line scopes "friendly" to the Legend only, so it may equip to **any**
+Unit including a rival's, plus friendly face-up Legends. A per-card registry
+keyed by id was chosen over a new `TargetSpec` or a def-level flag because this
+is one card's printed-text exception, not a vocabulary the data needs.
+(Gear on a rival Unit still goes to its *own* owner's trash when that Unit is
+defeated — §8, §29, and covered by a test.)
+
+## 35 — "This Unit can't attack" is a static `cantAttack` EffectNode
+
+Two cards print it: `corpo-security` and
+`misty-olszewski-mender-of-broken-spirits`. Task 6 could not enforce it (its
+combat legality read only readiness, Lag and {adrenaline}).
+
+**Ruling:** the effect vocabulary gains `{ kind: 'cantAttack' }`, used with
+`trigger: 'static'` (zod schema updated in `cardDb.ts` to match). `combat.ts`'s
+`canAttack` consults `query.ts`'s `cantAttack(db, state, uid)`, which reads the
+same static layer as `staticPower` — so the restriction can also arrive from
+attached Gear, and it can be gated by a `condition`. It vetoes the attack
+outright: {adrenaline} does not override it.
+
+The card data still carries `effects: []` for both cards; Task 8 adds the node,
+and this task's synthetic-card test proves the mechanism.
