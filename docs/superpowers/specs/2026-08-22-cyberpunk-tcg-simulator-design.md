@@ -15,7 +15,7 @@ All downloaded to `docs/rules/`:
 | `print-and-play-arasaka.pdf` | "Embracing Power" demo deck (Arasaka), card images |
 | `print-and-play-mercs.pdf` | "The Heist" demo deck (Mercs), card images |
 
-Additional sources: official card database at https://cyberpunktcg.com/cards (131-card beta set, powered by Netdeck.gg), FAQ at https://cyberpunktcg.com/faq, Beta rule-change notes at https://cyberpunktcg.com/blog/beta-rule-updates.
+Additional sources: official card database at https://cyberpunktcg.com/cards (141-card beta pool, powered by Netdeck.gg), FAQ at https://cyberpunktcg.com/faq, Beta rule-change notes at https://cyberpunktcg.com/blog/beta-rule-updates.
 
 **Rule precedence:** card text > gameplay guide > FAQ > agent ruling (documented in `docs/rulings.md`).
 
@@ -38,7 +38,7 @@ Additional sources: official card database at https://cyberpunktcg.com/cards (13
 | Decision | Choice |
 |---|---|
 | Platform | Local web app (Vite + React + TypeScript), no backend; `npm install && npm run dev` |
-| Card pool | Full 131-card beta set, transcribed from official database + print-and-play PDFs |
+| Card pool | Full beta card pool (141 cards after database reconciliation: 130 core + 10 starter-deck exclusives + 1 promo; see docs/rulings.md), transcribed from official database + print-and-play PDFs |
 | AI | Solid heuristic AI (single difficulty) |
 | Card visuals | Hybrid: HTML-rendered card frames from data (baseline); official images swapped in via settings toggle where fetching succeeded |
 | Extras | Game log + undo, deck save/import/export, playtest stats incl. AI-vs-AI batch simulation |
@@ -55,7 +55,7 @@ cyberpunk_tcg_simulator/
 │   ├── rulings.md             # every agent rules ruling / assumption, auditable
 │   └── superpowers/specs/     # this spec + implementation plan
 ├── data/
-│   ├── cards.json             # all 131 cards: stats, verbatim text, effect definitions
+│   ├── cards.json             # all 141 cards: stats, verbatim text, effect definitions
 │   ├── decks/                 # starter decks (Arasaka, Mercs) + bundled sample decks
 │   └── images/                # fetched official card images (gitignored)
 ├── src/
@@ -121,7 +121,7 @@ Each milestone ends with a green suite and a git commit, so interruption always 
 2. Card transcription pipeline + `cards.json` + double-check passes + `docs/rulings.md` started.
 3. Engine core: zones, setup/mulligan, turn structure, dice/Gigs/Street Cred, economy (sell, Eddies, Legends-as-currency, Call a Legend).
 4. Combat: attacks, React window, Blocker/Quick, fights, Gig stealing, win/loss/Overtime/deck-out.
-5. Effect system + all 131 cards implemented and tested.
+5. Effect system + all 141 cards implemented and tested.
 6. Heuristic AI + strength benchmarks.
 7. Play view UI (full game vs AI, log, undo, save/resume).
 8. Deck Builder view.
@@ -133,7 +133,7 @@ Each milestone ends with a green suite and a git commit, so interruption always 
 ## Success criteria
 
 - A complete game vs the AI is playable in the browser with only official-rules-legal moves possible.
-- All 131 beta cards present, transcription double-checked, effects implemented and individually tested.
+- All 141 beta-pool cards present, transcription double-checked, effects implemented and individually tested.
 - Deck building with RAM validation, import/export.
 - 1,000-game AI-vs-AI simulation completes without crash or invariant violation and produces a stats report.
 - Fresh clone → `npm install && npm run dev` → playing, with README covering the rest.

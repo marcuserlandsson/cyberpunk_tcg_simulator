@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A local web app (Vite + React + TypeScript) implementing WeirdCo's Cyberpunk TCG Beta rules with the full 131-card beta set, a heuristic AI opponent, deck builder, game log/undo, and AI-vs-AI batch simulation.
+**Goal:** A local web app (Vite + React + TypeScript) implementing WeirdCo's Cyberpunk TCG Beta rules with the full 141-card beta pool (130 core + 10 starter-deck exclusives + 1 promo, per database reconciliation in docs/rulings.md), a heuristic AI opponent, deck builder, game log/undo, and AI-vs-AI batch simulation.
 
 **Architecture:** A pure, UI-free TypeScript game engine (immutable state, `legalActions`/`applyAction` reducer, seeded RNG, event sourcing) consumed by three clients: the React UI, the heuristic AI, and a headless simulation runner. Card behavior is data-driven (`data/cards.json` effect definitions interpreted by an effect system) with a scripted-function escape hatch.
 
@@ -29,7 +29,7 @@
 
 ```
 ├── data/
-│   ├── cards.json               # CardDef[] — all 131 cards
+│   ├── cards.json               # CardDef[] — all 141 cards
 │   ├── cards.schema.md          # field-by-field schema doc + effect vocabulary
 │   ├── transcription-report.md  # per-card verification status (pass 1 / pass 2)
 │   └── decks/arasaka-embracing-power.json, mercs-the-heist.json
@@ -197,9 +197,9 @@ The official database https://cyberpunktcg.com/cards lists all 131 beta cards (6
 
 - [ ] **Step 6: Build the two starter deck lists** from the print-and-play PDFs (they show the exact demo deck contents — count copies from the sheets). Save as the two `data/decks/*.json` files.
 
-- [ ] **Step 7: Sanity checks.** Write a throwaway node script (or a permanent test in `tests/engine/cardDb.test.ts`, moved there in Task 3) asserting: exactly 131 unique ids; every card has type/name/text; every non-legend has ram; every legend has ramLimit; deck files reference only existing ids. Fix all failures.
+- [ ] **Step 7: Sanity checks.** Write a throwaway node script (or a permanent test in `tests/engine/cardDb.test.ts`, moved there in Task 3) asserting: exactly 141 unique ids; every card has type/name/text; every non-legend has ram; every legend has ramLimit; deck files reference only existing ids. Fix all failures.
 
-- [ ] **Step 8: Start `docs/rulings.md`** with any ambiguities already encountered (e.g. unclear keyword wording), then commit: `git commit -m "feat: transcribe full 131-card beta set with double-check pass"`
+- [ ] **Step 8: Start `docs/rulings.md`** with any ambiguities already encountered (e.g. unclear keyword wording), then commit: `git commit -m "feat: transcribe full 141-card beta pool (130 core + 10 starter-deck exclusives + 1 promo, per database reconciliation in docs/rulings.md) with double-check pass"`
 
 ---
 
@@ -217,7 +217,7 @@ export type PlayerId = 0 | 1
 export type DieSize = 4 | 6 | 8 | 10 | 12 | 20
 export interface GigDie { size: DieSize; value: number }        // value 0 = unrolled (in fixer)
 export type CardType = 'legend' | 'unit' | 'program' | 'gear'
-export type Keyword = 'rush' | 'quick' | 'blocker' | 'merc' | string // extend during transcription
+export type Keyword = 'adrenaline' | 'quick' | 'blocker' | 'go-solo' | string // 'adrenaline' = attack-turn-played (plan formerly 'rush'); 'go-solo' = play legend as unit (formerly 'merc'); role tags like 'merc','corpo' are inert classification strings
 
 export interface CardDef {
   id: string; name: string; subtitle?: string
@@ -326,7 +326,7 @@ export function deckSize(deck: DeckList): number
 
 - [ ] **Step 1: Write failing RNG tests** — determinism (same seed → same sequence), `rollDie` within 1..size, `shuffle` is a permutation and deterministic, distributions roughly uniform over 10k rolls (each face of a d6 between 1300 and 2000).
 - [ ] **Step 2:** Run `npx vitest run tests/engine/rng.test.ts` — expect FAIL (module missing). Implement mulberry32 in `rng.ts`. Re-run → PASS.
-- [ ] **Step 3: Write failing cardDb tests** — loads 131 cards; every id unique; zod rejects a card missing `type`; every legend has `ramLimit` and null `ram`; every non-legend has `ram`. Implement `cardDb.ts` (import cards.json with `import cards from '../../data/cards.json'`; ensure `resolveJsonModule` in tsconfig). PASS.
+- [ ] **Step 3: Write failing cardDb tests** — loads 141 cards; every id unique; zod rejects a card missing `type`; every legend has `ramLimit` and null `ram`; every non-legend has `ram`. Implement `cardDb.ts` (import cards.json with `import cards from '../../data/cards.json'`; ensure `resolveJsonModule` in tsconfig). PASS.
 - [ ] **Step 4: Write failing deck validation tests** covering every official rule: exactly 3 legends with unique **names** (not ids); 40–50 non-legend cards; ≤3 copies per card; RAM — for each non-legend card, `card.ram.value` ≤ sum of `ramLimit.value` over the deck's legends whose `ramLimit.color === card.ram.color`; unknown ids rejected. Include the worked example from the rules page (2 Green + 2 Green + 2 Red legends → Green ≤ 4, Red ≤ 2) using synthetic defs. Also test both starter decks validate as legal against the real DB (if they don't, investigate transcription before "fixing" validation). Implement `deck.ts`. PASS.
 - [ ] **Step 5: Write the purity test** `tests/engine/purity.test.ts`: recursively read all files under `src/engine`, `src/cards`, `src/ai`, `src/sim` (use `fs` in the test) and assert none match `/from ['"]react|from ['"].*\/ui\//`. PASS trivially now; it guards forever.
 - [ ] **Step 6: Commit** — `git commit -m "feat: engine foundation - types, seeded RNG, card DB, deck validation"`
@@ -413,12 +413,12 @@ Semantics: valid payment uids are ready cards in the payer's `eddies` or `legend
 - Produces: attack flow driven entirely through `applyAction`; `state.pendingAttack` / `state.pendingSteal` as defined in types.ts.
 
 Semantics (guide pages 8–9):
-- `attack` legal in `main` for each ready, non-lag friendly unit (or rush unit played this turn), against each **spent** rival unit and against `'gigArea'` (only if rival gigArea non-empty — attacking an empty gig area is pointless but the guide doesn't forbid it; forbid it and note as ruling). Applying it: spend the attacker, fire on-attack triggers (Task 7), set `pendingAttack`, phase → `react`; `actingPlayer()` = defender.
+- `attack` legal in `main` for each ready, non-lag friendly unit (or adrenaline unit played this turn), against each **spent** rival unit and against `'gigArea'` (only if rival gigArea non-empty — attacking an empty gig area is pointless but the guide doesn't forbid it; forbid it and note as ruling). Applying it: spend the attacker, fire on-attack triggers (Task 7), set `pendingAttack`, phase → `react`; `actingPlayer()` = defender.
 - React window: defender's `legalActions` = `react:pass`, `react:block` per ready Blocker unit (spends it, sets `redirectedTo`), `react:callLegend` (if not used this turn + affordable — flips, may fire on-call triggers, window stays open), `react:quick`/`quickAbility` (Task 7; none yet). Multiple reactions allowed before pass — the window closes only on `pass` (or when a redirect resolves the attack — after a block, resolve immediately: blocked direct attacks steal nothing, guide p9).
 - Resolution on `pass`: target spent unit (or blocker) → fight: compare effectivePower; strictly higher defeats lower; tie → both defeated; defeated units (with attached gear) → trash, fire on-defeat triggers. Target gigArea un-blocked → steal count = `1 + floor(power/10)` (power 0 → 0 steals), capped by rival gigArea size; phase → `chooseGig`, attacker picks dice via `chooseGig` actions (one per die, `pendingSteal.remaining` counts down); each moves the die to attacker's gigArea (`gigStolen` event). Then phase → `main`.
 - Ready units are never legal attack targets. Attacker spent even if the attack is blocked or steals nothing.
 
-- [ ] **Step 1: Write failing tests** — attacker must be ready/non-lag/rush-exempt; legal targets are exactly spent rival units + gigArea; fight higher-power wins, tie mutual, loser+gear to trash; steal thresholds: power 1 → 1 die, 9 → 1, 10 → 2, 20 → 3, 0 → 0; chooseGig moves chosen die and attacker picks each die when stealing multiple; blocker redirect → fight vs blocker and NO steal even on win; blocker must be ready and is spent by blocking; call-a-legend as reaction consumes the once-per-turn call; defender can chain block after call; pass with no reaction resolves; 12-dice conservation across steals; a steal reaching 7 dice does NOT win instantly (win checks at turn start — but overtime majority DOES apply if active).
+- [ ] **Step 1: Write failing tests** — attacker must be ready/non-lag/adrenaline-exempt; legal targets are exactly spent rival units + gigArea; fight higher-power wins, tie mutual, loser+gear to trash; steal thresholds: power 1 → 1 die, 9 → 1, 10 → 2, 20 → 3, 0 → 0; chooseGig moves chosen die and attacker picks each die when stealing multiple; blocker redirect → fight vs blocker and NO steal even on win; blocker must be ready and is spent by blocking; call-a-legend as reaction consumes the once-per-turn call; defender can chain block after call; pass with no reaction resolves; 12-dice conservation across steals; a steal reaching 7 dice does NOT win instantly (win checks at turn start — but overtime majority DOES apply if active).
 - [ ] **Step 2:** Run → FAIL. Implement `combat.ts` + reducer/legal wiring. → PASS.
 - [ ] **Step 3: Commit** — `git commit -m "feat: combat - attacks, react window, blockers, fights, gig stealing"`
 
@@ -469,17 +469,17 @@ export type ScriptedCard = (db: CardDb, state: GameState, ctx: EffectCtx) => Gam
 export const scriptedCards: Record<string, ScriptedCard>
 ```
 
-Wiring: reduce.ts fires `onPlay` after a card resolves, `onCall` when a legend flips via call, `onAttack` after spending the attacker but before the react window (guide: "before your Rival reacts"), `onDefeat` when a unit hits the trash from the field. `activated` abilities appear in `legalActions` as `activateAbility` (self-spend requires ready + non-lag; eddies cost paid with canonical payment); `quick: true` defs/programs appear as reactions during rival attacks. `staticPower` on gear/units feeds `effectivePower`. `condition.streetCredAtLeast` checks the controller's street cred at activation/trigger time. **Keywords rush/quick/blocker/merc are engine-level flags** (rush handled in Task 6; merc: a legend with `merc` gains a `playCard` legal action from the legends zone at its cost, entering the field ready without lag, removed from game — not trash — if it leaves the field).
+Wiring: reduce.ts fires `onPlay` after a card resolves, `onCall` when a legend flips via call, `onAttack` after spending the attacker but before the react window (guide: "before your Rival reacts"), `onDefeat` when a unit hits the trash from the field. `activated` abilities appear in `legalActions` as `activateAbility` (self-spend requires ready + non-lag; eddies cost paid with canonical payment); `quick: true` defs/programs appear as reactions during rival attacks. `staticPower` on gear/units feeds `effectivePower`. `condition.streetCredAtLeast` checks the controller's street cred at activation/trigger time. **Keywords adrenaline/quick/blocker/go-solo are engine-level flags** (adrenaline handled in Task 6; go-solo: a legend with `go-solo` gains a `playCard` legal action from the legends zone at its cost, entering the field ready without lag, removed from game — not trash — if it leaves the field). The role tag `merc` (and other classification tags like `corpo`, `ganger`) are inert strings — never give them mechanics.
 
 Extend the vocabulary as Task 8 demands; every new node kind gets a synthetic-card test here first.
 
-- [ ] **Step 1: Write failing tests with a synthetic CardDb** (build `CardDef`s inline in the test) — one test per node kind above; trigger timing tests (onPlay fires once; onAttack before react — assert a rival unit defeated by an onAttack effect can't block; onDefeat fires on fight loss); streetCred gating (below threshold → ability absent from legalActions / trigger skipped); activated ability self-spend blocked by lag; quick program playable only during rival attack react window and paid normally; merc legend fields ready+rush and is removed-from-game on defeat; gear staticPower changes fight outcomes; targets enumerated correctly.
+- [ ] **Step 1: Write failing tests with a synthetic CardDb** (build `CardDef`s inline in the test) — one test per node kind above; trigger timing tests (onPlay fires once; onAttack before react — assert a rival unit defeated by an onAttack effect can't block; onDefeat fires on fight loss); streetCred gating (below threshold → ability absent from legalActions / trigger skipped); activated ability self-spend blocked by lag; quick program playable only during rival attack react window and paid normally; go-solo legend fields ready and can attack the turn played and is removed-from-game on defeat; gear staticPower changes fight outcomes; targets enumerated correctly.
 - [ ] **Step 2:** Run → FAIL. Implement interpreter + wiring. → PASS.
 - [ ] **Step 3: Commit** — `git commit -m "feat: data-driven effect system, triggers, keywords, activated abilities"`
 
 ---
 
-### Task 8: Implement all 131 cards
+### Task 8: Implement all 141 cards
 
 **Files:**
 - Modify: `data/cards.json` (complete every card's `effects`), `src/cards/scripted/index.ts`, `data/cards.schema.md` (vocabulary extensions), `docs/rulings.md`
@@ -503,8 +503,8 @@ it('kiroshi-optics grants its power bonus to the equipped unit', () => {
 })
 ```
 Build `tests/cards/fixtures.ts` in the first batch: `fixtureWithHand`, `playCardByDef`, `findFielded`, `endBothTurnsOnce`, `forceStreetCred` (directly sets gig dice values in a copied state), `startAttack`. Vanilla units (no text) get a one-line test asserting cost/power/keywords match the def via a fight or play.
-- [ ] **Step 3:** Run the batch file + full suite → PASS. Commit per batch: `git commit -m "feat: implement <color> cards batch N (X/131 done)"`
-- [ ] **Step 4 (after all batches):** Write a completeness test: every card in the DB either has `effects.length > 0`, is in `scriptedCards`, or has empty rules `text` (vanilla). Assert 131/131. Commit.
+- [ ] **Step 3:** Run the batch file + full suite → PASS. Commit per batch: `git commit -m "feat: implement <color> cards batch N (X/141 done)"`
+- [ ] **Step 4 (after all batches):** Write a completeness test: every card in the DB either has `effects.length > 0`, is in `scriptedCards`, or has empty rules `text` (vanilla). Assert 141/141. Commit.
 
 ---
 
@@ -659,7 +659,7 @@ PlayView layout: rival zones mirrored on top (hand as face-down count, field, gi
 
 Layout: left = CardBrowser (search box over name+text, filter chips for color/type/keyword, cost range, sorted grid of `CardFrame size="small"`, click adds to deck / right-click or a “+/−” overlay adjusts count); right = DeckPanel (chosen 3 legend slots first — picking legends shows the resulting per-color RAM limits; card rows grouped by type with counts; live counters "cards: 43/40–50", per-color RAM limit chips; every `validateDeck` error shown in red; Save (named, localStorage), Export (textarea + copy), Import (paste → `importDeckText`, errors surfaced), New, Load from `listDecks()`).
 
-- [ ] **Step 1: Write failing component tests** — renders 131 cards; typing in search filters; clicking a card increments its count and a 4th copy is refused with the validation error visible; selecting legends updates RAM chips; an over-RAM card add shows the error; export text contains "3x" lines; import of the export reproduces the deck; save then reload lists the deck. Implement. → PASS.
+- [ ] **Step 1: Write failing component tests** — renders 141 cards; typing in search filters; clicking a card increments its count and a 4th copy is refused with the validation error visible; selecting legends updates RAM chips; an over-RAM card add shows the error; export text contains "3x" lines; import of the export reproduces the deck; save then reload lists the deck. Implement. → PASS.
 - [ ] **Step 2: Commit** — `git commit -m "feat: deck builder with RAM validation, import/export"`
 
 ---
@@ -686,7 +686,7 @@ Layout: two deck pickers (any saved/bundled deck), agent pickers (heuristic/rand
 - Test: extend `tests/fuzz/invariants.test.ts`
 
 - [ ] **Step 1: Big fuzz** — temporarily run the fuzz suite at 2000 seeds plus 500 heuristic-vs-heuristic games with invariants on (a one-off `npx vitest run tests/fuzz --testTimeout=600000` with an env var like `FUZZ_SEEDS=2000` read by the test). Fix anything found (regression test per fix). Restore default counts so `npm test` stays < ~2 min.
-- [ ] **Step 2: Official images (best effort)** — `scripts/fetch-images.mjs`: try to resolve each card's official image (from the database pages / netdeck CDN URLs found in Task 2), download to `data/images/<defId>.png` with polite 500ms delays. Tolerate total failure: the script reports N/131 fetched and the app works fully without images. Do not commit images (gitignored). If zero images fetchable, note it in README.
+- [ ] **Step 2: Official images (best effort)** — `scripts/fetch-images.mjs`: try to resolve each card's official image (from the database pages / netdeck CDN URLs found in Task 2), download to `data/images/<defId>.png` with polite 500ms delays. Tolerate total failure: the script reports N/141 fetched and the app works fully without images. Do not commit images (gitignored). If zero images fetchable, note it in README.
 - [ ] **Step 3: README** — rewrite with: what this is (unofficial playtesting simulator for WeirdCo's Cyberpunk TCG Beta; rules © their owners; card text used for personal playtesting), setup (`npm install && npm run dev`), how to play (UI walkthrough incl. reaction bar and undo), deck building rules recap, simulation CLI + UI usage, where rulings live, project architecture map, test commands.
 - [ ] **Step 4: Final review sweep** — run the full gate: `npm test && npm run build && npm run e2e && npm run sim -- --games 1000 --deckA data/decks/arasaka-embracing-power.json --deckB data/decks/mercs-the-heist.json --seed 7`. Re-read `docs/rulings.md` for completeness (every assumption made anywhere must be listed). Verify the spec's Success Criteria section item by item; fix any gap.
 - [ ] **Step 5: Commit** — `git commit -m "chore: hardening, image fetch, README, final review"`
@@ -695,6 +695,6 @@ Layout: two deck pickers (any saved/bundled deck), agent pickers (heuristic/rand
 
 ## Self-Review Notes (already applied)
 
-- Spec coverage: platform/stack (T1), transcription+rulings (T2), deck rules incl. RAM (T3/T14), full rules engine (T4–T7), 131 cards (T8), fuzz invariants (T9), AI + benchmarks (T10), 1000-game sim criterion (T11), hybrid card visuals + settings toggle (T12/T16), play view with log/undo/save (T13), deck builder import/export (T14), stats view + export (T15), README + success criteria check (T16).
+- Spec coverage: platform/stack (T1), transcription+rulings (T2), deck rules incl. RAM (T3/T14), full rules engine (T4–T7), 141 cards (T8), fuzz invariants (T9), AI + benchmarks (T10), 1000-game sim criterion (T11), hybrid card visuals + settings toggle (T12/T16), play view with log/undo/save (T13), deck builder import/export (T14), stats view + export (T15), README + success criteria check (T16).
 - Undo semantics, overtime "majority" interpretation, empty-gig-area attacks, sold-eddie readiness, and canonical payments are called out as explicit rulings — executors must record them in `docs/rulings.md` when implementing.
 - Type/name consistency: `Agent` defined once in `src/ai/random.ts` (T9) and reused by T10/T11; `GameRecord` in `src/engine/replay.ts` (T13) and consumed by `storage.ts` (T12) — Task 12's `saveGameRecord` may be implemented with a local type alias and unified in T13 if T12 executes first.
