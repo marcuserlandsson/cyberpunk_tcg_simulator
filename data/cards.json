@@ -1715,7 +1715,16 @@
       "corpo"
     ],
     "text": "{Blocker}\nThis Unit has +2 power while fighting a Legend.\nWhen a Rival adjusts or swaps 1 or more friendly Gigs, you may add a card from your trash to your hand.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": { "kind": "powerVsCardType", "cardType": "legend", "amount": 2 }
+      },
+      {
+        "trigger": "onRivalAdjustFriendlyGig",
+        "effect": { "kind": "retrieveFromTrash", "target": "friendlyTrashCard" }
+      }
+    ]
   },
   {
     "id": "minotaur",
@@ -1736,7 +1745,13 @@
       "militech"
     ],
     "text": "{Play} If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit with power 5 or less.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "condition": { "streetCredAheadOfRival": true },
+        "effect": { "kind": "defeat", "target": "rivalUnit", "filter": { "maxPower": 5 } }
+      }
+    ]
   },
   {
     "id": "misty-olszewski-mender-of-broken-spirits",
@@ -1920,7 +1935,15 @@
       "zetatech"
     ],
     "text": "Play this Unit for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "costReduction",
+          "reduction": { "per": "friendlyGigValueAtLeast", "value": 8, "amount": 1, "minimum": 1 }
+        }
+      }
+    ]
   },
   {
     "id": "offduty-malfini",
@@ -1959,7 +1982,16 @@
       "merc"
     ],
     "text": "Defeat a Unit with power equal to or less than the value of a friendly d20.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "defeat",
+          "target": "anyUnit",
+          "filter": { "maxPowerVsFriendlyD20": true }
+        }
+      }
+    ]
   },
   {
     "id": "overwatch-panam-s-gift",
@@ -2342,7 +2374,16 @@
       "ganger"
     ],
     "text": "{Play} Defeat a rival Unit with power 2 or less. If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit with power 3 or less instead.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "defeat",
+          "target": "rivalUnit",
+          "filter": { "maxPower": 2, "maxPowerIfAheadOnStreetCred": 3 }
+        }
+      }
+    ]
   },
   {
     "id": "royce-psycho-on-the-edge",
@@ -2364,7 +2405,13 @@
       "ganger"
     ],
     "text": "{Go Solo} (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nDuring your turn, this Legend has +2 power for each of its equipped Gear.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "condition": { "duringOwnTurn": true },
+        "effect": { "kind": "staticPower", "amount": { "perEquippedGear": 2 } }
+      }
+    ]
   },
   {
     "id": "ruthless-lowlife",
@@ -2384,7 +2431,9 @@
       "ganger"
     ],
     "text": "This Unit can only attack rival Units. (It can't attack Gig areas.)",
-    "effects": []
+    "effects": [
+      { "trigger": "static", "effect": { "kind": "cantAttackGigArea" } }
+    ]
   },
   {
     "id": "saburo-arasaka-stubborn-patriarch",
@@ -2509,7 +2558,9 @@
       "weapon"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit wins a fight against a rival Unit, draw 1.",
-    "effects": []
+    "effects": [
+      { "trigger": "onWinFight", "effect": { "kind": "draw", "count": 1 } }
+    ]
   },
   {
     "id": "saul-bright-stormrider",
@@ -2551,7 +2602,16 @@
       "ganger"
     ],
     "text": "{Defeated} Add another Unit from your trash to your hand.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onDefeat",
+        "effect": {
+          "kind": "retrieveFromTrash",
+          "target": "friendlyTrashCard",
+          "filter": { "cardType": "unit", "excludeSelf": true }
+        }
+      }
+    ]
   },
   {
     "id": "secondhand-bombus",
@@ -2591,7 +2651,10 @@
       "braindance"
     ],
     "text": "Each player discards their hand and may draw 5.\nIf the total number of discarded cards equals the value of a friendly Gig, draw 2.",
-    "effects": []
+    "effects": [
+      { "trigger": "onPlay", "effect": { "kind": "scripted", "name": "shattered-memories" } }
+    ],
+    "scripted": "shattered-memories"
   },
   {
     "id": "sketchy-ripper",
@@ -2631,7 +2694,13 @@
       "merc"
     ],
     "text": "{Attack} If this Unit has power 5+, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "condition": { "sourcePowerAtLeast": 5 },
+        "effect": { "kind": "draw", "count": 1 }
+      }
+    ]
   },
   {
     "id": "synapse-burnout",
@@ -2853,7 +2922,19 @@
       "merc"
     ],
     "text": "When this Unit steals a Gig, increase it by up to 5.\nAt the end of your turn, if you control 2 or more Gigs with 8+ value, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyStealDie",
+        "condition": { "selfIsStealer": true },
+        "effect": { "kind": "scripted", "name": "v-roamer-of-the-badlands" }
+      },
+      {
+        "trigger": "onEndTurn",
+        "condition": { "friendlyGigsAtLeastValueCount": { "value": 8, "count": 2 } },
+        "effect": { "kind": "draw", "count": 1 }
+      }
+    ],
+    "scripted": "v-roamer-of-the-badlands"
   },
   {
     "id": "v-streetkid",
@@ -2874,7 +2955,20 @@
       "merc"
     ],
     "text": "{Call} Trash 3. Then, add 1 BRAINDANCE Program from your trash to your hand.\n{Go Solo} (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onCall",
+        "effect": { "kind": "trashFromDeck", "whose": "friendly", "count": 3 }
+      },
+      {
+        "trigger": "onCall",
+        "effect": {
+          "kind": "retrieveFromTrash",
+          "target": "friendlyTrashCard",
+          "filter": { "cardType": "program", "keyword": "braindance" }
+        }
+      }
+    ]
   },
   {
     "id": "valentino-guerrera",
@@ -2895,7 +2989,13 @@
       "ganger"
     ],
     "text": "If you have more ☆ (Street Cred) than a Rival, this Unit can attack ready Units with {Blocker}.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "condition": { "streetCredAheadOfRival": true },
+        "effect": { "kind": "attackReadyWithKeyword", "keyword": "blocker" }
+      }
+    ]
   },
   {
     "id": "valentino-street-racer",
@@ -3058,7 +3158,20 @@
       "corpo"
     ],
     "text": "The first time a friendly ARASAKA Unit attacks each turn, draw 1. Then, if you have less than 20 ☆ (Street Cred), discard 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyAttack",
+        "oncePerTurn": true,
+        "condition": { "attackerKeyword": "arasaka" },
+        "effect": { "kind": "draw", "count": 1 }
+      },
+      {
+        "trigger": "onFriendlyAttack",
+        "oncePerTurn": true,
+        "condition": { "attackerKeyword": "arasaka", "streetCredBelow": 20 },
+        "effect": { "kind": "discardCard", "target": "friendlyHandCard" }
+      }
+    ]
   },
   {
     "id": "yorinobu-arasaka-steel-dragon",
@@ -3079,7 +3192,27 @@
       "corpo"
     ],
     "text": "{Play} You may play a Unit with cost 4 or less from your hand or trash for free. It can attack rival Units this turn.\nThe first time an ARASAKA Unit is defeated each turn, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "sameTarget",
+          "target": "friendlyHandOrTrashUnit",
+          "filter": { "maxCost": 4 },
+          "effects": [
+            { "kind": "scripted", "name": "yorinobu-arasaka-steel-dragon" },
+            { "kind": "grantKeyword", "keyword": "adrenaline", "target": "chosen", "duration": "turn" }
+          ]
+        }
+      },
+      {
+        "trigger": "onUnitDefeated",
+        "oncePerTurn": true,
+        "condition": { "defeatedKeyword": "arasaka" },
+        "effect": { "kind": "draw", "count": 1 }
+      }
+    ],
+    "scripted": "yorinobu-arasaka-steel-dragon"
   },
   {
     "id": "zetatech-berserk",

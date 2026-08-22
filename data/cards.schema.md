@@ -22,7 +22,7 @@ prose reference used during transcription and by anyone reading the data).
 | `keywords` | `string[]` | Lowercase, kebab-case for multi-word terms. See **Keyword vocabulary** below — this array mixes true rules keywords with classification/role tags, since `CardDef` has no separate tags field. |
 | `text` | `string` | Verbatim rules text from the database's `rules_text` field (empty string `""` for vanilla cards, including the one card — `rebecca-having-a-moment` — whose `rules_text` is `null` in the source). Keyword/timing-trigger markup is preserved as `{Term}`, exactly as the database renders it (this is the plaintext stand-in for the card's colored highlight boxes). **4 cards deviate from `rules_text` because the database's own card art proves the field wrong: `kiroshi-optics` (equip line, rulings §8) and `psycho-squad` / `animals-wrecker` / `rockn-rockerboy` (stripped `[Flavour]` annotation, rulings §9). All other 137 are byte-exact.** |
 | `effects` | `EffectDef[]` | Left as `[]` for every card in Task 2. Task 8 populates this from `text` using the vocabulary below. `[]` is also the *correct* value for a vanilla card (no rules text) and for `animals-wrecker`, whose printed line is flavour (`docs/rulings.md` §51). |
-| `scripted` | `string?` | The `scriptedCards` key of a card whose text needs a hand-written implementation (`src/cards/scripted/index.ts`). Informational: the interpreter dispatches on the `{ kind: 'scripted', name }` node inside `effects`, not on this field. Set for `all-is-lost`, `arasaka-emergency-radioport`, `johnny-silverhand-rocking-renegade`. |
+| `scripted` | `string?` | The `scriptedCards` key of a card whose text needs a hand-written implementation (`src/cards/scripted/index.ts`). Informational: the interpreter dispatches on the `{ kind: 'scripted', name }` node inside `effects`, not on this field. Set for `all-is-lost`, `arasaka-emergency-radioport`, `johnny-silverhand-rocking-renegade` (Task 8 batch 1) and `shattered-memories`, `v-roamer-of-the-badlands`, `yorinobu-arasaka-steel-dragon` (Task 8 batch 2). |
 
 ## Keyword vocabulary
 
@@ -82,15 +82,16 @@ possible classification values is a judgment call — see `docs/rulings.md` §3.
 The authoritative types are in `src/engine/types.ts` and the authoritative
 (strict) schema in `src/engine/cardDb.ts` — every node/field below is validated
 at load time, and an unknown key is a load error. The judgment calls behind each
-are in `docs/rulings.md` (§29–§38 from Task 7, §39–§52 from Task 8).
+are in `docs/rulings.md` (§29–§38 from Task 7, §39–§52 from Task 8 batch 1,
+§55–§66 from Task 8 batch 2).
 
 ### `EffectDef`
 
 | Field | Notes |
 |---|---|
-| `trigger` | `onPlay` \| `onCall` \| `onAttack` \| `onDefeat` \| `onBlock` \| `onWinFight` \| `onSpend` \| `onFriendlyStealDie` \| `activated` \| `static`. The last four triggers were added in Task 8 (§41, §42, §47); `onFriendlyStealDie` is a *watcher* — it fires on every in-play card of the thief, not on the card that stole. |
+| `trigger` | `onPlay` \| `onCall` \| `onAttack` \| `onDefeat` \| `onBlock` \| `onWinFight` \| `onSpend` \| `onFriendlyStealDie` \| `onFriendlyAttack` \| `onUnitDefeated` \| `onRivalAdjustFriendlyGig` \| `onEndTurn` \| `activated` \| `static`. `onFriendlyStealDie` was added in Task 8 batch 1 (§42); the next four in batch 2 (§60) — all five are *watchers*, firing on every in-play card of whichever side the printed text names (or, for the bare-worded `onUnitDefeated`, both sides) rather than on the card that acted. |
 | `cost` | `{ selfSpend?, eddies?, reduction? }`. On an `activated` def this is the printed, mandatory `{Spend}` / €$ cost; on a *triggered* def it is an optional "You may pay N €$", answered by the action that fires the trigger (`attack`'s `payOptionalCosts`) and **declined** by default (§49). |
-| `condition` | `{ streetCredAtLeast?, friendlyGigValueAtLeast?, rivalGigLeadAtLeast?, stolenDieSize? }` — "☆ N or more", "if you control a Gig with 8+ value", "if a Rival controls at least 2 Gigs more than you", and the watcher-only die-size gate (§42, §50). |
+| `condition` | `{ streetCredAtLeast?, friendlyGigValueAtLeast?, rivalGigLeadAtLeast?, stolenDieSize?, streetCredAheadOfRival?, streetCredBelow?, duringOwnTurn?, sourcePowerAtLeast?, selfIsStealer?, attackerKeyword?, defeatedKeyword?, friendlyGigsAtLeastValueCount? }` — "☆ N or more", "if you control a Gig with 8+ value", "if a Rival controls at least 2 Gigs more than you", the watcher-only die-size gate (§42, §50), "if you have more/less ☆ than a Rival" and "less than N ☆" (§55), "during your turn" (§59), the attacking Unit's own power (§61), "when THIS Unit steals" (§61), the attacking/defeated Unit's own faction-or-keyword tag (§60/§66), and "2 or more Gigs with 8+ value" (§62). |
 | `quick` | `{Quick}` — usable in the rival's react window. |
 | `oncePerTurn` | "The first time … each turn" (§40). Tracked per card instance + effect index in `GameState.oncePerTurnUsed`, cleared at the end of the game turn. |
 | `effect` | The `EffectNode` tree. |
@@ -98,18 +99,29 @@ are in `docs/rulings.md` (§29–§38 from Task 7, §39–§52 from Task 8).
 ### `TargetSpec`
 
 `self`, `friendlyUnit`, `rivalUnit`, `rivalSpentUnit`, `anyUnit`,
-`friendlyUnitOrLegend`, and (Task 8) `friendlyGigDie` / `rivalGigDie` /
+`friendlyUnitOrLegend`, and (Task 8 batch 1) `friendlyGigDie` / `rivalGigDie` /
 `anyGigDie` plus `chosen`. The Gig-die specs bind an **index into a `gigArea`**,
 not a card uid (§39): `friendlyGigDie` for printed "a friendly Gig",
 `rivalGigDie` for "a rival Gig", and `anyGigDie` for bare "a Gig" / "Adjust a
 Gig" (either player's die — the controller's area indexed first, then the
 rival's). `chosen` is not a decision: it reads the uid bound by the enclosing
-`sameTarget` (§53), the way `self` reads the source card.
+`sameTarget` (§53), the way `self` reads the source card. Task 8 batch 2 adds
+three more zones no earlier card needed to reach (§57, §63):
+`friendlyTrashCard` (every card in the controller's own trash),
+`friendlyHandCard` (every card in the controller's own hand), and
+`friendlyHandOrTrashUnit` (every **Unit** in the controller's own hand *and*
+trash combined — the "Unit" restriction is baked into the spec's own name,
+since a mixed hand+trash zone otherwise holds every card type).
 
 Card specs may be narrowed by a `filter`:
-`{ maxPower?, minPower?, keyword?, excludeSelf?, weakerThanAFriendlyUnit? }`,
-covering "with power 4 or less", "a CORPO Unit", "*another* friendly Unit" and
-"with less power than a friendly Unit".
+`{ maxPower?, minPower?, keyword?, excludeSelf?, weakerThanAFriendlyUnit?,
+cardType?, maxCost?, maxPowerIfAheadOnStreetCred?, maxPowerVsFriendlyD20? }`,
+covering "with power 4 or less", "a CORPO Unit", "*another* friendly Unit",
+"with less power than a friendly Unit", "a **Program**" (`cardType`, §57),
+"with cost 4 or less" (`maxCost`, §63), "power 2 or less … power 3 or less
+**instead**" (`maxPowerIfAheadOnStreetCred` **replaces** `maxPower` rather
+than adding to it — §64), and "power ≤ the value of a friendly d20"
+(`maxPowerVsFriendlyD20`, §64).
 
 ### Nodes
 
@@ -117,21 +129,26 @@ covering "with power 4 or less", "a CORPO Unit", "*another* friendly Unit" and
 |---|---|
 | `draw` | "Draw N." |
 | `discardRandomRival` | "A Rival discards N at random." |
-| `buffPower` | "Give a … +N power this turn / permanently". `amount` may be the string `'friendlyMaxGig'` for "power equal to a friendly max Gig" (§39). |
-| `staticPower` | An ongoing power bonus (a Gear card's printed power box is *not* restated — §29). |
+| `buffPower` | "Give a … +N power this turn / permanently". `amount` may be the string `'friendlyMaxGig'` for "power equal to a friendly max Gig" (§39), or `{ perEquippedGear: N }` for "+N power for each of its equipped Gear" (§59). |
+| `staticPower` | An ongoing power bonus (a Gear card's printed power box is *not* restated — §29). `amount` accepts the same dynamic amounts as `buffPower` (§59), e.g. "this Legend has +2 power for each of its equipped Gear". |
 | `defeat` / `bounce` / `bottomDeck` | Defeat a Unit / return it to hand / put it under its deck. |
 | `readyCard` / `spendCard` | Ready or spend a card ("{Spend} it", "ready it"). |
 | `stealGig` / `returnGig` / `rerollGig` | Steal a rival Gig (§32's `chooseGig` flow), send a friendly Gig back to the fixer, reroll a Gig. |
-| `changeGig` | "Increase/decrease a Gig by up to N" — the full amount, clamped to `[1, die size]`, on a chosen die. With `adjust: true` ("Adjust a Gig by up to N") the sign *and* magnitude become a second slot offering `-N..-1, 1..N` (§39). |
+| `changeGig` | "Increase/decrease a Gig by up to N" — the full amount, clamped to `[1, die size]`, on a chosen die. With `adjust: true` ("Adjust a Gig by up to N") the sign *and* magnitude become a second slot offering `-N..-1, 1..N` (§39). Also fires `onRivalAdjustFriendlyGig` on the die's actual owner when that differs from the effect's controller (§60). |
+| `retrieveFromTrash` | "Add a card / another Unit / a BRAINDANCE Program from your trash to your hand" (§57) — trash → hand. |
+| `discardCard` | "… discard 1" (the controller's own hand, a real choice of card, not the forced-random `discardRandomRival` — §57) — hand → trash. |
 | `sameTarget` | "Give a friendly Unit these effects" — one target slot, shared by every child that names `target: 'chosen'` (§53). |
 | `trashFromDeck` / `gainEddieFromTopDeck` | Mill from a deck / bank the top card as €$. |
 | `grantKeyword` | "… can attack the turn it's played" ({adrenaline}), "it may attack ready Units" (the granted-only `attack-ready` keyword) — until end of turn (§43). |
 | `chooseOne` | "Choose one effect. A // B". `chooser`: `'controller'` (default), `'rivalIfBehindStreetCred'` ("If you have less ☆ than a Rival, they instead choose one for you"), or `'allUnlessBehindStreetCred'` (every mode resolves unless you are behind, then the rival picks one — `gunpoint-diplomacy`, §45/§54). |
 | `defeatShield` | *static, on Gear*: "If this Unit would be defeated, defeat its `<gear>` instead" (§46). |
 | `winsFightVsKeyword` | *static*: "This Unit wins all fights against CORPO Units" (§41). |
+| `powerVsCardType` | *static, fight-only*: "This Unit has +2 power while fighting a Legend" — added to `effectivePower` only inside `fight()`, never generally (§56). |
 | `costReduction` | *static*: "Play this for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$" (§44). |
 | `cantAttack` | *static*: "This Unit can't attack" (§35). |
-| `sequence` | Several nodes in printed order, sharing one target slot list. |
+| `cantAttackGigArea` | *static*: "This Unit can only attack rival Units. (It can't attack Gig areas.)" (§58). |
+| `attackReadyWithKeyword` | *static*: "This Unit can attack ready Units with {Blocker}" — narrower than the granted-only `attack-ready` keyword, which permits *any* ready Unit (§43 vs §58). |
+| `sequence` | Several nodes in printed order, sharing one target slot list. **Only safe when no later node's targets depend on an earlier node's zone mutation within the same `EffectDef`** — split into separate same-trigger `EffectDef`s instead when they do (§57's `v-streetkid` write-up). |
 | `scripted` | A hand-written implementation, optionally with its own `targets` slots (§48). |
 
 A card whose text has two independent clauses ("Increase a Gig by up to 4. If

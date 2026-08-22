@@ -37,10 +37,14 @@ import {
 } from '../cards/effects'
 import { legendCallPayment } from './economy'
 import {
+  attackableReadyKeyword,
   ATTACK_READY,
   cantAttack,
+  cantAttackGigArea,
+  cardTags,
   defeatShieldOf,
   effectivePower,
+  fightPowerBonus,
   hasKeyword,
   opponentOf,
   winsFightRegardless,
@@ -104,10 +108,20 @@ function attackTargets(
   // "it may attack ready Units" — a granted permission that widens the target
   // list for that one attacker only (docs/rulings.md §43).
   const readyTooOk = hasKeyword(db, state, attackerUid, ATTACK_READY)
+  // "this Unit can attack ready Units with {Blocker}" — narrower: only ready
+  // Units carrying a specific keyword (docs/rulings.md §55 ff.).
+  const readyKeyword = attackableReadyKeyword(db, state, attackerUid)
   const targets: (number | 'gigArea')[] = rival.field.filter(
-    (uid) => readyTooOk || !state.cards[uid].ready
+    (uid) =>
+      readyTooOk ||
+      !state.cards[uid].ready ||
+      (readyKeyword !== null && hasKeyword(db, state, uid, readyKeyword))
   )
-  if (rival.gigArea.length > 0) targets.push('gigArea')
+  // "This Unit can only attack rival Units" (docs/rulings.md §55 ff.), on top
+  // of §24's engine-wide "no dice, no attack" rule.
+  if (rival.gigArea.length > 0 && !cantAttackGigArea(db, state, attackerUid)) {
+    targets.push('gigArea')
+  }
   return targets
 }
 
@@ -231,11 +245,23 @@ export function declareAttack(
   // [trigger seam] on-attack effects on the attacking Unit (and its Gear)
   // resolve here — after it is spent (guide step 01) and before the rival
   // reacts, so a Unit this defeats never gets to block (guide: "before your
-  // Rival reacts").
-  fireTriggerOnDraft(db, draft, 'onAttack', attacker, [], { payOptionalCosts })
+  // Rival reacts"). `sourcePower` answers "if this Unit has power N+"
+  // (docs/rulings.md §55 ff.).
+  fireTriggerOnDraft(db, draft, 'onAttack', attacker, [], {
+    payOptionalCosts,
+    sourcePower: effectivePower(db, draft, attacker),
+  })
 
   // An on-attack effect can end the game (a forced draw off an empty deck, an
   // overtime-winning steal). Never re-open a decision window over `gameOver`.
+  if (draft.winner !== null) return
+
+  // [trigger seam] "The first time a friendly ARASAKA Unit attacks each turn,
+  // ..." — a watcher, broadcast to every in-play card of the ATTACKER'S OWN
+  // side (docs/rulings.md §55 ff.), never the attacker's own printed text.
+  fireWatcherTrigger(db, draft, 'onFriendlyAttack', draft.cards[attacker].owner, {
+    attackerTags: cardTags(db[draft.cards[attacker].defId]),
+  })
   if (draft.winner !== null) return
 
   draft.pendingAttack = { attacker, target }
@@ -322,9 +348,20 @@ export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
   // "{Defeated} ..." text is about the Unit wearing it being defeated
   // (docs/rulings.md §37), and it resolves for that Unit's controller.
   const gear = [...draft.cards[uid].attachedGear]
+  // Capture the defeated Unit's own tags before anything moves it — a Unit's
+  // faction membership does not depend on its (about-to-be-detached) Gear.
+  const defeatedTags = cardTags(db[draft.cards[uid].defId])
 
   draft.events.push({ type: 'unitDefeated', uid })
   leaveField(draft, db, uid, 'trash')
+
+  // [trigger seam] "The first time an ARASAKA Unit is defeated each turn,
+  // ..." — bare, so it watches GLOBALLY: every in-play card of BOTH players,
+  // whichever side the defeated Unit belonged to (docs/rulings.md §55 ff.,
+  // mirroring §39's bare-Gig convention).
+  fireWatcherTrigger(db, draft, 'onUnitDefeated', 0, { defeatedTags })
+  fireWatcherTrigger(db, draft, 'onUnitDefeated', 1, { defeatedTags })
+  if (draft.winner !== null) return
 
   // [trigger seam] on-defeat effects resolve once the Unit and its Gear have
   // left the field (guide step 04).
@@ -342,8 +379,11 @@ export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
  * "strictly higher wins, tie kills both".
  */
 function fight(draft: GameState, db: CardDb, attacker: number, defender: number): void {
-  const attackPower = effectivePower(db, draft, attacker)
-  const defendPower = effectivePower(db, draft, defender)
+  // "+2 power while fighting a Legend" — a bonus that only exists for the
+  // duration of this specific fight, never folded into `effectivePower`
+  // (docs/rulings.md §55 ff.).
+  const attackPower = effectivePower(db, draft, attacker) + fightPowerBonus(db, draft, attacker, defender)
+  const defendPower = effectivePower(db, draft, defender) + fightPowerBonus(db, draft, defender, attacker)
   // "This Unit wins all fights against CORPO Units" overrides the power
   // comparison in that Unit's favour (docs/rulings.md §41).
   const attackerAlwaysWins = winsFightRegardless(db, draft, attacker, defender)
@@ -457,7 +497,11 @@ export function takeStolenGig(draft: GameState, db: CardDb, dieIndex: number): v
 
   // [trigger seam] "When a friendly Unit steals a d6, ..." — a watcher trigger,
   // fired on every in-play card of the thief (docs/rulings.md §42).
-  fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, { stolenDieSize: die.size })
+  // `stealerUid` answers "When THIS Unit steals a Gig" (docs/rulings.md §55 ff.).
+  fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
+    stolenDieSize: die.size,
+    stealerUid: steal.attacker,
+  })
 
   steal.remaining -= 1
   if (steal.remaining > 0 && draft.players[victim].gigArea.length > 0) return

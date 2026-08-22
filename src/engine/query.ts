@@ -10,7 +10,9 @@
 import type {
   CardDb,
   CardDef,
+  CardType,
   CostReduction,
+  DynamicAmount,
   EffectDef,
   EffectNode,
   GameState,
@@ -62,12 +64,22 @@ export function maxGigValue(state: GameState, player: PlayerId): number {
 }
 
 /**
- * Extra facts a watcher trigger's condition needs, which no read of the state
- * can supply: the size of the Gig die that was just stolen
- * (docs/rulings.md §42).
+ * Extra facts a triggered effect's condition needs, which no read of the
+ * state can supply: the size of the Gig die that was just stolen
+ * (docs/rulings.md §42), plus four batch-2 additions (docs/rulings.md §55 ff.)
+ * that are each scoped to exactly one trigger seam and unsatisfiable anywhere
+ * else, the same way `stolenDieSize` only ever matches inside a steal.
  */
 export interface ConditionContext {
   stolenDieSize?: number
+  /** `onAttack` only: the attacking Unit's own `effectivePower`. */
+  sourcePower?: number
+  /** `onFriendlyStealDie` only: the card uid that actually did the stealing. */
+  stealerUid?: number
+  /** `onFriendlyAttack` only: the attacking Unit's own faction/keyword tags. */
+  attackerTags?: string[]
+  /** `onUnitDefeated` only: the defeated Unit's own faction/keyword tags. */
+  defeatedTags?: string[]
 }
 
 /**
@@ -82,7 +94,8 @@ export function conditionMet(
   state: GameState,
   player: PlayerId,
   def: EffectDef,
-  context: ConditionContext = {}
+  context: ConditionContext = {},
+  sourceUid?: number
 ): boolean {
   const condition = def.condition
   if (condition === undefined) return true
@@ -105,6 +118,45 @@ export function conditionMet(
   }
   if (condition.stolenDieSize !== undefined && context.stolenDieSize !== condition.stolenDieSize) {
     return false
+  }
+  // Batch 2 additions (docs/rulings.md §55 ff.):
+  if (
+    condition.streetCredAheadOfRival === true &&
+    streetCred(state, player) <= streetCred(state, opponentOf(player))
+  ) {
+    return false
+  }
+  if (condition.streetCredBelow !== undefined && streetCred(state, player) >= condition.streetCredBelow) {
+    return false
+  }
+  if (condition.duringOwnTurn === true && state.activePlayer !== player) {
+    return false
+  }
+  if (
+    condition.sourcePowerAtLeast !== undefined &&
+    (context.sourcePower ?? -Infinity) < condition.sourcePowerAtLeast
+  ) {
+    return false
+  }
+  if (condition.selfIsStealer === true && context.stealerUid !== sourceUid) {
+    return false
+  }
+  if (
+    condition.attackerKeyword !== undefined &&
+    !(context.attackerTags ?? []).includes(condition.attackerKeyword)
+  ) {
+    return false
+  }
+  if (
+    condition.defeatedKeyword !== undefined &&
+    !(context.defeatedTags ?? []).includes(condition.defeatedKeyword)
+  ) {
+    return false
+  }
+  if (condition.friendlyGigsAtLeastValueCount !== undefined) {
+    const { value, count } = condition.friendlyGigsAtLeastValueCount
+    const matching = state.players[player].gigArea.filter((die) => die.value >= value).length
+    if (matching < count) return false
   }
   return true
 }
@@ -226,9 +278,83 @@ export function effectivePower(db: CardDb, state: GameState, uid: number): numbe
     if (gearDef) power += gearDef.power ?? 0
   }
   for (const node of activeStaticNodes(db, state, uid)) {
-    if (node.kind === 'staticPower') power += node.amount
+    if (node.kind === 'staticPower') power += resolvePowerAmount(state, node.amount, uid, card.owner)
   }
   return power
+}
+
+/**
+ * A `buffPower`/`staticPower` amount, resolved against the board: a plain
+ * number is itself; `'friendlyMaxGig'` reads `player`'s best Gig die;
+ * `{ perEquippedGear: N }` reads `subjectUid`'s own `attachedGear.length`
+ * (docs/rulings.md §55 ff. — royce-psycho-on-the-edge's "+2 power for each of
+ * its equipped Gear").
+ */
+export function resolvePowerAmount(
+  state: GameState,
+  amount: number | DynamicAmount,
+  subjectUid: number,
+  player: PlayerId
+): number {
+  if (typeof amount === 'number') return amount
+  if (amount === 'friendlyMaxGig') return maxGigValue(state, player)
+  return state.cards[subjectUid].attachedGear.length * amount.perEquippedGear
+}
+
+/**
+ * A card's own faction/keyword tags, kebab-cased, as the schema's "Faction
+ * tags" section describes: at most one organization tag lives in `faction`,
+ * the rest (role tags, and any *second* organization tag) live in `keywords`
+ * already. A condition that means "an ARASAKA Unit" has to check both, since
+ * a single-faction ARASAKA card carries it in `faction`, not `keywords`
+ * (docs/rulings.md §55 ff.). Deliberately reads the card's OWN definition, not
+ * `effectiveKeywords` — a Unit's faction is not something its Gear changes.
+ */
+export function cardTags(def: CardDef): string[] {
+  const tags = [...def.keywords]
+  if (def.faction !== undefined) tags.push(def.faction.toLowerCase().replace(/\s+/g, '-'))
+  return tags
+}
+
+/**
+ * The extra power `uid` fights with against this specific `foe` — "+2 power
+ * while fighting a Legend" (meredith-stout-stone-cold-corpo). Deliberately
+ * separate from `effectivePower`: the bonus only exists while a fight against
+ * a matching foe is actually happening, so `fight()` is the only reader
+ * (docs/rulings.md §55 ff.).
+ */
+export function fightPowerBonus(db: CardDb, state: GameState, uid: number, foe: number): number {
+  const foeCard = state.cards[foe]
+  const foeDef = foeCard ? db[foeCard.defId] : undefined
+  if (!foeDef) return 0
+  let bonus = 0
+  for (const node of activeStaticNodes(db, state, uid)) {
+    if (node.kind === 'powerVsCardType' && node.cardType === foeDef.type) bonus += node.amount
+  }
+  return bonus
+}
+
+/**
+ * "This Unit can attack ready Units with {Blocker}" (valentino-guerrera) —
+ * the keyword a static `attackReadyWithKeyword` node widens `attackTargets`
+ * to, or null when no such (condition-gated) node is active. Narrower than
+ * the granted-only `attack-ready` keyword, which allows ANY ready Unit
+ * (docs/rulings.md §43 vs §55 ff.).
+ */
+export function attackableReadyKeyword(db: CardDb, state: GameState, uid: number): string | null {
+  for (const node of activeStaticNodes(db, state, uid)) {
+    if (node.kind === 'attackReadyWithKeyword') return node.keyword
+  }
+  return null
+}
+
+/**
+ * "This Unit can only attack rival Units. (It can't attack Gig areas.)"
+ * (ruthless-lowlife) — a per-card mirror of §24's engine-wide "no dice, no
+ * attack" omission (docs/rulings.md §55 ff.).
+ */
+export function cantAttackGigArea(db: CardDb, state: GameState, uid: number): boolean {
+  return activeStaticNodes(db, state, uid).some((node) => node.kind === 'cantAttackGigArea')
 }
 
 /**

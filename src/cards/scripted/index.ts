@@ -24,7 +24,8 @@
 // runs at module evaluation), exactly like the engine <-> cards cycle
 // documented at the top of ../effects.ts.
 
-import { hasKeyword } from '../../engine/query'
+import { endGame, drawCards } from '../../engine/game'
+import { hasKeyword, opponentOf } from '../../engine/query'
 import { nextInt } from '../../engine/rng'
 import type { CardDb, GameState, PlayerId } from '../../engine/types'
 import { fireTriggerOnDraft, type EffectCtx } from '../effects'
@@ -116,6 +117,92 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const card = state.cards[target]
     if (!card.tempKeywords.includes('adrenaline')) card.tempKeywords.push('adrenaline')
     if (hasKeyword(db, state, target, 'rocker')) card.tempPower += 2
+    return state
+  },
+
+  /**
+   * `v-roamer-of-the-badlands` — "When this Unit steals a Gig, increase it by
+   * up to 5." Attached to `onFriendlyStealDie` with `condition.selfIsStealer`
+   * (docs/rulings.md §55 ff.), so this only runs when V itself did the
+   * stealing. Unlike a general `changeGig` node (any Gig, a real choice of
+   * die), here BOTH the target (the die that was just stolen — always the
+   * last one pushed onto the thief's own Gig area, per docs/rulings.md §42)
+   * and the amount (a fixed-sign "by up to N" always takes the full clamped
+   * N, docs/rulings.md §39) are forced, so there is no real decision left to
+   * route through the slot machinery.
+   */
+  'v-roamer-of-the-badlands': (_db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const die = p.gigArea[p.gigArea.length - 1]
+    if (die !== undefined) die.value = Math.min(die.size, die.value + 5)
+    return state
+  },
+
+  /**
+   * `yorinobu-arasaka-steel-dragon` — "{Play} You may play a Unit with cost 4
+   * or less from your hand or trash for free. It can attack rival Units this
+   * turn." Wrapped in a `sameTarget` (docs/rulings.md §53) whose target spec
+   * (`friendlyHandOrTrashUnit`, filtered to cost 4 or less) is the real,
+   * enumerated decision — this script only performs the "play it for free"
+   * half; the second child of the `sameTarget` grants {adrenaline} so it can
+   * attack despite the Lag every freshly-played Unit gets (docs/rulings.md §55
+   * ff.). "Play" means the full thing: the card's own onPlay effects fire too,
+   * auto-targeted per docs/rulings.md §32 (a script-driven play carries no
+   * player decision of its own for them).
+   */
+  'yorinobu-arasaka-steel-dragon': (db, state, ctx) => {
+    const target = ctx.chosen
+    if (target === undefined) return state
+    const p = state.players[ctx.player]
+    const inHand = p.hand.includes(target)
+    const inTrash = p.trash.includes(target)
+    if (!inHand && !inTrash) return state
+    if (inHand) p.hand = p.hand.filter((uid) => uid !== target)
+    if (inTrash) p.trash = p.trash.filter((uid) => uid !== target)
+    const card = state.cards[target]
+    card.ready = true
+    card.lag = true
+    p.field.push(target)
+    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: target })
+    fireTriggerOnDraft(db, state, 'onPlay', target, [])
+    return state
+  },
+
+  /**
+   * `shattered-memories` — "Each player discards their hand and may draw 5.
+   * If the total number of discarded cards equals the value of a friendly
+   * Gig, draw 2."
+   *
+   * A one-off shape (no other card in the pool shares it), so it is fully
+   * scripted rather than grown into vocabulary (docs/rulings.md §48/§55 ff.).
+   * "May draw 5" is taken whenever possible, but — unlike a mandatory `draw`
+   * node (docs/rulings.md §17/§36) — it draws only *up to* 5 and never decks
+   * a player out, the same "up to what the deck holds" reading
+   * `trashFromDeck` already uses (docs/rulings.md §36). The bonus "draw 2" IS
+   * a mandatory draw and can end the game on an empty deck, like any other
+   * `draw` node.
+   */
+  'shattered-memories': (db, state, ctx) => {
+    let totalDiscarded = 0
+    for (const player of [0, 1] as const) {
+      const p = state.players[player]
+      totalDiscarded += p.hand.length
+      for (const uid of p.hand) {
+        p.trash.push(uid)
+        state.events.push({ type: 'cardTrashed', uid })
+      }
+      p.hand = []
+      for (let i = 0; i < 5; i++) {
+        const drawn = p.deck.shift()
+        if (drawn === undefined) break
+        p.hand.push(drawn)
+        state.events.push({ type: 'cardDrawn', player, uid: drawn })
+      }
+    }
+    const matches = state.players[ctx.player].gigArea.some((die) => die.value === totalDiscarded)
+    if (matches && !drawCards(state, ctx.player, 2)) {
+      endGame(state, opponentOf(ctx.player), 'deckout')
+    }
     return state
   },
 }

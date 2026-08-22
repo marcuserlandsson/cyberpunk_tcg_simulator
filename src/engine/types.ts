@@ -39,6 +39,22 @@ export type Trigger =
   | 'onWinFight'
   | 'onSpend'
   | 'onFriendlyStealDie'
+  // Batch 2 (docs/rulings.md §55-§6x) — four more watcher-shaped triggers:
+  //   * onFriendlyAttack — "the first time a friendly ARASAKA Unit attacks
+  //     each turn" — fires on every in-play card of the ATTACKER'S owner,
+  //     whenever any friendly Unit attacks;
+  //   * onUnitDefeated — "the first time an ARASAKA Unit is defeated each
+  //     turn" — bare, so it fires GLOBALLY (every in-play card of BOTH
+  //     players), whichever side the defeated Unit belonged to;
+  //   * onRivalAdjustFriendlyGig — "When a Rival adjusts ... friendly Gigs" —
+  //     fires on the AFFECTED player's in-play cards when a `changeGig` node
+  //     run by the other player touches one of their dice;
+  //   * onEndTurn — "At the end of your turn, ..." — fires on every in-play
+  //     card of the player whose turn is ending.
+  | 'onFriendlyAttack'
+  | 'onUnitDefeated'
+  | 'onRivalAdjustFriendlyGig'
+  | 'onEndTurn'
   | 'activated'
   | 'static'
 
@@ -63,6 +79,10 @@ export type TargetSpec =
   | 'friendlyGigDie'
   | 'rivalGigDie'
   | 'anyGigDie'
+  // Batch 2 (docs/rulings.md §55-§6x): zones no earlier card needed to reach.
+  | 'friendlyTrashCard'
+  | 'friendlyHandCard'
+  | 'friendlyHandOrTrashUnit'
 
 /** The three Gig-die scopes a card's text can name (docs/rulings.md §39). */
 export type GigDieSpec = 'friendlyGigDie' | 'rivalGigDie' | 'anyGigDie'
@@ -79,6 +99,18 @@ export interface TargetFilter {
   keyword?: string
   excludeSelf?: boolean
   weakerThanAFriendlyUnit?: boolean
+  /** "a Unit" restricted to CardDef.type (docs/rulings.md §55 ff.). */
+  cardType?: CardType
+  /** "with cost 4 or less" (yorinobu-arasaka-steel-dragon). */
+  maxCost?: number
+  /**
+   * "power 2 or less ... power 3 or less INSTEAD" (royce-don-t-call-me-simon):
+   * the alternate `maxPower` used when the controller has more Street Cred
+   * than the rival, replacing `maxPower` rather than adding to it.
+   */
+  maxPowerIfAheadOnStreetCred?: number
+  /** "power equal to or less than the value of a friendly d20" (over-the-edge). */
+  maxPowerVsFriendlyD20?: boolean
 }
 
 /**
@@ -93,8 +125,13 @@ export interface CostReduction {
   minimum: number
 }
 
-/** A power amount read off the board instead of printed on the card. */
-export type DynamicAmount = 'friendlyMaxGig'
+/**
+ * A power amount read off the board instead of printed on the card.
+ * `{ perEquippedGear: N }` is "+N power for each of its equipped Gear"
+ * (royce-psycho-on-the-edge, docs/rulings.md §55 ff.) — N times the subject
+ * card's own `attachedGear.length`.
+ */
+export type DynamicAmount = 'friendlyMaxGig' | { perEquippedGear: number }
 
 export type EffectNode =
   | { kind: 'draw'; count: number }
@@ -106,7 +143,7 @@ export type EffectNode =
       filter?: TargetFilter
       duration: 'turn' | 'permanent'
     }
-  | { kind: 'staticPower'; amount: number }
+  | { kind: 'staticPower'; amount: number | DynamicAmount }
   | { kind: 'defeat'; target: TargetSpec; filter?: TargetFilter }
   | { kind: 'bounce'; target: TargetSpec; filter?: TargetFilter }
   | { kind: 'readyCard'; target: TargetSpec; filter?: TargetFilter }
@@ -165,6 +202,29 @@ export type EffectNode =
   | { kind: 'winsFightVsKeyword'; keyword: string }
   // Static: this card's own play cost is reduced (docs/rulings.md §44).
   | { kind: 'costReduction'; reduction: CostReduction }
+  // Batch 2 additions (docs/rulings.md §55 ff.):
+  // Static: "+N power while fighting a [cardType]" (meredith-stout). Only
+  // consulted by combat.ts's `fight()`, never by the generic `effectivePower`
+  // (there is no "current foe" outside a fight).
+  | { kind: 'powerVsCardType'; cardType: CardType; amount: number }
+  // "Add a card from your trash to your hand" / "...another Unit..." /
+  // "...1 BRAINDANCE Program...": moves a trash-zone card to hand.
+  | { kind: 'retrieveFromTrash'; target: TargetSpec; filter?: TargetFilter }
+  // "Then, ... discard 1": moves a hand-zone card to the trash. Unlike
+  // `discardRandomRival` (forced, on the RIVAL, at random) this is the
+  // controller discarding their OWN hand, so it goes through the ordinary
+  // target-slot machinery — a real decision whenever the firing action can
+  // carry one, an rng fallback otherwise (docs/rulings.md §32/§55).
+  | { kind: 'discardCard'; target: TargetSpec; filter?: TargetFilter }
+  // Static: "this Unit can attack ready Units with {Blocker}" — widens
+  // `attackTargets` to ready Units carrying `keyword`, narrower than the
+  // granted-only `attack-ready` keyword which allows ANY ready Unit
+  // (docs/rulings.md §43 vs §55).
+  | { kind: 'attackReadyWithKeyword'; keyword: string }
+  // Static: "This Unit can only attack rival Units. (It can't attack Gig
+  // areas.)" — the mirror image of §24's engine-level Gig-area omission, but
+  // printed on one specific card rather than universal.
+  | { kind: 'cantAttackGigArea' }
 
 export interface EffectDef {
   trigger: Trigger
@@ -177,6 +237,23 @@ export interface EffectDef {
     rivalGigLeadAtLeast?: number
     /** Watcher triggers only: the size of the Gig die that was just stolen. */
     stolenDieSize?: DieSize
+    // Batch 2 additions (docs/rulings.md §55 ff.):
+    /** "If you have more ☆ (Street Cred) than a Rival" — strictly greater. */
+    streetCredAheadOfRival?: boolean
+    /** "if you have less than N ☆ (Street Cred)" — strictly less. */
+    streetCredBelow?: number
+    /** "During your turn, ..." — only while the controller is the active player. */
+    duringOwnTurn?: boolean
+    /** `onAttack` only: "if this Unit has power N+" — the attacker's own power. */
+    sourcePowerAtLeast?: number
+    /** `onFriendlyStealDie` only: "When THIS Unit steals a Gig" (not any friendly Unit). */
+    selfIsStealer?: boolean
+    /** `onFriendlyAttack` only: the attacking Unit's own faction/keyword tag. */
+    attackerKeyword?: string
+    /** `onUnitDefeated` only: the defeated Unit's own faction/keyword tag. */
+    defeatedKeyword?: string
+    /** "if you control 2 or more Gigs with 8+ value" */
+    friendlyGigsAtLeastValueCount?: { value: number; count: number }
   }
   quick?: boolean
   /** "The first time ... each turn" — one firing per game turn, per source. */

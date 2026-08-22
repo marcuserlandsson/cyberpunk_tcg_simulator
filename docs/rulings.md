@@ -1401,3 +1401,340 @@ so the play offers exactly one decision — which friendly Unit — and the Stre
 Cred comparison decides how much that Unit gets. The `attack-ready` grant is
 still turn-long rather than one-attack-long (§43's recorded
 over-approximation, waiting on §52's floating effects).
+
+# Task 8 rulings, batch 2 (Red, 17 more cards)
+
+Batch 2 needed roughly as much new vocabulary as batch 1, spread thinner
+across more cards (the 17 assigned here, plus several forward-looking
+generalizations the pool's other "more ☆", "end of your turn" and "for each
+of its equipped Gear" cards will reuse later). Each entry names the printed
+text that forced it and, where relevant, how many other pool cards share the
+shape (checked by grepping `data/cards.json`'s `text` field pool-wide, not
+just this batch).
+
+## 55 — "More/less ☆ than a Rival" and "less than N ☆" join the condition object
+
+Four cards use "If you have more ☆ (Street Cred) than a Rival" as a plain
+gate (`minotaur`, `royce-don-t-call-me-simon`, `valentino-guerrera`, and
+`evelyn-parker-scheming-siren` outside this batch) — a strict comparison, not
+an absolute threshold, so the existing `streetCredAtLeast` field cannot
+express it. `yorinobu-arasaka-embracing-destruction` also needs the mirror
+image at a fixed threshold: "if you have less than 20 ☆".
+
+**Ruling:** `EffectDef.condition` gains `streetCredAheadOfRival?: boolean`
+(strictly greater than the rival's Street Cred) and `streetCredBelow?: number`
+(strictly less than the threshold). Both are plain reads of `streetCred` on
+both sides, mirroring `effects.ts`'s pre-existing (unexported) local
+`behindOnStreetCred` helper that `chooseOne`'s `rivalIfBehindStreetCred`
+chooser already used — this just promotes the same comparison to a
+data-driven condition so a plain (non-modal) effect can gate on it too.
+
+## 56 — "+N power while fighting a [card type]" is a fight-only static, never folded into `effectivePower`
+
+`meredith-stout-stone-cold-corpo`: "This Unit has +2 power while fighting a
+Legend." No other pool card shares this exact shape, but it is not a `chooseOne`
+or a `buffPower` — the bonus exists only for the duration of one specific fight,
+against one specific kind of foe, and disappears completely outside that fight
+(it must not, for instance, make the Unit look stronger when computing an
+attack's Gig-steal count, which the guide bases on power *before* any foe is
+known).
+
+**Ruling:** the vocabulary gains the static node
+`{ kind: 'powerVsCardType', cardType: CardType, amount: number }`, read by a
+new `query.ts` helper `fightPowerBonus(db, state, uid, foe)` that
+`combat.ts`'s `fight()` adds on **both** sides on top of `effectivePower`,
+matching each side's own foe. It is deliberately **not** added inside
+`effectivePower` itself (unlike a Gear's printed power or an unconditional
+`staticPower`): `effectivePower` has no "current foe" parameter, and every
+other reader of it (Gig-steal count, target filters, UI display) would
+otherwise see a bonus that only makes sense mid-fight.
+
+## 57 — Trash-zone and hand-zone targeting: `friendlyTrashCard`, `friendlyHandCard`, `retrieveFromTrash`, `discardCard`
+
+Three cards move a specific card between the trash and the hand, and the
+card chosen is a real decision, not an "at random" forced pick (contrast
+`discardRandomRival`, whose text is explicit about randomness because the
+*rival's* hand is not the acting player's to see):
+
+- `meredith-stout-stone-cold-corpo`: "you may add **a card** from your trash
+  to your hand" — no restriction at all;
+- `screw-lovelorn-fool`: "Add **another Unit** from your trash to your hand"
+  — restricted to card type Unit, excluding the source itself;
+- `v-streetkid`: "add **1 BRAINDANCE Program** from your trash to your hand"
+  — restricted to card type Program with the `braindance` keyword.
+
+**Ruling:** `TargetSpec` gains `friendlyTrashCard` (every card in the
+controller's own trash) and `friendlyHandCard` (every card in the
+controller's own hand); `TargetFilter` gains `cardType?: CardType`, checked
+against the candidate's own `CardDef.type`. Two new nodes consume them:
+`retrieveFromTrash` (trash → hand) and `discardCard` (hand → trash, the
+controller's own choice of card — see §65 for why this differs from
+`discardRandomRival`). Because these route through the ordinary target-slot
+machinery, a triggered use (as all three cards' printed triggers are)
+auto-targets via rng when nothing can supply a real choice (§32), and an
+on-play/activated use would get a real enumerated decision for free if a
+future card needs one.
+
+**A same-EffectDef ordering trap, and why `v-streetkid` is two `EffectDef`s
+sharing one trigger, not a `sequence`.** `v-streetkid`'s printed text is
+"Trash 3. Then, add 1 BRAINDANCE Program from your trash to your hand" — no
+"from *among them*" qualifier (contrast `all-is-lost`, which has exactly that
+qualifier and is scripted for exactly this reason, §48). So the retrieval
+must be able to reach the newly-trashed cards, which only exist *after* the
+`trashFromDeck` node has run. But §32 binds every slot of one `EffectDef`
+**once, before its first node runs** — a `sequence` wrapping both nodes would
+enumerate `retrieveFromTrash`'s candidates against the trash as it was
+*before* the trash-3 even happened, so a BRAINDANCE Program trashed by this
+same effect could never be chosen (verified failing before this fix: with an
+otherwise-empty trash, the slot had zero candidates and the retrieval always
+fizzled). The fix costs nothing structurally: `fireCardTrigger` already
+resolves a card's matching `EffectDef`s **in printed order, each with its own
+fresh `bindSlots` call** (this is how `yorinobu-arasaka-embracing-destruction`'s
+two `onFriendlyAttack` defs and `johnny-silverhand-never-stop-fighting`-style
+cards already work). So `v-streetkid` is encoded as two `onCall` defs — trash
+3, then retrieve — and the second one's candidates are correctly computed
+*after* the first has resolved. **Any future card with this "fill a zone,
+then target what you just put there" shape must split into separate
+same-trigger `EffectDef`s the same way**, not a `sequence`; a `sequence` is
+only safe when no later node's target set depends on an earlier node's
+zone mutation within the same `EffectDef`.
+
+## 58 — Attack-permission statics: `attackReadyWithKeyword`, `cantAttackGigArea`
+
+- `valentino-guerrera`: "If you have more ☆ than a Rival, this Unit can
+  attack ready Units **with {Blocker}**" — narrower than §43's granted-only
+  `attack-ready` keyword (which permits attacking *any* ready Unit): this is a
+  standing, condition-gated static, not a temporary grant from resolving an
+  effect, and it only ever widens the target list to ready Units carrying one
+  specific keyword.
+- `ruthless-lowlife`: "This Unit can only attack rival Units. (It can't
+  attack Gig areas.)" — the mirror image of §24's *engine-wide* omission of an
+  empty Gig area from the attack-target list, but printed on one card as a
+  blanket restriction regardless of whether the Gig area is empty.
+
+**Ruling:** two static nodes, `{ kind: 'attackReadyWithKeyword', keyword }`
+and `{ kind: 'cantAttackGigArea' }`, read by new `query.ts` helpers
+(`attackableReadyKeyword`, `cantAttackGigArea`) that `combat.ts`'s
+`attackTargets` consults alongside the existing `ATTACK_READY` keyword check
+and the rival-Gig-area-non-empty check. Both are gated by the owning
+`EffectDef`'s ordinary `condition` (`streetCredAheadOfRival` for Valentino),
+so nothing new is needed for the "only while ahead" half.
+
+## 59 — "+N power for each of its equipped Gear" as a static, and "during your turn"
+
+`royce-psycho-on-the-edge`: "During your turn, this Legend has +2 power for
+each of its equipped Gear." The pool has two more cards with the "for each of
+its equipped Gear" shape (`cyberpsychosis`, `dum-dum-maelstrom-triggerman`,
+both outside this batch) but as a one-shot `buffPower`, not an ongoing static
+— all three want the same *amount*, read off the board instead of printed.
+
+**Ruling:**
+
+- `DynamicAmount` (already `'friendlyMaxGig'` from §39) gains a second
+  variant, `{ perEquippedGear: number }` — N times the *subject* card's own
+  `attachedGear.length`. A new `query.ts` helper, `resolvePowerAmount(state,
+  amount, subjectUid, player)`, is the one place both variants are resolved,
+  used by `buffPower`'s node handler (unchanged behaviour for the
+  `'friendlyMaxGig'` case) and now also by `effectivePower`'s `staticPower`
+  loop — `staticPower.amount` widens from a bare `number` to `number |
+  DynamicAmount` for exactly this;
+- `EffectDef.condition` gains `duringOwnTurn?: boolean` — true only while
+  `state.activePlayer` is the effect's own controller. This is a plain board
+  read, not a new trigger: Royce's bonus is a **static**, live continuously
+  while the condition holds, not something that fires and then persists.
+
+## 60 — Four more watcher-shaped triggers: `onFriendlyAttack`, `onUnitDefeated`, `onRivalAdjustFriendlyGig`, `onEndTurn`
+
+Following §42's `onFriendlyStealDie` template (a trigger about *another*
+card's action, broadcast to every in-play card that might care), four more
+printed shapes need the same treatment:
+
+- `onFriendlyAttack` — "The first time a friendly ARASAKA Unit attacks each
+  turn, ..." (`yorinobu-arasaka-embracing-destruction`). Broadcast, from
+  `combat.ts`'s `declareAttack`, to every in-play card of the **attacker's own
+  controller** (single-sided, like `onFriendlyStealDie`), carrying
+  `context.attackerTags` (see §61) for the keyword gate;
+- `onUnitDefeated` — "The first time an ARASAKA Unit is defeated each turn,
+  ..." (`yorinobu-arasaka-steel-dragon`). Bare — no "friendly" qualifier — so,
+  per §39's convention for bare wording, it watches **globally**: broadcast
+  from `combat.ts`'s `defeatUnit` to every in-play card of **both** players,
+  whichever side the defeated Unit belonged to. Fired after the field exit
+  (so the Unit is genuinely gone, and a `defeatShield`-saved Unit never
+  triggers it — same non-event as §41's "no winner" case) but the tags are
+  captured from the card's own definition **before** `leaveField` detaches its
+  Gear, since a Unit's own faction membership never depended on its Gear;
+- `onRivalAdjustFriendlyGig` — "When a Rival adjusts or swaps 1 or more
+  friendly Gigs, ..." (`meredith-stout-stone-cold-corpo`). Fired from
+  `effects.ts`'s `changeGig` node handler itself, on the die's **actual
+  owner** (via a new `targets.ts` helper `gigDieOwner`, the mirror image of
+  `gigDieAt`), whenever that owner differs from the effect's controller —
+  i.e. whenever someone else's `changeGig` reaches into your Gig area.
+  **Known gap:** the printed text also says "or swaps", but no card in the
+  pool implements a Gig-swap node yet (`hanako-arasaka-daughter-of-the-emperor`
+  and `maxtac-av` print "Swap a friendly Gig with a rival Gig" — both future
+  batches). Meredith's ability only actually fires off `changeGig` today;
+  whichever batch adds the swap node must fire this same trigger from it too,
+  or this half of her text silently under-delivers;
+- `onEndTurn` — "At the end of your turn, ..." (`v-roamer-of-the-badlands`;
+  11 cards pool-wide print this). Broadcast, from `reduce.ts`'s `endTurn`,
+  to every in-play card of the player whose turn is ending, **before**
+  `clearTurnBuffs` wipes the turn's `tempPower`/`tempKeywords` — so a card
+  whose end-of-turn condition reads "this turn" state (e.g. a future card
+  checking a turn-scoped flag) sees it intact. `endTurn` gained a `db:
+  CardDb` parameter for this (previously it needed none), and checks
+  `draft.winner !== null` immediately after, the same guard `declareAttack`
+  and `defeatUnit` already use, so an end-of-turn effect that decks a player
+  out stops the turn hand-off dead rather than starting the next turn over a
+  finished game.
+
+All four reuse the existing `fireWatcherTrigger` helper (§42) unchanged —
+"global" is simply calling it once per player instead of once.
+
+## 61 — Two more one-trigger-only condition contexts: `sourcePowerAtLeast`, `selfIsStealer`
+
+Following §42's `stolenDieSize` pattern (a fact only the firing trigger can
+supply, so the condition is unsatisfiable anywhere else):
+
+- `swordwise-huscle`: "{Attack} If this Unit has power 5+, draw 1." —
+  `condition.sourcePowerAtLeast`, answered by `context.sourcePower`, which
+  `combat.ts`'s `declareAttack` now also computes (alongside the existing
+  `payOptionalCosts`) and passes into the `onAttack` firing;
+- `v-roamer-of-the-badlands`: "When **this Unit** steals a Gig, increase it
+  by up to 5." Every other `onFriendlyStealDie` card in the pool (just
+  `6th-street-recruits` so far) means "any friendly Unit"; this one means
+  specifically itself. `condition.selfIsStealer`, answered by
+  `context.stealerUid` (the attacking/stealing card's own uid, which
+  `PendingSteal.attacker` already tracks) compared against the *checking*
+  card's own uid — which is why `conditionMet` grew an optional `sourceUid`
+  parameter (every call site that has one to give now passes it; the ones
+  that don't, e.g. a card's own static cost-reduction check, simply never
+  match a `selfIsStealer` condition, which is correct since that condition
+  can only ever appear on a triggered def).
+
+  **Also scripted, not a `changeGig` node:** "increase **it** by up to 5"
+  names the specific die just stolen (always the last one pushed onto the
+  thief's own Gig area, per §42) with a fixed, non-adjustable amount (§39's
+  "by up to N" rule: always the full clamped N). Neither the target nor the
+  amount is a real decision here, so there is nothing for the slot machinery
+  to enumerate — `changeGig`'s `anyGigDie`/`friendlyGigDie` specs would
+  incorrectly offer *every* friendly die as a choice. The card is scripted
+  (`v-roamer-of-the-badlands`) purely to reach "the last-pushed die" directly;
+  it is not the §48 kind of script (no player decision is being replaced).
+
+## 62 — "2 or more Gigs with 8+ value" needs a count, not just a max
+
+`v-roamer-of-the-badlands`: "At the end of your turn, if you control 2 or more
+Gigs with 8+ value, draw 1." The existing `friendlyGigValueAtLeast` (§39/§50)
+only checks the *best* die ("if you control **a** Gig with 8+ value" — one is
+enough); this needs a count of qualifying dice, which is a different
+predicate entirely.
+
+**Ruling:** `EffectDef.condition` gains `friendlyGigsAtLeastValueCount?: {
+value: number; count: number }` — the number of the controller's Gig dice at
+or above `value` must be at least `count`. Named and shaped differently from
+`friendlyGigValueAtLeast` on purpose, rather than overloading one field with
+two meanings depending on whether a `count` is present.
+
+## 63 — Free-playing a Unit from hand *or* trash: `friendlyHandOrTrashUnit`, `maxCost`, and a scripted play
+
+`yorinobu-arasaka-steel-dragon`: "{Play} You may play a Unit with cost 4 or
+less from your hand or trash for free. It can attack rival Units this turn."
+Two more pool cards print the same "play ... for free" shape from a mixed
+zone (`lizzy-wizzy-delicate-weapon`: hand-or-trash Program; `river-ward-
+detective-on-the-hunt`: hand-only Gear), so the *targeting* half is built as
+reusable vocabulary even though only this card is in scope this batch.
+
+**Rulings:**
+
+- `TargetSpec` gains `friendlyHandOrTrashUnit` — every card in the
+  controller's own hand *and* trash whose `CardDef.type` is `'unit'`. The
+  type restriction is baked into the spec itself (a mixed hand+trash zone
+  holds every card type, unlike any existing spec), rather than left to a
+  generic filter, because the spec's own name already promises "a Unit" the
+  way `friendlyUnit` does;
+- `TargetFilter` gains `maxCost?: number` for the printed cost cap ("cost 4 or
+  less"), checked against the candidate's own `CardDef.cost`;
+- this is wrapped in a `sameTarget` (§53) whose two children are a `scripted`
+  node (the actual "move it onto the field and play it" mechanics: it is
+  simply too much machinery — skip payment, skip the normal hand-only
+  entry point, still fire the moved card's own onPlay — to fit an
+  `EffectNode`, matching §48's script-vs-vocabulary line exactly) and a
+  `grantKeyword` for `adrenaline` on `'chosen'` (so it can attack despite the
+  Lag every freshly-entered Unit still gets — see below). The script reads
+  `ctx.chosen`, the uid the `sameTarget` bound, rather than declaring its own
+  `targets`, since the enclosing `sameTarget` already claimed the one real
+  decision;
+- the freed Unit's own **onPlay** still fires ("play" means the whole thing),
+  auto-targeted per §32 (a script-driven play carries no player decision of
+  its own for the freed card's effects) — mirroring §38's rule that a card's
+  own onPlay is a first-class play, not folded into whoever caused it;
+- the freed Unit enters with the **ordinary** Lag every Unit gets (matching
+  every other entry point, rather than special-casing this one script to
+  skip it), and the `grantKeyword adrenaline` child is what actually lets it
+  attack "this turn" — so "It can attack rival Units this turn" reads exactly
+  like §43's `johnny-silverhand-rocking-renegade` clause: {adrenaline} is the
+  keyword that means "can attack the turn it's played", and "rival Units" is
+  the ordinary attack-target restriction (guide p11), not an extra
+  permission needing its own node.
+
+## 64 — Two more dynamic `maxPower` filters: an alternate cap, and a friendly-die reading
+
+- `royce-don-t-call-me-simon`: "Defeat a rival Unit with power 2 or less. If
+  you have more ☆ than a Rival, defeat a rival Unit with power 3 or less
+  **instead**." "Instead" is the operative word: this is **one** defeat with
+  a threshold that depends on the board, not two additive defeats (contrast
+  §50's `bonnie-and-clyde`, whose "instead" genuinely means "one more, on top
+  of the first"). `TargetFilter` gains `maxPowerIfAheadOnStreetCred?: number`,
+  which **replaces** `maxPower` (never adds to it) when the controller has
+  more Street Cred than the rival, decided once per `filterTargets` call
+  rather than per candidate (so it cannot flicker mid-evaluation);
+- `over-the-edge`: "Defeat a Unit with power equal to or less than the value
+  of a friendly d20." Bare "a Unit" is `anyUnit` (§39's bare convention,
+  applied to card targets rather than Gig dice) — verified against the
+  card's own effects, which can and do reach the controller's own side.
+  `TargetFilter` gains `maxPowerVsFriendlyD20?: boolean`, resolved through a
+  new `targets.ts` helper `friendlyD20Value` (the highest face among the
+  controller's own d20 dice, or **-1** with none, so "no d20" rejects every
+  candidate rather than needing a special case).
+
+## 65 — `shattered-memories`: a one-off "discard hands, may redraw, conditional bonus" script
+
+"Each player discards their hand and may draw 5. If the total number of
+discarded cards equals the value of a friendly Gig, draw 2." No other pool
+card shares this shape (both-players-discard, a per-player optional
+redraw, and a board-dependent bonus keyed off a value nothing else tracks —
+the running discard total), so per §48 it is fully scripted rather than grown
+into vocabulary.
+
+**Ruling — "may draw 5" is "draw up to 5", never a deck-out risk.** Unlike a
+mandatory `draw` node (§17/§36, which loses the game on an empty deck), an
+optional redraw that could accidentally lose the game for choosing the
+*beneficial* option would be a trap no rational player would ever spring —
+and nothing in the text suggests "you may" here means "an all-or-nothing
+gamble with your own life". This reuses `trashFromDeck`'s already-settled
+"take up to what the deck holds, stop early" reading (§36) rather than
+`draw`'s. The bonus "draw 2", by contrast, carries no "may" and is a genuine
+mandatory draw — it can end the game exactly like any other `draw` node, and
+the script calls the same `endGame`/`drawCards` primitives `effects.ts` uses
+for that case.
+
+## 66 — `cardTags`: a card's own faction *and* keyword tags, for bare organization checks
+
+`yorinobu-arasaka-embracing-destruction` ("a friendly ARASAKA Unit") and
+`yorinobu-arasaka-steel-dragon` ("an ARASAKA Unit") both gate on organization
+membership. Per the schema doc's "Faction tags" section (and docs/rulings.md
+§10), a card with only **one** organization tag stores it in `faction`, not
+`keywords` — so `hasKeyword(uid, 'arasaka')` is **false** for most
+single-faction ARASAKA cards (e.g. `satori-sword-of-saburo`: `faction:
+"Arasaka"`, `keywords: ["weapon"]`), and would silently never match.
+
+**Ruling:** a new `query.ts` helper, `cardTags(def)`, returns the union of a
+card's own `keywords` and its kebab-cased `faction` (if any) — the same
+partition the transcription task already promises callers can reconstruct.
+`combat.ts` computes this once per firing (`context.attackerTags` in
+`declareAttack`, `context.defeatedTags` in `defeatUnit`) from the card's own
+`CardDef`, deliberately **not** `effectiveKeywords` — a Unit's faction is not
+something its equipped Gear can change, unlike the keywords Gear grants
+(§30). `EffectDef.condition.attackerKeyword`/`defeatedKeyword` (named to match
+the existing `filter.keyword` convention, even though the check is really
+"keyword-or-faction") match against these lists.

@@ -13,7 +13,7 @@
 // to the *source card's owner*, never to the active player: a Gear card equipped
 // to a rival Unit still targets its own owner's side (docs/rulings.md §8).
 
-import { effectivePower, hasKeyword, opponentOf } from '../engine/query'
+import { effectivePower, hasKeyword, opponentOf, streetCred } from '../engine/query'
 import type {
   CardDb,
   GameState,
@@ -51,7 +51,7 @@ function faceUpLegendsOf(state: GameState, player: PlayerId): number[] {
  * `effectController` for that.
  */
 export function targetsFor(
-  _db: CardDb,
+  db: CardDb,
   state: GameState,
   spec: TargetSpec,
   sourceUid: number,
@@ -89,6 +89,20 @@ export function targetsFor(
       return [...state.players[me].gigArea, ...state.players[rival].gigArea].map(
         (_die, index) => index
       )
+    // Batch 2 additions (docs/rulings.md §55 ff.): zones no earlier card
+    // needed to reach.
+    case 'friendlyTrashCard':
+      return state.players[me].trash.slice()
+    case 'friendlyHandCard':
+      return state.players[me].hand.slice()
+    // "a Unit ... from your hand or trash" — the "Unit" restriction is baked
+    // into the spec itself (a mixed hand+trash zone holds every card type);
+    // a printed cost cap ("cost 4 or less") narrows further via the ordinary
+    // `maxCost` filter.
+    case 'friendlyHandOrTrashUnit':
+      return [...state.players[me].hand, ...state.players[me].trash].filter(
+        (uid) => db[state.cards[uid].defId]?.type === 'unit'
+      )
   }
 }
 
@@ -120,10 +134,40 @@ export function gigDieAt(
   }
 }
 
+/**
+ * Which player's Gig area a bound `changeGig` index actually belongs to — the
+ * mirror image of `gigDieAt`. Used to fire "When a Rival adjusts ... friendly
+ * Gigs" from the AFFECTED player's point of view (docs/rulings.md §55 ff.).
+ */
+export function gigDieOwner(
+  state: GameState,
+  spec: GigDieSpec,
+  index: number,
+  controller: PlayerId
+): PlayerId {
+  if (spec === 'friendlyGigDie') return controller
+  if (spec === 'rivalGigDie') return opponentOf(controller)
+  const mine = state.players[controller].gigArea.length
+  return index < mine ? controller : opponentOf(controller)
+}
+
 /** The highest `effectivePower` among `player`'s field Units, or null if none. */
 function bestFriendlyPower(db: CardDb, state: GameState, player: PlayerId): number | null {
   const powers = fieldOf(state, player).map((uid) => effectivePower(db, state, uid))
   return powers.length === 0 ? null : Math.max(...powers)
+}
+
+/**
+ * The highest face value among `player`'s own d20 Gig dice, or -1 when they
+ * have none — "the value of a friendly d20" (over-the-edge). -1 makes the
+ * filter reject every candidate rather than special-casing "no d20"
+ * (docs/rulings.md §55 ff.).
+ */
+function friendlyD20Value(state: GameState, player: PlayerId): number {
+  const values = state.players[player].gigArea
+    .filter((die) => die.size === 20)
+    .map((die) => die.value)
+  return values.length === 0 ? -1 : Math.max(...values)
 }
 
 /**
@@ -144,10 +188,31 @@ export function filterTargets(
   const friendlyBest = filter.weakerThanAFriendlyUnit
     ? bestFriendlyPower(db, state, controller)
     : null
+  // "power 2 or less ... power 3 or less INSTEAD" — the alternate cap replaces
+  // `maxPower` rather than adding to it, and is decided once per filter call
+  // rather than per candidate (docs/rulings.md §55 ff.).
+  const aheadOnStreetCred =
+    filter.maxPowerIfAheadOnStreetCred !== undefined
+      ? streetCred(state, controller) > streetCred(state, opponentOf(controller))
+      : false
+  const d20Cap = filter.maxPowerVsFriendlyD20 ? friendlyD20Value(state, controller) : null
   return candidates.filter((uid) => {
     if (filter.excludeSelf === true && uid === sourceUid) return false
     if (filter.keyword !== undefined && !hasKeyword(db, state, uid, filter.keyword)) return false
-    if (filter.maxPower !== undefined && effectivePower(db, state, uid) > filter.maxPower) {
+    if (filter.cardType !== undefined && db[state.cards[uid].defId]?.type !== filter.cardType) {
+      return false
+    }
+    if (filter.maxCost !== undefined && db[state.cards[uid].defId].cost > filter.maxCost) {
+      return false
+    }
+    const maxPower =
+      filter.maxPowerIfAheadOnStreetCred !== undefined && aheadOnStreetCred
+        ? filter.maxPowerIfAheadOnStreetCred
+        : filter.maxPower
+    if (maxPower !== undefined && effectivePower(db, state, uid) > maxPower) {
+      return false
+    }
+    if (filter.maxPowerVsFriendlyD20 === true && effectivePower(db, state, uid) > (d20Cap ?? -1)) {
       return false
     }
     if (filter.minPower !== undefined && effectivePower(db, state, uid) < filter.minPower) {

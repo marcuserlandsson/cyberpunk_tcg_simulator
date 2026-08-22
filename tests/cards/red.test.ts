@@ -702,6 +702,540 @@ describe('la-llorona-ghost-of-the-past', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Task 8 — Red cards, batch 2: mantis-blades, meredith-stout-stone-cold-corpo,
+// minotaur, octant, over-the-edge, royce-don-t-call-me-simon,
+// royce-psycho-on-the-edge, ruthless-lowlife, satori-sword-of-saburo,
+// screw-lovelorn-fool, shattered-memories, swordwise-huscle,
+// v-roamer-of-the-badlands, v-streetkid, valentino-guerrera,
+// yorinobu-arasaka-embracing-destruction, yorinobu-arasaka-steel-dragon.
+// ---------------------------------------------------------------------------
+
+describe('mantis-blades', () => {
+  it('is a vanilla Gear that hands its printed +2 power to its host', () => {
+    expect(db['mantis-blades'].effects).toEqual([])
+    const { state } = fixtureWithHand(0, ['mantis-blades'])
+    const host = fieldCard(state, 0, 'japantown-jonin') // power 0
+    const next = playCardByDef(db, state, 0, 'mantis-blades', { targetDef: 'japantown-jonin' })
+    expect(next.cards[host].attachedGear).toHaveLength(1)
+    expect(effectivePower(db, next, host)).toBe(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// meredith-stout-stone-cold-corpo — "{Blocker}\nThis Unit has +2 power while
+// fighting a Legend.\nWhen a Rival adjusts or swaps 1 or more friendly Gigs,
+// you may add a card from your trash to your hand."
+// ---------------------------------------------------------------------------
+
+describe('meredith-stout-stone-cold-corpo', () => {
+  it('gets +2 power only while fighting a Legend, enough to win a fight it would otherwise lose', () => {
+    const { state } = fixtureWithHand(0, [])
+    const meredith = fieldCard(state, 0, 'meredith-stout-stone-cold-corpo') // power 5
+    const legendFoe = fieldCard(state, 1, 'royce-psycho-on-the-edge', { ready: false }) // power 6, a Legend
+    const next = passReact(db, startAttack(db, state, meredith, legendFoe))
+    // A fielded Legend that leaves the field is removed from the game, never
+    // trashed (docs/rulings.md §31) — but it did lose the fight, which is the
+    // point: 5 + 2 = 7 beats 6, where 5 vs 6 would have lost.
+    expect(next.players[1].removed).toContain(legendFoe)
+    expect(next.players[0].field).toContain(meredith)
+  })
+
+  it('gets no bonus fighting a non-Legend Unit', () => {
+    const { state } = fixtureWithHand(0, [])
+    const meredith = fieldCard(state, 0, 'meredith-stout-stone-cold-corpo') // power 5
+    const unitFoe = fieldCard(state, 1, 'kerry-eurodyne-the-last-rockerboy', { ready: false }) // power 5
+    const next = passReact(db, startAttack(db, state, meredith, unitFoe))
+    // Equal power with no bonus: a tie defeats both.
+    expect(next.players[1].trash).toContain(unitFoe)
+    expect(next.players[0].trash).toContain(meredith)
+  })
+
+  it('may retrieve a trashed card when a Rival adjusts a friendly Gig', () => {
+    const { state } = fixtureWithHand(1, [])
+    fieldCard(state, 0, 'meredith-stout-stone-cold-corpo')
+    const trashed = mintInto(state, 0, 'trash', 'animals-wrecker')
+    setGigs(state, 0, [{ size: 10, value: 3 }])
+    setGigs(state, 1, []) // player 1's own Gig area is empty
+    state.players[1].legends = []
+    const dexter = mintInto(state, 1, 'legends', 'dexter-deshawn-off-the-grid')
+
+    // anyGigDie with player 1's own area empty: index 0 is player 0's die.
+    const next = activate(db, state, dexter, 1, { targets: [0] })
+    expect(gigValues(next, 0)).toEqual([5])
+    expect(next.players[0].hand).toContain(trashed)
+    expect(next.players[0].trash).not.toContain(trashed)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// minotaur — "{Play} If you have more ☆ (Street Cred) than a Rival, defeat a
+// rival Unit with power 5 or less."
+// ---------------------------------------------------------------------------
+
+describe('minotaur', () => {
+  it('only defeats a rival Unit of power 5 or less while ahead on Street Cred', () => {
+    const { state } = fixtureWithHand(0, ['minotaur'])
+    const weak = fieldCard(state, 1, 'la-llorona-ghost-of-the-past') // power 3
+    const tough = fieldCard(state, 1, 'animals-wrecker') // power 10
+    setGigs(state, 0, [{ size: 6, value: 1 }])
+    setGigs(state, 1, [{ size: 6, value: 5 }]) // not ahead
+    const next = playCardByDef(db, state, 0, 'minotaur')
+    expect(next.players[1].field).toContain(weak)
+    expect(next.players[1].field).toContain(tough)
+  })
+
+  it('defeats the weak target while ahead on Street Cred', () => {
+    const { state } = fixtureWithHand(0, ['minotaur'])
+    const weak = fieldCard(state, 1, 'la-llorona-ghost-of-the-past') // power 3
+    const tough = fieldCard(state, 1, 'animals-wrecker') // power 10
+    setGigs(state, 0, [{ size: 6, value: 5 }])
+    setGigs(state, 1, [{ size: 6, value: 1 }]) // ahead
+    const next = playCardByDef(db, state, 0, 'minotaur')
+    expect(next.players[1].trash).toContain(weak)
+    expect(next.players[1].field).toContain(tough) // power 10 is out of range
+  })
+})
+
+// ---------------------------------------------------------------------------
+// octant — "Play this Unit for -1 €$ for each friendly Gig with 8+ value, to
+// a minimum of 1 €$."
+// ---------------------------------------------------------------------------
+
+describe('octant', () => {
+  it('costs 1 €$ less per friendly Gig with 8+ value, never below 1 €$', () => {
+    const { state } = fixtureWithHand(0, ['octant'])
+    const card = findInHand(state, 0, 'octant')
+
+    setGigs(state, 0, [{ size: 10, value: 3 }])
+    expect(actionsOfType(db, state, 'playCard').find((a) => a.card === card)!.payment).toHaveLength(7)
+
+    setGigs(state, 0, Array.from({ length: 8 }, () => ({ size: 10 as const, value: 10 })))
+    expect(actionsOfType(db, state, 'playCard').find((a) => a.card === card)!.payment).toHaveLength(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// over-the-edge — "Defeat a Unit with power equal to or less than the value
+// of a friendly d20."
+// ---------------------------------------------------------------------------
+
+describe('over-the-edge', () => {
+  it('defeats a Unit (either side) at or below the friendly d20 value', () => {
+    const { state } = fixtureWithHand(0, ['over-the-edge'])
+    setGigs(state, 0, [{ size: 20, value: 5 }])
+    const weak = fieldCard(state, 1, 'la-llorona-ghost-of-the-past') // power 3
+    const tough = fieldCard(state, 1, 'animals-wrecker') // power 10
+    const next = playCardByDef(db, state, 0, 'over-the-edge', { targets: [weak] })
+    expect(next.players[1].trash).toContain(weak)
+    expect(next.players[1].field).toContain(tough)
+  })
+
+  it('never offers a target above the friendly d20 value, including its own side', () => {
+    const { state } = fixtureWithHand(0, ['over-the-edge'])
+    setGigs(state, 0, [{ size: 20, value: 2 }])
+    const mine = fieldCard(state, 0, 'la-llorona-ghost-of-the-past') // power 3 > 2
+    const card = findInHand(state, 0, 'over-the-edge')
+    const plays = actionsOfType(db, state, 'playCard').filter((a) => a.card === card)
+    expect(plays.every((a) => !a.targets.includes(mine))).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// royce-don-t-call-me-simon — "{Play} Defeat a rival Unit with power 2 or
+// less. If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit
+// with power 3 or less instead."
+// ---------------------------------------------------------------------------
+
+describe('royce-don-t-call-me-simon', () => {
+  it('caps at power 2 while not ahead, and at power 3 (replacing, not adding) while ahead', () => {
+    const { state } = fixtureWithHand(0, ['royce-don-t-call-me-simon'])
+    const p2 = fieldCard(state, 1, 'corpo-security') // power 2
+    const p3 = fieldCard(state, 1, 'la-llorona-ghost-of-the-past') // power 3
+    setGigs(state, 0, [{ size: 6, value: 1 }])
+    setGigs(state, 1, [{ size: 6, value: 5 }]) // not ahead
+    const card = findInHand(state, 0, 'royce-don-t-call-me-simon')
+    const notAhead = actionsOfType(db, state, 'playCard').filter((a) => a.card === card)
+    expect(notAhead.map((a) => a.targets)).toEqual([[p2]])
+
+    setGigs(state, 0, [{ size: 6, value: 5 }])
+    setGigs(state, 1, [{ size: 6, value: 1 }]) // ahead
+    const ahead = actionsOfType(db, state, 'playCard').filter((a) => a.card === card)
+    const targetedAhead = new Set(ahead.flatMap((a) => a.targets))
+    expect([...targetedAhead].sort()).toEqual([p2, p3].sort())
+
+    const next = playCardByDef(db, state, 0, 'royce-don-t-call-me-simon', { targets: [p3] })
+    expect(next.players[1].trash).toContain(p3)
+    expect(next.players[1].field).toContain(p2) // exactly one defeat, not both
+  })
+})
+
+// ---------------------------------------------------------------------------
+// royce-psycho-on-the-edge — "{Go Solo} ...\nDuring your turn, this Legend
+// has +2 power for each of its equipped Gear."
+// ---------------------------------------------------------------------------
+
+describe('royce-psycho-on-the-edge', () => {
+  it('gains +2 power per equipped Gear only during its controller’s own turn', () => {
+    const { state } = fixtureWithHand(0, ['mantis-blades'])
+    const royce = fieldCard(state, 0, 'royce-psycho-on-the-edge') // power 6
+    let next = playCardByDef(db, state, 0, 'mantis-blades', { targetDef: 'royce-psycho-on-the-edge' })
+    // 6 (own) + 2 (Gear's printed power bonus, §29) + 2*1 (the new static, own turn)
+    expect(effectivePower(db, next, royce)).toBe(10)
+
+    next = applyAction(db, next, { type: 'endTurn' })
+    if (next.phase === 'start') {
+      next = applyAction(db, next, actionsOfType(db, next, 'chooseGigDie')[0])
+    }
+    // It's the rival's turn now: the static bonus is gone, the Gear bonus stays.
+    expect(effectivePower(db, next, royce)).toBe(8)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ruthless-lowlife — "This Unit can only attack rival Units. (It can't attack
+// Gig areas.)"
+// ---------------------------------------------------------------------------
+
+describe('ruthless-lowlife', () => {
+  it('never offers the rival Gig area as an attack target', () => {
+    const { state } = fixtureWithHand(0, [])
+    const lowlife = fieldCard(state, 0, 'ruthless-lowlife')
+    const victim = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+    setGigs(state, 1, [{ size: 6, value: 3 }]) // otherwise a legal attack target
+    const attacks = actionsOfType(db, state, 'attack').filter((a) => a.attacker === lowlife)
+    expect(attacks.map((a) => a.target)).toEqual([victim])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// satori-sword-of-saburo — "(Equip to a friendly Unit or face-up Legend.)
+// When this Unit wins a fight against a rival Unit, draw 1."
+// ---------------------------------------------------------------------------
+
+describe('satori-sword-of-saburo', () => {
+  it('draws 1 for its host winning a fight', () => {
+    const { state } = fixtureWithHand(0, ['satori-sword-of-saburo'])
+    const host = fieldCard(state, 0, 'la-llorona-ghost-of-the-past') // power 3
+    let next = playCardByDef(db, state, 0, 'satori-sword-of-saburo', {
+      targetDef: 'la-llorona-ghost-of-the-past',
+    })
+    const victim = fieldCard(next, 1, 'japantown-jonin', { ready: false }) // power 0
+    const handBefore = next.players[0].hand.length
+    next = passReact(db, startAttack(db, next, host, victim))
+    expect(next.players[1].trash).toContain(victim)
+    expect(next.players[0].hand).toHaveLength(handBefore + 1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// screw-lovelorn-fool — "{Defeated} Add another Unit from your trash to your
+// hand."
+// ---------------------------------------------------------------------------
+
+describe('screw-lovelorn-fool', () => {
+  it('retrieves another Unit from the trash when defeated', () => {
+    const { state } = fixtureWithHand(1, []) // player 1 attacks, player 0's Screw defends
+    const screw = fieldCard(state, 0, 'screw-lovelorn-fool', { ready: false }) // power 7
+    const retrievable = mintInto(state, 0, 'trash', 'japantown-jonin')
+    const attacker = fieldCard(state, 1, 'animals-wrecker') // power 10
+    const next = passReact(db, startAttack(db, state, attacker, screw))
+    expect(next.players[0].trash).toContain(screw)
+    expect(next.players[0].hand).toContain(retrievable)
+    expect(next.players[0].trash).not.toContain(retrievable)
+  })
+
+  it('never retrieves itself when no other Unit is in the trash', () => {
+    const { state } = fixtureWithHand(1, [])
+    const screw = fieldCard(state, 0, 'screw-lovelorn-fool', { ready: false })
+    const attacker = fieldCard(state, 1, 'animals-wrecker')
+    const next = passReact(db, startAttack(db, state, attacker, screw))
+    expect(next.players[0].trash).toContain(screw)
+    expect(next.players[0].hand).not.toContain(screw)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// shattered-memories — "Each player discards their hand and may draw 5. If
+// the total number of discarded cards equals the value of a friendly Gig,
+// draw 2."
+// ---------------------------------------------------------------------------
+
+describe('shattered-memories', () => {
+  function stage(): ReturnType<typeof fixtureWithHand> {
+    const fixture = fixtureWithHand(0, ['shattered-memories', 'animals-wrecker', 'animals-wrecker'])
+    const state = fixture.state
+    // [surgery] a known, empty-then-refilled hand for player 1 too.
+    state.players[1].deck = [...state.players[1].deck, ...state.players[1].hand]
+    state.players[1].hand = []
+    mintInto(state, 1, 'hand', 'japantown-jonin')
+    mintInto(state, 1, 'hand', 'japantown-jonin')
+    return fixture
+  }
+
+  it('discards and redraws up to 5 for both players, skipping the bonus draw', () => {
+    const { state } = stage()
+    // Playing the card removes it from hand first, leaving 2 discards for
+    // player 0 and 2 for player 1 -> total 4, which this Gig does not match.
+    setGigs(state, 0, [{ size: 10, value: 3 }])
+    const next = playCardByDef(db, state, 0, 'shattered-memories')
+    expect(next.players[0].hand).toHaveLength(5)
+    expect(next.players[1].hand).toHaveLength(5)
+  })
+
+  it('draws 2 more when the total discarded matches the value of a friendly Gig', () => {
+    const { state } = stage()
+    setGigs(state, 0, [{ size: 10, value: 4 }]) // matches the 2+2 total discarded
+    const next = playCardByDef(db, state, 0, 'shattered-memories')
+    expect(next.players[0].hand).toHaveLength(5 + 2)
+    expect(next.players[1].hand).toHaveLength(5)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// swordwise-huscle — "{Attack} If this Unit has power 5+, draw 1."
+// ---------------------------------------------------------------------------
+
+describe('swordwise-huscle', () => {
+  it('draws 1 when it attacks with power 5 or more', () => {
+    const { state } = fixtureWithHand(0, ['swordwise-huscle', 'mantis-blades'])
+    let next = playCardByDef(db, state, 0, 'swordwise-huscle')
+    next = endBothTurnsOnce(db, next)
+    next = playCardByDef(db, next, 0, 'mantis-blades', { targetDef: 'swordwise-huscle' })
+    const huscle = findFielded(next, 0, 'swordwise-huscle')
+    expect(effectivePower(db, next, huscle)).toBe(5)
+    setGigs(next, 1, [{ size: 6, value: 2 }])
+    const handBefore = next.players[0].hand.length
+    const attacked = startAttack(db, next, huscle, 'gigArea')
+    expect(attacked.players[0].hand).toHaveLength(handBefore + 1)
+  })
+
+  it('does not draw while under power 5', () => {
+    const { state } = fixtureWithHand(0, ['swordwise-huscle'])
+    let next = playCardByDef(db, state, 0, 'swordwise-huscle')
+    next = endBothTurnsOnce(db, next)
+    const huscle = findFielded(next, 0, 'swordwise-huscle')
+    setGigs(next, 1, [{ size: 6, value: 2 }])
+    const handBefore = next.players[0].hand.length
+    const attacked = startAttack(db, next, huscle, 'gigArea')
+    expect(attacked.players[0].hand).toHaveLength(handBefore)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// v-roamer-of-the-badlands — "When this Unit steals a Gig, increase it by up
+// to 5.\nAt the end of your turn, if you control 2 or more Gigs with 8+
+// value, draw 1."
+// ---------------------------------------------------------------------------
+
+describe('v-roamer-of-the-badlands', () => {
+  it('increases the just-stolen die by up to 5', () => {
+    const { state } = fixtureWithHand(0, [])
+    const roamer = fieldCard(state, 0, 'v-roamer-of-the-badlands') // power 6
+    setGigs(state, 0, [{ size: 20, value: 1 }])
+    setGigs(state, 1, [{ size: 8, value: 3 }])
+    const next = attackAndSteal(db, state, roamer, 'gigArea', [0])
+    expect(gigValues(next, 0).sort((a, b) => a - b)).toEqual([1, 8]) // 3 + 5, clamped to the d8's 8 faces
+  })
+
+  it('does not boost a die stolen by a different friendly Unit', () => {
+    const { state } = fixtureWithHand(0, [])
+    fieldCard(state, 0, 'v-roamer-of-the-badlands')
+    const other = fieldCard(state, 0, 'animals-wrecker') // power 10
+    setGigs(state, 0, [])
+    setGigs(state, 1, [{ size: 8, value: 3 }])
+    const next = attackAndSteal(db, state, other, 'gigArea', [0])
+    expect(gigValues(next, 0)).toEqual([3])
+  })
+
+  it('draws at the end of its controller’s turn while controlling 2+ Gigs at 8+', () => {
+    const { state } = fixtureWithHand(0, [])
+    fieldCard(state, 0, 'v-roamer-of-the-badlands')
+    setGigs(state, 0, [
+      { size: 10, value: 8 },
+      { size: 10, value: 9 },
+    ])
+    const handBefore = state.players[0].hand.length
+    // endBothTurnsOnce ends player 0's turn (firing the bonus draw), then
+    // player 1's, then returns to player 0's next main phase (a normal
+    // start-of-turn draw on top).
+    const next = endBothTurnsOnce(db, state)
+    expect(next.players[0].hand).toHaveLength(handBefore + 2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// v-streetkid — "{Call} Trash 3. Then, add 1 BRAINDANCE Program from your
+// trash to your hand."
+// ---------------------------------------------------------------------------
+
+describe('v-streetkid', () => {
+  it('trashes 3 and retrieves a BRAINDANCE Program among them when Called', () => {
+    const { state } = fixtureWithHand(0, [], { eddies: 3 })
+    state.players[0].legends = []
+    const v = mintInto(state, 0, 'legends', 'v-streetkid', { faceUp: false })
+    // [surgery] a known top-of-deck: one BRAINDANCE Program, two non-BRAINDANCE
+    // fillers (Units, so they can never compete for the retrieval slot).
+    const bd = mintInto(state, 0, 'deck', 'shattered-memories')
+    const f1 = mintInto(state, 0, 'deck', 'japantown-jonin')
+    const f2 = mintInto(state, 0, 'deck', 'japantown-jonin')
+    const rest = state.players[0].deck.filter((uid) => ![bd, f1, f2].includes(uid))
+    state.players[0].deck = [bd, f1, f2, ...rest]
+
+    const next = applyAction(db, state, {
+      type: 'callLegend',
+      payment: [state.players[0].eddies[0]],
+    })
+    expect(next.cards[v].faceUp).toBe(true)
+    expect(next.players[0].hand).toContain(bd)
+    expect(next.players[0].trash).toContain(f1)
+    expect(next.players[0].trash).toContain(f2)
+    expect(next.players[0].trash).not.toContain(bd)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// valentino-guerrera — "If you have more ☆ (Street Cred) than a Rival, this
+// Unit can attack ready Units with {Blocker}."
+// ---------------------------------------------------------------------------
+
+describe('valentino-guerrera', () => {
+  it('may attack a ready {Blocker} Unit only while ahead on Street Cred', () => {
+    const { state } = fixtureWithHand(0, [])
+    const valentino = fieldCard(state, 0, 'valentino-guerrera')
+    const readyBlocker = fieldCard(state, 1, 'la-llorona-ghost-of-the-past', { ready: true })
+    setGigs(state, 0, [{ size: 6, value: 5 }])
+    setGigs(state, 1, [{ size: 6, value: 1 }]) // ahead
+    const attacksAhead = actionsOfType(db, state, 'attack').filter((a) => a.attacker === valentino)
+    expect(attacksAhead.some((a) => a.target === readyBlocker)).toBe(true)
+
+    setGigs(state, 0, [{ size: 6, value: 1 }])
+    setGigs(state, 1, [{ size: 6, value: 5 }]) // not ahead
+    const attacksBehind = actionsOfType(db, state, 'attack').filter((a) => a.attacker === valentino)
+    expect(attacksBehind.some((a) => a.target === readyBlocker)).toBe(false)
+  })
+
+  it('still cannot attack a ready non-{Blocker} Unit while ahead', () => {
+    const { state } = fixtureWithHand(0, [])
+    const valentino = fieldCard(state, 0, 'valentino-guerrera')
+    const readyNonBlocker = fieldCard(state, 1, 'japantown-jonin', { ready: true })
+    setGigs(state, 0, [{ size: 6, value: 5 }])
+    setGigs(state, 1, [{ size: 6, value: 1 }])
+    const attacks = actionsOfType(db, state, 'attack').filter((a) => a.attacker === valentino)
+    expect(attacks.some((a) => a.target === readyNonBlocker)).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// yorinobu-arasaka-embracing-destruction — "The first time a friendly ARASAKA
+// Unit attacks each turn, draw 1. Then, if you have less than 20 ☆ (Street
+// Cred), discard 1."
+// ---------------------------------------------------------------------------
+
+describe('yorinobu-arasaka-embracing-destruction', () => {
+  it('draws the first time a friendly ARASAKA Unit attacks each turn, and no more', () => {
+    const { state } = fixtureWithHand(0, [])
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'yorinobu-arasaka-embracing-destruction')
+    const m1 = fieldCard(state, 0, 'minotaur')
+    const m2 = fieldCard(state, 0, 'minotaur')
+    const v1 = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+    const v2 = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+    setGigs(state, 0, [{ size: 20, value: 20 }]) // 20 ☆: the discard clause is inert
+    const handBefore = state.players[0].hand.length
+
+    let next = passReact(db, startAttack(db, state, m1, v1))
+    expect(next.players[0].hand).toHaveLength(handBefore + 1)
+
+    next = passReact(db, startAttack(db, next, m2, v2))
+    expect(next.players[0].hand).toHaveLength(handBefore + 1) // no second draw
+  })
+
+  it('also discards while under 20 Street Cred', () => {
+    const { state } = fixtureWithHand(0, [])
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'yorinobu-arasaka-embracing-destruction')
+    mintInto(state, 0, 'hand', 'animals-wrecker')
+    const minotaurUid = fieldCard(state, 0, 'minotaur')
+    const victim = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+    setGigs(state, 0, [{ size: 20, value: 5 }]) // 5 ☆ < 20
+    const trashBefore = state.players[0].trash.length
+
+    const next = passReact(db, startAttack(db, state, minotaurUid, victim))
+    expect(next.players[0].trash).toHaveLength(trashBefore + 1)
+  })
+
+  it('does not fire for a non-ARASAKA attacker', () => {
+    const { state } = fixtureWithHand(0, [])
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'yorinobu-arasaka-embracing-destruction')
+    const attacker = fieldCard(state, 0, 'animals-wrecker') // no faction tag
+    const victim = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+    const handBefore = state.players[0].hand.length
+
+    const next = passReact(db, startAttack(db, state, attacker, victim))
+    expect(next.players[0].hand).toHaveLength(handBefore)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// yorinobu-arasaka-steel-dragon — "{Play} You may play a Unit with cost 4 or
+// less from your hand or trash for free. It can attack rival Units this
+// turn.\nThe first time an ARASAKA Unit is defeated each turn, draw 1."
+// ---------------------------------------------------------------------------
+
+describe('yorinobu-arasaka-steel-dragon', () => {
+  it('plays a cheap Unit from hand for free and lets it attack immediately', () => {
+    const { state } = fixtureWithHand(0, ['yorinobu-arasaka-steel-dragon', 'japantown-jonin'])
+    setGigs(state, 1, [{ size: 6, value: 2 }])
+    const jonin = findInHand(state, 0, 'japantown-jonin')
+
+    const next = playCardByDef(db, state, 0, 'yorinobu-arasaka-steel-dragon', { targets: [jonin] })
+    expect(next.players[0].field).toContain(jonin)
+    expect(next.cards[jonin].tempKeywords).toContain('adrenaline')
+    expect(actionsOfType(db, next, 'attack').some((a) => a.attacker === jonin)).toBe(true)
+  })
+
+  it('can also free-play a Unit sitting in the trash', () => {
+    const { state } = fixtureWithHand(0, ['yorinobu-arasaka-steel-dragon'])
+    const trashedUnit = mintInto(state, 0, 'trash', 'japantown-jonin')
+    setGigs(state, 1, [{ size: 6, value: 2 }])
+
+    const next = playCardByDef(db, state, 0, 'yorinobu-arasaka-steel-dragon', {
+      targets: [trashedUnit],
+    })
+    expect(next.players[0].field).toContain(trashedUnit)
+    expect(next.players[0].trash).not.toContain(trashedUnit)
+    expect(next.cards[trashedUnit].tempKeywords).toContain('adrenaline')
+  })
+
+  it('never offers a free play for a Unit costing more than 4', () => {
+    const { state } = fixtureWithHand(0, ['yorinobu-arasaka-steel-dragon', 'animals-wrecker'])
+    const wrecker = findInHand(state, 0, 'animals-wrecker') // cost 6
+    const card = findInHand(state, 0, 'yorinobu-arasaka-steel-dragon')
+    const plays = actionsOfType(db, state, 'playCard').filter((a) => a.card === card)
+    expect(plays.every((a) => !a.targets.includes(wrecker))).toBe(true)
+  })
+
+  it('draws the first time any ARASAKA Unit is defeated each turn, on either side', () => {
+    const { state } = fixtureWithHand(0, [])
+    fieldCard(state, 0, 'yorinobu-arasaka-steel-dragon')
+    const attackerA = fieldCard(state, 0, 'animals-wrecker')
+    const attackerB = fieldCard(state, 0, 'animals-wrecker')
+    const nonArasakaVictim = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+    const arasakaVictim = fieldCard(state, 1, 'minotaur', { ready: false })
+    const handBefore = state.players[0].hand.length
+
+    let next = passReact(db, startAttack(db, state, attackerA, nonArasakaVictim))
+    expect(next.players[1].trash).toContain(nonArasakaVictim)
+    expect(next.players[0].hand).toHaveLength(handBefore)
+
+    next = passReact(db, startAttack(db, next, attackerB, arasakaVictim))
+    expect(next.players[1].trash).toContain(arasakaVictim)
+    expect(next.players[0].hand).toHaveLength(handBefore + 1)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Batch bookkeeping: the two cards this batch could not encode.
 // ---------------------------------------------------------------------------
 

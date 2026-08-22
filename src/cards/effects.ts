@@ -33,15 +33,22 @@ import { draftState, drawCards, endGame } from '../engine/game'
 import {
   conditionMet,
   effectiveCardCost,
-  maxGigValue,
   opponentOf,
   reducedCost,
+  resolvePowerAmount,
   streetCred,
   type ConditionContext,
 } from '../engine/query'
 import { nextInt, rollDie } from '../engine/rng'
 import { scriptedCards } from './scripted/index'
-import { filterTargets, gearEquipTargets, gigDieAt, isGigDieSpec, targetsFor } from './targets'
+import {
+  filterTargets,
+  gearEquipTargets,
+  gigDieAt,
+  gigDieOwner,
+  isGigDieSpec,
+  targetsFor,
+} from './targets'
 import type {
   Action,
   CardDb,
@@ -125,6 +132,8 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
     case 'spendCard':
     case 'bottomDeck':
     case 'grantKeyword':
+    case 'retrieveFromTrash':
+    case 'discardCard':
       // `self` and `chosen` are references, not decisions: no slot.
       return node.target === 'self' || node.target === 'chosen'
         ? []
@@ -437,10 +446,10 @@ function applyNode(
     case 'buffPower': {
       const target = takeTarget(node, ctx, slots)
       if (target === null || !draft.cards[target]) return
-      // "gains power equal to a friendly max Gig" — an amount read off the
-      // board instead of printed (docs/rulings.md §39).
-      const amount =
-        node.amount === 'friendlyMaxGig' ? maxGigValue(draft, ctx.player) : node.amount
+      // "gains power equal to a friendly max Gig" / "... for each of its
+      // equipped Gear" — an amount read off the board instead of printed
+      // (docs/rulings.md §39, §55 ff.).
+      const amount = resolvePowerAmount(draft, node.amount, target, ctx.player)
       if (node.duration === 'turn') draft.cards[target].tempPower += amount
       else draft.cards[target].permPower += amount
       const sign = amount >= 0 ? '+' : ''
@@ -475,6 +484,14 @@ function applyNode(
       const before = die.value
       die.value = Math.max(1, Math.min(die.size, die.value + amount))
       note(draft, ctx.sourceUid, `gig ${before} -> ${die.value}`)
+      // "When a Rival adjusts ... friendly Gigs" — fired on the AFFECTED
+      // player, from their own point of view, whenever the die touched
+      // belongs to someone other than this effect's controller
+      // (docs/rulings.md §55 ff.).
+      const dieOwner = gigDieOwner(draft, node.target, index, ctx.player)
+      if (dieOwner !== ctx.player) {
+        fireWatcherTrigger(db, draft, 'onRivalAdjustFriendlyGig', dieOwner, {})
+      }
       return
     }
 
@@ -556,6 +573,29 @@ function applyNode(
       if (!draft.players[draft.cards[target].owner].field.includes(target)) return
       note(draft, ctx.sourceUid, `bottom-deck ${target}`)
       leaveField(draft, db, target, 'deckBottom')
+      return
+    }
+
+    case 'retrieveFromTrash': {
+      const target = takeTarget(node, ctx, slots)
+      if (target === null || !draft.cards[target]) return
+      const p = draft.players[draft.cards[target].owner]
+      if (!p.trash.includes(target)) return
+      p.trash = p.trash.filter((uid) => uid !== target)
+      p.hand.push(target)
+      note(draft, ctx.sourceUid, `retrieve ${target} from the trash`)
+      return
+    }
+
+    case 'discardCard': {
+      const target = takeTarget(node, ctx, slots)
+      if (target === null || !draft.cards[target]) return
+      const p = draft.players[draft.cards[target].owner]
+      if (!p.hand.includes(target)) return
+      p.hand = p.hand.filter((uid) => uid !== target)
+      p.trash.push(target)
+      draft.events.push({ type: 'cardTrashed', uid: target })
+      note(draft, ctx.sourceUid, `discard ${target}`)
       return
     }
 
@@ -696,6 +736,9 @@ function applyNode(
     case 'defeatShield':
     case 'winsFightVsKeyword':
     case 'costReduction':
+    case 'powerVsCardType':
+    case 'attackReadyWithKeyword':
+    case 'cantAttackGigArea':
       // Static layers, read by query.ts — nothing to do at resolution time.
       return
   }
@@ -720,7 +763,7 @@ export function applyEffectDefOnDraft(
   if (!card) return
   if (draft.winner !== null) return
   const player = controller ?? effectController(draft, sourceUid)
-  if (!conditionMet(draft, player, def, context)) return
+  if (!conditionMet(draft, player, def, context, sourceUid)) return
   // A *triggered* def may carry an optional cost ("{Attack} You may pay 2 €$.
   // If you do, ..."). Paying is the controller's decision, carried on the
   // action that fired the trigger; an unanswered option is declined, and the
@@ -812,7 +855,7 @@ export function fireCardTrigger(
     const slice = targets.slice(offset, offset + demand)
     offset += demand
     if (oncePerTurnSpent(draft, sourceUid, index, effect)) continue
-    if (!conditionMet(draft, player, effect, context)) continue
+    if (!conditionMet(draft, player, effect, context, sourceUid)) continue
     if (effect.oncePerTurn === true) markOncePerTurn(draft, sourceUid, index)
     applyEffectDefOnDraft(db, draft, effect, sourceUid, slice, player, context)
   }
@@ -883,7 +926,7 @@ export function hasPayableOptionalTrigger(
     if (!def) continue
     for (const effect of def.effects) {
       if (effect.trigger !== trigger || effect.cost === undefined) continue
-      if (!conditionMet(state, controller, effect)) continue
+      if (!conditionMet(state, controller, effect, {}, source)) continue
       if (canPayAbility(state, controller, effect, source)) return true
     }
   }
@@ -1044,7 +1087,7 @@ export function activatedAbilityActions(
       if (effect.trigger !== 'activated') continue
       if (quickOnly && effect.quick !== true) continue
       if (oncePerTurnSpent(state, uid, abilityIndex, effect)) continue
-      if (!conditionMet(state, player, effect)) continue
+      if (!conditionMet(state, player, effect, {}, uid)) continue
       if (!canPayAbility(state, player, effect, uid)) continue
       // A costed ability with a dead target is never worth offering.
       if (hasUnfillableSlot(db, state, uid, effect)) continue

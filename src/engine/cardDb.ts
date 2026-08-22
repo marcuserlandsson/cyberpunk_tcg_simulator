@@ -15,9 +15,15 @@ const triggerSchema = z.enum([
   'onWinFight',
   'onSpend',
   'onFriendlyStealDie',
+  'onFriendlyAttack',
+  'onUnitDefeated',
+  'onRivalAdjustFriendlyGig',
+  'onEndTurn',
   'activated',
   'static',
 ])
+
+const cardTypeSchema = z.enum(['legend', 'unit', 'program', 'gear'])
 
 const targetSpecSchema = z.enum([
   'self',
@@ -30,6 +36,9 @@ const targetSpecSchema = z.enum([
   'friendlyGigDie',
   'rivalGigDie',
   'anyGigDie',
+  'friendlyTrashCard',
+  'friendlyHandCard',
+  'friendlyHandOrTrashUnit',
 ])
 
 const gigDieSpecSchema = z.enum(['friendlyGigDie', 'rivalGigDie', 'anyGigDie'])
@@ -42,6 +51,10 @@ const targetFilterSchema = z.strictObject({
   keyword: z.string().optional(),
   excludeSelf: z.boolean().optional(),
   weakerThanAFriendlyUnit: z.boolean().optional(),
+  cardType: cardTypeSchema.optional(),
+  maxCost: z.number().optional(),
+  maxPowerIfAheadOnStreetCred: z.number().optional(),
+  maxPowerVsFriendlyD20: z.boolean().optional(),
 })
 
 const costReductionSchema = z.strictObject({
@@ -51,7 +64,12 @@ const costReductionSchema = z.strictObject({
   minimum: z.number(),
 })
 
-const powerAmountSchema = z.union([z.number(), z.literal('friendlyMaxGig')])
+const dynamicAmountSchema = z.union([
+  z.literal('friendlyMaxGig'),
+  z.strictObject({ perEquippedGear: z.number() }),
+])
+
+const powerAmountSchema = z.union([z.number(), dynamicAmountSchema])
 
 const dieSizeSchema = z.union([
   z.literal(4),
@@ -73,7 +91,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       filter: targetFilterSchema.optional(),
       duration: z.enum(['turn', 'permanent']),
     }),
-    z.strictObject({ kind: z.literal('staticPower'), amount: z.number() }),
+    z.strictObject({ kind: z.literal('staticPower'), amount: powerAmountSchema }),
     z.strictObject({
       kind: z.literal('defeat'),
       target: targetSpecSchema,
@@ -140,6 +158,23 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
     z.strictObject({ kind: z.literal('defeatShield') }),
     z.strictObject({ kind: z.literal('winsFightVsKeyword'), keyword: z.string() }),
     z.strictObject({ kind: z.literal('costReduction'), reduction: costReductionSchema }),
+    z.strictObject({
+      kind: z.literal('powerVsCardType'),
+      cardType: cardTypeSchema,
+      amount: z.number(),
+    }),
+    z.strictObject({
+      kind: z.literal('retrieveFromTrash'),
+      target: targetSpecSchema,
+      filter: targetFilterSchema.optional(),
+    }),
+    z.strictObject({
+      kind: z.literal('discardCard'),
+      target: targetSpecSchema,
+      filter: targetFilterSchema.optional(),
+    }),
+    z.strictObject({ kind: z.literal('attackReadyWithKeyword'), keyword: z.string() }),
+    z.strictObject({ kind: z.literal('cantAttackGigArea') }),
   ])
 )
 
@@ -158,6 +193,16 @@ const effectDefSchema: z.ZodType<EffectDef> = z.strictObject({
       friendlyGigValueAtLeast: z.number().optional(),
       rivalGigLeadAtLeast: z.number().optional(),
       stolenDieSize: dieSizeSchema.optional(),
+      streetCredAheadOfRival: z.boolean().optional(),
+      streetCredBelow: z.number().optional(),
+      duringOwnTurn: z.boolean().optional(),
+      sourcePowerAtLeast: z.number().optional(),
+      selfIsStealer: z.boolean().optional(),
+      attackerKeyword: z.string().optional(),
+      defeatedKeyword: z.string().optional(),
+      friendlyGigsAtLeastValueCount: z
+        .strictObject({ value: z.number(), count: z.number() })
+        .optional(),
     })
     .optional(),
   quick: z.boolean().optional(),
@@ -177,7 +222,7 @@ const cardSchema: z.ZodType<CardDef> = z.strictObject({
   subtitle: z.string().optional(),
   color: z.string(),
   faction: z.string().optional(),
-  type: z.enum(['legend', 'unit', 'program', 'gear']),
+  type: cardTypeSchema,
   cost: z.number(),
   power: z.number().nullable(),
   ram: ramSchema.nullable(),

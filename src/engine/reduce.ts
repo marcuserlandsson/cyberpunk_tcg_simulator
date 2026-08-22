@@ -16,6 +16,7 @@
 import {
   activateAbilityOnDraft,
   fireTriggerOnDraft,
+  fireWatcherTrigger,
   playCardOnDraft,
   spendOnDraft,
 } from '../cards/effects'
@@ -324,9 +325,14 @@ function react(draft: GameState, db: CardDb, reaction: Reaction): void {
  * lasts to the end of the *game* turn, docs/rulings.md §20), then the rival's
  * start-of-turn sequence runs immediately.
  */
-function endTurn(draft: GameState): void {
+function endTurn(draft: GameState, db: CardDb): void {
   const player = draft.activePlayer
   draft.events.push({ type: 'turnEnded', player })
+  // [trigger seam] "At the end of your turn, ..." — broadcast to every
+  // in-play card of the player whose turn is ending, before the turn buffs
+  // wipe (docs/rulings.md §55 ff.).
+  fireWatcherTrigger(db, draft, 'onEndTurn', player, {})
+  if (draft.winner !== null) return
   clearTurnBuffs(draft)
   const next = opponentOf(player)
   // turnNumber counts each player's own turns and advances when the first
@@ -392,7 +398,7 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
       takeStolenGig(draft, db, action.dieIndex)
       break
     case 'endTurn':
-      endTurn(draft)
+      endTurn(draft, db)
       break
   }
 
