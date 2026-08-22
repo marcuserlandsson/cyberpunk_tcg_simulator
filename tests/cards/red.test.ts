@@ -1,4 +1,5 @@
-// Task 8 — Red cards, batch 1 (19 of the 22 Red cards).
+// Task 8 — Red cards, batch 1: the 19 Red cards assigned to this batch (the
+// pool holds 37 Red cards in all; the rest belong to later batches).
 //
 // Every test here drives a REAL card definition from `data/cards.json` through
 // the public engine API (`newGame` / `legalActions` / `applyAction`), using the
@@ -385,13 +386,21 @@ describe('dexter-deshawn-off-the-grid', () => {
 // ---------------------------------------------------------------------------
 
 describe('el-sombreron-la-venganza-lenta', () => {
-  it('pays 2 €$ on attack and gains the max friendly Gig as power', () => {
+  it('offers paying the 2 €$ as a real decision, and pays it on request', () => {
     const { state } = fixtureWithHand(0, [], { eddies: 2 })
+    state.players[0].legends = [] // a ready Legend is €$ too; keep the count exact
     const sombreron = fieldCard(state, 0, 'el-sombrero-n-la-venganza-lenta') // power 4
     setGigs(state, 0, [{ size: 10, value: 9 }, { size: 6, value: 2 }])
     setGigs(state, 1, [{ size: 6, value: 1 }, { size: 6, value: 2 }])
 
-    const next = startAttack(db, state, sombreron, 'gigArea')
+    // Both branches are enumerated (docs/rulings.md §49).
+    const attacks = actionsOfType(db, state, 'attack').filter((a) => a.attacker === sombreron)
+    expect(attacks).toEqual([
+      { type: 'attack', attacker: sombreron, target: 'gigArea' },
+      { type: 'attack', attacker: sombreron, target: 'gigArea', payOptionalCosts: true },
+    ])
+
+    const next = applyAction(db, state, attacks[1])
     expect(next.cards[sombreron].tempPower).toBe(9)
     expect(effectivePower(db, next, sombreron)).toBe(13)
     expect(next.players[0].eddies.filter((uid) => next.cards[uid].ready)).toEqual([])
@@ -400,7 +409,20 @@ describe('el-sombreron-la-venganza-lenta', () => {
     expect(stolen.pendingSteal?.remaining).toBe(2)
   })
 
-  it('skips the optional cost entirely when it cannot be paid', () => {
+  it('keeps the €$ and the effect when the attacker declines', () => {
+    const { state } = fixtureWithHand(0, [], { eddies: 2 })
+    state.players[0].legends = []
+    const sombreron = fieldCard(state, 0, 'el-sombrero-n-la-venganza-lenta')
+    setGigs(state, 0, [{ size: 10, value: 9 }])
+    setGigs(state, 1, [{ size: 6, value: 1 }])
+
+    const next = startAttack(db, state, sombreron, 'gigArea') // the plain variant declines
+    expect(next.cards[sombreron].tempPower).toBe(0)
+    expect(effectivePower(db, next, sombreron)).toBe(4)
+    expect(next.players[0].eddies.every((uid) => next.cards[uid].ready)).toBe(true)
+  })
+
+  it('is not even offered the choice when the 2 €$ cannot be paid', () => {
     const { state } = fixtureWithHand(0, [], { eddies: 1 })
     // A ready Legend is worth 1 €$ too, so clear the legends zone to make the
     // 2 €$ genuinely unaffordable.
@@ -408,6 +430,10 @@ describe('el-sombreron-la-venganza-lenta', () => {
     const sombreron = fieldCard(state, 0, 'el-sombrero-n-la-venganza-lenta')
     setGigs(state, 0, [{ size: 10, value: 9 }])
     setGigs(state, 1, [{ size: 6, value: 1 }])
+
+    expect(
+      actionsOfType(db, state, 'attack').filter((a) => a.attacker === sombreron)
+    ).toEqual([{ type: 'attack', attacker: sombreron, target: 'gigArea' }])
 
     const next = startAttack(db, state, sombreron, 'gigArea')
     expect(next.cards[sombreron].tempPower).toBe(0)
@@ -422,37 +448,41 @@ describe('el-sombreron-la-venganza-lenta', () => {
 // ---------------------------------------------------------------------------
 
 describe('gunpoint-diplomacy', () => {
-  it('lets the controller pick a mode while they are not behind on street cred', () => {
+  it('gives ONE friendly Unit BOTH effects while you are not behind on street cred', () => {
     const { state } = fixtureWithHand(0, ['gunpoint-diplomacy'])
     const mine = fieldCard(state, 0, 'la-llorona-ghost-of-the-past') // power 3
+    const other = fieldCard(state, 0, 'japantown-jonin')
     const readyRival = fieldCard(state, 1, 'animals-wrecker', { ready: true })
     setGigs(state, 0, [{ size: 20, value: 10 }])
     setGigs(state, 1, [])
     const card = findInHand(state, 0, 'gunpoint-diplomacy')
 
+    // One decision only: which friendly Unit receives the effects.
     const plays = actionsOfType(db, state, 'playCard').filter((a) => a.card === card)
-    expect(plays.map((a) => a.targets)).toEqual([
-      [0, mine, mine],
-      [1, mine, mine],
-    ])
+    expect(plays.map((a) => a.targets)).toEqual([[mine], [other]])
 
-    // Mode 0: it may attack a *ready* rival Unit, which is normally illegal.
     expect(actionsOfType(db, state, 'attack').some((a) => a.target === readyRival)).toBe(false)
-    const permitted = applyAction(db, state, plays[0])
+    const next = applyAction(db, state, plays[0])
+
+    // Both clauses, on the same Unit: +3 power AND may attack ready Units.
+    expect(effectivePower(db, next, mine)).toBe(6)
+    expect(next.cards[mine].tempKeywords).toContain('attack-ready')
     expect(
-      actionsOfType(db, permitted, 'attack').some(
+      actionsOfType(db, next, 'attack').some(
         (a) => a.attacker === mine && a.target === readyRival
       )
     ).toBe(true)
-    expect(permitted.cards[mine].tempPower).toBe(0)
-
-    // Mode 1: +3 power instead.
-    const buffed = applyAction(db, state, plays[1])
-    expect(effectivePower(db, buffed, mine)).toBe(6)
-    expect(buffed.cards[mine].tempKeywords).toEqual([])
+    // ... and nothing at all for the Unit that was not chosen.
+    expect(next.cards[other].tempPower).toBe(0)
+    expect(next.cards[other].tempKeywords).toEqual([])
+    expect(
+      actionsOfType(db, next, 'attack').some(
+        (a) => a.attacker === other && a.target === readyRival
+      )
+    ).toBe(false)
   })
 
-  it('hands the mode choice to the rival when you have less street cred', () => {
+  it('is cut to one rival-chosen effect while you have less street cred', () => {
     const { state } = fixtureWithHand(0, ['gunpoint-diplomacy'])
     const mine = fieldCard(state, 0, 'la-llorona-ghost-of-the-past')
     setGigs(state, 0, [{ size: 6, value: 1 }])
@@ -460,12 +490,12 @@ describe('gunpoint-diplomacy', () => {
     const card = findInHand(state, 0, 'gunpoint-diplomacy')
 
     const plays = actionsOfType(db, state, 'playCard').filter((a) => a.card === card)
-    expect(plays.map((a) => a.targets)).toEqual([[mine, mine]]) // no mode to pick
+    expect(plays.map((a) => a.targets)).toEqual([[mine]]) // still only the Unit
 
     const next = applyAction(db, state, plays[0])
     const granted = next.cards[mine].tempKeywords.includes('attack-ready')
     const buffed = next.cards[mine].tempPower === 3
-    expect(granted !== buffed).toBe(true) // exactly one mode landed
+    expect(granted !== buffed).toBe(true) // exactly one effect, the rival's pick
   })
 })
 
@@ -651,6 +681,10 @@ describe('la-llorona-ghost-of-the-past', () => {
     const llorona = fieldCard(state, 0, 'la-llorona-ghost-of-the-past') // power 3, {blocker}
     const attacker = fieldCard(state, 1, 'japantown-jonin') // power 0
     setGigs(state, 0, [{ size: 12, value: 2 }])
+    // The card says bare "a Gig", so either player's die is a candidate
+    // (docs/rulings.md §39); with the attacker holding none, the blocker's own
+    // die is the only one the auto-target can pick.
+    setGigs(state, 1, [])
 
     let next = startAttack(db, state, attacker, 'gigArea')
     expect(

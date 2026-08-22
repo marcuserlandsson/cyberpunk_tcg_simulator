@@ -31,6 +31,7 @@ import {
   fireCardTrigger,
   fireTriggerOnDraft,
   fireWatcherTrigger,
+  hasPayableOptionalTrigger,
   quickReactionActions,
   spendOnDraft,
 } from '../cards/effects'
@@ -110,14 +111,21 @@ function attackTargets(
   return targets
 }
 
-/** One `attack` per (eligible attacker x legal target) pair, for the `main` phase. */
+/**
+ * One `attack` per (eligible attacker x legal target) pair, for the `main`
+ * phase — doubled for an attacker whose "{Attack} You may pay N €$" trigger is
+ * affordable, so paying is a real decision (docs/rulings.md §49). The plain
+ * variant (no `payOptionalCosts` key) always declines.
+ */
 export function attackActions(db: CardDb, state: GameState): Action[] {
   const player = state.activePlayer
   const actions: Action[] = []
   for (const attacker of state.players[player].field) {
     if (!canAttack(db, state, attacker)) continue
+    const optional = hasPayableOptionalTrigger(db, state, attacker, 'onAttack')
     for (const target of attackTargets(db, state, player, attacker)) {
       actions.push({ type: 'attack', attacker, target })
+      if (optional) actions.push({ type: 'attack', attacker, target, payOptionalCosts: true })
     }
   }
   return actions
@@ -210,7 +218,8 @@ export function declareAttack(
   draft: GameState,
   db: CardDb,
   attacker: number,
-  target: number | 'gigArea'
+  target: number | 'gigArea',
+  payOptionalCosts = false
 ): void {
   // Spending the attacker is a spend like any other: "When this Unit is spent"
   // fires here (docs/rulings.md §47).
@@ -223,7 +232,7 @@ export function declareAttack(
   // resolve here — after it is spent (guide step 01) and before the rival
   // reacts, so a Unit this defeats never gets to block (guide: "before your
   // Rival reacts").
-  fireTriggerOnDraft(db, draft, 'onAttack', attacker, [])
+  fireTriggerOnDraft(db, draft, 'onAttack', attacker, [], { payOptionalCosts })
 
   // An on-attack effect can end the game (a forced draw off an empty deck, an
   // overtime-winning steal). Never re-open a decision window over `gameOver`.
@@ -354,9 +363,12 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   }
 
   // [trigger seam] "when this Unit wins a fight": the survivor of a fight that
-  // defeated the other side (docs/rulings.md §41). A tie has no winner.
-  const winner = defeated.length === 1 ? (defeated[0] === defender ? attacker : defender) : null
-  if (winner !== null && onField(draft, winner)) {
+  // actually defeated the other side (docs/rulings.md §41). A tie has no
+  // winner, and neither does a fight whose loser was saved by a `defeatShield`
+  // (§46) — it was never defeated, so nobody won.
+  const loser = defeated.length === 1 ? defeated[0] : null
+  const winner = loser === null ? null : loser === defender ? attacker : defender
+  if (winner !== null && loser !== null && !onField(draft, loser) && onField(draft, winner)) {
     fireTriggerOnDraft(db, draft, 'onWinFight', winner, [])
   }
 }

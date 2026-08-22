@@ -14,7 +14,15 @@
 // to a rival Unit still targets its own owner's side (docs/rulings.md §8).
 
 import { effectivePower, hasKeyword, opponentOf } from '../engine/query'
-import type { CardDb, GameState, PlayerId, TargetFilter, TargetSpec } from '../engine/types'
+import type {
+  CardDb,
+  GameState,
+  GigDie,
+  GigDieSpec,
+  PlayerId,
+  TargetFilter,
+  TargetSpec,
+} from '../engine/types'
 
 /** The player an effect acts for: the owner of the card the effect is on. */
 export function controllerOf(state: GameState, sourceUid: number): PlayerId {
@@ -55,6 +63,10 @@ export function targetsFor(
   switch (spec) {
     case 'self':
       return [sourceUid]
+    // Never enumerated: a `chosen` reference consumes no slot, it reads the uid
+    // the enclosing `sameTarget` bound (docs/rulings.md §53).
+    case 'chosen':
+      return []
     case 'friendlyUnit':
       return fieldOf(state, me)
     case 'rivalUnit':
@@ -71,12 +83,41 @@ export function targetsFor(
       return state.players[me].gigArea.map((_die, index) => index)
     case 'rivalGigDie':
       return state.players[rival].gigArea.map((_die, index) => index)
+    // Bare "a Gig" on a card means either player's die: the controller's area
+    // first, then the rival's, as one index space (docs/rulings.md §39).
+    case 'anyGigDie':
+      return [...state.players[me].gigArea, ...state.players[rival].gigArea].map(
+        (_die, index) => index
+      )
   }
 }
 
 /** Does `spec` bind a Gig-die index rather than a card uid? */
 export function isGigDieSpec(spec: TargetSpec): boolean {
-  return spec === 'friendlyGigDie' || spec === 'rivalGigDie'
+  return spec === 'friendlyGigDie' || spec === 'rivalGigDie' || spec === 'anyGigDie'
+}
+
+/**
+ * The Gig die one bound index refers to, resolved against the scope the node
+ * asked for. `anyGigDie` counts the controller's area first, then the rival's
+ * (docs/rulings.md §39). Returns null for an index that no longer exists.
+ */
+export function gigDieAt(
+  state: GameState,
+  spec: GigDieSpec,
+  index: number,
+  controller: PlayerId
+): GigDie | null {
+  const mine = state.players[controller].gigArea
+  const theirs = state.players[opponentOf(controller)].gigArea
+  switch (spec) {
+    case 'friendlyGigDie':
+      return mine[index] ?? null
+    case 'rivalGigDie':
+      return theirs[index] ?? null
+    case 'anyGigDie':
+      return (index < mine.length ? mine[index] : theirs[index - mine.length]) ?? null
+  }
 }
 
 /** The highest `effectivePower` among `player`'s field Units, or null if none. */

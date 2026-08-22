@@ -984,9 +984,24 @@ it; these do.
 
 **Rulings:**
 
-- the vocabulary gains `{ kind: 'changeGig', amount, target }` with
+- the vocabulary gains `{ kind: 'changeGig', amount, target, adjust? }` with
   `amount > 0` increasing and `amount < 0` decreasing, and `TargetSpec` gains
-  `friendlyGigDie` / `rivalGigDie`;
+  `friendlyGigDie` / `rivalGigDie` / `anyGigDie`;
+- **the three scopes are printed distinctions, not engine policy** (fix round 1).
+  The pool says "a **friendly** Gig" when it means your own
+  (`jackie-welles-pour-one-out-for-me`) and bare "a Gig" / "Adjust a Gig"
+  otherwise (`6th-street-recruits`, `dexter-deshawn-off-the-grid`,
+  `dexter-deshawn-one-last-chance`, `industrial-assembly`,
+  `la-llorona-ghost-of-the-past`, `trust-no-one`, `dying-night-v-s-pistol`,
+  `wakako-okada-peace-and-harmony`, `afterparty-at-lizzie-s`,
+  `zetatech-faceplate`, `muamar-reyes-el-capita-n`). **Bare means either
+  player's die, chosen by the effect's controller** — nothing in the text
+  narrows it, and `meredith-stout-stone-cold-corpo` ("When a Rival adjusts …
+  1 or more friendly Gigs") only makes sense if a Rival's adjust effect can
+  reach your dice. So bare text encodes as `anyGigDie`; all four batch-1 uses
+  are bare and were corrected to it. `anyGigDie` indexes the **controller's**
+  area first, then the rival's, as one list, and `targets.gigDieAt` is the one
+  place that mapping lives;
 - **a Gig-die spec binds an index into that player's `gigArea`, not a card
   uid.** A die is not a card and has no uid, but *which* die you raise is as
   real a decision as which Unit you buff — it moves street cred, the "8+ value"
@@ -996,15 +1011,23 @@ it; these do.
   back to §32's uniform-random pick like every other trigger target. The
   alternative — a second bespoke pending-decision phase alongside `chooseGig` —
   was rejected for exactly the reason §32 gives;
-- **"up to N" takes the full N.** The engine applies the whole printed amount
-  and clamps it to the faces the die actually has: `[1, die.size]`. A d6 showing
-  5 "increased by up to 4" shows 6, not 9, and a decrease never goes below 1,
-  because a die's top face is a physical face. Choosing a *smaller* amount is
-  never better for the player who is increasing their own Gig or decreasing a
-  rival's, so the choice is resolved to its maximum rather than enumerated (it
-  would multiply the action list by N for no gain). The one card that could care
-  — `chrome-fang`, whose text punishes high-value friendly Gigs — is deferred,
-  and if it lands the amount becomes a slot;
+- **a fixed-sign "increase/decrease by up to N" takes the full N**, clamped to
+  the faces the die actually has: `[1, die.size]`. A d6 showing 5 "increased by
+  up to 4" shows 6, not 9, and a decrease never goes below 1, because a die's
+  top face is a physical face. The direction is printed, so the extreme is the
+  best available result *for the die the player picked* — and the player picks
+  the die, which is where the decision actually lives;
+- **"Adjust a Gig by up to N" makes the sign AND the magnitude a decision**
+  (fix round 1). `adjust: true` gives the node a second slot whose candidates
+  are `-N..-1, 1..N` — never 0, which is not one of the printed options — so
+  `legalActions` enumerates one entry per (die, amount) pair.
+  `afterparty-at-lizzie-s`, `dexter-deshawn-one-last-chance` and
+  `zetatech-faceplate` ("adjust … by up to 1"), plus
+  `muamar-reyes-el-capita-n` ("Adjust a Gig by 1", i.e. ±1), all need this: the
+  right answer there depends on whether you are chasing a value-pair, a min
+  Gig or a max Gig, so no fixed rule can stand in for the player. An amount
+  slot dies with its die slot (no die, no "how much"), and a trigger that
+  supplies no amount falls back to the rng like any other slot (§32);
 - `buffPower.amount` may also be the string `'friendlyMaxGig'`
   (`el-sombrero-n-la-venganza-lenta`, `sasha-yakovleva-won-t-let-you-down`:
   "gains power equal to a friendly max Gig this turn"), read off the board at
@@ -1043,7 +1066,10 @@ winning a fight (`appetite-for-destruction`, `satori-sword-of-saburo`,
 - `onWinFight` fires for the survivor of a fight that defeated the other side.
   A tie has no winner (both are defeated), and a Unit that won but has since
   left the field does not trigger. It fires after the loser's `onDefeat`, since
-  the loser is defeated first.
+  the loser is defeated first. **A fight whose loser was saved by a
+  `defeatShield` (§46) has no winner either** (fix round 1): the shield means
+  the Unit was never defeated, so `fight()` checks that the loser actually left
+  the field before firing.
 - "This Unit wins all fights against CORPO Units" becomes the static node
   `{ kind: 'winsFightVsKeyword', keyword }`, consulted by `fight()` *instead of*
   the power comparison in that Unit's favour — it wins and survives whatever the
@@ -1123,7 +1149,7 @@ Five cards print "for -1 €$ for each friendly Gig with 8+ value"
 
 ## 45 — "Choose one effect" is a `chooseOne` node whose mode is a slot
 
-Five cards are modal: `dexter-deshawn-off-the-grid`, `gunpoint-diplomacy`,
+Six cards are modal: `dexter-deshawn-off-the-grid`, `gunpoint-diplomacy`,
 `muamar-reyes-el-capita-n`, `padre-man-of-the-cross`, `pyramid-song`,
 `wakako-okada-peace-and-harmony`.
 
@@ -1141,14 +1167,13 @@ Five cards are modal: `dexter-deshawn-off-the-grid`, `gunpoint-diplomacy`,
 - a `chooseOne` reached from a trigger that carries no player choice
   (`dexter-deshawn-off-the-grid`'s `{Call}`) picks its mode off the rng, exactly
   like any other unsupplied slot (§32);
-- **"If you have less ☆ than a Rival, they instead choose one effect for you"**
-  (`gunpoint-diplomacy`) is `chooser: 'rivalIfBehindStreetCred'`. While the
-  controller is behind, the mode slot offers **no** candidates — a rival's
-  private choice is not the acting player's to enumerate — and resolution falls
-  back to the rng. That is strictly better than either alternative (letting the
-  controller pick anyway, or fizzling the card): the rival is modelled as an
-  unpredictable agent, and the enumerated action list stays honest about who
-  decides.
+- **a rival's private choice is never enumerated.** While the rival is the
+  chooser, the mode slot offers **no** candidates and resolution falls back to
+  the rng — the rival is modelled as an unpredictable agent, and the action list
+  stays honest about who decides. Two choosers use this:
+  `'rivalIfBehindStreetCred'` (the rival picks the one mode while you are
+  behind, otherwise you do) and `'allUnlessBehindStreetCred'` — see §54 for the
+  card that forced the second.
 
 **Known limitation:** an *activated* ability whose `chooseOne` has any
 unfillable slot is not offered at all (§32's "never charge for nothing" rule
@@ -1218,18 +1243,37 @@ chosen Unit, the second gated on that Unit's tags).
   `changeGig`, `chooseOne`, `grantKeyword`, `defeatShield`, cost reduction and
   the four new triggers are nodes, and why only these three cards are scripts.
 
-## 49 — An optional cost on a *triggered* effect is paid automatically when affordable
+## 49 — An optional cost on a *triggered* effect is a decision on the triggering action
 
 `el-sombrero-n-la-venganza-lenta`: "{Attack} You may pay 2 €$. If you do, this
 Unit gains power equal to a friendly max Gig this turn."
 
-**Ruling:** an `EffectDef` with a `cost` and a trigger other than `activated` is
-resolved by paying the cost first: if the payment cannot be made the def does
-not resolve at all, and nothing is spent. Triggers carry no player decision
-(§32), and the option is never a downside on the card that has it — it converts
-€$ into power at the moment the Unit is already committed to a fight. When a
-future card makes the option genuinely two-sided, this is the line to promote
-into an explicit decision, and `attack` would grow an options field.
+**Ruling (revised in fix round 1 — the first version paid it automatically
+whenever it was affordable, which quietly burned 2 €$ on every attack).**
+Spending €$ is a resource decision, and €$ is the game's scarcest resource: the
+same 2 €$ could play a card, Call a Legend, or pay for this. Nothing about being
+mid-attack makes the trade automatically correct — a 4-power attacker hitting an
+empty Gig area gains nothing from +9 power.
+
+- an `EffectDef` with a `cost` and a trigger other than `activated` resolves
+  **only** when the firing carries `payOptionalCosts: true`; otherwise it is
+  skipped and nothing is spent;
+- the answer rides on the action that fires the trigger. `attack` gained an
+  optional `payOptionalCosts` field, and `attackActions` offers **both**
+  variants — `{attacker, target}` (decline) and
+  `{attacker, target, payOptionalCosts: true}` (pay) — but only when the
+  attacker (or its propagated Gear, §37) actually has such a def and can afford
+  it, so no other card grows the action list. The plain variant stays exactly
+  the action every existing caller already builds, so declining is the default
+  and no existing legality changes;
+- a costed trigger fired from a path that *cannot* carry the answer (an
+  `onDefeat`, `onSpend` or watcher trigger with a cost) counts as declined. No
+  card in the pool is in that position; when one lands, that trigger's action
+  grows the same field, or — for a genuinely action-less trigger — it wants a
+  pending two-option decision phase in the shape of `chooseGig`.
+
+An activated ability's cost is untouched: it is mandatory, and choosing to
+activate *is* the decision.
 
 ## 50 — "You may …" is taken whenever it can be
 
@@ -1239,6 +1283,9 @@ Beyond §49's costed option, three batch-1 cards print a bare "you may":
 free").
 
 **Ruling:** an optional clause with no cost and no drawback resolves as taken.
+(An optional clause that *does* cost something is a real decision — see §49 for
+"you may pay N €$"; the same will apply to "you may discard/defeat X" when a
+batch reaches those cards.)
 `bonnie-and-clyde` therefore encodes as two `onPlay` defeats, the second gated
 on `condition.rivalGigLeadAtLeast: 2` — one defeat normally, two when the Gig
 deficit is there ("defeat 2 **instead**" = the first one plus one more, both
@@ -1283,3 +1330,74 @@ than a vocabulary extension, and one that wants its own test pass. Pool-wide it
 would also subsume §43's `gunpoint-diplomacy` over-approximation and the
 "next time" clauses in `gorilla-arms` / `jackie-welles-pour-one-out-for-me`, so
 it is worth doing once, properly, rather than three ad-hoc times.
+
+# Task 8 fix-round-1 rulings
+
+## 53 — "Give a friendly Unit these effects" needs one shared target slot
+
+`slotSpecs` gives every node its own slot, so a sequence of two nodes asks for
+two targets — which is wrong for every card that hands *one* Unit several
+things: `gunpoint-diplomacy` ("Give a friendly Unit these effects … The next
+time **this Unit** attacks … // Give **this Unit** +3 power"),
+`goro-takemura-vengeful-bodyguard` ("Give a friendly Unit with cost 4 or less
+{Blocker} this turn. If you control a value-pair of Gigs, also give **it** +1
+power"), `johnny-silverhand-rocking-renegade`,
+`yorinobu-arasaka-steel-dragon` ("play a Unit … **It** can attack rival Units
+this turn"), `dum-dum-maelstrom-triggerman`. Before this, the only way to say it
+was a script.
+
+**Ruling:** the vocabulary gains
+`{ kind: 'sameTarget', target, filter?, effects }` and `TargetSpec` gains
+`'chosen'`.
+
+- `sameTarget` contributes **one** target slot, then the slots of its children;
+- a child that names `target: 'chosen'` consumes **no** slot and reads the uid
+  the enclosing `sameTarget` bound (`EffectCtx.chosen`), exactly the way `'self'`
+  reads the source. So "buff it and grant it a keyword" is one decision, and
+  `legalActions` offers one entry per candidate Unit rather than the cartesian
+  product of two independent picks;
+- if the shared slot cannot be filled the whole construct fizzles (the children
+  are all *about* that target), but the children's slots are still stepped over
+  so any node after the `sameTarget` reads the right ones — the §34 alignment
+  rule;
+- `'chosen'` outside a `sameTarget` resolves to nothing rather than throwing, and
+  is never enumerated as a candidate.
+
+This is what let `gunpoint-diplomacy` (§54) be encoded faithfully, and it
+retires the shared-target half of `johnny-silverhand-rocking-renegade`'s script
+rationale (the script stays for the ROCKER tag check, which is a condition on
+the chosen target that the vocabulary still cannot express).
+
+## 54 — `gunpoint-diplomacy` gives BOTH effects; being behind on ☆ is the penalty
+
+Printed text: "Give a friendly Unit these effects. If you have less ☆ (Street
+Cred) than a Rival, they instead choose one effect for you. / The next time this
+Unit attacks this turn, it may attack ready Units. // Give this Unit +3 power
+this turn."
+
+Batch 1 first encoded this as a plain "choose one", which is **half the card**:
+the `//` separates the two effects the Unit is given, and the modal reading only
+applies while you are behind on Street Cred. The first version also let the
+controller pick a mode in the default case, i.e. it turned an upside into a
+choice and the penalty clause into the normal rule.
+
+**Ruling:** `chooseOne` gains a third chooser,
+`'allUnlessBehindStreetCred'`: **every** mode resolves, unless the controller's
+Street Cred is strictly less than the rival's, in which case the rival picks
+exactly one (not enumerated, per §45). Wrapped in a `sameTarget` (§53) so both
+effects land on the one chosen friendly Unit, the whole card is:
+
+```jsonc
+{ "trigger": "onPlay", "effect": {
+    "kind": "sameTarget", "target": "friendlyUnit",
+    "effects": [{ "kind": "chooseOne", "chooser": "allUnlessBehindStreetCred",
+      "modes": [
+        { "kind": "grantKeyword", "keyword": "attack-ready", "target": "chosen", "duration": "turn" },
+        { "kind": "buffPower", "amount": 3, "target": "chosen", "duration": "turn" }
+      ] }] } }
+```
+
+so the play offers exactly one decision — which friendly Unit — and the Street
+Cred comparison decides how much that Unit gets. The `attack-ready` grant is
+still turn-long rather than one-attack-long (§43's recorded
+over-approximation, waiting on §52's floating effects).

@@ -383,7 +383,7 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
       )
       break
     case 'attack':
-      declareAttack(draft, db, action.attacker, action.target)
+      declareAttack(draft, db, action.attacker, action.target, action.payOptionalCosts === true)
       break
     case 'react':
       react(draft, db, action.reaction)

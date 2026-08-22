@@ -41,7 +41,7 @@ import {
 } from '../engine/query'
 import { nextInt, rollDie } from '../engine/rng'
 import { scriptedCards } from './scripted/index'
-import { filterTargets, gearEquipTargets, isGigDieSpec, targetsFor } from './targets'
+import { filterTargets, gearEquipTargets, gigDieAt, isGigDieSpec, targetsFor } from './targets'
 import type {
   Action,
   CardDb,
@@ -60,6 +60,19 @@ export interface EffectCtx {
   player: PlayerId
   sourceUid: number
   targets: number[]
+  /** The uid bound by an enclosing `sameTarget`, read by `target: 'chosen'`. */
+  chosen?: number
+}
+
+/**
+ * Facts a trigger firing carries that no read of the state can supply: the size
+ * of the Gig die that was just stolen (docs/rulings.md §42) and the answer to a
+ * "You may pay N €$" optional cost (docs/rulings.md §49). Absent
+ * `payOptionalCosts` means *declined*, so a costed trigger fired from a path
+ * that cannot offer the choice never spends the player's €$.
+ */
+export interface TriggerContext extends ConditionContext {
+  payOptionalCosts?: boolean
 }
 
 /** Keyword: "usable during the rival's attack" (guide p11 / glossary QUICK). */
@@ -86,7 +99,14 @@ const MAX_TARGET_TUPLES = 256
  */
 type SlotSpec =
   | { kind: 'target'; spec: TargetSpec; filter?: TargetFilter }
-  | { kind: 'mode'; count: number; chooser: 'controller' | 'rivalIfBehindStreetCred' }
+  | {
+      kind: 'mode'
+      count: number
+      chooser: 'controller' | 'rivalIfBehindStreetCred' | 'allUnlessBehindStreetCred'
+    }
+  // "Adjust a Gig by up to N": the signed amounts the player may pick from
+  // (docs/rulings.md §39).
+  | { kind: 'amount'; options: number[] }
 
 /**
  * The slots an EffectNode tree needs, in resolution order. `self` needs no
@@ -105,9 +125,22 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
     case 'spendCard':
     case 'bottomDeck':
     case 'grantKeyword':
-      return node.target === 'self' ? [] : [{ kind: 'target', spec: node.target, filter: node.filter }]
+      // `self` and `chosen` are references, not decisions: no slot.
+      return node.target === 'self' || node.target === 'chosen'
+        ? []
+        : [{ kind: 'target', spec: node.target, filter: node.filter }]
     case 'changeGig':
-      return [{ kind: 'target', spec: node.target }]
+      return [
+        { kind: 'target', spec: node.target },
+        ...(node.adjust === true ? [{ kind: 'amount' as const, options: adjustOptions(node.amount) }] : []),
+      ]
+    case 'sameTarget':
+      return [
+        ...(node.target === 'self' || node.target === 'chosen'
+          ? []
+          : [{ kind: 'target' as const, spec: node.target, filter: node.filter }]),
+        ...node.effects.flatMap(slotSpecs),
+      ]
     case 'scripted':
       return (node.targets ?? []).map((spec) => ({ kind: 'target' as const, spec }))
     case 'chooseOne':
@@ -127,6 +160,23 @@ function slotWidth(node: EffectNode): number {
   return slotSpecs(node).length
 }
 
+/**
+ * The signed amounts "Adjust a Gig by up to N" offers: -N..-1 and 1..N, never 0
+ * (adjusting by nothing is not one of the printed options).
+ */
+function adjustOptions(amount: number): number[] {
+  const magnitude = Math.abs(amount)
+  const options: number[] = []
+  for (let i = magnitude; i >= 1; i--) options.push(-i)
+  for (let i = 1; i <= magnitude; i++) options.push(i)
+  return options
+}
+
+/** "If you have less ☆ (Street Cred) than a Rival" (docs/rulings.md §45). */
+function behindOnStreetCred(state: GameState, player: PlayerId): boolean {
+  return streetCred(state, player) < streetCred(state, opponentOf(player))
+}
+
 /** The candidates a slot admits right now (empty = no decision to offer). */
 function candidatesFor(
   db: CardDb,
@@ -135,14 +185,16 @@ function candidatesFor(
   sourceUid: number,
   controller: PlayerId
 ): number[] {
+  if (slot.kind === 'amount') return slot.options.map((_option, index) => index)
+
   if (slot.kind === 'mode') {
     // "If you have less ☆ than a Rival, they instead choose one effect for
     // you" — a rival's private choice is not ours to enumerate, so the slot
     // offers nothing and resolution falls back to the rng (docs/rulings.md §45).
-    if (
-      slot.chooser === 'rivalIfBehindStreetCred' &&
-      streetCred(state, controller) < streetCred(state, opponentOf(controller))
-    ) {
+    if (behindOnStreetCred(state, controller)) {
+      if (slot.chooser !== 'controller') return []
+    } else if (slot.chooser === 'allUnlessBehindStreetCred') {
+      // Not behind: every mode resolves, so there is nothing to choose.
       return []
     }
     return Array.from({ length: slot.count }, (_value, index) => index)
@@ -166,10 +218,20 @@ function fillableSlots(
   def: EffectDef,
   controller: PlayerId
 ): { slot: SlotSpec; candidates: number[] }[] {
-  return slotSpecs(def.effect).map((slot) => ({
+  const slots = slotSpecs(def.effect).map((slot) => ({
     slot,
     candidates: candidatesFor(db, state, slot, sourceUid, controller),
   }))
+  // An `amount` slot always follows the die slot it belongs to (see the
+  // `changeGig` case of `slotSpecs`). "How much" is not a decision worth
+  // offering when there is no die to adjust, so it dies with its die — the slot
+  // *count* is untouched, which is what keeps the offsets stable.
+  for (let i = 1; i < slots.length; i++) {
+    if (slots[i].slot.kind === 'amount' && slots[i - 1].candidates.length === 0) {
+      slots[i] = { slot: slots[i].slot, candidates: [] }
+    }
+  }
+  return slots
 }
 
 /**
@@ -318,6 +380,9 @@ function takeSlot(slots: Slots): number | null {
 /** The next bound target for a node, or null when the slot could not be filled. */
 function takeTarget(node: { target: TargetSpec }, ctx: EffectCtx, slots: Slots): number | null {
   if (node.target === 'self') return ctx.sourceUid
+  // A `chosen` reference reads the enclosing sameTarget's binding, and consumes
+  // no slot (docs/rulings.md §53).
+  if (node.target === 'chosen') return ctx.chosen ?? null
   return takeSlot(slots)
 }
 
@@ -395,32 +460,74 @@ function applyNode(
 
     case 'changeGig': {
       const index = takeSlot(slots)
+      // "Adjust ..." carries a second slot for the signed amount; it must be
+      // consumed whether or not the die slot was filled, or the nodes after
+      // this one would read the wrong slots (docs/rulings.md §39).
+      const options = node.adjust === true ? adjustOptions(node.amount) : null
+      const pick = options === null ? null : takeSlot(slots)
       if (index === null) return
-      const owner = node.target === 'friendlyGigDie' ? ctx.player : opponentOf(ctx.player)
-      const die = draft.players[owner].gigArea[index]
-      if (die === undefined) return
-      // "by up to N": the full amount, clamped to the faces the die actually
-      // has (docs/rulings.md §39).
+      const die = gigDieAt(draft, node.target, index, ctx.player)
+      if (die === null) return
+      const amount =
+        options === null ? node.amount : options[pick ?? randomIndex(draft, options.length)]
+      // "by up to N": the amount, clamped to the faces the die actually has
+      // (docs/rulings.md §39).
       const before = die.value
-      die.value = Math.max(1, Math.min(die.size, die.value + node.amount))
+      die.value = Math.max(1, Math.min(die.size, die.value + amount))
       note(draft, ctx.sourceUid, `gig ${before} -> ${die.value}`)
+      return
+    }
+
+    case 'sameTarget': {
+      // One target, every child effect (docs/rulings.md §53).
+      const target = takeTarget(node, ctx, slots)
+      const end = slots.next + node.effects.reduce((sum, child) => sum + slotWidth(child), 0)
+      if (target === null || !draft.cards[target]) {
+        // The whole construct fizzles, but the children's slots must still be
+        // stepped over so the nodes after it read the right ones.
+        slots.next = end
+        return
+      }
+      const shared: EffectCtx = { ...ctx, chosen: target }
+      for (const child of node.effects) {
+        if (draft.winner !== null) break
+        applyNode(db, draft, child, shared, slots)
+      }
+      slots.next = end
       return
     }
 
     case 'chooseOne': {
       const base = slots.next
       const chosen = takeSlot(slots)
-      const index = chosen ?? randomIndex(draft, node.modes.length)
-      const mode = node.modes[index]
-      if (mode === undefined) return
-      // Jump the cursor onto the chosen mode's own slots, then past all of them
-      // (docs/rulings.md §45).
-      let offset = base + 1
-      for (let i = 0; i < index; i++) offset += slotWidth(node.modes[i])
-      const end = base + 1 + node.modes.reduce((sum, child) => sum + slotWidth(child), 0)
-      slots.next = offset
-      note(draft, ctx.sourceUid, `chose mode ${index}`)
-      applyNode(db, draft, mode, ctx, slots)
+      const firstMode = base + 1
+      const end = firstMode + node.modes.reduce((sum, child) => sum + slotWidth(child), 0)
+      /** Resolves one mode with the cursor on that mode's own slots (§45). */
+      const applyMode = (index: number): void => {
+        const mode = node.modes[index]
+        if (mode === undefined) return
+        let offset = firstMode
+        for (let i = 0; i < index; i++) offset += slotWidth(node.modes[i])
+        slots.next = offset
+        note(draft, ctx.sourceUid, `mode ${index}`)
+        applyNode(db, draft, mode, ctx, slots)
+      }
+
+      // "Give a friendly Unit these effects. If you have less ☆ than a Rival,
+      // they instead choose one effect for you." — all of them, unless behind.
+      if (
+        node.chooser === 'allUnlessBehindStreetCred' &&
+        !behindOnStreetCred(draft, ctx.player)
+      ) {
+        for (let index = 0; index < node.modes.length; index++) {
+          if (draft.winner !== null) break
+          applyMode(index)
+        }
+        slots.next = end
+        return
+      }
+
+      applyMode(chosen ?? randomIndex(draft, node.modes.length))
       slots.next = end
       return
     }
@@ -607,7 +714,7 @@ export function applyEffectDefOnDraft(
   sourceUid: number,
   targets: number[],
   controller?: PlayerId,
-  context: ConditionContext = {}
+  context: TriggerContext = {}
 ): void {
   const card = draft.cards[sourceUid]
   if (!card) return
@@ -615,10 +722,12 @@ export function applyEffectDefOnDraft(
   const player = controller ?? effectController(draft, sourceUid)
   if (!conditionMet(draft, player, def, context)) return
   // A *triggered* def may carry an optional cost ("{Attack} You may pay 2 €$.
-  // If you do, ..."). The engine takes the option whenever it is affordable and
-  // skips the def otherwise (docs/rulings.md §49). An activated ability's cost
-  // is paid by `activateAbilityOnDraft` instead, before this runs.
+  // If you do, ..."). Paying is the controller's decision, carried on the
+  // action that fired the trigger; an unanswered option is declined, and the
+  // def does not resolve (docs/rulings.md §49). An activated ability's cost is
+  // mandatory and paid by `activateAbilityOnDraft` before this runs.
   if (def.trigger !== 'activated' && def.cost !== undefined) {
+    if (context.payOptionalCosts !== true) return
     if (!payTriggerCost(db, draft, def, sourceUid, player)) return
   }
   const ctx: EffectCtx = { player, sourceUid, targets }
@@ -691,7 +800,7 @@ export function fireCardTrigger(
   sourceUid: number,
   targets: number[],
   controller?: PlayerId,
-  context: ConditionContext = {}
+  context: TriggerContext = {}
 ): void {
   const def = defOf(db, draft, sourceUid)
   if (!def) return
@@ -738,17 +847,47 @@ export function fireTriggerOnDraft(
   draft: GameState,
   trigger: Trigger,
   sourceUid: number,
-  targets: number[]
+  targets: number[],
+  context: TriggerContext = {}
 ): void {
   const card = draft.cards[sourceUid]
   if (!card) return
   const controller = effectController(draft, sourceUid)
-  fireCardTrigger(db, draft, trigger, sourceUid, targets, controller)
+  fireCardTrigger(db, draft, trigger, sourceUid, targets, controller, context)
 
   if (!GEAR_PROPAGATED_TRIGGERS.includes(trigger)) return
   for (const gearUid of [...card.attachedGear]) {
-    fireCardTrigger(db, draft, trigger, gearUid, [], controller)
+    fireCardTrigger(db, draft, trigger, gearUid, [], controller, context)
   }
+}
+
+/**
+ * Does `uid` (or its propagated Gear) have a `trigger` EffectDef with an
+ * *optional* cost the controller could pay right now? `legalActions` uses this
+ * to decide whether to offer the pay/decline pair (docs/rulings.md §49).
+ */
+export function hasPayableOptionalTrigger(
+  db: CardDb,
+  state: GameState,
+  uid: number,
+  trigger: Trigger
+): boolean {
+  const card = state.cards[uid]
+  if (!card) return false
+  const controller = effectController(state, uid)
+  const sources = GEAR_PROPAGATED_TRIGGERS.includes(trigger)
+    ? [uid, ...card.attachedGear]
+    : [uid]
+  for (const source of sources) {
+    const def = defOf(db, state, source)
+    if (!def) continue
+    for (const effect of def.effects) {
+      if (effect.trigger !== trigger || effect.cost === undefined) continue
+      if (!conditionMet(state, controller, effect)) continue
+      if (canPayAbility(state, controller, effect, source)) return true
+    }
+  }
+  return false
 }
 
 /** Is `uid` on the field, or a face-up Legend in the legends zone? */
@@ -783,7 +922,7 @@ export function fireWatcherTrigger(
   draft: GameState,
   trigger: Trigger,
   player: PlayerId,
-  context: ConditionContext
+  context: TriggerContext
 ): void {
   const p = draft.players[player]
   const watchers = [...p.field, ...p.legends.filter((uid) => draft.cards[uid].faceUp)]

@@ -43,14 +43,18 @@ export type Trigger =
   | 'static'
 
 /**
- * What a target slot admits. Card specs bind a **card uid**; the two Gig-die
- * specs bind an **index into that player's `gigArea`** instead — a Gig die is
- * not a card, but "increase a Gig by up to 4" is as much a player decision as
- * picking a Unit, so it goes through the same slot machinery
- * (docs/rulings.md §39).
+ * What a target slot admits. Card specs bind a **card uid**; the Gig-die specs
+ * bind an **index into a `gigArea`** instead — a Gig die is not a card, but
+ * "increase a Gig by up to 4" is as much a player decision as picking a Unit,
+ * so it goes through the same slot machinery (docs/rulings.md §39).
+ *
+ * `anyGigDie` (bare "a Gig" on the card) indexes the controller's Gig area
+ * followed by the rival's, as one list. `chosen` is not a decision at all: it
+ * reads the uid the enclosing `sameTarget` bound (docs/rulings.md §53).
  */
 export type TargetSpec =
   | 'self'
+  | 'chosen'
   | 'friendlyUnit'
   | 'rivalUnit'
   | 'rivalSpentUnit'
@@ -58,6 +62,10 @@ export type TargetSpec =
   | 'friendlyUnitOrLegend'
   | 'friendlyGigDie'
   | 'rivalGigDie'
+  | 'anyGigDie'
+
+/** The three Gig-die scopes a card's text can name (docs/rulings.md §39). */
+export type GigDieSpec = 'friendlyGigDie' | 'rivalGigDie' | 'anyGigDie'
 
 /**
  * Narrows a card target spec to the cards a printed line actually allows:
@@ -116,8 +124,17 @@ export type EffectNode =
   | { kind: 'cantAttack' }
   // "Increase/decrease a Gig by up to N": moves one Gig die's top face by
   // `amount` (negative decreases), clamped to [1, die size]
-  // (docs/rulings.md §39).
-  | { kind: 'changeGig'; amount: number; target: 'friendlyGigDie' | 'rivalGigDie' }
+  // (docs/rulings.md §39). With `adjust: true` ("Adjust a Gig by up to N") the
+  // sign *and* the magnitude are the player's decision, enumerated as a slot.
+  | { kind: 'changeGig'; amount: number; target: GigDieSpec; adjust?: boolean }
+  // "Give a friendly Unit these effects": one target slot, shared by every
+  // child that names `target: 'chosen'` (docs/rulings.md §53).
+  | {
+      kind: 'sameTarget'
+      target: TargetSpec
+      filter?: TargetFilter
+      effects: EffectNode[]
+    }
   // "Give a friendly Unit {adrenaline} this turn" and friends — an
   // until-end-of-turn keyword grant (docs/rulings.md §43).
   | {
@@ -128,11 +145,18 @@ export type EffectNode =
       duration: 'turn'
     }
   // "Choose one effect. A // B" — the mode is a slot like any other target
-  // (docs/rulings.md §45).
+  // (docs/rulings.md §45). `chooser`:
+  //   * 'controller' (default) — the acting player picks one mode;
+  //   * 'rivalIfBehindStreetCred' — the rival picks one while the controller is
+  //     behind on ☆, so the mode is not enumerated;
+  //   * 'allUnlessBehindStreetCred' — **every** mode resolves, unless the
+  //     controller is behind on ☆, in which case the rival picks exactly one
+  //     ("Give a friendly Unit these effects. If you have less ☆ than a Rival,
+  //     they instead choose one effect for you." — gunpoint-diplomacy).
   | {
       kind: 'chooseOne'
       modes: EffectNode[]
-      chooser?: 'controller' | 'rivalIfBehindStreetCred'
+      chooser?: 'controller' | 'rivalIfBehindStreetCred' | 'allUnlessBehindStreetCred'
     }
   // Static, printed on Gear: "If this Unit would be defeated, defeat its
   // <gear> instead" (docs/rulings.md §46).
@@ -286,7 +310,16 @@ export type Action =
   | { type: 'playCard'; card: number; payment: number[]; targets: number[] }
   | { type: 'callLegend'; payment: number[] }
   | { type: 'activateAbility'; card: number; abilityIndex: number; targets: number[] }
-  | { type: 'attack'; attacker: number; target: number | 'gigArea' }
+  // `payOptionalCosts` answers a "{Attack} You may pay N €$" trigger: omitted
+  // (or false) declines, true pays. `legalActions` offers both variants only
+  // when the attacker actually has such a trigger and can afford it
+  // (docs/rulings.md §49).
+  | {
+      type: 'attack'
+      attacker: number
+      target: number | 'gigArea'
+      payOptionalCosts?: boolean
+    }
   | { type: 'chooseGig'; dieIndex: number }
   | { type: 'react'; reaction: Reaction }
   | { type: 'endTurn' }

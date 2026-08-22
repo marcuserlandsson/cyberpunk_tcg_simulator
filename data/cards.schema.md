@@ -89,7 +89,7 @@ are in `docs/rulings.md` (§29–§38 from Task 7, §39–§52 from Task 8).
 | Field | Notes |
 |---|---|
 | `trigger` | `onPlay` \| `onCall` \| `onAttack` \| `onDefeat` \| `onBlock` \| `onWinFight` \| `onSpend` \| `onFriendlyStealDie` \| `activated` \| `static`. The last four triggers were added in Task 8 (§41, §42, §47); `onFriendlyStealDie` is a *watcher* — it fires on every in-play card of the thief, not on the card that stole. |
-| `cost` | `{ selfSpend?, eddies?, reduction? }`. On an `activated` def this is the printed `{Spend}` / €$ cost; on a *triggered* def it is an optional "You may pay N €$" that the engine takes whenever it is affordable (§49). |
+| `cost` | `{ selfSpend?, eddies?, reduction? }`. On an `activated` def this is the printed, mandatory `{Spend}` / €$ cost; on a *triggered* def it is an optional "You may pay N €$", answered by the action that fires the trigger (`attack`'s `payOptionalCosts`) and **declined** by default (§49). |
 | `condition` | `{ streetCredAtLeast?, friendlyGigValueAtLeast?, rivalGigLeadAtLeast?, stolenDieSize? }` — "☆ N or more", "if you control a Gig with 8+ value", "if a Rival controls at least 2 Gigs more than you", and the watcher-only die-size gate (§42, §50). |
 | `quick` | `{Quick}` — usable in the rival's react window. |
 | `oncePerTurn` | "The first time … each turn" (§40). Tracked per card instance + effect index in `GameState.oncePerTurnUsed`, cleared at the end of the game turn. |
@@ -98,9 +98,15 @@ are in `docs/rulings.md` (§29–§38 from Task 7, §39–§52 from Task 8).
 ### `TargetSpec`
 
 `self`, `friendlyUnit`, `rivalUnit`, `rivalSpentUnit`, `anyUnit`,
-`friendlyUnitOrLegend`, and (Task 8) `friendlyGigDie` / `rivalGigDie` — the two
-Gig-die specs bind an **index into that player's `gigArea`**, not a card uid
-(§39). Card specs may be narrowed by a `filter`:
+`friendlyUnitOrLegend`, and (Task 8) `friendlyGigDie` / `rivalGigDie` /
+`anyGigDie` plus `chosen`. The Gig-die specs bind an **index into a `gigArea`**,
+not a card uid (§39): `friendlyGigDie` for printed "a friendly Gig",
+`rivalGigDie` for "a rival Gig", and `anyGigDie` for bare "a Gig" / "Adjust a
+Gig" (either player's die — the controller's area indexed first, then the
+rival's). `chosen` is not a decision: it reads the uid bound by the enclosing
+`sameTarget` (§53), the way `self` reads the source card.
+
+Card specs may be narrowed by a `filter`:
 `{ maxPower?, minPower?, keyword?, excludeSelf?, weakerThanAFriendlyUnit? }`,
 covering "with power 4 or less", "a CORPO Unit", "*another* friendly Unit" and
 "with less power than a friendly Unit".
@@ -116,10 +122,11 @@ covering "with power 4 or less", "a CORPO Unit", "*another* friendly Unit" and
 | `defeat` / `bounce` / `bottomDeck` | Defeat a Unit / return it to hand / put it under its deck. |
 | `readyCard` / `spendCard` | Ready or spend a card ("{Spend} it", "ready it"). |
 | `stealGig` / `returnGig` / `rerollGig` | Steal a rival Gig (§32's `chooseGig` flow), send a friendly Gig back to the fixer, reroll a Gig. |
-| `changeGig` | "Increase/decrease a Gig by up to N" — the full amount, clamped to `[1, die size]`, on a chosen die (§39). |
+| `changeGig` | "Increase/decrease a Gig by up to N" — the full amount, clamped to `[1, die size]`, on a chosen die. With `adjust: true` ("Adjust a Gig by up to N") the sign *and* magnitude become a second slot offering `-N..-1, 1..N` (§39). |
+| `sameTarget` | "Give a friendly Unit these effects" — one target slot, shared by every child that names `target: 'chosen'` (§53). |
 | `trashFromDeck` / `gainEddieFromTopDeck` | Mill from a deck / bank the top card as €$. |
 | `grantKeyword` | "… can attack the turn it's played" ({adrenaline}), "it may attack ready Units" (the granted-only `attack-ready` keyword) — until end of turn (§43). |
-| `chooseOne` | "Choose one effect. A // B". `chooser: 'rivalIfBehindStreetCred'` covers "If you have less ☆ than a Rival, they instead choose one for you" (§45). |
+| `chooseOne` | "Choose one effect. A // B". `chooser`: `'controller'` (default), `'rivalIfBehindStreetCred'` ("If you have less ☆ than a Rival, they instead choose one for you"), or `'allUnlessBehindStreetCred'` (every mode resolves unless you are behind, then the rival picks one — `gunpoint-diplomacy`, §45/§54). |
 | `defeatShield` | *static, on Gear*: "If this Unit would be defeated, defeat its `<gear>` instead" (§46). |
 | `winsFightVsKeyword` | *static*: "This Unit wins all fights against CORPO Units" (§41). |
 | `costReduction` | *static*: "Play this for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$" (§44). |

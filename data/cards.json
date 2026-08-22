@@ -26,7 +26,7 @@
         "effect": {
           "kind": "changeGig",
           "amount": 6,
-          "target": "friendlyGigDie"
+          "target": "anyGigDie"
         }
       }
     ]
@@ -618,7 +618,7 @@
         "effect": {
           "kind": "changeGig",
           "amount": 2,
-          "target": "friendlyGigDie"
+          "target": "anyGigDie"
         }
       }
     ]
@@ -989,20 +989,26 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "chooseOne",
-          "chooser": "rivalIfBehindStreetCred",
-          "modes": [
+          "kind": "sameTarget",
+          "target": "friendlyUnit",
+          "effects": [
             {
-              "kind": "grantKeyword",
-              "keyword": "attack-ready",
-              "target": "friendlyUnit",
-              "duration": "turn"
-            },
-            {
-              "kind": "buffPower",
-              "amount": 3,
-              "target": "friendlyUnit",
-              "duration": "turn"
+              "kind": "chooseOne",
+              "chooser": "allUnlessBehindStreetCred",
+              "modes": [
+                {
+                  "kind": "grantKeyword",
+                  "keyword": "attack-ready",
+                  "target": "chosen",
+                  "duration": "turn"
+                },
+                {
+                  "kind": "buffPower",
+                  "amount": 3,
+                  "target": "chosen",
+                  "duration": "turn"
+                }
+              ]
             }
           ]
         }
@@ -1116,7 +1122,7 @@
         "effect": {
           "kind": "changeGig",
           "amount": 4,
-          "target": "friendlyGigDie"
+          "target": "anyGigDie"
         }
       },
       {
@@ -1468,7 +1474,7 @@
         "effect": {
           "kind": "changeGig",
           "amount": 3,
-          "target": "friendlyGigDie"
+          "target": "anyGigDie"
         }
       }
     ]

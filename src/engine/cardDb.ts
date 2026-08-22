@@ -21,6 +21,7 @@ const triggerSchema = z.enum([
 
 const targetSpecSchema = z.enum([
   'self',
+  'chosen',
   'friendlyUnit',
   'rivalUnit',
   'rivalSpentUnit',
@@ -28,9 +29,10 @@ const targetSpecSchema = z.enum([
   'friendlyUnitOrLegend',
   'friendlyGigDie',
   'rivalGigDie',
+  'anyGigDie',
 ])
 
-const gigDieSpecSchema = z.enum(['friendlyGigDie', 'rivalGigDie'])
+const gigDieSpecSchema = z.enum(['friendlyGigDie', 'rivalGigDie', 'anyGigDie'])
 
 const whoseSchema = z.enum(['friendly', 'rival'])
 
@@ -113,6 +115,13 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       kind: z.literal('changeGig'),
       amount: z.number(),
       target: gigDieSpecSchema,
+      adjust: z.boolean().optional(),
+    }),
+    z.strictObject({
+      kind: z.literal('sameTarget'),
+      target: targetSpecSchema,
+      filter: targetFilterSchema.optional(),
+      effects: z.array(effectNodeSchema),
     }),
     z.strictObject({
       kind: z.literal('grantKeyword'),
@@ -124,7 +133,9 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
     z.strictObject({
       kind: z.literal('chooseOne'),
       modes: z.array(effectNodeSchema),
-      chooser: z.enum(['controller', 'rivalIfBehindStreetCred']).optional(),
+      chooser: z
+        .enum(['controller', 'rivalIfBehindStreetCred', 'allUnlessBehindStreetCred'])
+        .optional(),
     }),
     z.strictObject({ kind: z.literal('defeatShield') }),
     z.strictObject({ kind: z.literal('winsFightVsKeyword'), keyword: z.string() }),
