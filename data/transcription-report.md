@@ -184,6 +184,8 @@ encoding "no Go Solo cost" as `cost: 0` for Legends, (5) the
 `rebecca-having-a-moment` RAM gap, (6) `{Spend}` not being a keyword, (7)
 flavor text embedded directly in `rules_text` for some vanilla Gear.
 
+See `docs/rulings.md` §8–§13 for rulings added during pass-2 verification and review.
+
 ## Per-card source table (141 cards)
 
 | id | name | source | pass-2 status | notes |
