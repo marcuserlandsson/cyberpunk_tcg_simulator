@@ -1,0 +1,37 @@
+:root {
+  --bg: #0a0a12;
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff2a6d;
+  --neon-yellow: #f9f002;
+  --font-display: 'Share Tech Mono', 'Courier New', ui-monospace, monospace;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--neon-cyan);
+  font-family: var(--font-display);
+}
+
+h1 {
+  color: var(--neon-magenta);
+}
+
+button {
+  background: transparent;
+  color: var(--neon-cyan);
+  border: 1px solid var(--neon-cyan);
+  font-family: var(--font-display);
+  padding: 0.5em 1em;
+  cursor: pointer;
+}
+
+button[aria-pressed='true'] {
+  background: var(--neon-cyan);
+  color: var(--bg);
+}
+
+button:hover {
+  border-color: var(--neon-yellow);
+  color: var(--neon-yellow);
+}
