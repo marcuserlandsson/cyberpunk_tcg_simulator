@@ -108,7 +108,7 @@ localStorage for decks, settings, stats; file import/export for decks and sim re
 
 - **Rule tests:** every normative statement in the gameplay guide → at least one Vitest case.
 - **Per-card tests:** ≥1 test per card exercising its effect through the public engine API.
-- **Fuzz/invariant tests:** thousands of seeded random-vs-random games asserting: 13 total dice conserved, no negative resources, spent cards never act, every `legalActions` result applies cleanly, games terminate, winner determination matches rules.
+- **Fuzz/invariant tests:** thousands of seeded random-vs-random games asserting: 12 total dice conserved (6 per player), no negative resources, spent cards never act, every `legalActions` result applies cleanly, games terminate, winner determination matches rules.
 - **AI tests:** legality (by construction, verified), strength vs random baseline, no hidden-info access (lint/API boundary).
 - **UI smoke test:** headless browser drives a complete game end-to-end on the built app.
 - TDD throughout; milestones do not advance on a red suite.
