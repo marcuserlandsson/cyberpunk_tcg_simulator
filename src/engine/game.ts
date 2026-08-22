@@ -246,11 +246,30 @@ function readySpentCards(draft: GameState, player: PlayerId, turnNumber: number)
   }
 }
 
-/** Clears the once-per-turn flags and the until-end-of-turn card state. */
+/**
+ * Clears the once-per-turn flags and the until-end-of-turn card state.
+ *
+ * The two once-per-turn flags have deliberately different scopes, because the
+ * actions they gate do (docs/rulings.md §26):
+ *
+ *   * `calledLegendThisTurn` is cleared for **both** players, because Call a
+ *     Legend can be taken "during your main phase, **or as a reaction when a
+ *     rival Unit attacks**" (glossary CALL A LEGEND) — so its "each turn"
+ *     allowance has to refresh for the player who is about to *defend* as much
+ *     as for the player whose turn is starting. Clearing only the active
+ *     player's flag would let a main-phase call silently eat the reaction call
+ *     that player was owed during the rival's next turn.
+ *   * `soldThisTurn` is cleared for the **active player only**. Selling is a
+ *     main-phase action with no reaction form, so a player can only ever sell
+ *     on their own turn and resetting at their own turn start is exactly
+ *     equivalent to resetting every turn. (If a future card ever allows selling
+ *     at another time, this is the line to revisit.)
+ */
 function resetTurnState(draft: GameState, player: PlayerId): void {
   const p = draft.players[player]
   p.soldThisTurn = false
-  p.calledLegendThisTurn = false
+  draft.players[0].calledLegendThisTurn = false
+  draft.players[1].calledLegendThisTurn = false
   for (const key of Object.keys(draft.cards)) {
     const card = draft.cards[Number(key)]
     if (card.owner !== player) continue

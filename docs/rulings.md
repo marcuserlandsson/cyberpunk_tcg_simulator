@@ -525,30 +525,48 @@ The attacker is still spent — see §28.
 debuff effects can produce; `1 + floor(power/10)` would otherwise go
 nonsensical there.
 
-## 26 — Call a Legend's once-per-turn gate is one shared gate per player
+## 26 — Call a Legend: one shared gate per player, refreshed every game turn
 
 Guide glossary CALL A LEGEND: "Each turn, you may spend 1 €$ to flip a Legend
 face-up. You can do this during your main phase, **or as a reaction when a
 rival Unit attacks**." Both the main-phase list (p10) and the reactions list
 (p11) are headed "CALL A LEGEND (ONCE PER TURN)".
 
-**Ruling:** there is exactly one gate per player — the existing
-`PlayerState.calledLegendThisTurn` flag — shared by the main-phase action and
-the react-window reaction. Calling in either place blocks the other, and both
-routes run the same handler (`reduce.ts`'s `callLegend`, now parameterised by
-player) so the RNG flip and the payment rules cannot diverge. `legalActions`
-asks `economy.ts`'s `legendCallPayment` in both places, so the availability
-test cannot diverge either.
+**Ruling, part 1 — one gate.** There is exactly one gate per player, the
+existing `PlayerState.calledLegendThisTurn` flag, shared by the main-phase
+action and the react-window reaction: calling in either place blocks the other
+*for that turn*. Both routes run the same handler (`reduce.ts`'s `callLegend`,
+parameterised by player) so the RNG flip and the payment rules cannot diverge,
+and `legalActions` asks `economy.ts`'s `legendCallPayment` in both places so the
+availability test cannot diverge either.
 
-**Known deviation, flagged for a later task.** The flag is cleared by
-`resetTurnState` at the start of its *owner's* turn (Task 4), so a player who
-called during their own main phase cannot react-call during the rival's
-following turn: in effect one call per player per own-turn *cycle*. The other
-defensible reading of "each turn" is one call per player per turn *including
-the rival's*, which would require clearing both players' flags at every turn
-start. Task 6 deliberately did not change Task 4's turn machinery for this;
-if the stricter reading is wanted, the one-line fix is in `resetTurnState`
-and this engine's react window needs no change at all.
+**Ruling, part 2 — "each turn" means each *game* turn, for each player.** Every
+turn start refreshes **both** players' allowance (`resetTurnState` in
+`game.ts`), not just the incoming active player's. So:
+
+- a player who calls during their own main phase still gets their reaction call
+  when a rival Unit attacks them on the rival's next turn;
+- a player who calls as a reaction during the rival's turn still gets their
+  main-phase call when their own next turn begins;
+- but nobody gets two calls inside one and the same game turn — a defender who
+  react-calls against the first attack of a turn cannot call again against the
+  second.
+
+The alternative reading — clearing the flag only at its owner's turn start, so
+that a main-phase call consumed the reaction call owed during the rival's
+following turn — was implemented first and **rejected**: it makes one call per
+player per own-turn *cycle*, which contradicts the guide's plain "each turn"
+and silently penalises using the main-phase call. Recorded here because the
+engine's behaviour changed as a result (`resetTurnState` now clears both
+players' flags), and because it is exactly the kind of asymmetry a reader of
+that function will want explained.
+
+**`soldThisTurn` is deliberately not symmetric.** It stays cleared for the
+active player only. Selling is a main-phase action with no reaction form, so a
+player can only ever sell on their own turn, and resetting at their own turn
+start is exactly equivalent to resetting every turn. The asymmetry between the
+two flags is therefore a real, documented distinction rather than an oversight
+— see the comment on `resetTurnState`.
 
 ## 27 — A block closes the react window and resolves the attack at once, stealing nothing
 

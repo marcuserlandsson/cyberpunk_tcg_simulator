@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { stealCount } from '../../src/engine/combat'
+import { canonicalPayment } from '../../src/engine/economy'
 import { newGame } from '../../src/engine/game'
 import { legalActions } from '../../src/engine/legal'
 import { actingPlayer } from '../../src/engine/query'
@@ -89,6 +90,19 @@ function attachGear(state: GameState, player: PlayerId, defId: string, host: num
   }
   state.cards[host].attachedGear.push(uid)
   return uid
+}
+
+/** Gives `player` `count` fresh ready, face-down eddies from their deck. Mutates `state`. */
+function putEddies(state: GameState, player: PlayerId, count: number): number[] {
+  const p = state.players[player]
+  const uids = p.deck.slice(0, count)
+  p.deck = p.deck.slice(count)
+  for (const uid of uids) {
+    state.cards[uid].ready = true
+    state.cards[uid].faceUp = false
+  }
+  p.eddies.push(...uids)
+  return uids
 }
 
 function dice(...sizes: DieSize[]): GigDie[] {
@@ -624,7 +638,10 @@ describe('callLegend as a reaction', () => {
     expect(() => react(called, call!)).toThrow(IllegalActionError)
   })
 
-  it('is not offered when the defender already called on their own turn', () => {
+  it('is not offered when the defender already used this turn\'s call', () => {
+    // The allowance is per game turn (docs/rulings.md §26), so a defender who
+    // already called earlier *in this same turn* — reacting to an earlier
+    // attack — gets no second call.
     const s = base()
     const attacker = putUnit(s, 0, 'psycho-squad')
     s.players[1].gigArea = dice(6)
@@ -683,6 +700,108 @@ describe('callLegend as a reaction', () => {
     const allUp = structuredClone(s)
     for (const uid of allUp.players[1].legends) allUp.cards[uid].faceUp = true
     expect(reactionOptions(declare(allUp, attacker, 'gigArea')).some((r) => r.type === 'callLegend')).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The Call-a-Legend allowance across turns (docs/rulings.md §26)
+//
+// "Each turn, you may spend 1 €$ to flip a Legend face-up. You can do this
+// during your main phase, or as a reaction when a rival Unit attacks."
+// (glossary CALL A LEGEND). "Each turn" is each *game* turn, for each player:
+// every turn start refreshes BOTH players' allowance, so a main-phase call
+// never eats the reaction call you would have had on the rival's next turn.
+// Within one and the same game turn, though, nobody gets two calls.
+// ---------------------------------------------------------------------------
+
+describe('the Call-a-Legend allowance refreshes every game turn', () => {
+  it("a main-phase call does not block that player's reaction call on the rival's next turn", () => {
+    const s = base()
+    putEddies(s, 0, 1) // so the main-phase call cannot exhaust player 0's payments
+    s.players[0].gigArea = dice(6) // something for player 1 to raid
+    const raider = putUnit(s, 1, 'psycho-squad')
+
+    // Player 0 calls a legend during their own main phase.
+    const mainCall = legalActions(db, s).find((a) => a.type === 'callLegend')
+    expect(mainCall).toBeDefined()
+    let next = applyAction(db, s, mainCall!)
+    expect(next.players[0].calledLegendThisTurn).toBe(true)
+
+    // Player 1's turn begins: the allowance refreshes for BOTH players.
+    next = applyAction(db, next, { type: 'endTurn' })
+    expect(next.activePlayer).toBe(1)
+    expect(next.phase).toBe('main')
+    expect(next.players[0].calledLegendThisTurn).toBe(false)
+    expect(next.players[1].calledLegendThisTurn).toBe(false)
+
+    // Player 1 attacks, and player 0 may call again — as a reaction this time.
+    const window = declare(next, raider, 'gigArea')
+    expect(canonicalPayment(window, 0, 1)).not.toBeNull() // affordability is not the question
+    const reaction = reactionOptions(window).find(
+      (r): r is Extract<Reaction, { type: 'callLegend' }> => r.type === 'callLegend'
+    )
+    expect(reaction).toBeDefined()
+
+    const called = react(window, reaction!)
+    expect(called.players[0].calledLegendThisTurn).toBe(true)
+    expect(called.players[0].legends.filter((u) => called.cards[u].faceUp)).toHaveLength(2)
+    expect(called.phase).toBe('react') // the window is still open
+  })
+
+  it("a reaction call does not block that player's main-phase call on their own next turn", () => {
+    const s = base()
+    const victim = putUnit(s, 0, 'japantown-jonin', { ready: false }) // power 0, a free kill
+    const raider = putUnit(s, 1, 'psycho-squad')
+
+    let next = applyAction(db, s, { type: 'endTurn' }) // player 1's turn 1
+    const window = declare(next, raider, victim)
+    const reaction = reactionOptions(window).find((r) => r.type === 'callLegend')
+    expect(reaction).toBeDefined()
+    next = react(window, reaction!)
+    expect(next.players[0].calledLegendThisTurn).toBe(true)
+    next = react(next, passReaction)
+    expect(next.phase).toBe('main')
+
+    // Player 0's turn 2 begins: they may call again.
+    next = applyAction(db, next, { type: 'endTurn' })
+    expect(next.activePlayer).toBe(0)
+    expect(next.turnNumber).toBe(2)
+    expect(next.players[0].calledLegendThisTurn).toBe(false)
+    expect(next.players[0].legends.filter((u) => !next.cards[u].faceUp)).toHaveLength(2)
+    expect(legalActions(db, next).some((a) => a.type === 'callLegend')).toBe(true)
+  })
+
+  it('nobody may call twice within the same game turn', () => {
+    const s = base()
+    putEddies(s, 0, 3) // player 0 can always pay, so only the gate can stop them
+    const victimA = putUnit(s, 0, 'japantown-jonin', { ready: false })
+    const victimB = putUnit(s, 0, 'evelyn-parker-scheming-siren', { ready: false })
+    const raiderA = putUnit(s, 1, 'psycho-squad')
+    const raiderB = putUnit(s, 1, 'minotaur')
+
+    let next = applyAction(db, s, { type: 'endTurn' }) // player 1's turn 1
+
+    // Attack 1: the defender reacts with a call, then passes.
+    let window = declare(next, raiderA, victimA)
+    const call = reactionOptions(window).find((r) => r.type === 'callLegend')
+    expect(call).toBeDefined()
+    next = react(react(window, call!), passReaction)
+    expect(next.players[0].calledLegendThisTurn).toBe(true)
+
+    // Attack 2, same turn: still affordable, but the allowance is used up.
+    window = declare(next, raiderB, victimB)
+    expect(canonicalPayment(window, 0, 1)).not.toBeNull()
+    expect(reactionOptions(window).some((r) => r.type === 'callLegend')).toBe(false)
+    expect(() => react(window, call!)).toThrow(IllegalActionError)
+    next = react(window, passReaction)
+
+    // The attacker's own allowance is equally single-use inside their turn.
+    expect(next.phase).toBe('main')
+    const ownCall = legalActions(db, next).find((a) => a.type === 'callLegend')
+    expect(ownCall).toBeDefined()
+    next = applyAction(db, next, ownCall!)
+    expect(next.players[1].calledLegendThisTurn).toBe(true)
+    expect(legalActions(db, next).some((a) => a.type === 'callLegend')).toBe(false)
   })
 })
 
