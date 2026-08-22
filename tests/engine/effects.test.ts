@@ -214,6 +214,17 @@ describe('EffectNode: draw', () => {
     expect(next.events.some((e) => e.type === 'effectResolved')).toBe(true)
   })
 
+  it('drawing from an empty deck loses the game (docs/rulings.md §36)', () => {
+    const db = makeDb([def('drawer', 'program', { effects: [onPlay({ kind: 'draw', count: 2 })] })])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'drawer')
+    mint(s, 0, 'deck', 'drawer')
+
+    const next = fire(db, s, src)
+    expect(next.winner).toBe(1)
+    expect(next.events.some((e) => e.type === 'gameEnded' && e.reason === 'deckout')).toBe(true)
+  })
+
   it('does not mutate the state it was given', () => {
     const db = makeDb([def('drawer', 'program', { effects: [onPlay({ kind: 'draw', count: 1 })] })])
     const s = scenario()

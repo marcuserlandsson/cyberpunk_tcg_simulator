@@ -395,7 +395,11 @@ function applyNode(
     }
 
     case 'sequence': {
-      for (const child of node.effects) applyNode(db, draft, child, ctx, slots)
+      for (const child of node.effects) {
+        // A node can end the game (a `draw` off an empty deck): stop resolving.
+        if (draft.winner !== null) return
+        applyNode(db, draft, child, ctx, slots)
+      }
       return
     }
 
@@ -428,6 +432,7 @@ export function applyEffectDefOnDraft(
 ): void {
   const card = draft.cards[sourceUid]
   if (!card) return
+  if (draft.winner !== null) return
   if (!conditionMet(draft, card.owner, def)) return
   const ctx: EffectCtx = { player: card.owner, sourceUid, targets }
   const slots = bindSlots(db, draft, def, sourceUid, targets)

@@ -825,3 +825,17 @@ outright: {adrenaline} does not override it.
 
 The card data still carries `effects: []` for both cards; Task 8 adds the node,
 and this task's synthetic-card test proves the mechanism.
+
+## 36 — An effect that draws from an empty deck loses the game, like the start-of-turn draw
+
+§17 made the start-of-turn draw an immediate, unconditional deck-out loss.
+
+**Ruling:** an effect's `draw` follows the same rule — a card that tells you to
+draw is a required draw, so failing it loses the game (`gameEnded`, reason
+`deckout`). Once the game has ended, the interpreter stops: the remaining nodes
+of a `sequence`, and any later EffectDef of the same trigger, do not resolve.
+
+`trashFromDeck` and `gainEddieFromTopDeck` are deliberately *not* required
+draws: they take "up to" what the deck holds and stop early on an empty deck,
+because neither is the guide's draw step and neither has a printed failure
+clause.
