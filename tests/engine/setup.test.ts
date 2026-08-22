@@ -132,7 +132,18 @@ describe('choosePlayOrder', () => {
   it('lets the roll winner pass the first turn to their rival', () => {
     const before = freshGame(3)
     const state = applyAction(db, before, { type: 'choosePlayOrder', goFirst: false })
-    expect(state.firstPlayer).toBe(other(before.activePlayer))
+    const first = other(before.activePlayer)
+    expect(state.firstPlayer).toBe(first)
+    expect(state.activePlayer).toBe(first)
+    // The penalty follows whoever actually goes first, not the roll winner.
+    expect(state.players[first].legends.map((uid) => state.cards[uid].ready)).toEqual([
+      false,
+      false,
+      true,
+    ])
+    expect(
+      state.players[before.activePlayer].legends.every((uid) => state.cards[uid].ready)
+    ).toBe(true)
   })
 
   it('draws 6 for both players, leaving the rest of the deck', () => {
