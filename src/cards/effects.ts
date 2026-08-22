@@ -289,7 +289,8 @@ function applyNode(
       if (target === null || !draft.cards[target]) return
       if (node.duration === 'turn') draft.cards[target].tempPower += node.amount
       else draft.cards[target].permPower += node.amount
-      note(draft, ctx.sourceUid, `${node.amount >= 0 ? '+' : ''}${node.amount} power (${node.duration}) on ${target}`)
+      const sign = node.amount >= 0 ? '+' : ''
+      note(draft, ctx.sourceUid, `${sign}${node.amount} power (${node.duration}) on ${target}`)
       return
     }
 
@@ -484,7 +485,8 @@ export function resolveEffect(
   ctx: EffectCtx
 ): GameState {
   const draft = draftState(state)
-  const slots = bindSlots(db, draft, { trigger: 'activated', effect: node }, ctx.sourceUid, ctx.targets)
+  const def: EffectDef = { trigger: 'activated', effect: node }
+  const slots = bindSlots(db, draft, def, ctx.sourceUid, ctx.targets)
   applyNode(db, draft, node, ctx, slots)
   return draft
 }
@@ -739,7 +741,8 @@ export function activateAbilityOnDraft(
   if (effect.cost?.selfSpend) draft.cards[host].ready = false
   const eddies = effect.cost?.eddies ?? 0
   if (eddies > 0) {
-    const payment = canonicalPayment(draft, player, eddies, effect.cost?.selfSpend ? host : undefined)
+    const exclude = effect.cost?.selfSpend ? host : undefined
+    const payment = canonicalPayment(draft, player, eddies, exclude)
     if (payment !== null) pay(draft, payment)
   }
 
