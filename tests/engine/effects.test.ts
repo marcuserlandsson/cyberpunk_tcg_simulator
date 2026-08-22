@@ -1692,13 +1692,19 @@ describe('gear keyword grants (real cards)', () => {
     void gear
   })
 
-  it('gear grants adrenaline, letting a lagged host attack', () => {
+  it('gear grants adrenaline only while a Rival leads by 2+ Gigs (docs/rulings.md §68 ff.)', () => {
+    // Fixed in Task 8 batch 3: §30 originally flagged this as granting
+    // {adrenaline} unconditionally, though the printed text gates it on "If a
+    // Rival controls at least 2 more Gigs than you". `grantKeywordWhile`
+    // (docs/rulings.md §68 ff.) makes the grant live only while that holds.
     const s = scenario()
     const host = mint(s, 0, 'field', 'delamain-cab', { lag: true })
     mint(s, 1, 'field', 'psycho-squad', { ready: false })
-    expect(legalActions(real, s).some((a) => a.type === 'attack')).toBe(false)
-
     mintGear(s, 0, 'adrenaline-converter', host)
+    expect(legalActions(real, s).some((a) => a.type === 'attack' && a.attacker === host)).toBe(false)
+
+    gigs(s, 0, [])
+    gigs(s, 1, [4, 6])
     expect(legalActions(real, s).some((a) => a.type === 'attack' && a.attacker === host)).toBe(true)
   })
 
@@ -2904,5 +2910,288 @@ describe("chooseOne chooser 'allUnlessBehindStreetCred' (docs/rulings.md §45)",
     const buffed = next.cards[unit].tempPower === 3
     const blocker = next.cards[unit].tempKeywords.includes('blocker')
     expect(buffed !== blocker).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 8 batch 3 vocabulary extensions (docs/rulings.md §68 ff.) — synthetic
+// cards. The real cards that use each are covered in tests/cards/yellow.test.ts.
+// ---------------------------------------------------------------------------
+
+describe('EffectNode: grantKeywordWhile (docs/rulings.md §68 ff.)', () => {
+  const db = makeDb([
+    def('gated', 'unit', {
+      power: 2,
+      keywords: ['adrenaline'],
+      effects: [
+        {
+          trigger: 'static',
+          condition: { streetCredAtLeast: 5 },
+          effect: { kind: 'grantKeywordWhile', keyword: 'adrenaline' },
+        },
+      ],
+    }),
+  ])
+
+  it('masks the printed keyword until its own static condition holds', () => {
+    const s = scenario()
+    const uid = mint(s, 0, 'field', 'gated', { lag: true })
+    expect(effectiveKeywords(db, s, uid)).not.toContain('adrenaline')
+
+    gigs(s, 0, [5])
+    expect(effectiveKeywords(db, s, uid)).toContain('adrenaline')
+  })
+
+  it('does not affect an unrelated printed keyword on the same card', () => {
+    const s = scenario()
+    const uid = mint(s, 0, 'field', 'gated')
+    // 'gated' has only 'adrenaline' printed in this synthetic def, so check a
+    // second card with an ungated keyword stays untouched by the mechanism.
+    const plain = mint(s, 0, 'field', 'grunt')
+    void plain
+    expect(effectiveKeywords(db, s, uid)).not.toContain('blocker')
+  })
+})
+
+describe('DynamicAmount: perFriendlyGigParity (docs/rulings.md §68 ff.)', () => {
+  const db = makeDb([
+    def('parity-buff', 'unit', {
+      power: 1,
+      effects: [
+        {
+          trigger: 'onAttack',
+          effect: {
+            kind: 'buffPower',
+            amount: { perFriendlyGigParity: { parity: 'even', amount: 2 } },
+            target: 'self',
+            duration: 'turn',
+          },
+        },
+      ],
+    }),
+    def('parity-draw', 'unit', {
+      power: 1,
+      effects: [
+        {
+          trigger: 'onDefeat',
+          effect: { kind: 'draw', count: { perFriendlyGigParity: { parity: 'odd', amount: 1 } } },
+        },
+      ],
+    }),
+    def('brute', 'unit', { power: 5 }),
+    def('grunt', 'unit', { power: 1 }),
+  ])
+
+  it('buffPower reads amount * the count of matching-parity friendly Gigs', () => {
+    const s = scenario()
+    const uid = mint(s, 0, 'field', 'parity-buff')
+    const victim = mint(s, 1, 'field', 'grunt', { ready: false })
+    s.players[0].gigArea = [
+      { size: 6, value: 2 },
+      { size: 6, value: 4 },
+      { size: 6, value: 3 },
+    ]
+    const next = applyAction(db, s, { type: 'attack', attacker: uid, target: victim })
+    expect(next.cards[uid].tempPower).toBe(4) // 2 even dice * 2
+  })
+
+  it('draw reads amount * the count of matching-parity friendly Gigs', () => {
+    const s = scenario()
+    const victim = mint(s, 1, 'field', 'parity-draw', { ready: false })
+    const attacker = mint(s, 0, 'field', 'brute')
+    mint(s, 1, 'deck', 'grunt')
+    mint(s, 1, 'deck', 'grunt')
+    s.players[1].gigArea = [
+      { size: 6, value: 3 },
+      { size: 6, value: 5 },
+      { size: 6, value: 4 },
+    ]
+    let next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.players[1].trash).toContain(victim)
+    expect(next.players[1].hand).toHaveLength(2) // 2 odd dice * 1
+  })
+})
+
+describe('conditions added in Task 8 batch 3 (docs/rulings.md §68 ff.)', () => {
+  it('friendlyGigDistinctValuesAtLeast', () => {
+    const db = makeDb([
+      def('proud', 'program', {
+        effects: [onPlay({ kind: 'draw', count: 1 }, { condition: { friendlyGigDistinctValuesAtLeast: 2 } })],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'proud')
+    mint(s, 0, 'deck', 'grunt')
+    gigs(s, 0, [3, 3])
+    expect(fire(db, s, src).players[0].hand).toEqual([])
+
+    gigs(s, 0, [3, 5])
+    expect(fire(db, s, src).players[0].hand).toHaveLength(1)
+  })
+
+  it('friendlyGigEvenAndOdd', () => {
+    const db = makeDb([
+      def('proud', 'program', {
+        effects: [onPlay({ kind: 'draw', count: 1 }, { condition: { friendlyGigEvenAndOdd: true } })],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'proud')
+    mint(s, 0, 'deck', 'grunt')
+    gigs(s, 0, [2, 4])
+    expect(fire(db, s, src).players[0].hand).toEqual([])
+
+    gigs(s, 0, [2, 3])
+    expect(fire(db, s, src).players[0].hand).toHaveLength(1)
+  })
+
+  it('friendlyGigValueEquals', () => {
+    const db = makeDb([
+      def('proud', 'program', {
+        effects: [onPlay({ kind: 'draw', count: 1 }, { condition: { friendlyGigValueEquals: 5 } })],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'proud')
+    mint(s, 0, 'deck', 'grunt')
+    gigs(s, 0, [4])
+    expect(fire(db, s, src).players[0].hand).toEqual([])
+
+    gigs(s, 0, [5])
+    expect(fire(db, s, src).players[0].hand).toHaveLength(1)
+  })
+
+  it('streetCredDiffAtLeast', () => {
+    const db = makeDb([
+      def('proud', 'program', {
+        effects: [onPlay({ kind: 'draw', count: 1 }, { condition: { streetCredDiffAtLeast: 10 } })],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'proud')
+    mint(s, 0, 'deck', 'grunt')
+    gigs(s, 0, [5])
+    gigs(s, 1, [3])
+    expect(fire(db, s, src).players[0].hand).toEqual([])
+
+    gigs(s, 1, [20])
+    expect(fire(db, s, src).players[0].hand).toHaveLength(1)
+  })
+
+  it('sourceEquipped', () => {
+    const db = makeDb([
+      def('vet', 'unit', {
+        power: 1,
+        effects: [{ trigger: 'onAttack', condition: { sourceEquipped: true }, effect: { kind: 'draw', count: 1 } }],
+      }),
+      def('trinket', 'gear', { power: 0 }),
+      def('grunt', 'unit', { power: 1, keywords: [] }),
+    ])
+    const s = scenario()
+    const vet = mint(s, 0, 'field', 'vet')
+    const victim = mint(s, 1, 'field', 'grunt', { ready: false })
+    mint(s, 0, 'deck', 'grunt')
+    const bare = applyAction(db, s, { type: 'attack', attacker: vet, target: victim })
+    expect(bare.players[0].hand).toEqual([])
+
+    const s2 = scenario()
+    const vet2 = mint(s2, 0, 'field', 'vet')
+    mintGear(s2, 0, 'trinket', vet2)
+    const victim2 = mint(s2, 1, 'field', 'grunt', { ready: false })
+    mint(s2, 0, 'deck', 'grunt')
+    const equipped = applyAction(db, s2, { type: 'attack', attacker: vet2, target: victim2 })
+    expect(equipped.players[0].hand).toHaveLength(1)
+  })
+})
+
+describe('EffectNode: stealGig with distinctValueOnly (docs/rulings.md §68 ff.)', () => {
+  const db = makeDb([
+    def('collector', 'unit', {
+      power: 6,
+      effects: [
+        {
+          trigger: 'onFriendlyStealDie',
+          oncePerTurn: true,
+          condition: { selfIsStealer: true },
+          effect: { kind: 'stealGig', count: 1, distinctValueOnly: true },
+        },
+      ],
+    }),
+  ])
+
+  it('extends the pending steal by one die, offered only among non-matching values', () => {
+    const s = scenario()
+    const thief = mint(s, 0, 'field', 'collector') // power 6 -> steals 1 as the base
+    s.players[0].gigArea = [{ size: 6, value: 2 }]
+    s.players[1].gigArea = [
+      { size: 20, value: 9 }, // the base steal's pick, unrelated to value-matching
+      { size: 6, value: 2 }, // will share a friendly value once the d20 is taken: excluded
+      { size: 8, value: 5 }, // stays distinct: still offered
+    ]
+
+    let next = applyAction(db, s, { type: 'attack', attacker: thief, target: 'gigArea' })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    // Not filtered yet: the watcher only fires once a die has actually been
+    // taken (docs/rulings.md §42), so the base pick sees every die.
+    expect(gigChoices(db, next)).toEqual([0, 1, 2])
+
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 }) // take the d20
+    expect(next.phase).toBe('chooseGig') // the watcher's bonus die is still owed
+    // Now filtered: friendly values are {2, 9}; the remaining d6=2 is excluded,
+    // leaving only the d8=5 (now at index 1, after the d20 left).
+    expect(gigChoices(db, next)).toEqual([1])
+
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 1 })
+    expect(next.players[1].gigArea).toEqual([{ size: 6, value: 2 }])
+    expect(next.players[0].gigArea).toHaveLength(3)
+  })
+
+  it('falls back to every die when none avoids every friendly value', () => {
+    const s = scenario()
+    const thief = mint(s, 0, 'field', 'collector')
+    s.players[0].gigArea = [{ size: 6, value: 2 }]
+    s.players[1].gigArea = [{ size: 6, value: 2 }] // the only die shares the friendly value
+
+    let next = applyAction(db, s, { type: 'attack', attacker: thief, target: 'gigArea' })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(gigChoices(db, next)).toEqual([0]) // not deadlocked
+  })
+})
+
+describe('trigger: onFriendlyEquippedSpend (docs/rulings.md §68 ff.)', () => {
+  const db = makeDb([
+    def('watcher', 'unit', {
+      power: 1,
+      effects: [{ trigger: 'onFriendlyEquippedSpend', effect: { kind: 'draw', count: 1 } }],
+    }),
+    def('trinket', 'gear', { power: 0 }),
+    def('grunt', 'unit', { power: 1 }),
+  ])
+
+  it('fires when a friendly equipped Unit is spent, including itself', () => {
+    const s = scenario()
+    const spy = mint(s, 0, 'field', 'watcher')
+    mintGear(s, 0, 'trinket', spy)
+    mint(s, 1, 'field', 'grunt', { ready: false })
+    mint(s, 0, 'deck', 'grunt')
+
+    const next = applyAction(db, s, { type: 'attack', attacker: spy, target: s.players[1].field[0] })
+    expect(next.players[0].hand).toHaveLength(1)
+  })
+
+  it('does not fire for an unequipped friendly Unit being spent', () => {
+    const s = scenario()
+    mint(s, 0, 'field', 'watcher')
+    const attacker = mint(s, 0, 'field', 'grunt')
+    mint(s, 1, 'field', 'grunt', { ready: false })
+    mint(s, 0, 'deck', 'grunt')
+
+    const next = applyAction(db, s, { type: 'attack', attacker, target: s.players[1].field[0] })
+    expect(next.players[0].hand).toEqual([])
   })
 })

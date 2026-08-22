@@ -187,8 +187,23 @@ export function reactActions(db: CardDb, state: GameState): Action[] {
 export function chooseGigActions(state: GameState): Action[] {
   const steal = state.pendingSteal
   if (steal === null) return []
-  const victim = opponentOf(steal.thief ?? state.activePlayer)
-  return state.players[victim].gigArea.map((_die, dieIndex) => ({ type: 'chooseGig', dieIndex }))
+  const thief = steal.thief ?? state.activePlayer
+  const victim = opponentOf(thief)
+  const dice = state.players[victim].gigArea
+  // "steal a rival Gig with a value not shared by a friendly Gig"
+  // (gorilla-arms, docs/rulings.md §68 ff.): narrow the offered dice to ones
+  // whose value the thief does not already hold, unless that would leave
+  // nothing to choose — never deadlock `chooseGig` (mirroring §25).
+  if (steal.distinctValueOnly === true) {
+    const friendlyValues = new Set(state.players[thief].gigArea.map((die) => die.value))
+    const qualifying = dice
+      .map((die, dieIndex) => ({ die, dieIndex }))
+      .filter(({ die }) => !friendlyValues.has(die.value))
+    if (qualifying.length > 0) {
+      return qualifying.map(({ dieIndex }) => ({ type: 'chooseGig', dieIndex }))
+    }
+  }
+  return dice.map((_die, dieIndex) => ({ type: 'chooseGig', dieIndex }))
 }
 
 // ---------------------------------------------------------------------------
@@ -369,6 +384,33 @@ export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
   for (const gearUid of gear) {
     fireCardTrigger(db, draft, 'onDefeat', gearUid, [], controller)
   }
+}
+
+/**
+ * Defeats an attached Gear card directly — not a Unit, so no `unitDefeated`
+ * event and no `onUnitDefeated` watcher fire, but the Gear's own printed
+ * "{Defeated} ..." text (if any, docs/rulings.md §37) still resolves for the
+ * Gear's own owner. Used by the several batch-3 "defeat a [friendly] Gear"
+ * scripts (docs/rulings.md §68 ff.) rather than by any vocabulary node — no
+ * card needs "defeat a Gear" as a real, enumerated decision yet.
+ */
+export function defeatGear(draft: GameState, db: CardDb, gearUid: number): void {
+  let host: number | null = null
+  for (const player of [0, 1] as const) {
+    for (const candidate of [...draft.players[player].field, ...draft.players[player].legends]) {
+      if (draft.cards[candidate].attachedGear.includes(gearUid)) {
+        host = candidate
+        break
+      }
+    }
+    if (host !== null) break
+  }
+  if (host === null) return
+  draft.cards[host].attachedGear = draft.cards[host].attachedGear.filter((uid) => uid !== gearUid)
+  const owner = draft.cards[gearUid].owner
+  draft.players[owner].trash.push(gearUid)
+  draft.events.push({ type: 'cardTrashed', uid: gearUid })
+  fireCardTrigger(db, draft, 'onDefeat', gearUid, [], owner)
 }
 
 /**

@@ -80,7 +80,16 @@
       "merc"
     ],
     "text": "{Play} Defeat all other Units.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "adam-smasher-metal-over-meat"
+        }
+      }
+    ],
+    "scripted": "adam-smasher-metal-over-meat"
   },
   {
     "id": "adrenaline-converter",
@@ -101,7 +110,18 @@
       "medtech"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nIf a Rival controls at least 2 more Gigs than you, this Unit has {Adrenaline}. (This Unit can attack the turn it's played.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "condition": {
+          "rivalGigLeadAtLeast": 2
+        },
+        "effect": {
+          "kind": "grantKeywordWhile",
+          "keyword": "adrenaline"
+        }
+      }
+    ]
   },
   {
     "id": "afterparty-at-lizzie-s",
@@ -121,7 +141,27 @@
       "braindance"
     ],
     "text": "Adjust a Gig by up to 1. If you control 2 or more Gigs with different values, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "changeGig",
+          "amount": 1,
+          "target": "anyGigDie",
+          "adjust": true
+        }
+      },
+      {
+        "trigger": "onPlay",
+        "condition": {
+          "friendlyGigDistinctValuesAtLeast": 2
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "all-is-lost",
@@ -169,7 +209,15 @@
       "netrunner"
     ],
     "text": "When a friendly equipped Unit or Legend is spent, draw 1.\nWhen a rival Unit would steal a Gig, you may discard 1 with cost equal to that Gig's value. If you do, the Gig isn't stolen.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyEquippedSpend",
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "alt-cunningham-soulkiller-architect",
@@ -280,7 +328,15 @@
       "corpo"
     ],
     "text": "{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nWhen this Unit uses {Blocker}, a Rival discards 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onBlock",
+        "effect": {
+          "kind": "discardRandomRival",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "bonnie-and-clyde",
@@ -342,7 +398,25 @@
       "braindance"
     ],
     "text": "Sell the top card of your deck.\nIf you control a Gig with an even value and a Gig with an odd value, draw 2.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "gainEddieFromTopDeck",
+          "count": 1
+        }
+      },
+      {
+        "trigger": "onPlay",
+        "condition": {
+          "friendlyGigEvenAndOdd": true
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 2
+        }
+      }
+    ]
   },
   {
     "id": "caliber-totentanz-s-top-dog",
@@ -363,7 +437,35 @@
       "ganger"
     ],
     "text": "{Play} Defeat a rival Unit with cost 2 or less.\n{Defeated} A Rival discards 1. If the card's cost equals the value of a friendly Gig, that Rival discards 1 more.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "defeat",
+          "target": "rivalUnit",
+          "filter": {
+            "maxCost": 2
+          }
+        }
+      },
+      {
+        "trigger": "onDefeat",
+        "effect": {
+          "kind": "discardRandomRival",
+          "count": 1
+        }
+      },
+      {
+        "trigger": "onDefeat",
+        "condition": {
+          "friendlyGigValueEquals": 5
+        },
+        "effect": {
+          "kind": "discardRandomRival",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "carnage-at-the-colosseum",
@@ -505,7 +607,23 @@
       "quickhack"
     ],
     "text": "{Quick} Give an equipped Unit +3 power this turn for each of its equipped Gears. If that Unit steals or fights, defeat it at the end of this turn.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "quick": true,
+        "effect": {
+          "kind": "buffPower",
+          "amount": {
+            "perEquippedGear": 3
+          },
+          "target": "anyUnit",
+          "filter": {
+            "equipped": true
+          },
+          "duration": "turn"
+        }
+      }
+    ]
   },
   {
     "id": "deadman-transmitter",
@@ -641,7 +759,36 @@
       "fixer"
     ],
     "text": "{Play} {Attack} Adjust a Gig by up to 1.\n{Defeated} If your ☆ (Street Cred) differs from a Rival's by 10+, draw 2.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "changeGig",
+          "amount": 1,
+          "target": "anyGigDie",
+          "adjust": true
+        }
+      },
+      {
+        "trigger": "onAttack",
+        "effect": {
+          "kind": "changeGig",
+          "amount": 1,
+          "target": "anyGigDie",
+          "adjust": true
+        }
+      },
+      {
+        "trigger": "onDefeat",
+        "condition": {
+          "streetCredDiffAtLeast": 10
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 2
+        }
+      }
+    ]
   },
   {
     "id": "don-t-fear-the-reaper",
@@ -682,7 +829,32 @@
       "ganger"
     ],
     "text": "{Call} You may defeat a friendly Gear. If you do, draw 2. Otherwise, draw 1.\n{Quick} 1 €$, {Spend} Give a friendly Unit +1 power this turn for each of its equipped Gear.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onCall",
+        "effect": {
+          "kind": "scripted",
+          "name": "dum-dum-maelstrom-triggerman"
+        }
+      },
+      {
+        "trigger": "activated",
+        "quick": true,
+        "cost": {
+          "selfSpend": true,
+          "eddies": 1
+        },
+        "effect": {
+          "kind": "buffPower",
+          "amount": {
+            "perEquippedGear": 1
+          },
+          "target": "friendlyUnit",
+          "duration": "turn"
+        }
+      }
+    ],
+    "scripted": "dum-dum-maelstrom-triggerman"
   },
   {
     "id": "dying-night-v-s-pistol",
@@ -879,7 +1051,16 @@
       "ganger"
     ],
     "text": "{Play} You may defeat a friendly Gear. If you do, defeat a rival Unit with cost 3 or less.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "gilded-mato-n"
+        }
+      }
+    ],
+    "scripted": "gilded-mato-n"
   },
   {
     "id": "gorilla-arms",
@@ -898,7 +1079,20 @@
       "cyberware"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nThe first time this Unit steals 1 or more Gigs each turn, steal a rival Gig with a value not shared by a friendly Gig.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyStealDie",
+        "oncePerTurn": true,
+        "condition": {
+          "selfIsStealer": true
+        },
+        "effect": {
+          "kind": "stealGig",
+          "count": 1,
+          "distinctValueOnly": true
+        }
+      }
+    ]
   },
   {
     "id": "goro-takemura-hands-unclean",
@@ -1077,7 +1271,16 @@
       "netrunner"
     ],
     "text": "{Play} Search the top 4 cards of your deck. Reveal any number of cards with cost equal to any friendly Gig values and add them to your hand. Bottom-deck the rest.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "hanako-arasaka-in-a-gilded-cage"
+        }
+      }
+    ],
+    "scripted": "hanako-arasaka-in-a-gilded-cage"
   },
   {
     "id": "heywood-ripperdoc",
@@ -1096,7 +1299,16 @@
       "ripperdoc"
     ],
     "text": "{Play} You may defeat a Gear. If its cost equals the value of a friendly Gig, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "heywood-ripperdoc"
+        }
+      }
+    ],
+    "scripted": "heywood-ripperdoc"
   },
   {
     "id": "industrial-assembly",
@@ -1217,7 +1429,34 @@
       "merc"
     ],
     "text": "{Attack} Give this Unit +2 power this turn for each friendly Gig with an even value.\n{Defeated} Draw 1 for each friendly Gig with an odd value.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "effect": {
+          "kind": "buffPower",
+          "amount": {
+            "perFriendlyGigParity": {
+              "parity": "even",
+              "amount": 2
+            }
+          },
+          "target": "self",
+          "duration": "turn"
+        }
+      },
+      {
+        "trigger": "onDefeat",
+        "effect": {
+          "kind": "draw",
+          "count": {
+            "perFriendlyGigParity": {
+              "parity": "odd",
+              "amount": 1
+            }
+          }
+        }
+      }
+    ]
   },
   {
     "id": "japantown-jonin",
@@ -1446,7 +1685,16 @@
       "cyberware"
     ],
     "text": "(Equip to a Unit or friendly face-up Legend.)\n{Attack} Look at a friendly face-down Legend. (Don't reveal it.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "effect": {
+          "kind": "scripted",
+          "name": "kiroshi-optics"
+        }
+      }
+    ],
+    "scripted": "kiroshi-optics"
   },
   {
     "id": "la-llorona-ghost-of-the-past",
@@ -1515,7 +1763,19 @@
       "plan"
     ],
     "text": "Each player defeats one of their Units.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "live-with-the-aftermath",
+          "targets": [
+            "friendlyUnit"
+          ]
+        }
+      }
+    ],
+    "scripted": "live-with-the-aftermath"
   },
   {
     "id": "lizzy-wizzy-delicate-weapon",
@@ -1556,7 +1816,19 @@
       "ganger"
     ],
     "text": "When this Unit steals a Gig, if it's equipped, a Rival discards 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyStealDie",
+        "condition": {
+          "selfIsStealer": true,
+          "sourceEquipped": true
+        },
+        "effect": {
+          "kind": "discardRandomRival",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "maelstrom-zealots",
@@ -1718,11 +1990,18 @@
     "effects": [
       {
         "trigger": "static",
-        "effect": { "kind": "powerVsCardType", "cardType": "legend", "amount": 2 }
+        "effect": {
+          "kind": "powerVsCardType",
+          "cardType": "legend",
+          "amount": 2
+        }
       },
       {
         "trigger": "onRivalAdjustFriendlyGig",
-        "effect": { "kind": "retrieveFromTrash", "target": "friendlyTrashCard" }
+        "effect": {
+          "kind": "retrieveFromTrash",
+          "target": "friendlyTrashCard"
+        }
       }
     ]
   },
@@ -1748,8 +2027,16 @@
     "effects": [
       {
         "trigger": "onPlay",
-        "condition": { "streetCredAheadOfRival": true },
-        "effect": { "kind": "defeat", "target": "rivalUnit", "filter": { "maxPower": 5 } }
+        "condition": {
+          "streetCredAheadOfRival": true
+        },
+        "effect": {
+          "kind": "defeat",
+          "target": "rivalUnit",
+          "filter": {
+            "maxPower": 5
+          }
+        }
       }
     ]
   },
@@ -1940,7 +2227,12 @@
         "trigger": "static",
         "effect": {
           "kind": "costReduction",
-          "reduction": { "per": "friendlyGigValueAtLeast", "value": 8, "amount": 1, "minimum": 1 }
+          "reduction": {
+            "per": "friendlyGigValueAtLeast",
+            "value": 8,
+            "amount": 1,
+            "minimum": 1
+          }
         }
       }
     ]
@@ -1988,7 +2280,9 @@
         "effect": {
           "kind": "defeat",
           "target": "anyUnit",
-          "filter": { "maxPowerVsFriendlyD20": true }
+          "filter": {
+            "maxPowerVsFriendlyD20": true
+          }
         }
       }
     ]
@@ -2380,7 +2674,10 @@
         "effect": {
           "kind": "defeat",
           "target": "rivalUnit",
-          "filter": { "maxPower": 2, "maxPowerIfAheadOnStreetCred": 3 }
+          "filter": {
+            "maxPower": 2,
+            "maxPowerIfAheadOnStreetCred": 3
+          }
         }
       }
     ]
@@ -2408,8 +2705,15 @@
     "effects": [
       {
         "trigger": "static",
-        "condition": { "duringOwnTurn": true },
-        "effect": { "kind": "staticPower", "amount": { "perEquippedGear": 2 } }
+        "condition": {
+          "duringOwnTurn": true
+        },
+        "effect": {
+          "kind": "staticPower",
+          "amount": {
+            "perEquippedGear": 2
+          }
+        }
       }
     ]
   },
@@ -2432,7 +2736,12 @@
     ],
     "text": "This Unit can only attack rival Units. (It can't attack Gig areas.)",
     "effects": [
-      { "trigger": "static", "effect": { "kind": "cantAttackGigArea" } }
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "cantAttackGigArea"
+        }
+      }
     ]
   },
   {
@@ -2559,7 +2868,13 @@
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit wins a fight against a rival Unit, draw 1.",
     "effects": [
-      { "trigger": "onWinFight", "effect": { "kind": "draw", "count": 1 } }
+      {
+        "trigger": "onWinFight",
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      }
     ]
   },
   {
@@ -2608,7 +2923,10 @@
         "effect": {
           "kind": "retrieveFromTrash",
           "target": "friendlyTrashCard",
-          "filter": { "cardType": "unit", "excludeSelf": true }
+          "filter": {
+            "cardType": "unit",
+            "excludeSelf": true
+          }
         }
       }
     ]
@@ -2652,7 +2970,13 @@
     ],
     "text": "Each player discards their hand and may draw 5.\nIf the total number of discarded cards equals the value of a friendly Gig, draw 2.",
     "effects": [
-      { "trigger": "onPlay", "effect": { "kind": "scripted", "name": "shattered-memories" } }
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "shattered-memories"
+        }
+      }
     ],
     "scripted": "shattered-memories"
   },
@@ -2697,8 +3021,13 @@
     "effects": [
       {
         "trigger": "onAttack",
-        "condition": { "sourcePowerAtLeast": 5 },
-        "effect": { "kind": "draw", "count": 1 }
+        "condition": {
+          "sourcePowerAtLeast": 5
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
       }
     ]
   },
@@ -2925,13 +3254,26 @@
     "effects": [
       {
         "trigger": "onFriendlyStealDie",
-        "condition": { "selfIsStealer": true },
-        "effect": { "kind": "scripted", "name": "v-roamer-of-the-badlands" }
+        "condition": {
+          "selfIsStealer": true
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "v-roamer-of-the-badlands"
+        }
       },
       {
         "trigger": "onEndTurn",
-        "condition": { "friendlyGigsAtLeastValueCount": { "value": 8, "count": 2 } },
-        "effect": { "kind": "draw", "count": 1 }
+        "condition": {
+          "friendlyGigsAtLeastValueCount": {
+            "value": 8,
+            "count": 2
+          }
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
       }
     ],
     "scripted": "v-roamer-of-the-badlands"
@@ -2958,14 +3300,21 @@
     "effects": [
       {
         "trigger": "onCall",
-        "effect": { "kind": "trashFromDeck", "whose": "friendly", "count": 3 }
+        "effect": {
+          "kind": "trashFromDeck",
+          "whose": "friendly",
+          "count": 3
+        }
       },
       {
         "trigger": "onCall",
         "effect": {
           "kind": "retrieveFromTrash",
           "target": "friendlyTrashCard",
-          "filter": { "cardType": "program", "keyword": "braindance" }
+          "filter": {
+            "cardType": "program",
+            "keyword": "braindance"
+          }
         }
       }
     ]
@@ -2992,8 +3341,13 @@
     "effects": [
       {
         "trigger": "static",
-        "condition": { "streetCredAheadOfRival": true },
-        "effect": { "kind": "attackReadyWithKeyword", "keyword": "blocker" }
+        "condition": {
+          "streetCredAheadOfRival": true
+        },
+        "effect": {
+          "kind": "attackReadyWithKeyword",
+          "keyword": "blocker"
+        }
       }
     ]
   },
@@ -3163,15 +3517,26 @@
         "trigger": "onFriendlyAttack",
         "oncePerTurn": true,
         "onceKey": "embracing-destruction",
-        "condition": { "attackerKeyword": "arasaka" },
-        "effect": { "kind": "draw", "count": 1 }
+        "condition": {
+          "attackerKeyword": "arasaka"
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
       },
       {
         "trigger": "onFriendlyAttack",
         "oncePerTurn": true,
         "onceKey": "embracing-destruction",
-        "condition": { "attackerKeyword": "arasaka", "streetCredBelow": 20 },
-        "effect": { "kind": "discardCard", "target": "friendlyHandCard" }
+        "condition": {
+          "attackerKeyword": "arasaka",
+          "streetCredBelow": 20
+        },
+        "effect": {
+          "kind": "discardCard",
+          "target": "friendlyHandCard"
+        }
       }
     ]
   },
@@ -3200,18 +3565,33 @@
         "effect": {
           "kind": "sameTarget",
           "target": "friendlyHandOrTrashUnit",
-          "filter": { "maxCost": 4 },
+          "filter": {
+            "maxCost": 4
+          },
           "effects": [
-            { "kind": "scripted", "name": "yorinobu-arasaka-steel-dragon" },
-            { "kind": "grantKeyword", "keyword": "adrenaline", "target": "chosen", "duration": "turn" }
+            {
+              "kind": "scripted",
+              "name": "yorinobu-arasaka-steel-dragon"
+            },
+            {
+              "kind": "grantKeyword",
+              "keyword": "adrenaline",
+              "target": "chosen",
+              "duration": "turn"
+            }
           ]
         }
       },
       {
         "trigger": "onUnitDefeated",
         "oncePerTurn": true,
-        "condition": { "defeatedKeyword": "arasaka" },
-        "effect": { "kind": "draw", "count": 1 }
+        "condition": {
+          "defeatedKeyword": "arasaka"
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
       }
     ],
     "scripted": "yorinobu-arasaka-steel-dragon"

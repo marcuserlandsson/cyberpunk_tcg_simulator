@@ -55,6 +55,12 @@ export type Trigger =
   | 'onUnitDefeated'
   | 'onRivalAdjustFriendlyGig'
   | 'onEndTurn'
+  // Batch 3 (docs/rulings.md §68 ff.): "When a friendly EQUIPPED Unit or
+  // Legend is spent, ..." — a watcher, broadcast to every in-play card of the
+  // SPENT card's own controller whenever a card meeting that description (in
+  // play, type Unit/Legend, attachedGear.length > 0) is spent, from the same
+  // `spendOnDraft` seam that already fires the self-referential `onSpend`.
+  | 'onFriendlyEquippedSpend'
   | 'activated'
   | 'static'
 
@@ -111,6 +117,8 @@ export interface TargetFilter {
   maxPowerIfAheadOnStreetCred?: number
   /** "power equal to or less than the value of a friendly d20" (over-the-edge). */
   maxPowerVsFriendlyD20?: boolean
+  /** "an EQUIPPED Unit" — has at least one attached Gear (cyberpsychosis, docs/rulings.md §68 ff.). */
+  equipped?: boolean
 }
 
 /**
@@ -131,10 +139,19 @@ export interface CostReduction {
  * (royce-psycho-on-the-edge, docs/rulings.md §55 ff.) — N times the subject
  * card's own `attachedGear.length`.
  */
-export type DynamicAmount = 'friendlyMaxGig' | { perEquippedGear: number }
+export type DynamicAmount =
+  | 'friendlyMaxGig'
+  | { perEquippedGear: number }
+  // "+2 power for each friendly Gig with an even value" / "Draw 1 for each
+  // friendly Gig with an odd value" (jackie-welles-ride-or-die-choom,
+  // docs/rulings.md §68 ff.) — `amount` times the count of the controller's
+  // own Gig dice matching `parity`.
+  | { perFriendlyGigParity: { parity: 'even' | 'odd'; amount: number } }
 
 export type EffectNode =
-  | { kind: 'draw'; count: number }
+  // "Draw 1 for each friendly Gig with an odd value" needs a board-read count
+  // too, not just a printed one (docs/rulings.md §68 ff.).
+  | { kind: 'draw'; count: number | DynamicAmount }
   | { kind: 'discardRandomRival'; count: number }
   | {
       kind: 'buffPower'
@@ -148,7 +165,12 @@ export type EffectNode =
   | { kind: 'bounce'; target: TargetSpec; filter?: TargetFilter }
   | { kind: 'readyCard'; target: TargetSpec; filter?: TargetFilter }
   | { kind: 'spendCard'; target: TargetSpec; filter?: TargetFilter }
-  | { kind: 'stealGig'; count: number }
+  // `distinctValueOnly`: "steal a rival Gig with a value not shared by a
+  // friendly Gig" (gorilla-arms, docs/rulings.md §68 ff.) — narrows which die
+  // `chooseGig` offers for this steal to ones whose value the thief does not
+  // already hold, falling back to every die if none qualifies (never
+  // deadlocking `chooseGig`, mirroring §25).
+  | { kind: 'stealGig'; count: number; distinctValueOnly?: boolean }
   | { kind: 'returnGig'; count: number }
   | { kind: 'rerollGig'; whose: 'friendly' | 'rival' }
   | { kind: 'trashFromDeck'; whose: 'friendly' | 'rival'; count: number }
@@ -225,6 +247,14 @@ export type EffectNode =
   // areas.)" — the mirror image of §24's engine-level Gig-area omission, but
   // printed on one specific card rather than universal.
   | { kind: 'cantAttackGigArea' }
+  // Batch 3 addition (docs/rulings.md §68 ff.): a CONDITIONAL keyword grant,
+  // live only while this def's own `condition` holds — unlike a card's
+  // printed `keywords` (always active) and unlike `grantKeyword` (a one-shot,
+  // until-end-of-turn grant fired from a trigger's resolution). Masks the
+  // matching entry in the card's/Gear's own printed `keywords` so the gate is
+  // the sole authority ("If a Rival controls at least 2 more Gigs than you,
+  // this Unit has {Adrenaline}." — adrenaline-converter).
+  | { kind: 'grantKeywordWhile'; keyword: string }
 
 export interface EffectDef {
   trigger: Trigger
@@ -254,6 +284,17 @@ export interface EffectDef {
     defeatedKeyword?: string
     /** "if you control 2 or more Gigs with 8+ value" */
     friendlyGigsAtLeastValueCount?: { value: number; count: number }
+    // Batch 3 additions (docs/rulings.md §68 ff.):
+    /** "if you control 2 or more Gigs with different values" (afterparty-at-lizzie-s). */
+    friendlyGigDistinctValuesAtLeast?: number
+    /** "if you control a Gig with an even value and a Gig with an odd value" (bootleg-black-sapphire-show). */
+    friendlyGigEvenAndOdd?: boolean
+    /** "if [a fixed number, e.g. this card's own cost] equals the value of a friendly Gig" (caliber-totentanz-s-top-dog). */
+    friendlyGigValueEquals?: number
+    /** "if your ☆ (Street Cred) differs from a Rival's by N+" — |own - rival| >= N (dexter-deshawn-one-last-chance). */
+    streetCredDiffAtLeast?: number
+    /** "if it's equipped" — does the SOURCE card itself carry ≥1 attached Gear (maelstrom-goons). */
+    sourceEquipped?: boolean
   }
   quick?: boolean
   /** "The first time ... each turn" — one firing per game turn, per source. */
@@ -364,6 +405,14 @@ export interface PendingSteal {
   thief?: PlayerId
   resumePhase?: Phase
   queue?: PendingSteal[]
+  /**
+   * "steal a rival Gig with a value not shared by a friendly Gig"
+   * (gorilla-arms, docs/rulings.md §68 ff.): narrows `chooseGig`'s offered
+   * dice to ones whose value the thief does not already hold. Applies to the
+   * whole steal for as long as it is set — a documented simplification when a
+   * filtered bonus steal merges into an already-larger, unfiltered one.
+   */
+  distinctValueOnly?: boolean
 }
 
 export interface GameState {

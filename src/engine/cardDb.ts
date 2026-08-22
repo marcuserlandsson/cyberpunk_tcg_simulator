@@ -19,6 +19,7 @@ const triggerSchema = z.enum([
   'onUnitDefeated',
   'onRivalAdjustFriendlyGig',
   'onEndTurn',
+  'onFriendlyEquippedSpend',
   'activated',
   'static',
 ])
@@ -55,6 +56,7 @@ const targetFilterSchema = z.strictObject({
   maxCost: z.number().optional(),
   maxPowerIfAheadOnStreetCred: z.number().optional(),
   maxPowerVsFriendlyD20: z.boolean().optional(),
+  equipped: z.boolean().optional(),
 })
 
 const costReductionSchema = z.strictObject({
@@ -67,6 +69,12 @@ const costReductionSchema = z.strictObject({
 const dynamicAmountSchema = z.union([
   z.literal('friendlyMaxGig'),
   z.strictObject({ perEquippedGear: z.number() }),
+  z.strictObject({
+    perFriendlyGigParity: z.strictObject({
+      parity: z.enum(['even', 'odd']),
+      amount: z.number(),
+    }),
+  }),
 ])
 
 const powerAmountSchema = z.union([z.number(), dynamicAmountSchema])
@@ -82,7 +90,7 @@ const dieSizeSchema = z.union([
 
 export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
   z.discriminatedUnion('kind', [
-    z.strictObject({ kind: z.literal('draw'), count: z.number() }),
+    z.strictObject({ kind: z.literal('draw'), count: powerAmountSchema }),
     z.strictObject({ kind: z.literal('discardRandomRival'), count: z.number() }),
     z.strictObject({
       kind: z.literal('buffPower'),
@@ -112,7 +120,11 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       target: targetSpecSchema,
       filter: targetFilterSchema.optional(),
     }),
-    z.strictObject({ kind: z.literal('stealGig'), count: z.number() }),
+    z.strictObject({
+      kind: z.literal('stealGig'),
+      count: z.number(),
+      distinctValueOnly: z.boolean().optional(),
+    }),
     z.strictObject({ kind: z.literal('returnGig'), count: z.number() }),
     z.strictObject({ kind: z.literal('rerollGig'), whose: whoseSchema }),
     z.strictObject({ kind: z.literal('trashFromDeck'), whose: whoseSchema, count: z.number() }),
@@ -175,6 +187,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
     }),
     z.strictObject({ kind: z.literal('attackReadyWithKeyword'), keyword: z.string() }),
     z.strictObject({ kind: z.literal('cantAttackGigArea') }),
+    z.strictObject({ kind: z.literal('grantKeywordWhile'), keyword: z.string() }),
   ])
 )
 
@@ -203,6 +216,11 @@ const effectDefSchema: z.ZodType<EffectDef> = z.strictObject({
       friendlyGigsAtLeastValueCount: z
         .strictObject({ value: z.number(), count: z.number() })
         .optional(),
+      friendlyGigDistinctValuesAtLeast: z.number().optional(),
+      friendlyGigEvenAndOdd: z.boolean().optional(),
+      friendlyGigValueEquals: z.number().optional(),
+      streetCredDiffAtLeast: z.number().optional(),
+      sourceEquipped: z.boolean().optional(),
     })
     .optional(),
   quick: z.boolean().optional(),

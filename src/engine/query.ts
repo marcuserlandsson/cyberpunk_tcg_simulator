@@ -64,6 +64,23 @@ export function maxGigValue(state: GameState, player: PlayerId): number {
 }
 
 /**
+ * The card `uid` acts on behalf of: its Gear host, if `uid` is attached
+ * Gear (mirroring `effects.ts`'s `abilityHost`, reimplemented locally so
+ * this pure-read module does not need to import the card layer), otherwise
+ * `uid` itself. Used by `selfIsStealer` so a "When THIS Unit steals" clause
+ * printed on Gear (gorilla-arms) reads its host's identity, not the Gear
+ * card's own uid (docs/rulings.md §68 ff.).
+ */
+function actingCardFor(state: GameState, uid: number): number {
+  for (const player of [0, 1] as const) {
+    for (const host of [...state.players[player].field, ...state.players[player].legends]) {
+      if (state.cards[host].attachedGear.includes(uid)) return host
+    }
+  }
+  return uid
+}
+
+/**
  * Extra facts a triggered effect's condition needs, which no read of the
  * state can supply: the size of the Gig die that was just stolen
  * (docs/rulings.md §42), plus four batch-2 additions (docs/rulings.md §55 ff.)
@@ -138,7 +155,14 @@ export function conditionMet(
   ) {
     return false
   }
-  if (condition.selfIsStealer === true && context.stealerUid !== sourceUid) {
+  // "When THIS Unit steals a Gig" compares against the ACTING card — its Gear
+  // host, when the printed effect sits on attached Gear (gorilla-arms), or
+  // itself otherwise (v-roamer-of-the-badlands). A watcher firing for a Gear
+  // card passes the Gear's own uid as `sourceUid` (docs/rulings.md §42/§68 ff.).
+  if (
+    condition.selfIsStealer === true &&
+    context.stealerUid !== (sourceUid !== undefined ? actingCardFor(state, sourceUid) : undefined)
+  ) {
     return false
   }
   if (
@@ -157,6 +181,31 @@ export function conditionMet(
     const { value, count } = condition.friendlyGigsAtLeastValueCount
     const matching = state.players[player].gigArea.filter((die) => die.value >= value).length
     if (matching < count) return false
+  }
+  // Task 8 batch 3 additions (docs/rulings.md §68 ff.):
+  if (condition.friendlyGigDistinctValuesAtLeast !== undefined) {
+    const distinct = new Set(state.players[player].gigArea.map((die) => die.value)).size
+    if (distinct < condition.friendlyGigDistinctValuesAtLeast) return false
+  }
+  if (condition.friendlyGigEvenAndOdd === true) {
+    const area = state.players[player].gigArea
+    const hasEven = area.some((die) => die.value % 2 === 0)
+    const hasOdd = area.some((die) => die.value % 2 === 1)
+    if (!hasEven || !hasOdd) return false
+  }
+  if (
+    condition.friendlyGigValueEquals !== undefined &&
+    !state.players[player].gigArea.some((die) => die.value === condition.friendlyGigValueEquals)
+  ) {
+    return false
+  }
+  if (condition.streetCredDiffAtLeast !== undefined) {
+    const diff = Math.abs(streetCred(state, player) - streetCred(state, opponentOf(player)))
+    if (diff < condition.streetCredDiffAtLeast) return false
+  }
+  if (condition.sourceEquipped === true) {
+    const source = sourceUid !== undefined ? state.cards[sourceUid] : undefined
+    if (source === undefined || source.attachedGear.length === 0) return false
   }
   return true
 }
@@ -207,6 +256,26 @@ export function effectiveCardCost(def: CardDef, state: GameState, player: Player
 /** Flattens `sequence` nodes so a static def can bundle several statics. */
 function flattenNodes(node: EffectNode): EffectNode[] {
   return node.kind === 'sequence' ? node.effects.flatMap(flattenNodes) : [node]
+}
+
+/**
+ * Keyword names one of `def`'s own `static` EffectDefs explicitly gates via
+ * `grantKeywordWhile` — masks that keyword out of the blanket printed-keyword
+ * grant below, so the gate becomes the sole authority on whether it is
+ * currently active ("If a Rival controls at least 2 more Gigs than you, this
+ * Unit has {Adrenaline}." — adrenaline-converter, docs/rulings.md §68 ff.).
+ * Every other card's printed keywords are unaffected: this only ever removes
+ * a keyword a card ALSO gates with its own static def.
+ */
+function gatedKeywordNames(def: CardDef): Set<string> {
+  const names = new Set<string>()
+  for (const effect of def.effects) {
+    if (effect.trigger !== 'static') continue
+    for (const node of flattenNodes(effect.effect)) {
+      if (node.kind === 'grantKeywordWhile') names.add(node.keyword)
+    }
+  }
+  return names
 }
 
 /**
@@ -298,7 +367,16 @@ export function resolvePowerAmount(
 ): number {
   if (typeof amount === 'number') return amount
   if (amount === 'friendlyMaxGig') return maxGigValue(state, player)
-  return state.cards[subjectUid].attachedGear.length * amount.perEquippedGear
+  if ('perEquippedGear' in amount) {
+    return state.cards[subjectUid].attachedGear.length * amount.perEquippedGear
+  }
+  // "+2 power for each friendly Gig with an even value" / "Draw 1 for each
+  // friendly Gig with an odd value" (docs/rulings.md §68 ff.).
+  const { parity, amount: perDie } = amount.perFriendlyGigParity
+  const matching = state.players[player].gigArea.filter((die) =>
+    parity === 'even' ? die.value % 2 === 0 : die.value % 2 === 1
+  ).length
+  return matching * perDie
 }
 
 /**
@@ -379,16 +457,33 @@ export function effectiveKeywords(db: CardDb, state: GameState, uid: number): Ke
   const card = state.cards[uid]
   if (!card) return []
   const def = db[card.defId]
-  const keywords = new Set<Keyword>(def ? def.keywords : [])
+  const keywords = new Set<Keyword>()
+  if (def) {
+    const gated = gatedKeywordNames(def)
+    for (const keyword of def.keywords) {
+      if (!gated.has(keyword)) keywords.add(keyword)
+    }
+  }
   // Until-end-of-turn grants (docs/rulings.md §43) are as real as printed ones.
   for (const keyword of card.tempKeywords) keywords.add(keyword)
   for (const gearUid of card.attachedGear) {
     const gear = state.cards[gearUid]
     const gearDef = gear ? db[gear.defId] : undefined
     if (!gearDef) continue
+    const gearGated = gatedKeywordNames(gearDef)
     for (const keyword of gearDef.keywords) {
       if (NEVER_GRANTED_BY_GEAR.includes(keyword)) continue
+      if (gearGated.has(keyword)) continue
       keywords.add(keyword)
+    }
+  }
+  // A `grantKeywordWhile` static — on the card itself (while in play) or on
+  // its Gear — contributes its keyword only while its own condition holds,
+  // unlike the always-on printed keywords masked out above (docs/rulings.md
+  // §68 ff.).
+  for (const node of activeStaticNodes(db, state, uid)) {
+    if (node.kind === 'grantKeywordWhile' && !NEVER_GRANTED_BY_GEAR.includes(node.keyword)) {
+      keywords.add(node.keyword)
     }
   }
   return [...keywords]

@@ -1815,3 +1815,336 @@ temporarily reverting `fireCardTrigger` and re-running.
 against one pre-firing snapshot; `onceKey` does not touch that — it only
 shares an allowance flag, never a target list. No card needs both shapes at
 once yet.
+
+# Task 8 rulings, batch 3 (Yellow, 19 cards)
+
+Batch 3 needed six vocabulary extensions, one propagation fix and two
+engine-level fixes surfaced while writing the real-card tests, plus seven
+scripted cards (more than either Red batch, because Yellow's "you may defeat
+a Gear" family recurs three times with no clean shared shape — see §73).
+
+## 68 — `grantKeywordWhile`: a conditional keyword grant, masking the printed one
+
+`adrenaline-converter`: "(Equip to a friendly Unit or face-up Legend.) If a
+Rival controls at least 2 more Gigs than you, this Unit has {Adrenaline}."
+§30 already flagged this as a known over-approximation: `effectiveKeywords`
+unions in *every* printed keyword of an attached Gear unconditionally,
+including `adrenaline` here, though the card's own text gates the grant on
+the Gig-count comparison.
+
+**Ruling:** the vocabulary gains a static node, `{ kind: 'grantKeywordWhile',
+keyword }`, used with an ordinary `condition` (here `rivalGigLeadAtLeast: 2`,
+already existing from §50). `query.ts` gains `gatedKeywordNames(def)` —
+every keyword name any of `def`'s own `static` EffectDefs gates this way —
+and `effectiveKeywords` now:
+
+- unions in a card's (or its Gear's) printed `keywords`, **except** any name
+  `gatedKeywordNames` returns for that same def;
+- separately unions in `grantKeywordWhile`'s keyword from
+  `activeStaticNodes` — which already only returns nodes whose `condition`
+  currently holds, so the gate is live only while the printed clause is true.
+
+Every other card's printed keywords are completely unaffected: masking only
+ever removes a keyword a card *also* gates with its own static def, and no
+other card in the pool does that yet. The pre-existing synthetic test that
+documented the old over-approximation (`tests/engine/effects.test.ts`, "gear
+keyword grants (real cards)") is updated in place to assert the *fixed*
+conditional behaviour, per the batch-3 task brief's "check existing
+dynamic/conditional machinery before extending" steer.
+
+## 69 — Five new plain board-read conditions
+
+Five cards each need one board fact `EffectDef.condition` cannot yet read:
+
+- `afterparty-at-lizzie-s`: "If you control 2 or more Gigs with different
+  values" → `friendlyGigDistinctValuesAtLeast?: number` — the size of the
+  `Set` of the controller's own Gig-die values must be at least this;
+- `bootleg-black-sapphire-show`: "If you control a Gig with an even value
+  and a Gig with an odd value" → `friendlyGigEvenAndOdd?: boolean` — at
+  least one die of each parity, which (unlike the distinct-values count
+  above) is a *shape* check, not a threshold;
+- `caliber-totentanz-s-top-dog`: "{Defeated} ... If **the card's** cost
+  equals the value of a friendly Gig, ..." — "the card" is Caliber itself, a
+  fixed number known at data-encoding time (its own printed cost, 5), so
+  this is `friendlyGigValueEquals?: number` rather than a new "read the
+  source's own cost" indirection — the literal `5` is baked into the card's
+  data the same way every other printed threshold already is;
+- `dexter-deshawn-one-last-chance`: "If your ☆ (Street Cred) differs from a
+  Rival's by 10+" → `streetCredDiffAtLeast?: number`, the absolute
+  difference — distinct from §55's `streetCredAheadOfRival` (a strict `>`,
+  no threshold) and `streetCredBelow` (compares to a fixed number, not the
+  rival's);
+- `maelstrom-goons`: "When this Unit steals a Gig, **if it's equipped**, a
+  Rival discards 1" → `sourceEquipped?: boolean`, reading
+  `state.cards[sourceUid].attachedGear.length > 0`. Combined with the
+  already-existing `selfIsStealer` (§61), the def reads:
+  `condition: { selfIsStealer: true, sourceEquipped: true }`.
+
+All five are plain, pure reads over `state` (plus, for the last, the
+existing `sourceUid` parameter `conditionMet` already threads through for
+`selfIsStealer`), following the exact shape of every condition field before
+them.
+
+## 70 — `DynamicAmount.perFriendlyGigParity`, and `draw` becomes dynamic too
+
+`jackie-welles-ride-or-die-choom`: "{Attack} Give this Unit +2 power this
+turn for each friendly Gig with an even value. {Defeated} Draw 1 for each
+friendly Gig with an odd value." The power half fits the existing
+`DynamicAmount` slot on `buffPower`; the draw half needs a count that reads
+the board too, which `draw` never supported (`count: number` only).
+
+**Ruling:**
+
+- `DynamicAmount` gains a third variant, `{ perFriendlyGigParity: { parity:
+  'even' | 'odd', amount: number } }` — `amount` times the count of the
+  controller's own Gig dice matching `parity`, resolved by the existing
+  `resolvePowerAmount` (which now discriminates its three variants by shape
+  — `'perEquippedGear' in amount` — since a bare `typeof amount === 'object'`
+  check is no longer enough with two object-shaped variants);
+- `EffectNode`'s `draw` widens from `{ count: number }` to `{ count: number
+  | DynamicAmount }`, and `effects.ts`'s `draw` handler resolves a
+  non-numeric count through the same `resolvePowerAmount` `buffPower`
+  already uses. This is additive: every existing `draw` node in the pool
+  still carries a plain `number`, so no card's behaviour changes.
+
+## 71 — `stealGig.distinctValueOnly`, and two merge-logic fixes it exposed
+
+`gorilla-arms`: "The first time this Unit steals 1 or more Gigs each turn,
+steal a rival Gig with a value not shared by a friendly Gig." Per the batch
+brief's own steer, this reuses §32's `stealGig` node/`pendingSteal` +
+`chooseGig` machinery rather than growing a new Gig-die `TargetFilter` (no
+other card in the pool restricts *which* die an effect may steal, and Gig
+dice are deliberately never filtered by `filterTargets`).
+
+**Ruling:** `stealGig` gains `distinctValueOnly?: boolean`, mirrored onto
+`PendingSteal.distinctValueOnly`. `combat.ts`'s `chooseGigActions` narrows
+the offered dice to those whose value the thief does not already hold
+whenever it is set, falling back to every die if none qualifies — never
+deadlocking `chooseGig` (mirroring §25's "a steal of 0 dice never enters
+`chooseGig`" principle, extended to "a filter with zero survivors is not
+really a filter"). A filtered bonus steal that merges into an
+already-pending, unfiltered one (the common case here: the attack's base
+steal is still open when the watcher fires) applies the filter to the
+**whole** remaining choice, not just the bonus die — a documented
+simplification; the alternative (per-die filters inside one `PendingSteal`)
+would need every remaining slot to carry its own provenance, which no card
+in the pool needs yet.
+
+Writing this card's real-game test (attack → steal → watcher fires →
+bonus die) surfaced two bugs in machinery §32/§42 had already built, neither
+specific to the new field:
+
+- **`selfIsStealer` compared the wrong uid for a Gear-printed effect.**
+  §61's `condition.selfIsStealer` checks `context.stealerUid !== sourceUid`,
+  which is correct when the effect is printed on the stealing Unit itself
+  (`v-roamer-of-the-badlands`) but wrong when it is printed on that Unit's
+  *Gear* (`gorilla-arms`): a watcher firing for an attached Gear card passes
+  the **Gear's own uid** as `sourceUid` (§42's watcher loop treats a Unit
+  and each of its Gear as separate watcher "cards"), while
+  `context.stealerUid` is always the **attacking card's** uid — the host,
+  never its Gear. `query.ts` gains a small local helper, `actingCardFor`
+  (the Gear's host if `uid` is attached Gear, otherwise `uid` itself — the
+  same resolution `effects.ts`'s `abilityHost` already does, reimplemented
+  locally so this pure-read module does not need to import the card layer),
+  and `selfIsStealer` now compares `context.stealerUid` against
+  `actingCardFor(state, sourceUid)`. `v-roamer-of-the-badlands` is
+  unaffected: `actingCardFor` on a plain field Unit (nothing has it in
+  `attachedGear`) returns the uid unchanged.
+- **`stealGig`'s merge check could not recognize an attack-driven steal as
+  "the same thief."** An attack-driven `PendingSteal` leaves `thief`
+  `undefined`, meaning "the active player" (§32); the merge branch compared
+  `head.thief === ctx.player` literally, so `undefined === 0` was always
+  false and a bonus steal from the *same* controller was wrongly treated as
+  a **different** thief's steal and pushed onto `queue` instead of
+  extending `head.remaining`. Fixed by comparing against the *effective*
+  thief, `head.thief ?? draft.activePlayer`, matching how `combat.ts`
+  already resolves the same field everywhere else. No batch-1/2 card
+  exercised this path: their `onFriendlyStealDie` effects use `changeGig`,
+  never a *second* `stealGig` layered on top of an attack's own steal.
+
+Both fixes are covered by the synthetic `EffectNode: stealGig with
+distinctValueOnly` and the real `gorilla-arms` tests; the full pre-existing
+suite stayed green throughout, confirming neither is a behaviour change for
+any already-encoded card.
+
+## 72 — `onFriendlyEquippedSpend`: one more watcher, plus a genuinely blocked half-card
+
+`alt-cunningham-mother-of-daemons`: "When a friendly equipped Unit or
+Legend is spent, draw 1. When a rival Unit would steal a Gig, you may
+discard 1 with cost equal to that Gig's value. If you do, the Gig isn't
+stolen."
+
+**Ruling, clause 1.** A new watcher trigger, `onFriendlyEquippedSpend`,
+following §42/§60's template exactly: fired from `effects.ts`'s
+`spendOnDraft`, on the just-spent card's own controller, whenever that card
+is in play, is a Unit or Legend, and carries at least one attached Gear —
+right alongside the existing self-referential `onSpend` fire in the same
+loop. "A friendly ... Unit" includes the watching card itself, mirroring
+§42's convention for `onFriendlyStealDie`.
+
+**Deferred, clause 2.** "When a rival Unit would steal a Gig, you may
+discard 1 [with a cost restriction], ... the Gig isn't stolen" needs a
+*true interception point* before a steal's die actually moves — nothing
+today lets the non-acting player answer an optional, costed decision in the
+middle of `takeStolenGig`, the way `payOptionalCosts` lets the *attacker*
+answer one on their own trigger (§49). Building that decision phase (who
+answers, what it costs, and how declining it differs from a `defeatShield`'s
+unconditional interception, §46) is a genuine engine feature, not a
+vocabulary extension — left with only clause 1 encoded, `effects: []` for
+the rest, exactly like §52's floating-effects deferral.
+
+## 73 — Three "you may defeat a Gear" scripts, and a new `defeatGear` combat helper
+
+Three cards print "you may defeat a [friendly] Gear," each with a different
+follow-up: `dum-dum-maelstrom-triggerman` ("If you do, draw 2. Otherwise,
+draw 1."), `gilded-mato-n` ("If you do, defeat a rival Unit with cost 3 or
+less."), `heywood-ripperdoc` ("If its cost equals the value of a friendly
+Gig, draw 1."). Despite the shared "optional Gear defeat" shell, none of the
+three follow-ups is expressible with the same vocabulary shape:
+
+- `dum-dum`'s and `gilded-mato-n`'s "if you do, X" makes a LATER node's
+  resolution depend on whether an EARLIER node's target slot was actually
+  filled — a dependency no existing node expresses. A `sequence`'s second
+  node has no way to see whether the first one found a target (§32/§57); a
+  `chooseOne` mode containing both nodes does not help either, because the
+  mode's own slot is chosen unconditionally and each child node's slot is
+  independently filled — picking "the defeat-and-follow-up mode" with no
+  Gear available would still let the follow-up fire, which is exactly wrong;
+- `heywood-ripperdoc`'s "**its** cost" needs the specific Gear that was
+  defeated, carried into a later check — the same "read a property of what
+  a prior step touched" problem `sameTarget`'s `'chosen'` solves for a
+  *target reference*, but not for "check a numeric property of it," which no
+  node reads.
+
+**Ruling:** all three are scripted. "You may [defeat your own Gear, no
+€$ cost]" is auto-taken whenever a Gear exists, per §50's established
+convention for every other cost-free "you may" in the pool (extended here
+from "defeat 2 instead of 1" and "look at/Call a Legend for free" to
+"defeat your own card") — declining a free, no-drawback-stated option was
+never modelled as a real choice anywhere else in the pool, and building the
+first "optional-even-though-fillable" decision surface for exactly three
+cards was judged not worth it. Which Gear (and, for `gilded-mato-n`, which
+rival Unit) is picked through the rng, the same script-internal-choice
+convention as `arasaka-emergency-radioport`'s random face-down Legend (§48).
+
+A new `combat.ts` export, `defeatGear(draft, db, gearUid)`, detaches the
+Gear from its host and trashes it to its own owner, firing the Gear's own
+`{Defeated}` triggers if it has any (§37) — but **no** `unitDefeated` event
+and no `onUnitDefeated` watcher fire, because a Gear card is not a Unit.
+This is a plain combat-layer helper, not a vocabulary node: no card needs
+"defeat a Gear" as a real, enumerated player decision yet, so there is no
+`friendlyGear`/`anyGear` `TargetSpec` — only the three scripts call it.
+
+## 74 — `adam-smasher-metal-over-meat`: a scripted mass defeat
+
+"{Play} Defeat all other Units." The only "defeat **all**" shape in the
+141-card pool with no target choice at all (`don-t-fear-the-reaper`'s "Spend
+all rival Units" is the pool's other mass effect, but a different verb and
+scope, outside this batch) — scripted rather than grown into a one-card
+`defeatAll` node. Both fields are snapshotted before defeating anything,
+since `defeatUnit` mutates the very zone arrays being iterated; a field card
+counts as a "Unit" here whether it got there as a printed Unit or a
+{go-solo} Legend, matching §31/§39's existing convention.
+
+## 75 — `hanako-arasaka-in-a-gilded-cage`: a scripted search with no rng at all
+
+"{Play} Search the top 4 cards of your deck. Reveal any number of cards
+with cost equal to any friendly Gig values and add them to your hand.
+Bottom-deck the rest." A pure search over a *look-then-decide* zone
+(the searched 4, which exist only once the effect resolves) — the same
+"candidates only come into existence mid-resolution" reasoning that makes
+`all-is-lost` a script (§48). Unlike that card, though, "any number" here
+has an unambiguous best answer: every qualifying card is strictly worth
+taking (no card in the pool ever benefits from *leaving* a cost-matching
+card in the deck to keep searching), so §50's "you may" convention resolves
+it deterministically — no rng needed anywhere in this script, the only one
+in the pool so far that can say that.
+
+## 76 — `live-with-the-aftermath`: one real decision, one rng'd one, in the same effect
+
+"Each player defeats one of their Units." The controller's own casualty is
+a genuine decision (which friendly Unit to lose), enumerable exactly like
+any other `defeat` node's target; the RIVAL's casualty is not a decision
+*this* action's single acting player can make on the rival's behalf — there
+is no second "whose turn is it to decide" slot in `playCard`. Scripted with
+one declared target (`friendlyUnit`, docs/rulings.md §48) for the real half,
+and the rival's own Unit picked through the rng for the other half, exactly
+mirroring how `discardRandomRival` already treats "the rival" as an
+unpredictable agent whose hand/board is not the controller's to optimize
+(§32).
+
+## 77 — `kiroshi-optics`'s {Attack} effect is a scripted no-op, by design
+
+"{Attack} Look at a friendly face-down Legend. (Don't reveal it.)" This
+engine represents `GameState` with full visibility — every `CardInstance`
+carries its real `defId` regardless of `faceUp` — because nothing downstream
+(AI search, simulation, replay) needs a separate "what does player X
+currently know" layer; `faceUp` only ever gates *game rules* (equip
+legality, static effects, Call a Legend's random flip), never information
+flow. A "look, don't reveal" effect has literally nothing to change under
+that model: the looking player already has full read access to
+`state.cards[uid].defId` regardless of this effect.
+
+**Ruling:** encoded as `{ trigger: 'onAttack', effect: { kind: 'scripted',
+name: 'kiroshi-optics' } }` whose script is the identity function
+(`(_db, state, _ctx) => state`). This still exercises real machinery worth
+proving: Kiroshi Optics is attached Gear, and `{Attack}` is one of the two
+triggers Gear propagates from its host (§37) — the EffectDef's presence, and
+the `effectResolved` event the interpreter logs after any scripted node
+regardless of what it does, are what the real-card test asserts through the
+host's attack, per the batch brief's explicit instruction for this card. A
+bare `{ kind: 'sequence', effects: [] }` would satisfy "has effects" just as
+emptily but would not name what the printed text is actually about, so the
+named no-op script was chosen for legibility over a generic empty node.
+
+## 78 — Deferred: `kerry-eurodyne-axe-attitude-audience` (needs a new trigger seam)
+
+"When you roll in a Gig from your fixer area, you may ignore the result and
+reroll it once. When you roll a min or max value on a Gig, draw 1. If it's
+a d20, draw 3 instead." Both clauses hook into the **die roll itself** —
+the start-of-turn `chooseGigDie` action's roll, and (for the first clause) a
+brand-new "reroll it once" decision layered on top of that roll — not
+anything the existing `rerollGig` node or any trigger seam exposes today.
+Every existing trigger fires from a *resolved* action (a play, a call, an
+attack, a defeat, a spend); nothing fires *during* the roll that produces a
+Gig die's value, and there is no "may reroll the die you just rolled, once"
+decision anywhere in the engine (`rerollGig` rerolls an *already-placed* Gig
+Die chosen at random, per §32's still-open note, not the fixer roll that
+seeds one).
+
+**Ruling (scope):** left with `effects: []`, the only fully-deferred card in
+this batch. Encoding it needs: (1) a new trigger fired from `game.ts`'s
+gig-gain step, carrying the rolled value and die size; (2) a genuine player
+decision ("ignore and reroll once") threaded through that same seam, which
+is a new phase or action shape, not a vocabulary node; (3) a "min or max
+face" condition reading the roll's own value against its die's size. None
+of these piggyback on `stealGig`/`changeGig`/any existing condition the way
+every other batch-3 card's text did — this is an engine gap in the same
+family as §52's floating effects, and should be scoped and built once
+rather than half-solved for one card.
+
+## 79 — `cyberpsychosis`: the buff is encoded, the delayed self-destruct is deferred
+
+"{Quick} Give an equipped Unit +3 power this turn for each of its equipped
+Gears. If that Unit steals or fights, defeat it at the end of this turn."
+The first sentence is an ordinary `buffPower` with the `perEquippedGear`
+`DynamicAmount` (§59), targeting `anyUnit` filtered by the new `equipped`
+`TargetFilter` (§68 ff. — bare "an equipped Unit" reaches either side, per
+§39's/§64's bare convention). The second sentence is a **delayed,
+conditional, one-shot effect**: it must remember, for the rest of the
+current turn, that *this specific card instance* is now rigged to blow up
+if it steals or fights *at any point before end of turn*, then act on that
+memory at a turn boundary. Nothing in `GameState` tracks per-card "something
+will happen to you later, conditionally" — this is exactly the
+`floatingEffects` gap §52 already scoped and declined to half-solve for
+`chrome-fang`/`appetite-for-destruction`.
+
+**Ruling (scope):** the `buffPower` clause is encoded on its own
+`EffectDef`; the delayed self-destruct clause is left off entirely (this
+card's `effects` therefore under-delivers its printed text by that one
+clause, not by leaving `effects: []` for the whole card — the same partial
+encoding §60 already accepted for `meredith-stout-stone-cold-corpo`'s "or
+swaps" gap). Building `floatingEffects` once would also let this card's
+clause, `chrome-fang`, `appetite-for-destruction` and §43's
+`gunpoint-diplomacy` over-approximation all be finished together, per §52's
+own recommendation.

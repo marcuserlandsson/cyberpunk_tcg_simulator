@@ -420,13 +420,19 @@ function applyNode(
 ): void {
   switch (node.kind) {
     case 'draw': {
-      if (!drawCards(draft, ctx.player, node.count)) {
+      // "Draw 1 for each friendly Gig with an odd value" needs a board-read
+      // count, not just a printed one (docs/rulings.md §68 ff.).
+      const count =
+        typeof node.count === 'number'
+          ? node.count
+          : resolvePowerAmount(draft, node.count, ctx.sourceUid, ctx.player)
+      if (!drawCards(draft, ctx.player, count)) {
         // Same rule as the start-of-turn draw (docs/rulings.md §17): being
         // asked to draw from an empty deck loses the game.
         endGame(draft, opponentOf(ctx.player), 'deckout')
         return
       }
-      note(draft, ctx.sourceUid, `draw ${node.count}`)
+      note(draft, ctx.sourceUid, `draw ${count}`)
       return
     }
 
@@ -626,24 +632,43 @@ function applyNode(
       const count = Math.min(node.count, available)
       if (count <= 0) return
       const head = draft.pendingSteal
+      // An attack-driven steal leaves `thief` undefined, meaning "the active
+      // player" (docs/rulings.md §32) — compare against the EFFECTIVE thief so
+      // a bonus `stealGig` firing mid-attack (gorilla-arms) merges into it
+      // instead of being mistaken for a different thief's steal.
+      const headThief = head === null ? null : head.thief ?? draft.activePlayer
       if (head === null) {
         draft.pendingSteal = {
           attacker: ctx.sourceUid,
           remaining: count,
           thief: ctx.player,
           resumePhase: draft.phase === 'chooseGig' ? 'main' : draft.phase,
+          ...(node.distinctValueOnly === true ? { distinctValueOnly: true } : {}),
         }
         draft.phase = 'chooseGig'
-      } else if (head.thief === ctx.player && (head.queue ?? []).length === 0) {
+      } else if (headThief === ctx.player && (head.queue ?? []).length === 0) {
         // Same controller, nothing queued behind: one longer choice sequence.
         head.remaining += count
+        // A filtered bonus steal merging into an already-pending one applies
+        // its filter to the whole remaining choice (a documented
+        // simplification, docs/rulings.md §68 ff.).
+        if (node.distinctValueOnly === true) head.distinctValueOnly = true
       } else {
         // A steal for a *different* thief (a tied fight defeating two stealing
         // Units) waits its turn instead of overwriting — docs/rulings.md §32.
         const queue = head.queue ?? []
         const last = queue[queue.length - 1]
-        if (last !== undefined && last.thief === ctx.player) last.remaining += count
-        else queue.push({ attacker: ctx.sourceUid, remaining: count, thief: ctx.player })
+        if (last !== undefined && last.thief === ctx.player) {
+          last.remaining += count
+          if (node.distinctValueOnly === true) last.distinctValueOnly = true
+        } else {
+          queue.push({
+            attacker: ctx.sourceUid,
+            remaining: count,
+            thief: ctx.player,
+            ...(node.distinctValueOnly === true ? { distinctValueOnly: true } : {}),
+          })
+        }
         head.queue = queue
       }
       note(draft, ctx.sourceUid, `steal ${count} gig(s)`)
@@ -980,6 +1005,16 @@ export function spendOnDraft(db: CardDb, draft: GameState, uids: number[]): void
   for (const uid of uids) {
     if (!inPlay(draft, uid)) continue
     fireTriggerOnDraft(db, draft, 'onSpend', uid, [])
+    // "When a friendly EQUIPPED Unit or Legend is spent, ..." — a watcher on
+    // the spent card's own controller, broadcast whenever the just-spent card
+    // is a Unit/Legend carrying at least one attached Gear (alt-cunningham,
+    // docs/rulings.md §68 ff.). "A friendly ... Unit" includes the watching
+    // card itself, mirroring §42's onFriendlyStealDie convention.
+    const card = draft.cards[uid]
+    const def = db[card.defId]
+    if (card.attachedGear.length > 0 && (def.type === 'unit' || def.type === 'legend')) {
+      fireWatcherTrigger(db, draft, 'onFriendlyEquippedSpend', card.owner, {})
+    }
   }
 }
 

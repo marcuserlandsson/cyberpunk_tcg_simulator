@@ -205,6 +205,9 @@ export function filterTargets(
     if (filter.maxCost !== undefined && db[state.cards[uid].defId].cost > filter.maxCost) {
       return false
     }
+    if (filter.equipped === true && state.cards[uid].attachedGear.length === 0) {
+      return false
+    }
     const maxPower =
       filter.maxPowerIfAheadOnStreetCred !== undefined && aheadOnStreetCred
         ? filter.maxPowerIfAheadOnStreetCred
