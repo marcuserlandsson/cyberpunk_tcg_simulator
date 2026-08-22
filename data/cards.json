@@ -607,23 +607,7 @@
       "quickhack"
     ],
     "text": "{Quick} Give an equipped Unit +3 power this turn for each of its equipped Gears. If that Unit steals or fights, defeat it at the end of this turn.",
-    "effects": [
-      {
-        "trigger": "onPlay",
-        "quick": true,
-        "effect": {
-          "kind": "buffPower",
-          "amount": {
-            "perEquippedGear": 3
-          },
-          "target": "anyUnit",
-          "filter": {
-            "equipped": true
-          },
-          "duration": "turn"
-        }
-      }
-    ]
+    "effects": []
   },
   {
     "id": "deadman-transmitter",
@@ -1056,7 +1040,10 @@
         "trigger": "onPlay",
         "effect": {
           "kind": "scripted",
-          "name": "gilded-mato-n"
+          "name": "gilded-mato-n",
+          "targets": [
+            "friendlyGear"
+          ]
         }
       }
     ],
@@ -1304,7 +1291,10 @@
         "trigger": "onPlay",
         "effect": {
           "kind": "scripted",
-          "name": "heywood-ripperdoc"
+          "name": "heywood-ripperdoc",
+          "targets": [
+            "anyGear"
+          ]
         }
       }
     ],

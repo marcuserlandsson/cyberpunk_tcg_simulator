@@ -112,19 +112,23 @@ three more zones no earlier card needed to reach (§57, §63):
 `friendlyHandCard` (every card in the controller's own hand), and
 `friendlyHandOrTrashUnit` (every **Unit** in the controller's own hand *and*
 trash combined — the "Unit" restriction is baked into the spec's own name,
-since a mixed hand+trash zone otherwise holds every card type).
+since a mixed hand+trash zone otherwise holds every card type). Task 8 batch
+3 fix round 1 adds two more (§73/§80): `friendlyGear` (every Gear card
+attached anywhere on the controller's own side) and `anyGear` (the same,
+plus the rival's, controller's own listed first — §39's bare-scope
+convention, for bare "a Gear"). Both are real, enumerated decisions — no
+card's "which Gear" is ever left to the rng when the firing action can
+carry a target.
 
 Card specs may be narrowed by a `filter`:
 `{ maxPower?, minPower?, keyword?, excludeSelf?, weakerThanAFriendlyUnit?,
-cardType?, maxCost?, maxPowerIfAheadOnStreetCred?, maxPowerVsFriendlyD20?,
-equipped? }`,
+cardType?, maxCost?, maxPowerIfAheadOnStreetCred?, maxPowerVsFriendlyD20? }`,
 covering "with power 4 or less", "a CORPO Unit", "*another* friendly Unit",
 "with less power than a friendly Unit", "a **Program**" (`cardType`, §57),
 "with cost 4 or less" (`maxCost`, §63), "power 2 or less … power 3 or less
 **instead**" (`maxPowerIfAheadOnStreetCred` **replaces** `maxPower` rather
-than adding to it — §64), "power ≤ the value of a friendly d20"
-(`maxPowerVsFriendlyD20`, §64), and "an **equipped** Unit" — has ≥1 attached
-Gear (`equipped`, §68 ff.).
+than adding to it — §64), and "power ≤ the value of a friendly d20"
+(`maxPowerVsFriendlyD20`, §64).
 
 ### Nodes
 

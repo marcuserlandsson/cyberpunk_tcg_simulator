@@ -1331,6 +1331,18 @@ would also subsume §43's `gunpoint-diplomacy` over-approximation and the
 "next time" clauses in `gorilla-arms` / `jackie-welles-pour-one-out-for-me`, so
 it is worth doing once, properly, rather than three ad-hoc times.
 
+**Batch 3 addition (fix round 1, docs/rulings.md §79):** `cyberpsychosis`
+("If that Unit steals or fights, defeat it at the end of this turn") needs the
+exact same `floatingEffects` zone — a delayed, conditional, one-shot effect
+tied to a specific card instance rather than to a turn boundary alone. Batch 3
+first shipped only this card's *other* clause (the immediate power buff) and
+deferred the delayed defeat, but a follow-up review overturned that: a
+gameplay-affecting partial encoding that keeps a card's upside while dropping
+its printed downside makes the card strictly better than as printed, with no
+visible marking that anything is missing — now a standing policy across all
+batches (§79). `cyberpsychosis` is deferred in full, `effects: []`, joining
+this list rather than shipping half-implemented.
+
 # Task 8 fix-round-1 rulings
 
 ## 53 — "Give a friendly Unit these effects" needs one shared target slot
@@ -1993,6 +2005,19 @@ unconditional interception, §46) is a genuine engine feature, not a
 vocabulary extension — left with only clause 1 encoded, `effects: []` for
 the rest, exactly like §52's floating-effects deferral.
 
+**Re-verified this partial encoding against §79's new policy (fix round
+1).** §79 forbids a partial encoding whenever the missing clause changes
+how the *encoded* clause should be played around. Here the two clauses are
+independent triggers with no shared state: clause 1 (`onFriendlyEquippedSpend`
+→ `draw 1`) is a pure, unconditional upside that fires exactly as printed
+whenever it should; clause 2, whether present or not, can only ever make
+the card weaker (a missing defensive option), never make clause 1 read
+differently or make the card better than printed. This is the same shape as
+§60's `meredith-stout-stone-cold-corpo` precedent, not `cyberpsychosis`'s —
+the card under-delivers by being weaker than printed, which is safe, rather
+than over-delivering by being stronger, which is not. Clause 1 stays
+encoded; clause 2 stays deferred.
+
 ## 73 — Three "you may defeat a Gear" scripts, and a new `defeatGear` combat helper
 
 Three cards print "you may defeat a [friendly] Gear," each with a different
@@ -2016,24 +2041,64 @@ three follow-ups is expressible with the same vocabulary shape:
   *target reference*, but not for "check a numeric property of it," which no
   node reads.
 
-**Ruling:** all three are scripted. "You may [defeat your own Gear, no
-€$ cost]" is auto-taken whenever a Gear exists, per §50's established
-convention for every other cost-free "you may" in the pool (extended here
-from "defeat 2 instead of 1" and "look at/Call a Legend for free" to
-"defeat your own card") — declining a free, no-drawback-stated option was
-never modelled as a real choice anywhere else in the pool, and building the
-first "optional-even-though-fillable" decision surface for exactly three
-cards was judged not worth it. Which Gear (and, for `gilded-mato-n`, which
-rival Unit) is picked through the rng, the same script-internal-choice
-convention as `arasaka-emergency-radioport`'s random face-down Legend (§48).
+**Ruling:** all three are scripted — the "if you do, X" / "its cost"
+dependencies above are still not vocabulary-expressible. "You may [defeat
+your own Gear, no €$ cost]" is auto-taken whenever a Gear exists, per §50's
+established convention for every other cost-free "you may" in the pool
+(extended here from "defeat 2 instead of 1" and "look at/Call a Legend for
+free" to "defeat your own card") — declining a free, no-drawback-stated
+option was never modelled as a real choice anywhere else in the pool.
 
 A new `combat.ts` export, `defeatGear(draft, db, gearUid)`, detaches the
 Gear from its host and trashes it to its own owner, firing the Gear's own
 `{Defeated}` triggers if it has any (§37) — but **no** `unitDefeated` event
-and no `onUnitDefeated` watcher fire, because a Gear card is not a Unit.
-This is a plain combat-layer helper, not a vocabulary node: no card needs
-"defeat a Gear" as a real, enumerated player decision yet, so there is no
-`friendlyGear`/`anyGear` `TargetSpec` — only the three scripts call it.
+and no `onUnitDefeated` watcher fire, because a Gear card is not a Unit. All
+three scripts call this one plain combat-layer helper.
+
+**Fix round 1 (batch 3 review): *which* Gear must be a real decision where
+the firing action can carry one.** The original version of this ruling
+picked the Gear (and, for `gilded-mato-n`, the rival Unit) through the rng
+for all three cards, reasoning that "no card needs 'defeat a Gear' as a real
+decision yet." That reasoning does not survive contact with the actual
+`onPlay` trigger both `gilded-mato-n` and `heywood-ripperdoc` fire from: an
+`onPlay` action already carries a real `targets` array the player commits to
+when playing the card (§34), and the candidate Gears all exist on the board
+*before* the effect resolves — nothing about them is only knowable
+mid-resolution the way, say, `all-is-lost`'s freshly-trashed cards are (§48).
+Leaving "which Gear" to the rng was simply wrong for these two, not a
+justified simplification.
+
+- `TargetSpec` gains `friendlyGear` (every Gear attached to the controller's
+  own field Units or face-up Legends) and `anyGear` (the same, plus the
+  rival's, controller's own listed first — §39's bare-scope convention,
+  since `heywood-ripperdoc` prints bare "a Gear");
+- `gilded-mato-n`'s scripted node now declares `targets: ['friendlyGear']`,
+  and its script reads `ctx.targets[0]` instead of `pick`ing from
+  `friendlyGearUids`. Which rival Unit to defeat afterward is **still**
+  picked through the rng: the review flagged only the Gear choice, and
+  exposing "a rival Unit with cost 3 or less" as a second real decision
+  would need a scripted target slot with `TargetFilter` support, which
+  `{ kind: 'scripted', targets?: TargetSpec[] }` does not have today (no
+  card needs a *filtered* scripted target yet, so this is left for whichever
+  batch first does);
+- `heywood-ripperdoc`'s scripted node now declares `targets: ['anyGear']`,
+  spanning both sides, and its script reads `ctx.targets[0]`;
+- `dum-dum-maelstrom-triggerman` is the one card of the three that
+  **cannot** get this fix: its Gear-defeat clause fires on `{Call}`, and
+  `onCall` fundamentally carries no target-bearing action — *which* Legend
+  flips is itself decided by the rng inside `callLegend` (docs/rulings.md
+  §23), so there is no action the player takes *before* the flip that could
+  carry a pre-committed Gear choice for *this* Legend specifically. This is
+  not a new gap: §45 already established that a `chooseOne` reached from
+  `{Call}` picks its mode off the rng for exactly this reason, and batch 1's
+  `dexter-deshawn-off-the-grid` already ships that way. `dum-dum` keeps its
+  rng-based Gear pick, now documented as consistent with §45 rather than as
+  an oversight matching the other two.
+
+Both `friendlyGear`/`anyGear`-driven choices are covered by real-card tests
+asserting `legalActions` actually enumerates one entry per candidate Gear
+(both the controller's own and, for `heywood-ripperdoc`, the rival's), not
+just that the effect works once a Gear is picked.
 
 ## 74 — `adam-smasher-metal-over-meat`: a scripted mass defeat
 
@@ -2123,28 +2188,103 @@ every other batch-3 card's text did — this is an engine gap in the same
 family as §52's floating effects, and should be scoped and built once
 rather than half-solved for one card.
 
-## 79 — `cyberpsychosis`: the buff is encoded, the delayed self-destruct is deferred
+## 79 — `cyberpsychosis`: fully deferred — a gameplay-affecting partial encoding is forbidden
 
 "{Quick} Give an equipped Unit +3 power this turn for each of its equipped
 Gears. If that Unit steals or fights, defeat it at the end of this turn."
 The first sentence is an ordinary `buffPower` with the `perEquippedGear`
-`DynamicAmount` (§59), targeting `anyUnit` filtered by the new `equipped`
-`TargetFilter` (§68 ff. — bare "an equipped Unit" reaches either side, per
-§39's/§64's bare convention). The second sentence is a **delayed,
-conditional, one-shot effect**: it must remember, for the rest of the
-current turn, that *this specific card instance* is now rigged to blow up
-if it steals or fights *at any point before end of turn*, then act on that
-memory at a turn boundary. Nothing in `GameState` tracks per-card "something
-will happen to you later, conditionally" — this is exactly the
+`DynamicAmount` (§59), targeting an equipped Unit. The second sentence is a
+**delayed, conditional, one-shot effect**: it must remember, for the rest of
+the current turn, that *this specific card instance* is now rigged to blow
+up if it steals or fights *at any point before end of turn*, then act on
+that memory at a turn boundary. Nothing in `GameState` tracks per-card
+"something will happen to you later, conditionally" — this is exactly the
 `floatingEffects` gap §52 already scoped and declined to half-solve for
 `chrome-fang`/`appetite-for-destruction`.
 
-**Ruling (scope):** the `buffPower` clause is encoded on its own
-`EffectDef`; the delayed self-destruct clause is left off entirely (this
-card's `effects` therefore under-delivers its printed text by that one
-clause, not by leaving `effects: []` for the whole card — the same partial
-encoding §60 already accepted for `meredith-stout-stone-cold-corpo`'s "or
-swaps" gap). Building `floatingEffects` once would also let this card's
-clause, `chrome-fang`, `appetite-for-destruction` and §43's
-`gunpoint-diplomacy` over-approximation all be finished together, per §52's
-own recommendation.
+**Original ruling (superseded below):** encode the `buffPower` clause on its
+own `EffectDef` and leave the delayed self-destruct clause off, reasoning
+that this was the same kind of partial encoding §60 already accepted for
+`meredith-stout-stone-cold-corpo`'s "or swaps" gap.
+
+**Fix round 1 (batch 3 review) — overturned, now standing policy for every
+batch.** That reasoning does not hold here, and the distinction from
+Meredith Stout matters: her missing "or swaps" half is a coverage gap in
+*what triggers* an already-symmetric, purely upside ability (a rival
+adjusting your Gig might also let you swap one, and today it can't — the
+ability is never worse than printed, only sometimes silent when it could
+have fired). `cyberpsychosis`'s printed design, by contrast, is a
+**trade-off**: the +3-power-per-Gear buff is deliberately paired with "this
+Unit dies at end of turn if it does anything with that power." Shipping
+only the buff half makes the card a strictly-better, no-downside version of
+its printed self — not a silent narrowing of *when* it helps, but an
+actual rules change in the card's favour, with nothing in the data or the
+UI marking that anything is missing.
+
+**Ruling:** a card is either encoded faithfully **in full**, or **fully
+deferred** (`effects: []`, reported, and given its own ruling) — never
+partially encoded when the missing clause changes how the *encoded* clause
+should be weighed by a player or an AI. This generalizes past this one card:
+`cyberpsychosis` moves to `effects: []` in full, joins the `floatingEffects`
+deferral list alongside `chrome-fang`/`appetite-for-destruction` (§52
+updated to name it), and its test in `tests/cards/yellow.test.ts` becomes a
+bookkeeping assertion (`effects` is empty) rather than a real-card test of
+half a card. §60's `meredith-stout-stone-cold-corpo` precedent is **not**
+overturned — a partial encoding is still acceptable when the missing half
+is a separate, independently-triggered clause whose absence can only make
+the card *less* good than printed, never more (§72 re-confirms this for
+`alt-cunningham-mother-of-daemons`'s two independent clauses this same
+review round). The dividing line is not "how much of the card is encoded"
+but "does the gap change how the encoded part should be played around."
+
+Building `floatingEffects` once would let this card's clause,
+`chrome-fang`, `appetite-for-destruction` and §43's `gunpoint-diplomacy`
+over-approximation all be finished together, per §52's own recommendation.
+
+# Task 8 fix-round-1 rulings (batch 3 review)
+
+The batch-3 review found two Important issues, both fixed above in place
+(§52, §72, §73, §79) rather than appended as untouched-original-plus-patch —
+this section is the single pointer to what changed and why, matching how
+§67 documented the batch-2 review's fix.
+
+## 80 — Summary: no gameplay-affecting partial encodings; "which Gear" is a real decision, not rng, when the action can carry one
+
+1. **`cyberpsychosis` reverted from a partial to a full deferral (§79).**
+   Batch 3 originally shipped only the card's power-buff clause and left the
+   "if that Unit steals or fights, defeat it at end of turn" downside
+   unencoded, reasoning by analogy to `meredith-stout-stone-cold-corpo`'s
+   accepted "or swaps" gap (§60). The review rejected the analogy: Meredith's
+   gap can only make her ability fire *less* than printed; cyberpsychosis's
+   gap makes the card strictly *better* than printed (all upside, no
+   downside), invisibly. **New standing policy, not scoped to this card:** a
+   card is either encoded faithfully in full, or fully deferred
+   (`effects: []`) — never partially encoded when the missing clause changes
+   how the encoded clause should be weighed. `cyberpsychosis` now joins
+   `chrome-fang`/`appetite-for-destruction` on the `floatingEffects`
+   deferral list (§52). `alt-cunningham-mother-of-daemons`'s partial
+   encoding (§72) was re-checked against this policy and found to be the
+   safe, Meredith-shaped kind (its unencoded clause can only ever make the
+   card weaker, never stronger, than printed) — it stays partially encoded.
+2. **`heywood-ripperdoc` and `gilded-mato-n`'s "which Gear" became a real,
+   enumerated target instead of an rng pick (§73).** Both fire from
+   `onPlay`, whose action already carries a real `targets` array, and every
+   candidate Gear exists on the board before the effect resolves — there
+   was no technical reason for the original version to fall back to the rng
+   here, unlike a genuine "the candidates only exist mid-resolution" case
+   (`all-is-lost`, §48). `TargetSpec` gains `friendlyGear`/`anyGear` for
+   this. `dum-dum-maelstrom-triggerman`'s Gear choice is the one of the
+   three that stays rng-based, on a real distinction rather than
+   inconsistency: it fires from `{Call}`, whose action cannot carry a
+   pre-committed target because *which Legend flips* is itself decided by
+   the rng inside the same action (§23) — there is no seam to attach a
+   choice to before the outcome the choice would apply to is even known.
+   This mirrors §45's already-accepted rule that a `{Call}`-triggered
+   `chooseOne` picks its mode off the rng for the identical reason.
+
+Both fixes are covered by updated tests in `tests/cards/yellow.test.ts`
+(`cyberpsychosis` moved to the deferred-cards bookkeeping block;
+`heywood-ripperdoc`/`gilded-mato-n` gained `legalActions`-enumeration
+assertions plus both a pick-own and a pick-rival case for
+`heywood-ripperdoc`) and by the full pre-existing suite staying green
+throughout (`npm test`, `npx tsc --noEmit`, `npm run build`).

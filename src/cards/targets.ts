@@ -103,6 +103,22 @@ export function targetsFor(
       return [...state.players[me].hand, ...state.players[me].trash].filter(
         (uid) => db[state.cards[uid].defId]?.type === 'unit'
       )
+    // Batch 3 fix round 1 (docs/rulings.md §73/§80): "a friendly Gear" / bare
+    // "a Gear" — every Gear card attached to a field Unit or face-up Legend,
+    // as a real, enumerable target rather than an internal rng pick.
+    case 'friendlyGear':
+      return [...fieldOf(state, me), ...faceUpLegendsOf(state, me)].flatMap(
+        (uid) => state.cards[uid].attachedGear
+      )
+    case 'anyGear':
+      return [
+        ...[...fieldOf(state, me), ...faceUpLegendsOf(state, me)].flatMap(
+          (uid) => state.cards[uid].attachedGear
+        ),
+        ...[...fieldOf(state, rival), ...faceUpLegendsOf(state, rival)].flatMap(
+          (uid) => state.cards[uid].attachedGear
+        ),
+      ]
   }
 }
 
@@ -203,9 +219,6 @@ export function filterTargets(
       return false
     }
     if (filter.maxCost !== undefined && db[state.cards[uid].defId].cost > filter.maxCost) {
-      return false
-    }
-    if (filter.equipped === true && state.cards[uid].attachedGear.length === 0) {
       return false
     }
     const maxPower =

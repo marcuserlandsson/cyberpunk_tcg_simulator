@@ -89,6 +89,13 @@ export type TargetSpec =
   | 'friendlyTrashCard'
   | 'friendlyHandCard'
   | 'friendlyHandOrTrashUnit'
+  // Batch 3 fix round 1 (docs/rulings.md §73/§80): "a friendly Gear" / bare
+  // "a Gear" — every Gear card attached anywhere on the controller's side
+  // (`friendlyGear`), or on either side, controller's first (`anyGear`,
+  // §39's bare convention). A real, enumerable decision — "which Gear" is
+  // never left to the rng when the firing action can carry a target.
+  | 'friendlyGear'
+  | 'anyGear'
 
 /** The three Gig-die scopes a card's text can name (docs/rulings.md §39). */
 export type GigDieSpec = 'friendlyGigDie' | 'rivalGigDie' | 'anyGigDie'
@@ -117,8 +124,6 @@ export interface TargetFilter {
   maxPowerIfAheadOnStreetCred?: number
   /** "power equal to or less than the value of a friendly d20" (over-the-edge). */
   maxPowerVsFriendlyD20?: boolean
-  /** "an EQUIPPED Unit" — has at least one attached Gear (cyberpsychosis, docs/rulings.md §68 ff.). */
-  equipped?: boolean
 }
 
 /**

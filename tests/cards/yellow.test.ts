@@ -8,16 +8,16 @@
 // Cards covered, in card-id order:
 //   adam-smasher-metal-over-meat, adrenaline-converter, afterparty-at-lizzie-s,
 //   alt-cunningham-mother-of-daemons, augmented-negotiators,
-//   bootleg-black-sapphire-show, caliber-totentanz-s-top-dog, cyberpsychosis,
+//   bootleg-black-sapphire-show, caliber-totentanz-s-top-dog,
 //   dexter-deshawn-one-last-chance, dum-dum-maelstrom-triggerman,
 //   gilded-mato-n, gorilla-arms, hanako-arasaka-in-a-gilded-cage,
 //   heywood-ripperdoc, jackie-welles-ride-or-die-choom, kiroshi-optics,
 //   live-with-the-aftermath, maelstrom-goons.
-// Deferred (see the batch report): kerry-eurodyne-axe-attitude-audience.
+// Deferred (see the batch report): cyberpsychosis, kerry-eurodyne-axe-attitude-audience.
 
 import { describe, expect, it } from 'vitest'
-import { effectivePower } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
+import type { GameState } from '../../src/engine/types'
 import {
   actionsOfType,
   activate,
@@ -36,6 +36,20 @@ import {
   setGigs,
   startAttack,
 } from './fixtures'
+
+/**
+ * [surgery] Attaches a freshly-minted Gear card directly to `hostUid`,
+ * bypassing the normal equip flow — used to give a UNIT'S OWNER's own
+ * side (or the rival's) a specific Gear to target, without spending a turn
+ * on the ordinary play-and-equip sequence.
+ */
+function attachGear(state: GameState, hostUid: number, gearDefId: string): number {
+  const owner = state.cards[hostUid].owner
+  const gearUid = mintInto(state, owner, 'trash', gearDefId)
+  state.cards[hostUid].attachedGear.push(gearUid)
+  state.players[owner].trash = state.players[owner].trash.filter((uid) => uid !== gearUid)
+  return gearUid
+}
 
 // ---------------------------------------------------------------------------
 // adam-smasher-metal-over-meat — "{Play} Defeat all other Units."
@@ -221,33 +235,6 @@ describe('caliber-totentanz-s-top-dog', () => {
 })
 
 // ---------------------------------------------------------------------------
-// cyberpsychosis — "{Quick} Give an equipped Unit +3 power this turn for
-// each of its equipped Gears. ..."
-// ---------------------------------------------------------------------------
-
-describe('cyberpsychosis', () => {
-  it('buffs an equipped Unit by 3 power per its equipped Gear', () => {
-    const { state } = fixtureWithHand(0, ['mantis-blades', 'satori-sword-of-saburo', 'cyberpsychosis'])
-    const host = fieldCard(state, 0, 'japantown-jonin') // power 0
-    let next = playCardByDef(db, state, 0, 'mantis-blades', { targetDef: 'japantown-jonin' })
-    next = playCardByDef(db, next, 0, 'satori-sword-of-saburo', { targetDef: 'japantown-jonin' })
-    expect(effectivePower(db, next, host)).toBe(4) // 0 + 2 + 2, the two Gears' printed power
-
-    next = playCardByDef(db, next, 0, 'cyberpsychosis', { targetDef: 'japantown-jonin' })
-    expect(effectivePower(db, next, host)).toBe(4 + 6) // +3 per equipped Gear (2) this turn
-  })
-
-  it('offers no target when no Unit is equipped', () => {
-    const { state } = fixtureWithHand(0, ['cyberpsychosis'])
-    fieldCard(state, 0, 'japantown-jonin') // unequipped
-    const card = findInHand(state, 0, 'cyberpsychosis')
-    const plays = actionsOfType(db, state, 'playCard').filter((a) => a.card === card)
-    expect(plays.length).toBeGreaterThan(0)
-    expect(plays[0].targets).toEqual([])
-  })
-})
-
-// ---------------------------------------------------------------------------
 // dexter-deshawn-one-last-chance — "{Play} {Attack} Adjust a Gig by up to 1.
 // {Defeated} If your ☆ differs from a Rival's by 10+, draw 2."
 // ---------------------------------------------------------------------------
@@ -345,13 +332,26 @@ describe('dum-dum-maelstrom-triggerman', () => {
 // ---------------------------------------------------------------------------
 
 describe('gilded-mato-n', () => {
-  it('defeats a friendly Gear and a cheap rival Unit together', () => {
+  it('offers each friendly Gear as a real, enumerated choice', () => {
+    const { state } = fixtureWithHand(0, ['mantis-blades', 'satori-sword-of-saburo', 'gilded-mato-n'])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    let next = playCardByDef(db, state, 0, 'mantis-blades', { targetDef: 'japantown-jonin' })
+    next = playCardByDef(db, next, 0, 'satori-sword-of-saburo', { targetDef: 'japantown-jonin' })
+    const [gearA, gearB] = next.cards[host].attachedGear
+    const card = findInHand(next, 0, 'gilded-mato-n')
+    const offered = actionsOfType(db, next, 'playCard')
+      .filter((a) => a.card === card)
+      .map((a) => a.targets[0])
+    expect(offered).toEqual(expect.arrayContaining([gearA, gearB]))
+  })
+
+  it('defeats the chosen friendly Gear and a cheap rival Unit together', () => {
     const { state } = fixtureWithHand(0, ['mantis-blades', 'gilded-mato-n'])
     const host = fieldCard(state, 0, 'japantown-jonin')
     let next = playCardByDef(db, state, 0, 'mantis-blades', { targetDef: 'japantown-jonin' })
     const gear = next.cards[host].attachedGear[0]
     const cheap = fieldCard(next, 1, 'japantown-jonin') // cost 2
-    next = playCardByDef(db, next, 0, 'gilded-mato-n')
+    next = playCardByDef(db, next, 0, 'gilded-mato-n', { targets: [gear] })
     expect(next.players[0].trash).toContain(gear)
     expect(next.players[1].trash).toContain(cheap)
   })
@@ -422,28 +422,47 @@ describe('hanako-arasaka-in-a-gilded-cage', () => {
 // ---------------------------------------------------------------------------
 
 describe('heywood-ripperdoc', () => {
-  it('defeats a Gear and draws 1 when its cost matches a friendly Gig value', () => {
+  it('offers every Gear on both sides as a real, enumerated choice', () => {
+    const { state } = fixtureWithHand(0, ['mantis-blades', 'heywood-ripperdoc'])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    let next = playCardByDef(db, state, 0, 'mantis-blades', { targetDef: 'japantown-jonin' })
+    const ownGear = next.cards[host].attachedGear[0]
+    const rivalHost = fieldCard(next, 1, 'japantown-jonin')
+    const rivalGear = attachGear(next, rivalHost, 'satori-sword-of-saburo')
+
+    const card = findInHand(next, 0, 'heywood-ripperdoc')
+    const offered = actionsOfType(db, next, 'playCard')
+      .filter((a) => a.card === card)
+      .map((a) => a.targets[0])
+    expect(offered).toEqual(expect.arrayContaining([ownGear, rivalGear]))
+  })
+
+  it('can choose to defeat its own equipped Gear and draws when its cost matches a friendly Gig', () => {
     const { state } = fixtureWithHand(0, ['mantis-blades', 'heywood-ripperdoc'])
     const host = fieldCard(state, 0, 'japantown-jonin')
     let next = playCardByDef(db, state, 0, 'mantis-blades', { targetDef: 'japantown-jonin' })
     const gear = next.cards[host].attachedGear[0]
     setGigs(next, 0, [{ size: 6, value: 1 }]) // matches mantis-blades' cost 1
     const handBefore = next.players[0].hand.length
-    next = playCardByDef(db, next, 0, 'heywood-ripperdoc')
+    next = playCardByDef(db, next, 0, 'heywood-ripperdoc', { targets: [gear] })
     expect(next.players[0].trash).toContain(gear)
     expect(next.players[0].hand).toHaveLength(handBefore) // heywood left, 1 drawn: net 0
   })
 
-  it('defeats the only Gear without drawing when the cost does not match', () => {
+  it('can choose to defeat a rival Gear instead of its own, without drawing on a cost mismatch', () => {
     const { state } = fixtureWithHand(0, ['mantis-blades', 'heywood-ripperdoc'])
     const host = fieldCard(state, 0, 'japantown-jonin')
     let next = playCardByDef(db, state, 0, 'mantis-blades', { targetDef: 'japantown-jonin' })
-    const gear = next.cards[host].attachedGear[0]
-    setGigs(next, 0, [{ size: 6, value: 4 }])
+    const ownGear = next.cards[host].attachedGear[0]
+    const rivalHost = fieldCard(next, 1, 'japantown-jonin')
+    const rivalGear = attachGear(next, rivalHost, 'satori-sword-of-saburo') // cost 2
+    setGigs(next, 0, [{ size: 6, value: 4 }]) // does not match the rival Gear's cost
     const handBefore = next.players[0].hand.length
-    next = playCardByDef(db, next, 0, 'heywood-ripperdoc')
-    expect(next.players[0].trash).toContain(gear)
-    expect(next.players[0].hand).toHaveLength(handBefore - 1)
+
+    next = playCardByDef(db, next, 0, 'heywood-ripperdoc', { targets: [rivalGear] })
+    expect(next.players[1].trash).toContain(rivalGear)
+    expect(next.cards[host].attachedGear).toEqual([ownGear]) // the own Gear is untouched
+    expect(next.players[0].hand).toHaveLength(handBefore - 1) // heywood left, no draw
   })
 })
 
@@ -572,10 +591,24 @@ describe('maelstrom-goons', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Batch bookkeeping: the one card this batch could not encode.
+// Batch bookkeeping: the cards this batch could not encode.
 // ---------------------------------------------------------------------------
 
 describe('deferred cards (see the batch-3 report)', () => {
+  it('cyberpsychosis still carries no effects', () => {
+    // "{Quick} Give an equipped Unit +3 power this turn for each of its
+    // equipped Gears. If that Unit steals or fights, defeat it at the end of
+    // this turn." A gameplay-affecting partial encoding (the buff alone,
+    // without the delayed self-destruct) would make the card strictly
+    // better than printed with no visible marking — forbidden by standing
+    // policy (docs/rulings.md §79). The delayed, conditional, one-shot
+    // defeat needs the same `floatingEffects` engine feature §52 already
+    // scoped and declined to half-build for chrome-fang/
+    // appetite-for-destruction, so the whole card is deferred, not just its
+    // second clause.
+    expect(db['cyberpsychosis'].effects).toEqual([])
+  })
+
   it('kerry-eurodyne-axe-attitude-audience still carries no effects', () => {
     // Both clauses hook into the gig-die *roll* itself (the fixer's
     // start-of-turn roll and any future reroll), which no existing trigger

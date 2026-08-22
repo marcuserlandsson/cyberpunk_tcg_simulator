@@ -40,6 +40,8 @@ const targetSpecSchema = z.enum([
   'friendlyTrashCard',
   'friendlyHandCard',
   'friendlyHandOrTrashUnit',
+  'friendlyGear',
+  'anyGear',
 ])
 
 const gigDieSpecSchema = z.enum(['friendlyGigDie', 'rivalGigDie', 'anyGigDie'])
@@ -56,7 +58,6 @@ const targetFilterSchema = z.strictObject({
   maxCost: z.number().optional(),
   maxPowerIfAheadOnStreetCred: z.number().optional(),
   maxPowerVsFriendlyD20: z.boolean().optional(),
-  equipped: z.boolean().optional(),
 })
 
 const costReductionSchema = z.strictObject({

@@ -250,12 +250,21 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * halves are scripted together. "You may" is taken whenever a friendly
    * Gear exists (docs/rulings.md §50, extended here to an uncosted "you may
    * [defeat your own card]" exactly as every other cost-free "you may" in
-   * the pool is auto-taken); which Gear and which rival Unit are picked
-   * through the rng, like any other script-internal choice the action space
-   * cannot enumerate (docs/rulings.md §48).
+   * the pool is auto-taken). **Fix round 1 (docs/rulings.md §73/§80):**
+   * *which* Gear is a real, enumerated decision — `onPlay` carries a real
+   * `targets` array, so this is declared as the scripted node's own
+   * `friendlyGear` target slot rather than an rng pick. Which rival Unit to
+   * defeat is still picked through the rng: the review that requested this
+   * fix only flagged the Gear choice, and — unlike the Gear, which is always
+   * a specific, known card the player is choosing to give up — "a rival
+   * Unit with cost 3 or less" has no `TargetFilter` support inside a
+   * scripted node's declared targets today, so exposing it as a second real
+   * decision would need that extension too; left as the existing
+   * script-internal rng choice (docs/rulings.md §48) pending a real card
+   * that needs a filtered scripted target.
    */
   'gilded-mato-n': (db, state, ctx) => {
-    const gear = pick(state, friendlyGearUids(state, ctx.player))
+    const gear = ctx.targets[0]
     if (gear === undefined) return state
     defeatGear(state, db, gear)
     const rival = opponentOf(ctx.player)
@@ -270,10 +279,22 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   /**
    * `dum-dum-maelstrom-triggerman` — "{Call} You may defeat a friendly Gear.
    * If you do, draw 2. Otherwise, draw 1." {Call} carries no player decision
-   * at all (the flip that triggers it is random, docs/rulings.md §32), so the
-   * "may" is auto-taken whenever a friendly Gear exists (docs/rulings.md
-   * §50), with the Gear itself picked through the rng; the doubled draw
-   * follows automatically from whether that pick found anything.
+   * at all — the flip that triggers it is random and the `callLegend` action
+   * has no `targets` field for the same reason (docs/rulings.md §32), a rule
+   * batch 1 already leaned on for an on-{Call} `chooseOne` (§45:
+   * "a chooseOne reached from a trigger that carries no player choice
+   * ({Call}) picks its mode off the rng"). **This is unlike
+   * `gilded-mato-n`/`heywood-ripperdoc` below (docs/rulings.md §73/§80
+   * fix round 1):** those fire from `onPlay`, which already carries a real
+   * `targets` array the player commits to when playing the card, so their
+   * Gear choice could become a declared target; `onCall`'s target (which
+   * face-down Legend flips) is only known *after* the action resolves, so
+   * there is no action-carrying seam to attach a pre-commitment to without a
+   * new decision phase (the same class of gap §78 defers
+   * `kerry-eurodyne-axe-attitude-audience` for). "You may" is still taken
+   * whenever a friendly Gear exists (docs/rulings.md §50), with the Gear
+   * itself picked through the rng; the doubled draw follows automatically
+   * from whether that pick found anything.
    */
   'dum-dum-maelstrom-triggerman': (db, state, ctx) => {
     const gear = pick(state, friendlyGearUids(state, ctx.player))
@@ -287,13 +308,16 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   /**
    * `heywood-ripperdoc` — "{Play} You may defeat a Gear. If its cost equals
    * the value of a friendly Gig, draw 1." Bare "a Gear" reaches either side
-   * (docs/rulings.md §39's bare convention), and "its cost" names a property
-   * of the specific Gear that was defeated, which only the script can carry
-   * forward (docs/rulings.md §48).
+   * (docs/rulings.md §39's bare convention — the `anyGear` `TargetSpec`
+   * enumerates the controller's own Gear first, then the rival's), and "its
+   * cost" names a property of the specific Gear that was defeated, read off
+   * the chosen uid before it is trashed. **Fix round 1 (docs/rulings.md
+   * §73/§80):** which Gear is now the scripted node's own declared
+   * `anyGear` target — a real, enumerated decision (spanning both sides) —
+   * rather than an rng pick.
    */
   'heywood-ripperdoc': (db, state, ctx) => {
-    const gearUids = [0, 1].flatMap((player) => friendlyGearUids(state, player as PlayerId))
-    const gear = pick(state, gearUids)
+    const gear = ctx.targets[0]
     if (gear === undefined) return state
     const cost = db[state.cards[gear].defId].cost
     defeatGear(state, db, gear)
