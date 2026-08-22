@@ -36,14 +36,20 @@ function faceUpLegendsOf(state: GameState, player: PlayerId): number[] {
  * A {go-solo} Legend played as a Unit sits on the field, so it is a "Unit" for
  * every spec below — which is exactly how the printed keyword reads ("play it
  * as a ready Unit").
+ *
+ * `controller` overrides whose side counts as "friendly". It defaults to the
+ * source card's owner, but an ability or trigger on attached Gear belongs to the
+ * *host's* controller, not the Gear's owner (docs/rulings.md §33) — callers pass
+ * `effectController` for that.
  */
 export function targetsFor(
   _db: CardDb,
   state: GameState,
   spec: TargetSpec,
-  sourceUid: number
+  sourceUid: number,
+  controller?: PlayerId
 ): number[] {
-  const me = controllerOf(state, sourceUid)
+  const me = controller ?? controllerOf(state, sourceUid)
   const rival = opponentOf(me)
 
   switch (spec) {

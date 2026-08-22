@@ -139,7 +139,17 @@ export interface GameState {
   firstPlayer: PlayerId
   phase: Phase
   pendingAttack: { attacker: number; target: number | 'gigArea'; redirectedTo?: number } | null
-  pendingSteal: { attacker: number; remaining: number } | null
+  // An unresolved Gig steal: the thief picks one die at a time (`chooseGig`).
+  // `thief`/`resumePhase` are set only by *effect*-driven steals (a `stealGig`
+  // EffectNode, docs/rulings.md §32); an attack-driven steal leaves them
+  // undefined, which means "the active player, and closing the attack when the
+  // last die is taken".
+  pendingSteal: {
+    attacker: number
+    remaining: number
+    thief?: PlayerId
+    resumePhase?: Phase
+  } | null
   winner: PlayerId | null
   rng: RngState
   events: GameEvent[]

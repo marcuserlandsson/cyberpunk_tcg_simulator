@@ -42,6 +42,7 @@ import type {
   EffectNode,
   GameState,
   PlayerId,
+  PlayerState,
   TargetSpec,
   Trigger,
 } from '../engine/types'
@@ -98,11 +99,12 @@ function fillableSlots(
   db: CardDb,
   state: GameState,
   sourceUid: number,
-  def: EffectDef
+  def: EffectDef,
+  controller: PlayerId
 ): { spec: TargetSpec; candidates: number[] }[] {
   return targetSpecs(def.effect).map((spec) => ({
     spec,
-    candidates: targetsFor(db, state, spec, sourceUid),
+    candidates: targetsFor(db, state, spec, sourceUid, controller),
   }))
 }
 
@@ -120,7 +122,7 @@ export function effectTargetChoices(
   def: EffectDef
 ): number[][] {
   let tuples: number[][] = [[]]
-  for (const slot of fillableSlots(db, state, uid, def)) {
+  for (const slot of fillableSlots(db, state, uid, def, effectController(state, uid))) {
     if (slot.candidates.length === 0) continue
     const next: number[][] = []
     for (const tuple of tuples) {
@@ -141,7 +143,9 @@ export function hasUnfillableSlot(
   uid: number,
   def: EffectDef
 ): boolean {
-  return fillableSlots(db, state, uid, def).some((slot) => slot.candidates.length === 0)
+  return fillableSlots(db, state, uid, def, effectController(state, uid)).some(
+    (slot) => slot.candidates.length === 0
+  )
 }
 
 /** The target tuples for every EffectDef of `uid` that fires on `trigger`. */
@@ -197,11 +201,12 @@ function bindSlots(
   draft: GameState,
   def: EffectDef,
   sourceUid: number,
-  supplied: number[]
+  supplied: number[],
+  controller: PlayerId
 ): Slots {
   const assigned: (number | null)[] = []
   let supply = 0
-  for (const slot of fillableSlots(db, draft, sourceUid, def)) {
+  for (const slot of fillableSlots(db, draft, sourceUid, def, controller)) {
     if (slot.candidates.length === 0) {
       assigned.push(null)
       continue
@@ -220,8 +225,16 @@ function bindSlots(
 }
 
 /** How many supplied targets one def consumes (used to split a shared array). */
-function slotDemand(db: CardDb, state: GameState, sourceUid: number, def: EffectDef): number {
-  return fillableSlots(db, state, sourceUid, def).filter((slot) => slot.candidates.length > 0).length
+function slotDemand(
+  db: CardDb,
+  state: GameState,
+  sourceUid: number,
+  def: EffectDef,
+  controller: PlayerId
+): number {
+  return fillableSlots(db, state, sourceUid, def, controller).filter(
+    (slot) => slot.candidates.length > 0
+  ).length
 }
 
 function note(draft: GameState, sourceUid: number, description: string): void {
@@ -331,15 +344,28 @@ function applyNode(
     }
 
     case 'stealGig': {
+      // Which dice are stolen is a real decision — it moves street cred and the
+      // win condition — so an effect steal routes through the same
+      // pendingSteal/chooseGig machinery as an attack steal, with this effect's
+      // controller as the thief (docs/rulings.md §32).
       const victim = opponentOf(ctx.player)
-      for (let i = 0; i < node.count; i++) {
-        const from = draft.players[victim].gigArea
-        if (from.length === 0) break
-        const [die] = from.splice(randomIndex(draft, from.length), 1)
-        draft.players[ctx.player].gigArea.push(die)
-        draft.events.push({ type: 'gigStolen', from: victim, die: { ...die } })
+      const available = draft.players[victim].gigArea.length
+      const count = Math.min(node.count, available)
+      if (count <= 0) return
+      const pending = draft.pendingSteal
+      if (pending !== null && pending.thief === ctx.player) {
+        // A second steal in the same effect just adds to the pending choice.
+        pending.remaining += count
+      } else {
+        draft.pendingSteal = {
+          attacker: ctx.sourceUid,
+          remaining: count,
+          thief: ctx.player,
+          resumePhase: draft.phase === 'chooseGig' ? 'main' : draft.phase,
+        }
+        draft.phase = 'chooseGig'
       }
-      note(draft, ctx.sourceUid, `steal ${node.count} gig(s)`)
+      note(draft, ctx.sourceUid, `steal ${count} gig(s)`)
       return
     }
 
@@ -423,28 +449,80 @@ function applyNode(
   }
 }
 
-/** Applies one EffectDef (condition + target binding + nodes) to a draft. */
+/**
+ * Applies one EffectDef (condition + target binding + nodes) to a draft.
+ * `controller` overrides who the effect acts *for*; it defaults to
+ * `effectController` (the source's owner, or the host's controller for an
+ * effect printed on attached Gear — docs/rulings.md §33).
+ */
 export function applyEffectDefOnDraft(
   db: CardDb,
   draft: GameState,
   def: EffectDef,
   sourceUid: number,
-  targets: number[]
+  targets: number[],
+  controller?: PlayerId
 ): void {
   const card = draft.cards[sourceUid]
   if (!card) return
   if (draft.winner !== null) return
-  if (!conditionMet(draft, card.owner, def)) return
-  const ctx: EffectCtx = { player: card.owner, sourceUid, targets }
-  const slots = bindSlots(db, draft, def, sourceUid, targets)
+  const player = controller ?? effectController(draft, sourceUid)
+  if (!conditionMet(draft, player, def)) return
+  const ctx: EffectCtx = { player, sourceUid, targets }
+  const slots = bindSlots(db, draft, def, sourceUid, targets, player)
   applyNode(db, draft, def.effect, ctx, slots)
 }
 
 /**
- * Fires every EffectDef of `sourceUid` matching `trigger`, in printed order, on
- * a draft the caller owns. `targets` is one flat array shared by all of them,
- * consumed left to right (each def taking as many entries as it has fillable
- * slots) — the same order `triggerTargetChoices` enumerates.
+ * Fires every EffectDef *printed on `sourceUid` itself* matching `trigger`, in
+ * printed order. `targets` is one flat array shared by all of them, consumed
+ * left to right (each def taking as many entries as it has fillable slots) —
+ * the same order `triggerTargetChoices` enumerates.
+ */
+export function fireCardTrigger(
+  db: CardDb,
+  draft: GameState,
+  trigger: Trigger,
+  sourceUid: number,
+  targets: number[],
+  controller?: PlayerId
+): void {
+  const def = defOf(db, draft, sourceUid)
+  if (!def) return
+  const player = controller ?? effectController(draft, sourceUid)
+  let offset = 0
+  for (const effect of def.effects) {
+    if (effect.trigger !== trigger) continue
+    const demand = slotDemand(db, draft, sourceUid, effect, player)
+    applyEffectDefOnDraft(
+      db,
+      draft,
+      effect,
+      sourceUid,
+      targets.slice(offset, offset + demand),
+      player
+    )
+    offset += demand
+  }
+}
+
+/**
+ * Triggers an attached Gear card propagates from the card wearing it: the ones
+ * that are *about the host acting* — "{Attack} ..." and "{Defeated} ..." on a
+ * Gear card describe what happens when the equipped Unit attacks or is defeated
+ * (docs/rulings.md §37). `onPlay`/`onCall` are deliberately excluded: a Gear
+ * card's own onPlay already fired when the Gear itself was played, and re-firing
+ * it because its host entered the field would double up.
+ */
+const GEAR_PROPAGATED_TRIGGERS: readonly Trigger[] = ['onAttack', 'onDefeat']
+
+/**
+ * Fires `trigger` for `sourceUid` *and* for its attached Gear (for the triggers
+ * Gear propagates). Gear effects resolve with the Gear as their source — so
+ * "this Unit" style targeting still reads off the Gear's own def — but for the
+ * *host's* controller. Only the host's own defs consume the supplied `targets`;
+ * Gear defs auto-target (docs/rulings.md §32), because `legalActions` enumerates
+ * the played/attacking card's own slots.
  */
 export function fireTriggerOnDraft(
   db: CardDb,
@@ -453,14 +531,14 @@ export function fireTriggerOnDraft(
   sourceUid: number,
   targets: number[]
 ): void {
-  const def = defOf(db, draft, sourceUid)
-  if (!def) return
-  let offset = 0
-  for (const effect of def.effects) {
-    if (effect.trigger !== trigger) continue
-    const demand = slotDemand(db, draft, sourceUid, effect)
-    applyEffectDefOnDraft(db, draft, effect, sourceUid, targets.slice(offset, offset + demand))
-    offset += demand
+  const card = draft.cards[sourceUid]
+  if (!card) return
+  const controller = effectController(draft, sourceUid)
+  fireCardTrigger(db, draft, trigger, sourceUid, targets, controller)
+
+  if (!GEAR_PROPAGATED_TRIGGERS.includes(trigger)) return
+  for (const gearUid of [...card.attachedGear]) {
+    fireCardTrigger(db, draft, trigger, gearUid, [], controller)
   }
 }
 
@@ -486,7 +564,7 @@ export function resolveEffect(
 ): GameState {
   const draft = draftState(state)
   const def: EffectDef = { trigger: 'activated', effect: node }
-  const slots = bindSlots(db, draft, def, ctx.sourceUid, ctx.targets)
+  const slots = bindSlots(db, draft, def, ctx.sourceUid, ctx.targets, ctx.player)
   applyNode(db, draft, node, ctx, slots)
   return draft
 }
@@ -509,6 +587,19 @@ function abilitySources(state: GameState, player: PlayerId): number[] {
     sources.push(...state.cards[uid].attachedGear)
   }
   return sources
+}
+
+/**
+ * Who an effect printed on `uid` acts for: the owner of the card wearing it if
+ * `uid` is attached Gear, otherwise `uid`'s own owner. Gear equipped to a rival
+ * Unit hands its abilities and triggers to that Unit's controller — they gate
+ * on, are paid by, and resolve for the host's side (docs/rulings.md §33).
+ */
+export function effectController(state: GameState, uid: number): PlayerId {
+  const host = abilityHost(state, uid)
+  const card = state.cards[host] ?? state.cards[uid]
+  if (!card) throw new Error(`Unknown card instance uid: ${uid}`)
+  return card.owner
 }
 
 /**
@@ -652,7 +743,11 @@ export function goSoloPayment(
 export function playCardTargetChoices(db: CardDb, state: GameState, uid: number): number[][] {
   const def = defOf(db, state, uid)
   if (!def) return []
-  const effectTuples = triggerTargetChoices(db, state, uid, 'onPlay')
+  // onPlay effects resolve *after* the card has entered its zone, so their
+  // targets must be enumerated against that same state — otherwise a Unit could
+  // never target itself, and a slot that only fills once the card is on the
+  // field would shift every later slot (docs/rulings.md §34).
+  const effectTuples = triggerTargetChoices(db, stateAfterEntry(db, state, uid), uid, 'onPlay')
   if (def.type !== 'gear') return effectTuples
 
   const tuples: number[][] = []
@@ -660,6 +755,30 @@ export function playCardTargetChoices(db: CardDb, state: GameState, uid: number)
     for (const extra of effectTuples) tuples.push([host, ...extra])
   }
   return tuples
+}
+
+/**
+ * The zones as they will be the moment `uid`'s onPlay effects resolve: out of
+ * hand (or the legends zone), and on the field for a Unit or a {go-solo}
+ * Legend. Only the zone arrays that target enumeration reads are rebuilt, so
+ * this stays cheap enough to call once per playable hand card in
+ * `legalActions`; card instances are shared, never mutated.
+ */
+function stateAfterEntry(db: CardDb, state: GameState, uid: number): GameState {
+  const card = state.cards[uid]
+  const def = db[card.defId]
+  const player = card.owner
+  const p = state.players[player]
+  const entersField = def.type === 'unit' || def.type === 'legend'
+  const moved: PlayerState = {
+    ...p,
+    hand: p.hand.filter((u) => u !== uid),
+    legends: p.legends.filter((u) => u !== uid),
+    field: entersField ? [...p.field, uid] : p.field,
+  }
+  const players: [PlayerState, PlayerState] =
+    player === 0 ? [moved, state.players[1]] : [state.players[0], moved]
+  return { ...state, players }
 }
 
 /**

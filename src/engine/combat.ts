@@ -27,7 +27,7 @@
 // The card layer (src/cards/effects.ts) is imported for those three; see the
 // import-cycle note at the top of that file.
 
-import { fireTriggerOnDraft, quickReactionActions } from '../cards/effects'
+import { fireCardTrigger, fireTriggerOnDraft, quickReactionActions } from '../cards/effects'
 import { legendCallPayment } from './economy'
 import { cantAttack, effectivePower, hasKeyword, opponentOf } from './query'
 import type { Action, CardDb, GameState, PlayerId } from './types'
@@ -140,8 +140,9 @@ export function reactActions(db: CardDb, state: GameState): Action[] {
  * decisions rather than one bulk transfer.
  */
 export function chooseGigActions(state: GameState): Action[] {
-  if (state.pendingSteal === null) return []
-  const victim = opponentOf(state.activePlayer)
+  const steal = state.pendingSteal
+  if (steal === null) return []
+  const victim = opponentOf(steal.thief ?? state.activePlayer)
   return state.players[victim].gigArea.map((_die, dieIndex) => ({ type: 'chooseGig', dieIndex }))
 }
 
@@ -156,9 +157,21 @@ function onField(state: GameState, uid: number): boolean {
   return state.players[card.owner].field.includes(uid)
 }
 
-/** Closes the attack: no pending attack or steal, back to the attacker's main phase. */
+/**
+ * Closes the attack: no pending attack or steal, back to the attacker's main
+ * phase — except that an *effect*-driven steal (docs/rulings.md §32) outlives
+ * the attack that spawned it. An on-defeat "steal a Gig" fired inside the fight
+ * still owes its controller a die choice, so the phase stays `chooseGig` and
+ * resumes into `main` once the dice are taken.
+ */
 function endAttack(draft: GameState): void {
   draft.pendingAttack = null
+  const steal = draft.pendingSteal
+  if (steal !== null && steal.thief !== undefined) {
+    steal.resumePhase = 'main'
+    draft.phase = 'chooseGig'
+    return
+  }
   draft.pendingSteal = null
   draft.phase = 'main'
 }
@@ -179,12 +192,26 @@ export function declareAttack(
   draft.cards[attacker].ready = false
   draft.events.push({ type: 'attackDeclared', attacker, target })
 
-  // [trigger seam] on-attack effects on the attacking Unit resolve here — after
-  // it is spent (guide step 01) and before the rival reacts, so a Unit this
-  // defeats never gets to block (guide: "before your Rival reacts").
+  // [trigger seam] on-attack effects on the attacking Unit (and its Gear)
+  // resolve here — after it is spent (guide step 01) and before the rival
+  // reacts, so a Unit this defeats never gets to block (guide: "before your
+  // Rival reacts").
   fireTriggerOnDraft(db, draft, 'onAttack', attacker, [])
 
+  // An on-attack effect can end the game (a forced draw off an empty deck, an
+  // overtime-winning steal). Never re-open a decision window over `gameOver`.
+  if (draft.winner !== null) return
+
   draft.pendingAttack = { attacker, target }
+
+  // An on-attack effect can also owe the attacker a Gig-die choice
+  // (docs/rulings.md §32). They take it first; the react window opens when the
+  // steal is done, which is what `pendingSteal.resumePhase` says.
+  if (draft.phase === 'chooseGig' && draft.pendingSteal !== null) {
+    draft.pendingSteal.resumePhase = 'react'
+    return
+  }
+
   draft.phase = 'react'
 }
 
@@ -242,12 +269,21 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
  * on-defeat effects.
  */
 export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
+  const controller = draft.cards[uid].owner
+  // `leaveField` detaches the Gear, so capture it first: a Gear card's
+  // "{Defeated} ..." text is about the Unit wearing it being defeated
+  // (docs/rulings.md §37), and it resolves for that Unit's controller.
+  const gear = [...draft.cards[uid].attachedGear]
+
   draft.events.push({ type: 'unitDefeated', uid })
   leaveField(draft, db, uid, 'trash')
 
   // [trigger seam] on-defeat effects resolve once the Unit and its Gear have
   // left the field (guide step 04).
-  fireTriggerOnDraft(db, draft, 'onDefeat', uid, [])
+  fireCardTrigger(db, draft, 'onDefeat', uid, [], controller)
+  for (const gearUid of gear) {
+    fireCardTrigger(db, draft, 'onDefeat', gearUid, [], controller)
+  }
 }
 
 /**
@@ -342,12 +378,24 @@ export function takeStolenGig(draft: GameState, dieIndex: number): void {
   // Unreachable: `legalActions` only offers `chooseGig` with a pending steal.
   if (steal === null) return
 
-  const thief = draft.activePlayer
+  // The thief is the attacking active player, except for an effect-driven steal,
+  // which names its own controller (docs/rulings.md §32).
+  const thief = steal.thief ?? draft.activePlayer
   const victim = opponentOf(thief)
   const [die] = draft.players[victim].gigArea.splice(dieIndex, 1)
   draft.players[thief].gigArea.push(die)
   draft.events.push({ type: 'gigStolen', from: victim, die: { ...die } })
 
   steal.remaining -= 1
-  if (steal.remaining <= 0 || draft.players[victim].gigArea.length === 0) endAttack(draft)
+  if (steal.remaining > 0 && draft.players[victim].gigArea.length > 0) return
+
+  if (steal.resumePhase === undefined) {
+    // An attack steal: the last die closes the attack.
+    endAttack(draft)
+    return
+  }
+  // An effect steal: hand control back to whatever was interrupted (the main
+  // phase, or a react window whose attack is still pending).
+  draft.pendingSteal = null
+  draft.phase = steal.resumePhase
 }

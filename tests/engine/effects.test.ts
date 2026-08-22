@@ -16,7 +16,7 @@ import { gearEquipTargets } from '../../src/cards/targets'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { createRng } from '../../src/engine/rng'
 import { legalActions } from '../../src/engine/legal'
-import { effectiveKeywords, effectivePower, streetCred } from '../../src/engine/query'
+import { actingPlayer, effectiveKeywords, effectivePower, streetCred } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
 import type {
   Action,
@@ -178,6 +178,10 @@ function playActions(db: CardDb, state: GameState): Extract<Action, { type: 'pla
   return legalActions(db, state).filter(
     (a): a is Extract<Action, { type: 'playCard' }> => a.type === 'playCard'
   )
+}
+
+function gigChoices(db: CardDb, state: GameState): number[] {
+  return legalActions(db, state).flatMap((a) => (a.type === 'chooseGig' ? [a.dieIndex] : []))
 }
 
 const pass: Reaction = { type: 'pass' }
@@ -459,7 +463,7 @@ describe('EffectNode: readyCard / spendCard', () => {
 })
 
 describe('EffectNode: gig manipulation', () => {
-  it('stealGig moves rival dice into the friendly gig area', () => {
+  it('stealGig hands the die choice to the effect controller (docs/rulings.md §32)', () => {
     const db = makeDb([
       def('thief', 'program', { effects: [onPlay({ kind: 'stealGig', count: 2 })] }),
     ])
@@ -467,10 +471,37 @@ describe('EffectNode: gig manipulation', () => {
     const src = mint(s, 0, 'trash', 'thief')
     gigs(s, 1, [3, 4, 5])
 
-    const next = fire(db, s, src)
-    expect(next.players[0].gigArea).toHaveLength(2)
-    expect(next.players[1].gigArea).toHaveLength(1)
+    let next = fire(db, s, src)
+    expect(next.phase).toBe('chooseGig')
+    expect(next.pendingSteal).toEqual({
+      attacker: src,
+      remaining: 2,
+      thief: 0,
+      resumePhase: 'main',
+    })
+    expect(actingPlayer(next)).toBe(0)
+    expect(next.players[0].gigArea).toEqual([]) // nothing moves until it is chosen
+
+    // The controller picks each die, exactly like an attack steal.
+    expect(gigChoices(db, next)).toEqual([0, 1, 2])
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 2 }) // the 5
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 }) // the 3
+    expect(next.phase).toBe('main')
+    expect(next.pendingSteal).toBeNull()
+    expect(next.players[0].gigArea.map((d) => d.value)).toEqual([5, 3])
+    expect(next.players[1].gigArea.map((d) => d.value)).toEqual([4])
     expect(next.events.filter((e) => e.type === 'gigStolen')).toHaveLength(2)
+  })
+
+  it('stealGig fizzles with no rival gig dice at all', () => {
+    const db = makeDb([
+      def('thief', 'program', { effects: [onPlay({ kind: 'stealGig', count: 1 })] }),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'thief')
+    const next = fire(db, s, src)
+    expect(next.phase).toBe('main')
+    expect(next.pendingSteal).toBeNull()
   })
 
   it('returnGig sends a friendly gig die back to the fixer, unrolled', () => {
@@ -736,6 +767,141 @@ describe('trigger: onPlay', () => {
   })
 })
 
+describe('onPlay targets are enumerated against the post-entry state', () => {
+  it('a unit can target itself with its own onPlay buff', () => {
+    const db = makeDb([
+      def('leader', 'unit', {
+        power: 1,
+        effects: [
+          onPlay({ kind: 'buffPower', amount: 2, target: 'friendlyUnit', duration: 'turn' }),
+        ],
+      }),
+    ])
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'leader')
+
+    // The friendly field is empty *before* the play; the unit itself is the
+    // only candidate once it enters, and must be offered.
+    const actions = playActions(db, s).filter((a) => a.card === card)
+    expect(actions.map((a) => a.targets)).toEqual([[card]])
+
+    const next = applyAction(db, s, actions[0])
+    expect(next.cards[card].tempPower).toBe(2)
+  })
+
+  it('honours the picked target when an earlier slot only fills after entry', () => {
+    const db = makeDb([
+      def('leader', 'unit', {
+        power: 1,
+        effects: [
+          onPlay({
+            kind: 'sequence',
+            effects: [
+              { kind: 'buffPower', amount: 2, target: 'friendlyUnit', duration: 'turn' },
+              { kind: 'defeat', target: 'rivalUnit' },
+            ],
+          }),
+        ],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'leader')
+    const a = mint(s, 1, 'field', 'grunt')
+    const b = mint(s, 1, 'field', 'grunt')
+
+    const actions = playActions(db, s).filter((x) => x.card === card)
+    expect(actions.map((x) => x.targets)).toEqual([
+      [card, a],
+      [card, b],
+    ])
+
+    const next = applyAction(db, s, actions[1])
+    expect(next.cards[card].tempPower).toBe(2)
+    expect(next.players[1].trash).toEqual([b]) // the *picked* rival, not a random one
+    expect(next.players[1].field).toEqual([a])
+  })
+})
+
+describe('attached gear triggers', () => {
+  it("a gear onAttack effect fires when its host attacks", () => {
+    const db = makeDb([
+      def('grunt', 'unit', { power: 2 }),
+      def('smartgun', 'gear', {
+        power: 0,
+        effects: [{ trigger: 'onAttack', effect: { kind: 'draw', count: 1 } }],
+      }),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'grunt')
+    mint(s, 1, 'field', 'grunt', { ready: false })
+    mint(s, 0, 'deck', 'grunt')
+
+    const bare = applyAction(db, s, { type: 'attack', attacker, target: s.players[1].field[0] })
+    expect(bare.players[0].hand).toEqual([])
+
+    const geared = structuredClone(s)
+    mintGear(geared, 0, 'smartgun', attacker)
+    const next = applyAction(db, geared, {
+      type: 'attack',
+      attacker,
+      target: geared.players[1].field[0],
+    })
+    expect(next.players[0].hand).toHaveLength(1)
+  })
+
+  it('a gear onDefeat effect fires when its host is defeated', () => {
+    const db = makeDb([
+      def('brute', 'unit', { power: 5 }),
+      def('grunt', 'unit', { power: 1 }),
+      def('blackbox', 'gear', {
+        power: 0,
+        effects: [{ trigger: 'onDefeat', effect: { kind: 'draw', count: 1 } }],
+      }),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'brute')
+    const victim = mint(s, 1, 'field', 'grunt', { ready: false })
+    const gear = mintGear(s, 1, 'blackbox', victim)
+    mint(s, 1, 'deck', 'grunt')
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.players[1].trash).toContain(gear)
+    expect(next.players[1].hand).toHaveLength(1) // the gear's controller drew
+  })
+
+  it("a gear activated ability belongs to the host's controller (docs/rulings.md §33)", () => {
+    const db = makeDb([
+      def('grunt', 'unit'),
+      def('spyware', 'gear', {
+        power: 0,
+        effects: [
+          { trigger: 'activated', cost: { selfSpend: true }, effect: { kind: 'draw', count: 1 } },
+        ],
+      }),
+    ])
+    const s = scenario()
+    const host = mint(s, 1, 'field', 'grunt') // player 1's unit ...
+    const gear = mintGear(s, 0, 'spyware', host) // ... wearing player 0's gear
+    mint(s, 0, 'deck', 'grunt')
+    mint(s, 1, 'deck', 'grunt')
+
+    // Player 0 owns the gear but does not control the host: no ability for them.
+    expect(abilityActions(db, s)).toEqual([])
+
+    const rivalTurn = structuredClone(s)
+    rivalTurn.activePlayer = 1
+    const actions = abilityActions(db, rivalTurn)
+    expect(actions).toEqual([{ type: 'activateAbility', card: gear, abilityIndex: 0, targets: [] }])
+
+    const next = applyAction(db, rivalTurn, actions[0])
+    expect(next.cards[host].ready).toBe(false) // the host paid
+    expect(next.players[1].hand).toHaveLength(1) // and the host's controller drew
+    expect(next.players[0].hand).toEqual([])
+  })
+})
+
 describe('trigger: onCall', () => {
   it('fires when a legend flips face-up via Call a Legend', () => {
     const db = makeDb([
@@ -783,6 +949,51 @@ describe('trigger: onAttack', () => {
   })
 })
 
+describe('trigger: onAttack — game-ending and steal effects', () => {
+  it('an onAttack effect that ends the game leaves no half-open attack', () => {
+    const db = makeDb([
+      def('doomed', 'unit', {
+        power: 3,
+        effects: [{ trigger: 'onAttack', effect: { kind: 'draw', count: 1 } }],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'doomed') // deck is empty: the draw kills
+    const victim = mint(s, 1, 'field', 'grunt', { ready: false })
+
+    const next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    expect(next.winner).toBe(1)
+    expect(next.phase).toBe('gameOver')
+    expect(next.pendingAttack).toBeNull()
+    expect(legalActions(db, next)).toEqual([])
+  })
+
+  it('an onAttack steal is chosen by the attacker before the rival reacts', () => {
+    const db = makeDb([
+      def('raider', 'unit', {
+        power: 3,
+        effects: [{ trigger: 'onAttack', effect: { kind: 'stealGig', count: 1 } }],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'raider')
+    const victim = mint(s, 1, 'field', 'grunt', { ready: false })
+    gigs(s, 1, [2, 6])
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    expect(next.phase).toBe('chooseGig')
+    expect(actingPlayer(next)).toBe(0)
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 1 }) // take the 6
+    // The steal resolved; only now does the react window open.
+    expect(next.phase).toBe('react')
+    expect(next.pendingAttack).toEqual({ attacker, target: victim })
+    expect(next.players[0].gigArea.map((d) => d.value)).toEqual([6])
+    expect(reactions(db, next).some((r) => r.type === 'pass')).toBe(true)
+  })
+})
+
 describe('trigger: onDefeat', () => {
   it('fires when the unit loses a fight', () => {
     const db = makeDb([
@@ -802,6 +1013,34 @@ describe('trigger: onDefeat', () => {
     next = applyAction(db, next, { type: 'react', reaction: pass })
     expect(next.players[1].trash).toContain(victim)
     expect(next.players[1].hand).toHaveLength(1) // the defeated unit's controller drew
+  })
+
+  it('an on-defeat steal survives the attack that caused it', () => {
+    const db = makeDb([
+      def('brute', 'unit', { power: 5 }),
+      def('martyr', 'unit', {
+        power: 1,
+        effects: [{ trigger: 'onDefeat', effect: { kind: 'stealGig', count: 1 } }],
+      }),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'brute')
+    const victim = mint(s, 1, 'field', 'martyr', { ready: false })
+    gigs(s, 0, [4])
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.players[1].trash).toContain(victim)
+    // The defeated unit's controller owes a die choice; the attack is over.
+    expect(next.phase).toBe('chooseGig')
+    expect(next.pendingAttack).toBeNull()
+    expect(actingPlayer(next)).toBe(1)
+
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
+    expect(next.players[1].gigArea).toHaveLength(1)
+    expect(next.players[0].gigArea).toEqual([])
+    expect(next.phase).toBe('main')
+    expect(next.activePlayer).toBe(0) // the attacker's turn carries on
   })
 
   it('fires when an effect defeats the unit', () => {
@@ -1151,6 +1390,41 @@ describe('quick', () => {
     expect(next.players[1].trash).toContain(victim)
   })
 
+  it('a quick steal is chosen by the defender, and the react window then resumes', () => {
+    const stealer = makeDb([
+      def('grunt', 'unit', { power: 3 }),
+      def('wall', 'unit', { power: 2 }),
+      def('snatch', 'program', {
+        cost: 1,
+        keywords: ['quick'],
+        effects: [onPlay({ kind: 'stealGig', count: 1 }, { quick: true })],
+      }),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'grunt')
+    const defender = mint(s, 1, 'field', 'wall', { ready: false })
+    const quick = mint(s, 1, 'hand', 'snatch')
+    const eddie = mint(s, 1, 'eddies', 'grunt', { faceUp: false })
+    gigs(s, 0, [3, 5])
+
+    let next = applyAction(stealer, s, { type: 'attack', attacker, target: defender })
+    next = applyAction(stealer, next, {
+      type: 'react',
+      reaction: { type: 'quick', card: quick, payment: [eddie], targets: [] },
+    })
+    expect(next.phase).toBe('chooseGig')
+    expect(actingPlayer(next)).toBe(1) // the *defender* picks their own steal
+    expect(gigChoices(stealer, next)).toEqual([0, 1])
+
+    next = applyAction(stealer, next, { type: 'chooseGig', dieIndex: 1 })
+    expect(next.players[1].gigArea.map((d) => d.value)).toEqual([5])
+    expect(next.players[0].gigArea.map((d) => d.value)).toEqual([3])
+    // Back into the react window, with the attack still pending.
+    expect(next.phase).toBe('react')
+    expect(next.pendingAttack).toEqual({ attacker, target: defender })
+    expect(actingPlayer(next)).toBe(1)
+  })
+
   it('a non-quick program is never offered as a reaction', () => {
     const slow = makeDb([
       def('grunt', 'unit', { power: 3 }),
@@ -1343,11 +1617,15 @@ describe('gear keyword grants (real cards)', () => {
     expect(legalActions(real, s).some((a) => a.type === 'attack' && a.attacker === host)).toBe(true)
   })
 
-  it('does not let gear grant go-solo to a legend in the legends zone', () => {
+  it('never grants go-solo, even though riot-shield prints the keyword', () => {
     const s = scenario()
     const legend = mint(s, 0, 'legends', 'yorinobu-arasaka-embracing-destruction')
     mintGear(s, 0, 'riot-shield', legend) // riot-shield's keywords include 'go-solo'
     mint(s, 0, 'eddies', 'mantis-blades', { faceUp: false })
+
+    expect(real['riot-shield'].keywords).toContain('go-solo') // the data trap itself
+    expect(effectiveKeywords(real, s, legend)).toContain('blocker') // other keywords pass
+    expect(effectiveKeywords(real, s, legend)).not.toContain('go-solo')
     expect(playActions(real, s).some((a) => a.card === legend)).toBe(false)
   })
 })

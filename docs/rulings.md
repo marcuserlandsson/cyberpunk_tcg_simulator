@@ -751,6 +751,38 @@ drop half of a card's printed text; a fixed "first candidate" choice would bias
 play in a way replays could not justify. Determinism and replayability are
 preserved because the choice comes off the seeded rng.
 
+**Exception — an effect's Gig-die steal is a real decision, never rng.**
+`stealGig` does *not* pick dice; it hands the choice to the effect's controller
+through the same machinery an attack steal uses: `pendingSteal` +
+`phase = 'chooseGig'` + one `chooseGig` action per die in the victim's Gig area.
+Which die you take moves street cred and the seven-Gig win condition, so it
+cannot be a coin flip. Consequences, all in `combat.ts`:
+
+- `pendingSteal` gained two optional fields: `thief` (the effect's controller —
+  an attack steal leaves it undefined, meaning "the active player") and
+  `resumePhase` (the phase to return to when the last die is taken). An attack
+  steal leaves both undefined and behaves exactly as it did in Task 6;
+- `actingPlayer` returns `pendingSteal.thief` during an effect steal, so the
+  **defender** can be the deciding player mid-attack (a {quick} Program that
+  steals) while `activePlayer` still belongs to the attacker;
+- an effect steal fired during a react window resumes into `react` with the
+  attack still pending; one fired by an on-attack effect is taken *before* the
+  react window opens; one fired by an on-defeat effect inside a fight outlives
+  the attack that caused it (`endAttack` keeps it and resumes into `main`);
+- a steal with an empty victim Gig area never enters `chooseGig` at all, and two
+  `stealGig` nodes in one effect accumulate into one choice.
+
+The rest of the effect resolves immediately, before the dice are picked — the
+same deferral the attack steal has always had (guide step 04 is the last step of
+the attack).
+
+**`rerollGig` still picks its die by rng.** Which die to reroll is a choice too,
+but no card in the pool pins the wording down yet, so the die selection stays
+uniform-random pending a real card in Task 8; when one lands it should take the
+die through the ordinary target-slot mechanism (which needs a die-targeting
+TargetSpec) rather than growing a second bespoke pending-decision. The same
+applies to `discardRandomRival`, which the card text explicitly makes random.
+
 Related target rules, all in `src/cards/effects.ts`:
 
 - target slots are bound **once**, before the def's first node runs, so a node
@@ -784,6 +816,17 @@ spends the Gear's **host** — which also means the host's Lag blocks the abilit
 and a host Legend being self-spent cannot also be spent for the €$ half of the
 same cost (`abilityHost` + `canonicalPayment`'s `exclude`).
 
+**An attached Gear's abilities and triggers belong to the HOST's controller, not
+the Gear's owner.** This matters for `kiroshi-optics`, the one card that can
+equip to a rival Unit (§8): its owner has handed the Gear over, so the Unit's
+controller is the one who may activate it, pays for it, has their street cred
+checked by any `condition`, and whose side counts as "friendly" for the effect's
+targets. `effectController(state, uid)` (the owner of `abilityHost(state, uid)`)
+is the single helper every path uses — enumeration, payment, gating and
+resolution — so they cannot disagree. The Gear card is still the effect's
+*source* (`ctx.sourceUid`), so `self` targeting and event attribution point at
+the Gear.
+
 `abilityIndex` indexes the card def's **`effects` array**, not a filtered list of
 activated abilities, so an index is stable no matter what else the card does.
 A `quick: true` activated ability is offered in *both* the main phase and the
@@ -799,6 +842,27 @@ entries are the on-play effect's target slots in resolution order. Units and
 Programs have no equip target, so their `targets` are purely effect targets.
 Gear with no legal host is still unplayable (no entries at all), but a card
 whose *effect* has no legal target stays playable — the effect just fizzles.
+
+**On-play target slots are enumerated against the state the effect will see —
+i.e. *after* the card has entered its zone.** A Unit's onPlay resolves once the
+Unit is on the field, so `legalActions` must enumerate against that same board.
+Two things break otherwise, both of them real cards:
+
+- a Unit could never target **itself**. `japantown-jonin`'s "Give a friendly Unit
+  +2 power this turn" must be able to buff the Unit that just arrived, and the
+  pool proves the distinction is deliberate: `valentino-street-racer` says
+  "*another* friendly Unit" when it means to exclude itself;
+- a slot that is empty before the play but fillable after it would be *skipped*
+  during enumeration and *filled* during resolution (§32's skip rule), shifting
+  every later slot by one — the player's chosen rival target would be rejected as
+  illegal and the real target drawn at random instead.
+
+`playCardTargetChoices` therefore enumerates through a cheap projected state
+(`stateAfterEntry`: out of hand/legends, on the field for a Unit or {go-solo}
+Legend) and `playCardOnDraft` binds the slots after performing the same move, so
+enumeration and binding always see one board. Gear equip targets are still
+enumerated against the pre-play state, which is identical for that purpose — a
+Gear card is not a Unit, so moving it changes no target set.
 
 Gear equip targets come from `src/cards/targets.ts`'s `gearEquipTargets`, which
 applies the pool-wide rule (§22) unless the card id has an entry in the
@@ -839,3 +903,34 @@ of a `sequence`, and any later EffectDef of the same trigger, do not resolve.
 draws: they take "up to" what the deck holds and stop early on an empty deck,
 because neither is the guide's draw step and neither has a printed failure
 clause.
+
+## 37 — Attached Gear propagates the host's {Attack} and {Defeated} triggers, and nothing else
+
+Gear cards print triggered text about their *host*: "{Attack} Look at a friendly
+face-down Legend" (`kiroshi-optics`), "{Attack} Decrease a Gig by up to 2"
+(`dying-night-v-s-pistol`), "{Defeated} Play another Unit ... from your trash"
+(`the-relic-experimental-biochip`). Statics, keywords and activated abilities
+already aggregated a card's Gear (§29, §30, §33), but triggers did not fire at
+all, which would have silently dropped every one of those lines.
+
+**Ruling:** when a card's trigger fires, the matching triggers of its attached
+Gear fire too — for `onAttack` and `onDefeat` only. Those are the triggers about
+the host acting; `onPlay` and `onCall` are deliberately **not** propagated,
+because a Gear card's own onPlay already fired when the Gear itself was played
+and re-firing it when its host enters the field (a {go-solo} Legend wearing Gear)
+would double it up.
+
+Details:
+
+- Gear effects resolve with the **Gear** as the source (`ctx.sourceUid`) but for
+  the **host's controller** (§33), so a rival-owned `kiroshi-optics` works for
+  the Unit wearing it;
+- only the host's own defs consume the `targets` the action supplied; Gear defs
+  auto-target per §32, because `legalActions` enumerates the acting card's slots,
+  not its Gear's;
+- on defeat, the Gear list is captured **before** the field exit detaches it
+  (`combat.ts`'s `defeatUnit`), so a "{Defeated}" Gear trigger still fires even
+  though the Gear is already in the trash when it resolves;
+- `fireCardTrigger` (own defs only) and `fireTriggerOnDraft` (own + propagated
+  Gear) are separate entry points, so a caller that must not double-fire — the
+  defeat path, which fires the Gear explicitly — can say so.

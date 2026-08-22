@@ -25,9 +25,15 @@ export function streetCred(state: GameState, player: PlayerId): number {
 
 /**
  * Whose decision is pending. Normally the active player; during a `react`
- * window it is the defender (the rival of the attacking/active player).
+ * window it is the defender (the rival of the attacking/active player); during
+ * an *effect*-driven Gig steal it is the effect's controller, who may be either
+ * player (docs/rulings.md §32) — an attack-driven steal leaves
+ * `pendingSteal.thief` undefined and stays with the active player.
  */
 export function actingPlayer(state: GameState): PlayerId {
+  if (state.phase === 'chooseGig' && state.pendingSteal?.thief !== undefined) {
+    return state.pendingSteal.thief
+  }
   return state.phase === 'react' ? opponentOf(state.activePlayer) : state.activePlayer
 }
 
@@ -130,10 +136,22 @@ export function effectivePower(db: CardDb, state: GameState, uid: number): numbe
 }
 
 /**
+ * Keywords a Gear card never hands to its host. {go-solo} is a property of a
+ * Legend card itself ("pay *this Legend's* cost to play it as a ready Unit"),
+ * and `riot-shield`'s keyword list contains `go-solo` only because its rules
+ * text mentions the keyword — granting it would make any shielded Legend
+ * playable as a Unit (docs/rulings.md §30).
+ */
+const NEVER_GRANTED_BY_GEAR: readonly Keyword[] = ['go-solo']
+
+/**
  * The keywords a card has right now: its own printed keywords plus those of
- * every attached Gear card (docs/rulings.md §30). Gear that prints {blocker}
- * (riot-shield, mandibular-upgrade) hands the keyword to the Unit or Legend
- * wearing it — the Gear itself can never act. Duplicates are collapsed.
+ * every attached Gear card, minus the ones Gear can never grant
+ * (docs/rulings.md §30). Gear that prints {blocker} (riot-shield,
+ * mandibular-upgrade) hands the keyword to the Unit or Legend wearing it — the
+ * Gear itself can never act. Duplicates are collapsed. This is the single
+ * authority on keywords: every caller (combat legality, go-solo plays) goes
+ * through it rather than reading `def.keywords`.
  */
 export function effectiveKeywords(db: CardDb, state: GameState, uid: number): Keyword[] {
   const card = state.cards[uid]
@@ -144,7 +162,10 @@ export function effectiveKeywords(db: CardDb, state: GameState, uid: number): Ke
     const gear = state.cards[gearUid]
     const gearDef = gear ? db[gear.defId] : undefined
     if (!gearDef) continue
-    for (const keyword of gearDef.keywords) keywords.add(keyword)
+    for (const keyword of gearDef.keywords) {
+      if (NEVER_GRANTED_BY_GEAR.includes(keyword)) continue
+      keywords.add(keyword)
+    }
   }
   return [...keywords]
 }
