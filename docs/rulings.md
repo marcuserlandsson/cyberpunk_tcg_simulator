@@ -288,3 +288,128 @@ to them. The engine's `validateDeck` (Task 3) will skip the size check when
 **Rationale:** Demo games deck out faster than constructed games, which is
 authentic to the physical demo product (the PDFs are explicitly designed for
 quick learning and introductory play).
+
+---
+
+# Task 4 rulings (game setup & turn skeleton)
+
+## 14 — `turnNumber` counts *each player's own* turns
+
+`GameState.turnNumber` is the **per-player** turn count, shared by both
+players: it is set to 1 when the first player begins their first turn and
+increments only when the **first player** begins a turn.
+
+```
+turnNumber 1: first player's 1st turn, then second player's 1st turn
+turnNumber 2: first player's 2nd turn, then second player's 2nd turn
+...
+```
+
+**Rationale:** every rule in the guide that mentions a turn count is
+*per-player* ("the player going first ... doesn't ready them on their first
+turn", "after the last player's 7th turn", "the d20 is always last" — a
+consequence of one die per turn from a 6-die fixer). Counting half-turns
+instead would force `Math.ceil`-style arithmetic into every rule. Under this
+representation:
+
+- "a player's Nth turn" is exactly `turnNumber === N`;
+- the first-player legend penalty is `player === firstPlayer && turnNumber === 1`;
+- when the active player is the first player on turn N, **both** players have
+  completed N-1 turns; when it is the second player on turn N, the first player
+  has completed N and the second N-1. So both players have completed 7 turns
+  exactly when `turnNumber >= 8` — that single comparison is the overtime
+  trigger (`isOvertime` in `src/engine/game.ts`).
+
+## 15 — Overtime "majority" = strictly more gig dice, checked after every action
+
+The guide (p3) says: *"OVERTIME starts after the last player's 7th TURN.
+Overtime is sudden death; as soon as a player has a majority of Gig dice in
+their Gig area, they win."*
+
+**Ruling:**
+
+1. *"After the last player's 7th turn"* means once **both** players have
+   completed 7 turns — i.e. from `turnNumber >= 8` onwards (see §14). The
+   first player finishing *their* 7th turn is not enough; the second player
+   must finish theirs too.
+2. *"Majority"* means **strictly more gig dice than the rival** — a plain
+   `>` on the two gig-area counts, not "more than half of all 12 dice". With
+   an even total, "more than half" would be unreachable at 6-6, whereas the
+   guide's own framing ("controlling two dice is always closer to winning than
+   controlling one die", p3) is comparative. Dice *values* are irrelevant here;
+   only the count of discrete dice matters.
+3. *"As soon as"* means the check runs **after every applied action** (in
+   `applyAction`, after the action's handler and any chained start-of-turn
+   sequence), not only at a phase boundary. The instant the counts diverge in
+   overtime, the game ends with `gameEnded(overtimeMajority)`.
+4. A tie in overtime ends nothing; play continues (and, in the skeleton game,
+   ends in a deckout).
+
+## 16 — Start-of-turn ordering: the 7-gig win check precedes ready/draw/gain
+
+The guide's start phase is *ready → draw 1 → gain a gig* (p9), while the win
+condition says a player wins "if they start their turn with 7 Gig dice ...
+**before taking one from the fixer area**" (p4).
+
+**Ruling:** the win check is step 0 of the start-of-turn sequence, before
+readying, before the draw, and before the gig gain. Practical consequence: a
+player sitting on 7 gigs wins even if their deck is empty — they never reach
+the draw that would deck them out. The engine emits `turnStarted` first (so the
+event log shows whose turn the win happened on), then `gameEnded(sevenGigs)`.
+
+## 17 — Deck-out is immediate and unconditional on a required draw
+
+Guide p3: *"if you are required to draw a card but have no cards left in your
+deck, your Rival immediately wins."* Implemented in `drawCards`: any required
+draw that cannot be satisfied ends the game at once with
+`gameEnded(deckout)`, winner = the rival of the player who had to draw. The
+game ends before the rest of the turn (the gig gain, the main phase) happens;
+any cards drawn before the deck ran dry stay in hand, which is moot once the
+game is over. (With the bundled 27-card demo decks this makes turn 22 the
+natural end of a game with no other win condition met.)
+
+## 18 — The first player's 2 spent legends are skipped by the ready step *once*
+
+Guide p9: *"The player going first spends their 2 leftmost Legends and doesn't
+ready them on their first turn."*
+
+**Ruling:** `choosePlayOrder` sets `ready: false` on `legends[0]` and
+`legends[1]` of whoever goes first (index 0 = leftmost, the order fixed by the
+face-down legend shuffle in `newGame`). The ready step skips exactly those two
+uids when `player === firstPlayer && turnNumber === 1`, so they stay spent for
+the whole of that first turn and ready normally on the first player's second
+turn. Because an already-spent card cannot be spent again (glossary, p11),
+this costs the first player 2 €$ of legend-payment capacity on turn 1 — that
+loss *is* the handicap for going first.
+
+## 19 — The gig-die choice is an explicit action; the d20 is offered only alone
+
+Guide p4/p12: *"You can choose any die you want, except for the twenty-sided
+die (d20), which is always last."*
+
+**Ruling:** `legalActions` emits one `chooseGigDie` per **distinct die size**
+in the acting player's fixer, ascending, with the d20 filtered out whenever any
+other die remains; when the d20 is the only die left it is the only choice.
+Because gaining a gig requires a decision, the start-of-turn sequence stops in
+phase `start` and the die is not rolled until the action is applied. Once the
+fixer is empty (from each player's 7th turn onward, six dice having been taken
+on turns 1-6) the sequence skips straight to `main` and no die is gained. The
+engine keys this off `fixer.length === 0`, not off a turn number, so future
+effects that return dice to a fixer behave sensibly.
+
+## 20 — Known simplification: `lag` and `tempPower` clear at the *owner's* next turn start
+
+The guide says lag and until-end-of-turn effects last "until the end of the
+turn". The engine clears `lag` and `tempPower` on a player's own cards during
+that player's start-of-turn sequence instead.
+
+For `lag` this is exactly equivalent: lag only ever gates the owner's own
+attacks and self-spend costs, which can only happen on the owner's turn.
+
+For `tempPower` it is a **real, deliberate deviation**: a +X/turn buff granted
+on your turn currently persists through your rival's turn (so it applies while
+your unit defends) and is only cleared when your next turn begins. The task-4
+brief specifies this ordering explicitly, and no card in the skeleton can grant
+`tempPower` yet. Flagged for Task 7 (effects): if buff timing matters there,
+move the `tempPower` clear into `endTurn` (clearing *all* cards) and keep the
+`lag` clear where it is.
