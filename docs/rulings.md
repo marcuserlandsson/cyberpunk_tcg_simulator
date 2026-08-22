@@ -413,3 +413,69 @@ brief specifies this ordering explicitly, and no card in the skeleton can grant
 `tempPower` yet. Flagged for Task 7 (effects): if buff timing matters there,
 move the `tempPower` clear into `endTurn` (clearing *all* cards) and keep the
 `lag` clear where it is.
+
+---
+
+# Task 5 rulings (economy: sell, payments, playing cards, Call a Legend)
+
+## 21 — A sold card enters the Eddies area *ready*, and may pay a cost that same turn
+
+The guide's SELL step (p10/glossary) says only: "reveal it to your opponent,
+then place it face-down in the Eddies area." Nothing in the guide's text
+restricts a freshly-sold card's spend/ready status, unlike Units (which
+explicitly enter the field with Lag) or Legends (whose spend status is set by
+setup/ready rules elsewhere).
+
+**Ruling:** a sold card's `CardInstance.ready` is left/set `true` — it enters
+the Eddies area exactly like a card readied at the start of a turn, and can
+immediately be spent (e.g. to pay for a `playCard` or `callLegend` later that
+same main phase). This is the natural reading of "no explicit restriction
+stated" given the guide is otherwise careful to call out exceptions (Lag) when
+it means to impose one, and it keeps `sellCard` symmetric with the rest of
+the Eddies-area bookkeeping (every other ready-by-default entry point —
+`newGame`'s `makeInstance`, `readySpentCards` — defaults to ready). Flagged for
+reviewers: if a future ruling or errata says otherwise, only `sellCard`'s
+handler in `reduce.ts` needs to change (it sets `ready = true` explicitly,
+rather than leaving the field untouched, specifically so this is a one-line
+fix).
+
+## 22 — Gear equips to a friendly Unit or a *face-up* Legend, not any Legend
+
+Guide p7 (GEAR, the general rule): "pay its cost and equip it to a friendly
+Unit or Legend" — no face-up qualifier. But every one of the 141 cards' own
+gear reminder line (see §7/§8 above) reads "Equip to a friendly Unit or
+face-up Legend," and the guide's own precedence rule (p6, "READING YOUR
+CARDS"): "If there's a conflict between a card's text and this guide, follow
+the text on the card."
+
+**Ruling:** `legal.ts`'s `friendlyGearTargets` restricts the Legend side of
+"friendly Unit or Legend" to face-up legends only. This is safe to hardcode
+at the engine level, not just per-card text, because it is universal: all 14
+gear cards agree on the Legend clause (§8's `kiroshi-optics` exception only
+widens the *Unit* side, to "any Unit" instead of "friendly Unit" — its Legend
+clause is unchanged, still face-up-only). A face-down Legend has no revealed
+identity to equip anything to, which matches this being unanimous across the
+whole pool rather than a per-card effect. `kiroshi-optics`'s wider Unit-side
+exception is out of this task's "vanilla" scope (it needs a target spec wider
+than `friendlyUnitOrLegend`, i.e. any Unit, friendly or rival) and is left for
+Task 7/8's per-card effect/target parsing; until then it is playable like any
+other gear card, just with a narrower-than-printed target set (friendly
+Unit/face-up Legend only) rather than a wider one — an under- rather than
+over-approximation of legality.
+
+## 23 — Call a Legend's random flip draws only from the acting player's own legends, uniformly
+
+Guide p10/p11/glossary CALL A LEGEND: "Spend 1 €$ to flip a Legend face-up.
+Don't peek beforehand, choom! The randomness of your choice is a part of the
+game." There is no other Legend zone to flip from (each player only ever has
+their own 3), so "a Legend" unambiguously means one of the acting player's own
+face-down legends, chosen uniformly at random.
+
+**Ruling:** `reduce.ts`'s `callLegend` handler collects the acting player's
+face-down legend uids in `legends` zone order (index 0 = leftmost) and draws
+one index via `nextInt(state.rng, faceDownUids.length)` — the same
+seeded-RNG primitive every other random choice in the engine uses (die
+rolls, shuffles), so the flip is fully deterministic from the game's seed and
+replayable. `legalActions` only offers `callLegend` while at least one
+face-down legend remains for that player (an empty list would make `nextInt`
+undefined behaviour) and the player hasn't already called this turn.

@@ -102,8 +102,13 @@ describe('gain a gig', () => {
     expect(turn7.players[first].fixer).toEqual([])
     expect(turn7.players[first].gigArea).toHaveLength(6)
     expect(turn7.phase).toBe('main')
-    expect(gigDieActions(legalActions(db, turn7))).toEqual([])
-    expect(legalActions(db, turn7)).toEqual([{ type: 'endTurn' }])
+    const turn7Actions = legalActions(db, turn7)
+    expect(gigDieActions(turn7Actions)).toEqual([])
+    // No more gig-die choices leak into main phase; endTurn is always legal
+    // there. (Since Task 5, main phase can also legally offer
+    // sellCard/playCard/callLegend once affordable — exercised in
+    // tests/engine/economy.test.ts, not asserted here.)
+    expect(turn7Actions).toContainEqual({ type: 'endTurn' })
   })
 })
 
@@ -176,10 +181,13 @@ describe('start-of-turn ready step', () => {
 })
 
 describe('endTurn', () => {
-  it('is the only main-phase action in this task and alternates the active player', () => {
+  it('is always legal in main phase (alongside Task 5 economy actions) and alternates the active player', () => {
     const first = startedGame(23).firstPlayer
     let state = applyAction(db, startedGame(23), { type: 'chooseGigDie', size: 4 })
-    expect(legalActions(db, state)).toEqual([{ type: 'endTurn' }])
+    // Task 5 may also legally offer sellCard/playCard/callLegend here
+    // (tests/engine/economy.test.ts covers those); endTurn itself must
+    // always remain among the choices.
+    expect(legalActions(db, state)).toContainEqual({ type: 'endTurn' })
     state = applyAction(db, state, { type: 'endTurn' })
     expect(state.activePlayer).toBe(other(first))
     expect(state.events.some((e) => e.type === 'turnEnded' && e.player === first)).toBe(true)

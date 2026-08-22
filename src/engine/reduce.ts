@@ -11,6 +11,7 @@
 // switch. Later tasks add their action types as new cases + functions without
 // touching the ones below.
 
+import { canPayWith, pay } from './economy'
 import {
   beginTurn,
   checkOvertimeWin,
@@ -21,8 +22,10 @@ import {
 } from './game'
 import { legalActions } from './legal'
 import { opponentOf } from './query'
-import { rollDie, shuffle } from './rng'
+import { nextInt, rollDie, shuffle } from './rng'
 import type { Action, CardDb, GameState, PlayerId } from './types'
+
+const CALL_A_LEGEND_COST = 1
 
 export class IllegalActionError extends Error {
   constructor(message: string) {
@@ -53,6 +56,38 @@ function deepEqual(a: unknown, b: unknown): boolean {
   const bKeys = Object.keys(bRec)
   if (aKeys.length !== bKeys.length) return false
   return aKeys.every((key) => key in bRec && deepEqual(aRec[key], bRec[key]))
+}
+
+/**
+ * `playCard` and `callLegend` carry a `payment` field that `legalActions`
+ * fills in with one canonical payment (economy.ts), but the caller may pay
+ * with any valid combination of ready eddies/legends totalling the same
+ * cost (Task 5 brief). So legality for these two action types is checked in
+ * two parts: the action *shape* (ignoring `payment`) must match some entry
+ * in `legalActions`, and the *supplied* payment must independently satisfy
+ * `canPayWith` for that action's cost. Every other action type still goes
+ * through a plain structural `deepEqual` against the legal list.
+ */
+function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action): boolean {
+  if (action.type === 'playCard') {
+    const shapeMatches = legal.some(
+      (candidate) =>
+        candidate.type === 'playCard' &&
+        candidate.card === action.card &&
+        deepEqual(candidate.targets, action.targets)
+    )
+    if (!shapeMatches) return false
+    const cost = db[state.cards[action.card].defId].cost
+    return canPayWith(state, state.activePlayer, action.payment, cost)
+  }
+
+  if (action.type === 'callLegend') {
+    const shapeMatches = legal.some((candidate) => candidate.type === 'callLegend')
+    if (!shapeMatches) return false
+    return canPayWith(state, state.activePlayer, action.payment, CALL_A_LEGEND_COST)
+  }
+
+  return legal.some((candidate) => deepEqual(candidate, action))
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +167,86 @@ function chooseGigDie(draft: GameState, size: number): void {
   draft.phase = 'main'
 }
 
+/**
+ * Sell (guide p10/glossary SELL; docs/rulings.md §21): move the card
+ * face-down into the Eddies area, ready (so it can pay a cost this same
+ * turn), and mark `soldThisTurn` so a second sell is rejected by
+ * `legalActions` for the rest of this turn.
+ */
+function sellCard(draft: GameState, cardUid: number): void {
+  const player = draft.activePlayer
+  const p = draft.players[player]
+  p.hand = p.hand.filter((uid) => uid !== cardUid)
+  p.eddies.push(cardUid)
+  const card = draft.cards[cardUid]
+  card.faceUp = false
+  card.ready = true
+  p.soldThisTurn = true
+  draft.events.push({ type: 'cardSold', player, uid: cardUid })
+}
+
+/**
+ * Play (guide p10/p7; Task 5 scope is vanilla cards only — no on-play
+ * effects yet, and legends never reach this handler since they can't be in
+ * hand). Units enter the field ready with Lag; Programs resolve (nothing to
+ * resolve yet) and go straight to the trash; Gear is equipped to the chosen
+ * target (already validated as legal by `legalActions`/`isLegal`).
+ */
+function playCard(
+  draft: GameState,
+  db: CardDb,
+  cardUid: number,
+  payment: number[],
+  targets: number[]
+): void {
+  const player = draft.activePlayer
+  const p = draft.players[player]
+  const card = draft.cards[cardUid]
+  const def = db[card.defId]
+
+  p.hand = p.hand.filter((uid) => uid !== cardUid)
+  pay(draft, payment)
+  draft.events.push({ type: 'cardPlayed', player, uid: cardUid })
+
+  switch (def.type) {
+    case 'unit':
+      card.ready = true
+      card.lag = true
+      p.field.push(cardUid)
+      break
+    case 'program':
+      p.trash.push(cardUid)
+      draft.events.push({ type: 'cardTrashed', uid: cardUid })
+      break
+    case 'gear':
+      draft.cards[targets[0]].attachedGear.push(cardUid)
+      break
+    case 'legend':
+      // Unreachable in this task: legends never sit in hand (go-solo play is
+      // Task 7 scope).
+      break
+  }
+}
+
+/**
+ * Call a Legend (guide p10/p11/glossary; docs/rulings.md §23): spend 1 €$,
+ * then flip a uniformly random face-down legend of the acting player's own
+ * face up, via the seeded RNG so the choice is deterministic and replayable.
+ */
+function callLegend(draft: GameState, payment: number[]): void {
+  const player = draft.activePlayer
+  const p = draft.players[player]
+  pay(draft, payment)
+
+  const faceDown = p.legends.filter((uid) => !draft.cards[uid].faceUp)
+  const [index, rng] = nextInt(draft.rng, faceDown.length)
+  draft.rng = rng
+  const target = faceDown[index]
+  draft.cards[target].faceUp = true
+  p.calledLegendThisTurn = true
+  draft.events.push({ type: 'legendCalled', player, uid: target })
+}
+
 /** Pass the turn; the rival's start-of-turn sequence runs immediately. */
 function endTurn(draft: GameState): void {
   const player = draft.activePlayer
@@ -149,7 +264,7 @@ function endTurn(draft: GameState): void {
 
 export function applyAction(db: CardDb, state: GameState, action: Action): GameState {
   const legal = legalActions(db, state)
-  if (!legal.some((candidate) => deepEqual(candidate, action))) {
+  if (!isLegal(db, state, legal, action)) {
     throw new IllegalActionError(
       `Illegal action ${JSON.stringify(action)} in phase "${state.phase}" ` +
         `(legal: ${JSON.stringify(legal)}).`
@@ -171,13 +286,22 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
     case 'chooseGigDie':
       chooseGigDie(draft, action.size)
       break
+    case 'sellCard':
+      sellCard(draft, action.card)
+      break
+    case 'playCard':
+      playCard(draft, db, action.card, action.payment, action.targets)
+      break
+    case 'callLegend':
+      callLegend(draft, action.payment)
+      break
     case 'endTurn':
       endTurn(draft)
       break
     default:
-      // sellCard / playCard / callLegend / activateAbility / attack /
-      // chooseGig / react arrive in Tasks 5-7. They are never legal yet, so
-      // this is only reachable if legalActions and this switch disagree.
+      // activateAbility / attack / chooseGig / react arrive in Tasks 6-7.
+      // They are never legal yet, so this is only reachable if legalActions
+      // and this switch disagree.
       throw new IllegalActionError(`Action type "${action.type}" is not implemented yet.`)
   }
 

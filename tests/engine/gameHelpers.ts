@@ -35,6 +35,13 @@ export function startedGame(seed = 1): GameState {
 /**
  * Plays the skeleton game (take the first legal gig die, then end the turn)
  * until `stop` returns true or the game ends. `maxActions` guards runaway loops.
+ *
+ * Since Task 5, `main` phase can also offer sellCard/playCard/callLegend
+ * once a hand card is sellable/affordable or a legend can be called — those
+ * are real, exercised elsewhere (tests/engine/economy.test.ts). This driver
+ * still prefers `endTurn` whenever it's legal (which is unconditionally, in
+ * `main`) so every pre-Task-5 test here keeps advancing turns exactly as
+ * before, rather than incidentally selling/playing/calling along the way.
  */
 export function drive(
   state: GameState,
@@ -46,7 +53,8 @@ export function drive(
     if (stop(current) || current.phase === 'gameOver') return current
     const actions = legalActions(db, current)
     if (actions.length === 0) return current
-    current = applyAction(db, current, actions[0])
+    const chosen = actions.find((a) => a.type === 'endTurn') ?? actions[0]
+    current = applyAction(db, current, chosen)
   }
   throw new Error('drive() exceeded maxActions without reaching the stop condition')
 }
