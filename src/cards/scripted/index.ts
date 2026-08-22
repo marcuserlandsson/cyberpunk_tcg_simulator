@@ -27,7 +27,7 @@
 import { defeatGear, defeatUnit } from '../../engine/combat'
 import { endGame, drawCards } from '../../engine/game'
 import { hasKeyword, opponentOf } from '../../engine/query'
-import { nextInt } from '../../engine/rng'
+import { nextInt, shuffle } from '../../engine/rng'
 import type { CardDb, GameState, PlayerId } from '../../engine/types'
 import { fireTriggerOnDraft, type EffectCtx } from '../effects'
 
@@ -384,6 +384,241 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const rival = opponentOf(ctx.player)
     const rivalUnit = pick(state, state.players[rival].field)
     if (rivalUnit !== undefined) defeatUnit(state, db, rivalUnit)
+    return state
+  },
+
+  // -------------------------------------------------------------------------
+  // Task 8 batch 4 (Yellow) — docs/rulings.md §81 ff.
+  // -------------------------------------------------------------------------
+
+  /**
+   * `sketchy-ripper` — "{Attack} Search the top 3 cards of your deck. Reveal
+   * a Gear and add it to your hand. Bottom-deck the rest." The candidates
+   * (whatever is on top of the deck) only exist once the effect resolves, so
+   * which Gear (if more than one turns up) is picked through the rng, exactly
+   * like `all-is-lost` (docs/rulings.md §48). Non-chosen cards return to the
+   * BOTTOM of the deck, per the card's own explicit instruction.
+   */
+  'sketchy-ripper': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const top: number[] = []
+    for (let i = 0; i < 3; i++) {
+      const uid = p.deck.shift()
+      if (uid === undefined) break
+      top.push(uid)
+    }
+    const gears = top.filter((uid) => db[state.cards[uid].defId].type === 'gear')
+    const chosen = pick(state, gears)
+    for (const uid of top) {
+      if (uid === chosen) p.hand.push(uid)
+      else p.deck.push(uid)
+    }
+    return state
+  },
+
+  /**
+   * `t-bug-amateur-philosopher` — "{Defeated} Look at all friendly face-down
+   * Legends. Then, you may Call a Legend for free. (You can only Call a
+   * Legend once per turn.)" "Look" is a no-op under this engine's
+   * full-visibility model (docs/rulings.md §77 — kiroshi-optics); the free
+   * Call is taken whenever available (docs/rulings.md §50), and which Legend
+   * flips is picked through the rng exactly like the paid action
+   * (docs/rulings.md §23) — there is no "which Legend" decision printed here
+   * at all, unlike `arasaka-emergency-radioport`'s gated version.
+   */
+  't-bug-amateur-philosopher': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    if (p.calledLegendThisTurn) return state
+    const legend = pick(
+      state,
+      p.legends.filter((uid) => !state.cards[uid].faceUp)
+    )
+    if (legend === undefined) return state
+    state.cards[legend].faceUp = true
+    p.calledLegendThisTurn = true
+    state.events.push({ type: 'legendCalled', player: ctx.player, uid: legend })
+    fireTriggerOnDraft(db, state, 'onCall', legend, [])
+    return state
+  },
+
+  /**
+   * `the-heist` — "Trash 4. Add a Gear from among them to your hand. If that
+   * Gear's cost equals the value of a friendly Gig, you may play it for free
+   * instead." Which Gear (if several turn up among the trashed 4) is picked
+   * through the rng, exactly like `all-is-lost` (docs/rulings.md §48); "you
+   * may play it for free instead" has no stated cost or drawback, so it is
+   * taken whenever the condition holds (docs/rulings.md §50) — including
+   * picking its equip host through the rng, since no action carries a
+   * pre-committed target for a card whose very existence is only known mid-
+   * resolution. With no legal host, it falls back to landing in hand instead
+   * of being lost entirely.
+   */
+  'the-heist': (db, state, ctx) => {
+    const trashed = trashFromTop(state, ctx.player, 4)
+    const gears = trashed.filter((uid) => db[state.cards[uid].defId].type === 'gear')
+    const chosen = pick(state, gears)
+    if (chosen === undefined) return state
+    const p = state.players[ctx.player]
+    const cost = db[state.cards[chosen].defId].cost
+    const matches = p.gigArea.some((die) => die.value === cost)
+    if (matches) {
+      const hosts = [...p.field, ...p.legends.filter((uid) => state.cards[uid].faceUp)]
+      const host = pick(state, hosts)
+      if (host !== undefined) {
+        p.trash = p.trash.filter((uid) => uid !== chosen)
+        state.cards[host].attachedGear.push(chosen)
+        state.events.push({ type: 'cardPlayed', player: ctx.player, uid: chosen })
+        fireTriggerOnDraft(db, state, 'onPlay', chosen, [])
+        return state
+      }
+    }
+    p.trash = p.trash.filter((uid) => uid !== chosen)
+    p.hand.push(chosen)
+    return state
+  },
+
+  /**
+   * `the-relic-experimental-biochip` — "{Defeated} Play another Unit with
+   * cost 9 or less from your trash for free. Then, bottom-deck this Unit."
+   * Printed on a Gear card, whose own "{Defeated}" text is about its HOST
+   * being defeated (docs/rulings.md §37) — "this Unit" is that host, already
+   * sitting in the trash by the time this fires. `ctx.context.defeatedHostUid`
+   * (docs/rulings.md §81 ff.) carries that uid through; with no host known
+   * (the Gear was defeated directly, not via a host defeat) this safely
+   * no-ops. Which trashed Unit to retrieve is picked through the rng: no
+   * on-defeat trigger carries an action-level target (docs/rulings.md §32).
+   */
+  'the-relic-experimental-biochip': (db, state, ctx) => {
+    const hostUid = ctx.context?.defeatedHostUid
+    if (hostUid === undefined) return state
+    const p = state.players[ctx.player]
+    const candidates = p.trash.filter((uid) => {
+      if (uid === hostUid) return false
+      const candidateDef = db[state.cards[uid].defId]
+      return candidateDef.type === 'unit' && candidateDef.cost <= 9
+    })
+    const chosen = pick(state, candidates)
+    if (chosen !== undefined) {
+      p.trash = p.trash.filter((uid) => uid !== chosen)
+      const card = state.cards[chosen]
+      card.ready = true
+      card.lag = true
+      p.field.push(chosen)
+      state.events.push({ type: 'cardPlayed', player: ctx.player, uid: chosen })
+      fireTriggerOnDraft(db, state, 'onPlay', chosen, [])
+    }
+    if (p.trash.includes(hostUid)) {
+      p.trash = p.trash.filter((uid) => uid !== hostUid)
+      p.deck.push(hostUid)
+      state.events.push({ type: 'cardBottomDecked', uid: hostUid })
+    }
+    return state
+  },
+
+  /**
+   * `viktor-vektor-sit-down-and-relax` — "{Call} Search the top 5 cards of
+   * your deck. Reveal up to 2 Gears with cost 2 or less and add them to your
+   * hand. Bottom-deck the rest in a random order." Every qualifying Gear is
+   * worth taking (§50's convention), capped at the printed 2; if more than 2
+   * qualify, which 2 is picked through the rng — nothing distinguishes them
+   * and {Call} carries no player-facing target (docs/rulings.md §32/§45).
+   * "In a random order" is the one place this batch needs an explicit
+   * shuffle rather than "as encountered" (docs/rulings.md §81 ff.).
+   */
+  'viktor-vektor-sit-down-and-relax': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const top: number[] = []
+    for (let i = 0; i < 5; i++) {
+      const uid = p.deck.shift()
+      if (uid === undefined) break
+      top.push(uid)
+    }
+    const qualifying = top.filter((uid) => {
+      const def = db[state.cards[uid].defId]
+      return def.type === 'gear' && def.cost <= 2
+    })
+    const taken: number[] = []
+    const pool = [...qualifying]
+    while (taken.length < 2 && pool.length > 0) {
+      const [index, rng] = nextInt(state.rng, pool.length)
+      state.rng = rng
+      taken.push(...pool.splice(index, 1))
+    }
+    const rest = top.filter((uid) => !taken.includes(uid))
+    const [shuffled, rng2] = shuffle(state.rng, rest)
+    state.rng = rng2
+    for (const uid of taken) p.hand.push(uid)
+    for (const uid of shuffled) p.deck.push(uid)
+    return state
+  },
+
+  /**
+   * `river-ward-detective-on-the-hunt:free-gear` — "{Quick} {Spend} Play a
+   * Gear with cost 2 or less from your hand for free." Both "which Gear" and
+   * "which host" are real, enumerated decisions declared as this scripted
+   * node's own `targets` (docs/rulings.md §81 ff.) — this activated ability
+   * fires from an action that already carries a committed `targets` array
+   * (docs/rulings.md §34/§73), unlike the several onDefeat/onCall scripts
+   * above.
+   */
+  'river-ward-detective-on-the-hunt:free-gear': (db, state, ctx) => {
+    const [gear, host] = ctx.targets
+    if (gear === undefined || host === undefined) return state
+    const p = state.players[ctx.player]
+    if (!p.hand.includes(gear)) return state
+    p.hand = p.hand.filter((uid) => uid !== gear)
+    state.cards[host].attachedGear.push(gear)
+    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: gear })
+    fireTriggerOnDraft(db, state, 'onPlay', gear, [])
+    return state
+  },
+
+  /**
+   * `river-ward-detective-on-the-hunt:defeat-search` — "When a friendly
+   * equipped Unit is defeated, search the top 2 cards of your deck and trash
+   * 1." No filter narrows which of the 2 is trashed, so it is picked through
+   * the rng (this fires from `onUnitDefeated`, which carries no action-level
+   * target, docs/rulings.md §32); the other card returns to the TOP of the
+   * deck, following the sibling card `tetratronic-rippler`'s explicit
+   * "(Otherwise, keep it on the top of your deck.)" clarification for the
+   * same "search the top N, act on some of them" shape (docs/rulings.md §81
+   * ff.).
+   */
+  'river-ward-detective-on-the-hunt:defeat-search': (_db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const top: number[] = []
+    for (let i = 0; i < 2; i++) {
+      const uid = p.deck.shift()
+      if (uid === undefined) break
+      top.push(uid)
+    }
+    const chosen = pick(state, top)
+    if (chosen === undefined) return state
+    p.trash.push(chosen)
+    state.events.push({ type: 'cardTrashed', uid: chosen })
+    for (const uid of top) {
+      if (uid !== chosen) p.deck.unshift(uid)
+    }
+    return state
+  },
+
+  /**
+   * `viktor-vektor-you-might-feel-a-little-pinch` — "{Play} Play a CYBERWARE
+   * Gear with cost 2 or less from your trash for free. Equip it only to
+   * another friendly Unit." Both "which Gear" (from trash, filtered) and
+   * "which host" (another friendly Unit, `excludeSelf`) are declared as this
+   * scripted node's own `targets`, real decisions an `onPlay` action already
+   * carries (docs/rulings.md §81 ff.).
+   */
+  'viktor-vektor-you-might-feel-a-little-pinch': (db, state, ctx) => {
+    const [gear, host] = ctx.targets
+    if (gear === undefined || host === undefined) return state
+    const p = state.players[ctx.player]
+    if (!p.trash.includes(gear)) return state
+    p.trash = p.trash.filter((uid) => uid !== gear)
+    state.cards[host].attachedGear.push(gear)
+    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: gear })
+    fireTriggerOnDraft(db, state, 'onPlay', gear, [])
     return state
   },
 }

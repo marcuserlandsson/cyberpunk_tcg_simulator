@@ -47,6 +47,7 @@ import {
   fightPowerBonus,
   hasKeyword,
   opponentOf,
+  rivalDeniesFreshAttacks,
   winsFightRegardless,
 } from './query'
 import type { Action, CardDb, GameState, PendingSteal, PlayerId } from './types'
@@ -55,6 +56,14 @@ import type { Action, CardDb, GameState, PendingSteal, PlayerId } from './types'
 const ADRENALINE = 'adrenaline'
 /** Keyword: "spend this Unit to redirect the attack to it instead" (guide p11). */
 const BLOCKER = 'blocker'
+/**
+ * Internal, never-printed keyword granted via the ordinary `grantKeyword`
+ * node: "A friendly Unit can't be defeated in a fight this turn"
+ * (muamar-reyes-el-capitán, docs/rulings.md §81 ff.) — mirrors `ATTACK_READY`
+ * (docs/rulings.md §43): a real card grants it, no card's printed `keywords`
+ * ever contains it.
+ */
+const FIGHT_IMMUNE = 'fight-immune'
 /** A Unit steals one extra Gig per this much power (guide p11). */
 const POWER_PER_EXTRA_GIG = 10
 
@@ -82,14 +91,19 @@ export function stealCount(power: number): number {
  * readies" (glossary SPEND), and attacking spends the attacker. A static
  * `cantAttack` effect ("This Unit can't attack", e.g. corpo-security) vetoes
  * everything (docs/rulings.md §35), and {adrenaline} may be printed on the Unit
- * *or* granted by its Gear (docs/rulings.md §30).
+ * *or* granted by its Gear (docs/rulings.md §30). A rival's
+ * `rivalCantAttackWhenPlayed` static ("Rival Units can't attack the turn
+ * they're played", maxtac-suppression-team) denies the {adrenaline} exception
+ * outright — Lag still gates the attack even with the keyword (docs/rulings.md
+ * §81 ff.).
  */
 function canAttack(db: CardDb, state: GameState, uid: number): boolean {
   const card = state.cards[uid]
   if (!card.ready) return false
   if (cantAttack(db, state, uid)) return false
   if (!card.lag) return true
-  return hasKeyword(db, state, uid, ADRENALINE)
+  if (!hasKeyword(db, state, uid, ADRENALINE)) return false
+  return !rivalDeniesFreshAttacks(db, state, uid)
 }
 
 /**
@@ -366,6 +380,9 @@ export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
   // Capture the defeated Unit's own tags before anything moves it — a Unit's
   // faction membership does not depend on its (about-to-be-detached) Gear.
   const defeatedTags = cardTags(db[draft.cards[uid].defId])
+  // "if it's [equipped]" (river-ward-detective-on-the-hunt, docs/rulings.md
+  // §81 ff.) — captured the same way, before `leaveField` clears it.
+  const defeatedWasEquipped = gear.length > 0
 
   draft.events.push({ type: 'unitDefeated', uid })
   leaveField(draft, db, uid, 'trash')
@@ -373,16 +390,28 @@ export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
   // [trigger seam] "The first time an ARASAKA Unit is defeated each turn,
   // ..." — bare, so it watches GLOBALLY: every in-play card of BOTH players,
   // whichever side the defeated Unit belonged to (docs/rulings.md §55 ff.,
-  // mirroring §39's bare-Gig convention).
-  fireWatcherTrigger(db, draft, 'onUnitDefeated', 0, { defeatedTags })
-  fireWatcherTrigger(db, draft, 'onUnitDefeated', 1, { defeatedTags })
+  // mirroring §39's bare-Gig convention). `defeatedOwner`/`defeatedWasEquipped`
+  // answer a "friendly equipped Unit" condition (docs/rulings.md §81 ff.).
+  fireWatcherTrigger(db, draft, 'onUnitDefeated', 0, {
+    defeatedTags,
+    defeatedOwner: controller,
+    defeatedWasEquipped,
+  })
+  fireWatcherTrigger(db, draft, 'onUnitDefeated', 1, {
+    defeatedTags,
+    defeatedOwner: controller,
+    defeatedWasEquipped,
+  })
   if (draft.winner !== null) return
 
   // [trigger seam] on-defeat effects resolve once the Unit and its Gear have
-  // left the field (guide step 04).
+  // left the field (guide step 04). A Gear's own "{Defeated} ..." text means
+  // its HOST being defeated (docs/rulings.md §37); `defeatedHostUid` lets that
+  // effect reach "this Unit" — the host, now sitting in the trash
+  // (the-relic-experimental-biochip, docs/rulings.md §81 ff.).
   fireCardTrigger(db, draft, 'onDefeat', uid, [], controller)
   for (const gearUid of gear) {
-    fireCardTrigger(db, draft, 'onDefeat', gearUid, [], controller)
+    fireCardTrigger(db, draft, 'onDefeat', gearUid, [], controller, { defeatedHostUid: uid })
   }
 }
 
@@ -430,13 +459,19 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // comparison in that Unit's favour (docs/rulings.md §41).
   const attackerAlwaysWins = winsFightRegardless(db, draft, attacker, defender)
   const defenderAlwaysWins = winsFightRegardless(db, draft, defender, attacker)
-  const defeated: number[] = []
+  const wouldDefeat: number[] = []
   if (!defenderAlwaysWins && (attackerAlwaysWins || attackPower >= defendPower)) {
-    defeated.push(defender)
+    wouldDefeat.push(defender)
   }
   if (!attackerAlwaysWins && (defenderAlwaysWins || defendPower >= attackPower)) {
-    defeated.push(attacker)
+    wouldDefeat.push(attacker)
   }
+  // "A friendly Unit can't be defeated in a fight this turn"
+  // (muamar-reyes-el-capitán, docs/rulings.md §81 ff.): an until-end-of-turn
+  // immunity granted via the ordinary `grantKeyword` machinery. The fight
+  // still happens normally for the OTHER combatant — this only saves whichever
+  // side(s) carry the granted keyword right now.
+  const defeated = wouldDefeat.filter((uid) => !hasKeyword(db, draft, uid, FIGHT_IMMUNE))
   for (const uid of defeated) {
     // An on-defeat effect from the first casualty could already have removed
     // the second one from the field; never defeat a card twice.
@@ -540,9 +575,14 @@ export function takeStolenGig(draft: GameState, db: CardDb, dieIndex: number): v
   // [trigger seam] "When a friendly Unit steals a d6, ..." — a watcher trigger,
   // fired on every in-play card of the thief (docs/rulings.md §42).
   // `stealerUid` answers "When THIS Unit steals a Gig" (docs/rulings.md §55 ff.).
+  // `stolenDieValue`/`stealerIsLegend` answer "if its value is even/odd" and
+  // "a friendly LEGEND steals" (rogue-amendiares-preem-solo, docs/rulings.md
+  // §81 ff.).
   fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
     stolenDieSize: die.size,
+    stolenDieValue: die.value,
     stealerUid: steal.attacker,
+    stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
   })
 
   steal.remaining -= 1

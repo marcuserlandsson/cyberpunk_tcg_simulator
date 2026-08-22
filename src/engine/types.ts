@@ -128,15 +128,15 @@ export interface TargetFilter {
 
 /**
  * "-1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$" — the
- * pool's one cost-reduction shape, used both as a `static` node (a card's own
+ * original cost-reduction shape, used both as a `static` node (a card's own
  * play cost) and inside an activated ability's `cost` (docs/rulings.md §44).
+ * Batch 4 adds a second `per` (docs/rulings.md §81 ff.): "-1 €$ for each Unit
+ * in your trash" (trauma-team-operatives) has no value threshold, just a flat
+ * count, so it is a distinct variant rather than an overload of `value`.
  */
-export interface CostReduction {
-  per: 'friendlyGigValueAtLeast'
-  value: number
-  amount: number
-  minimum: number
-}
+export type CostReduction =
+  | { per: 'friendlyGigValueAtLeast'; value: number; amount: number; minimum: number }
+  | { per: 'unitInTrash'; amount: number; minimum: number }
 
 /**
  * A power amount read off the board instead of printed on the card.
@@ -182,7 +182,12 @@ export type EffectNode =
   | { kind: 'bottomDeck'; target: TargetSpec; filter?: TargetFilter }
   | { kind: 'gainEddieFromTopDeck'; count: number }
   | { kind: 'sequence'; effects: EffectNode[] }
-  | { kind: 'scripted'; name: string; targets?: TargetSpec[] }
+  // `filters[i]` narrows `targets[i]` exactly like any other node's `filter`
+  // (docs/rulings.md §81 ff.) — e.g. "a Gear with cost 2 or less" from a hand
+  // zone, or "another friendly Unit" as the equip host. An absent entry (the
+  // array is shorter than `targets`, or omitted entirely) means no filter for
+  // that slot, matching every other node's optional `filter`.
+  | { kind: 'scripted'; name: string; targets?: TargetSpec[]; filters?: TargetFilter[] }
   // Static restriction: "This Unit can't attack" (e.g. corpo-security,
   // misty-olszewski-...). Only meaningful with `trigger: 'static'`.
   | { kind: 'cantAttack' }
@@ -260,6 +265,22 @@ export type EffectNode =
   // the sole authority ("If a Rival controls at least 2 more Gigs than you,
   // this Unit has {Adrenaline}." — adrenaline-converter).
   | { kind: 'grantKeywordWhile'; keyword: string }
+  // Batch 4 additions (docs/rulings.md §81 ff.):
+  // Static: "Rival Units can't attack the turn they're played"
+  // (maxtac-suppression-team) — denies the {adrenaline} exception to Lag for
+  // every Unit on the OPPOSING side of this card's controller, consulted by
+  // combat.ts's `canAttack` via `query.rivalDeniesFreshAttacks`.
+  | { kind: 'rivalCantAttackWhenPlayed' }
+  // Static: "Play your first CYBERWARE Gear each turn for -3 €$, to a minimum
+  // of 1 €$" (viktor-vektor-drop-your-illusions) — unlike `costReduction`
+  // (which discounts the card printing this static's OWN play), this
+  // discounts a DIFFERENT card being played, whenever it matches
+  // `cardType`+`keyword`, once per game turn. `query.effectiveCardCost`
+  // consults every friendly in-play card's active nodes of this kind when
+  // pricing ANY card the player might play; `effects.playCardOnDraft` marks
+  // the allowance used the moment a matching card is actually played, reusing
+  // the same `oncePerTurnUsed` array/key convention as `oncePerTurn` defs.
+  | { kind: 'firstMatchingPlayDiscount'; cardType: CardType; keyword: string; amount: number; minimum: number }
 
 export interface EffectDef {
   trigger: Trigger
@@ -300,6 +321,15 @@ export interface EffectDef {
     streetCredDiffAtLeast?: number
     /** "if it's equipped" — does the SOURCE card itself carry ≥1 attached Gear (maelstrom-goons). */
     sourceEquipped?: boolean
+    // Batch 4 additions (docs/rulings.md §81 ff.):
+    /** `onFriendlyStealDie` only: was the stealing card's own type a Legend (rogue-amendiares-preem-solo). */
+    stealerIsLegend?: boolean
+    /** `onFriendlyStealDie` only: the parity of the stolen die's rolled value (not its size). */
+    stolenDieValueParity?: 'even' | 'odd'
+    /** `onUnitDefeated` only: was the defeated Unit on the WATCHING card's own side? */
+    defeatedIsFriendly?: boolean
+    /** `onUnitDefeated` only: did the defeated Unit carry ≥1 attached Gear before it left the field? */
+    defeatedWasEquipped?: boolean
   }
   quick?: boolean
   /** "The first time ... each turn" — one firing per game turn, per source. */

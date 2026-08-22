@@ -60,12 +60,19 @@ const targetFilterSchema = z.strictObject({
   maxPowerVsFriendlyD20: z.boolean().optional(),
 })
 
-const costReductionSchema = z.strictObject({
-  per: z.literal('friendlyGigValueAtLeast'),
-  value: z.number(),
-  amount: z.number(),
-  minimum: z.number(),
-})
+const costReductionSchema = z.discriminatedUnion('per', [
+  z.strictObject({
+    per: z.literal('friendlyGigValueAtLeast'),
+    value: z.number(),
+    amount: z.number(),
+    minimum: z.number(),
+  }),
+  z.strictObject({
+    per: z.literal('unitInTrash'),
+    amount: z.number(),
+    minimum: z.number(),
+  }),
+])
 
 const dynamicAmountSchema = z.union([
   z.literal('friendlyMaxGig'),
@@ -140,6 +147,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       kind: z.literal('scripted'),
       name: z.string(),
       targets: z.array(targetSpecSchema).optional(),
+      filters: z.array(targetFilterSchema).optional(),
     }),
     z.strictObject({ kind: z.literal('cantAttack') }),
     z.strictObject({
@@ -189,6 +197,14 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
     z.strictObject({ kind: z.literal('attackReadyWithKeyword'), keyword: z.string() }),
     z.strictObject({ kind: z.literal('cantAttackGigArea') }),
     z.strictObject({ kind: z.literal('grantKeywordWhile'), keyword: z.string() }),
+    z.strictObject({ kind: z.literal('rivalCantAttackWhenPlayed') }),
+    z.strictObject({
+      kind: z.literal('firstMatchingPlayDiscount'),
+      cardType: cardTypeSchema,
+      keyword: z.string(),
+      amount: z.number(),
+      minimum: z.number(),
+    }),
   ])
 )
 
@@ -222,6 +238,10 @@ const effectDefSchema: z.ZodType<EffectDef> = z.strictObject({
       friendlyGigValueEquals: z.number().optional(),
       streetCredDiffAtLeast: z.number().optional(),
       sourceEquipped: z.boolean().optional(),
+      stealerIsLegend: z.boolean().optional(),
+      stolenDieValueParity: z.enum(['even', 'odd']).optional(),
+      defeatedIsFriendly: z.boolean().optional(),
+      defeatedWasEquipped: z.boolean().optional(),
     })
     .optional(),
   quick: z.boolean().optional(),

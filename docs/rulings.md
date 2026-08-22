@@ -2288,3 +2288,352 @@ Both fixes are covered by updated tests in `tests/cards/yellow.test.ts`
 assertions plus both a pick-own and a pick-rival case for
 `heywood-ripperdoc`) and by the full pre-existing suite staying green
 throughout (`npm test`, `npx tsc --noEmit`, `npm run build`).
+
+# Task 8 rulings, batch 4 (Yellow, 18 cards)
+
+The last Yellow batch. Two of the eighteen are pure reminder/flavour text
+(§81), one is fully deferred (§91, joining §52's `floatingEffects` list), and
+the other fifteen needed nine vocabulary/engine extensions between them —
+more engine surface than any earlier batch, because this batch's texts
+repeatedly reach for shapes no earlier card needed: a static that restricts
+the RIVAL's side rather than the printing card's own, a cost reduction that
+discounts a DIFFERENT card being played, and a Gear's own printed text
+needing to know which specific card its host *was* after the host has
+already left the field.
+
+## 81 — Two more vanilla/reminder-only cards, both with a direct precedent
+
+- `mandibular-upgrade`: `"(Equip to a friendly Unit or face-up Legend.)\n{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)"`.
+  Byte-for-byte the same shape as `riot-shield` (already encoded, `effects: []`)
+  — an equip reminder plus the {Blocker} keyword reminder, and nothing else.
+  {Blocker} is already granted to the wearer by the existing
+  `effectiveKeywords`/Gear machinery (§30), so there is no functional text
+  left to encode.
+- `secondhand-bombus`: `"{Blocker} (...)\n(Units with power 0 don't steal Gigs.)"`.
+  The second line is a reminder of a rule the engine already implements:
+  `combat.ts`'s `stealCount(power)` returns 0 for any non-positive power
+  (docs/rulings.md §25), so a 0-power Unit already steals nothing — there is
+  no card-specific behaviour to add.
+
+Both stay `effects: []`, and `rockn-rockerboy` (`"Scream your throat raw for
+something. Anything."`) joins `animals-wrecker`/`psycho-squad` as the third of
+the schema doc's three `[Flavour]`-marker cards (§9) that is genuinely
+vanilla — confirmed by checking `psycho-squad` (a Blue card not yet reached by
+any batch) already sits at `effects: []` from Task 2's default, which happens
+to also be its correct final value.
+
+## 82 — `rivalCantAttackWhenPlayed`: a static that restricts the OPPOSING side
+
+`maxtac-suppression-team`: "Rival Units can't attack the turn they're
+played." Every static node before this batch (`cantAttack`,
+`cantAttackGigArea`, `costReduction`, `winsFightVsKeyword`, ...) is read for
+the card printing it (or a Gear's host, §29/§30) — never for the printing
+card's RIVAL. This is the pool's first "shuts down something for the
+OPPOSING side" static.
+
+**Ruling:** a new static node, `{ kind: 'rivalCantAttackWhenPlayed' }`, read
+by a new `query.ts` helper `rivalDeniesFreshAttacks(db, state, uid)` that
+checks whether `uid`'s owner's OPPONENT has any in-play card carrying this
+static. `combat.ts`'s `canAttack` consults it only in the branch that would
+otherwise let {adrenaline} override Lag: a Unit with Lag and {adrenaline}
+still cannot attack if the rival controls a `rivalCantAttackWhenPlayed`
+source. This reads as "the {adrenaline} exception is switched off for the
+rival," which is exactly what "can't attack the turn they're played" means —
+a Unit with no Lag at all (already readied) is unaffected, matching every
+other Unit's ordinary attack eligibility.
+
+**Known, deliberately accepted gap.** A {go-solo} Legend enters the field
+with `lag: false` from the start (its own printed rule, "it can attack this
+turn," §31) rather than relying on the {adrenaline} exception to an existing
+Lag — so `maxtac-suppression-team` does not, and cannot without tracking a
+separate "entered the field this turn" flag on every card instance, stop a
+rival's freshly-played Go Solo Legend from attacking. This under-delivers
+(the card is weaker than a fully faithful reading, never stronger), which is
+the safe direction under §79/§80's policy — the same shape as
+`meredith-stout-stone-cold-corpo`'s accepted "or swaps" gap (§60), not
+`cyberpsychosis`'s forbidden one. Building a general "played this turn"
+per-instance flag, distinct from Lag, would close this gap but is not
+justified for the one card in the pool that needs it.
+
+## 83 — `fight-immune`: a granted-only keyword consulted inside `fight()`
+
+`muamar-reyes-el-capitán`: "{Call} Choose one effect. A friendly Unit can't
+be defeated in a fight this turn. // Draw 1." The "can't be defeated in a
+fight" clause needs an until-end-of-turn immunity on a chosen Unit — the
+grant itself is exactly what `grantKeyword` already does (§43), so no new
+`EffectNode` is needed; only `fight()` needs to *honour* a new keyword.
+
+**Ruling:** `combat.ts` gains an internal, never-printed keyword constant
+`FIGHT_IMMUNE = 'fight-immune'`, mirroring `ATTACK_READY`'s precedent (§43) —
+a real card's `grantKeyword` targets it, no card's printed `keywords` array
+ever contains it. `fight()` computes the same would-be-defeated set as
+before, then filters out any uid carrying `fight-immune` (via
+`hasKeyword`/`effectiveKeywords`, so a granted keyword works exactly like a
+printed one) before calling `defeatUnit` on what remains, and the
+loser/`onWinFight` computation now reads the FILTERED set. Consequences:
+
+- the fight still happens normally for the OTHER combatant — immunity saves
+  only the specific Unit(s) carrying the keyword, never both sides of a tie
+  automatically;
+- a fight where the only "loser" was saved has no `onWinFight` firing at all,
+  the same non-event §41's fix round already established for a
+  `defeatShield`-saved loser — the Unit was never defeated, so nobody "won".
+
+The card's `{Spend} Adjust a Gig by 1` half needs no new vocabulary at all:
+`adjustOptions(1)` already produces exactly `[-1, 1]` (§39), the correct
+sign-only decision for a fixed magnitude of 1, whether the text says "by 1"
+or "by up to 1" — the two read identically when the magnitude can only ever
+be 1.
+
+## 84 — `stealerIsLegend` / `stolenDieValueParity`: two more `onFriendlyStealDie`-only facts
+
+`rogue-amendiares-preem-solo`: "When a friendly Legend steals a Gig, if its
+value is even, draw 1. If its value is odd, a Rival discards 1." Every
+`onFriendlyStealDie` card before this one means "a friendly UNIT steals" —
+this is the first that narrows the watched *stealer* by card type rather
+than by "was it this specific card" (`selfIsStealer`, §61), and the first to
+key off the stolen die's rolled *value* rather than its `size`
+(`stolenDieSize`, §42).
+
+**Ruling:** `ConditionContext` (and `EffectDef.condition`) gain
+`stealerIsLegend?: boolean` and `stolenDieValueParity?: 'even' | 'odd'`, both
+answered only by `combat.ts`'s `takeStolenGig` (the sole `onFriendlyStealDie`
+firing site) — `stealerIsLegend` reads `db[cards[steal.attacker].defId].type
+=== 'legend'`, and `stolenDieValue` (a new context field alongside the
+existing `stolenDieSize`) is the die's own `.value` at the moment of the
+steal, before it joins the thief's Gig area. Both are, like every other
+watcher-only fact before them, unsatisfiable outside the steal that supplies
+them — a def gated on either can never misfire from an unrelated context.
+
+## 85 — `defeatedIsFriendly` / `defeatedWasEquipped`: narrowing the GLOBAL `onUnitDefeated` watcher to one side, plus an equip check
+
+`river-ward-detective-on-the-hunt`: "When a friendly equipped Unit is
+defeated, search the top 2 cards of your deck and trash 1." The pool's only
+existing `onUnitDefeated` card (`yorinobu-arasaka-steel-dragon`) is bare —
+"an ARASAKA Unit is defeated" — and per §60's bare-scope convention that
+trigger broadcasts GLOBALLY, to both players. River Ward's text explicitly
+says "a FRIENDLY equipped Unit," which the existing global broadcast cannot
+express on its own: nothing told a watching card whose side the defeated
+Unit belonged to, or whether it was carrying Gear.
+
+**Ruling (reusing the global trigger, not adding a new one):**
+`ConditionContext` gains `defeatedOwner?: PlayerId` and
+`defeatedWasEquipped?: boolean`, both computed once in `combat.ts`'s
+`defeatUnit` (`defeatedOwner` from the `controller` it already captures;
+`defeatedWasEquipped` from the captured Gear list's length, both *before*
+`leaveField` detaches anything) and passed into BOTH of the existing
+`fireWatcherTrigger(..., 'onUnitDefeated', 0/1, ...)` calls — every watcher on
+both sides now sees the same two facts, and decides for itself whether the
+defeated Unit was "friendly" or "equipped". `EffectDef.condition` gains the
+matching `defeatedIsFriendly?: boolean` (`context.defeatedOwner === player`)
+and `defeatedWasEquipped?: boolean`. A brand-new single-sided trigger was
+considered and rejected: it would duplicate `onUnitDefeated`'s entire firing
+site for a distinction (friendly vs. global) that a plain condition already
+expresses cleanly, and it would leave two near-identical triggers for future
+batches to choose between.
+
+## 86 — `scripted.filters`: a scripted node's declared targets can be narrowed too
+
+Two batch-4 cards need a scripted node to reach a *specific kind* of card
+inside a mixed zone, as a real, enumerated decision (not an rng pick, because
+both fire from an action — `activated`/`onPlay` — that already carries a
+committed `targets` array, docs/rulings.md §73's "which Gear is a real
+decision when the firing action can carry one" precedent):
+
+- `river-ward-detective-on-the-hunt`: "Play a Gear with cost 2 or less from
+  your hand for free" — needs `friendlyHandCard` narrowed to `cardType:
+  'gear', maxCost: 2`, plus a second, unfiltered slot for the equip host;
+- `viktor-vektor-you-might-feel-a-little-pinch`: "Play a CYBERWARE Gear with
+  cost 2 or less from your trash for free. Equip it only to another friendly
+  Unit" — needs `friendlyTrashCard` narrowed to `cardType: 'gear', keyword:
+  'cyberware', maxCost: 2`, plus `friendlyUnit` narrowed to `excludeSelf:
+  true` for the host.
+
+Before this batch, `{ kind: 'scripted', targets?: TargetSpec[] }` bound each
+declared slot to its RAW `TargetSpec` candidate list with no way to narrow
+it — §73 already flagged this as a known gap ("no card needs a *filtered*
+scripted target yet"). Two cards in this one batch now do.
+
+**Ruling:** `scripted` gains `filters?: TargetFilter[]`, positionally
+parallel to `targets` — `filters[i]` narrows `targets[i]` through the exact
+same `filterTargets` machinery every other node's `filter` already uses. A
+shorter (or omitted) `filters` array leaves the corresponding slot(s)
+unfiltered, matching every other node's optional `filter`. `effects.ts`'s
+`slotSpecs`' `'scripted'` case now maps `node.filters?.[index]` alongside each
+`spec`; no other machinery changes, because a `SlotSpec`'s `filter` field
+already existed and `candidatesFor`/`filterTargets` already consult it — this
+was purely a matter of a scripted node actually supplying one.
+
+## 87 — `EffectCtx.context`: threading the firing `TriggerContext` into scripts, and `defeatedHostUid`
+
+`the-relic-experimental-biochip`: "{Defeated} Play another Unit with cost 9
+or less from your trash for free. Then, bottom-deck this Unit." Printed on a
+**Gear** card. Per §37, a Gear's own `{Defeated}` text propagates from its
+HOST being defeated — so "this Unit" here means the host, not the Gear
+itself (a Gear is never a Unit). But by the time this fires, `leaveField` has
+already moved the host to the trash and detached the Gear (§29) — the
+Gear's own `ctx.sourceUid` is (correctly, per §33/§37) the Gear's own uid,
+which carries no back-reference to whichever card it used to be attached to.
+Nothing before this batch needed a Gear's own effect to name "the specific
+card that was just defeated" as a target; every `self`/`chosen` reference in
+the pool so far reads `ctx.sourceUid`/`ctx.chosen`, neither of which can
+supply this.
+
+**Ruling:** `TriggerContext` (`src/cards/effects.ts`) gains
+`defeatedHostUid?: number`, populated only where `combat.ts`'s `defeatUnit`
+fires a Gear's own `onDefeat` (`fireCardTrigger(db, draft, 'onDefeat',
+gearUid, [], controller, { defeatedHostUid: uid })`, `uid` being the
+just-defeated host, already in the trash by this point). More generally,
+`EffectCtx` gains `context?: TriggerContext` — `applyEffectDefOnDraft` now
+threads the `context` it already receives (previously consulted only by
+`conditionMet` and then discarded) into the `ctx` it hands to `applyNode`, so
+ANY `scripted` node can read a fact the firing trigger carried beyond
+player/sourceUid/targets/chosen, not just this one card's `defeatedHostUid`.
+This is additive and inert for every other card: no existing script reads
+`ctx.context`, and `resolveEffect` (which calls with no `TriggerContext` at
+all) simply leaves it `undefined`.
+
+The script itself (`the-relic-experimental-biochip`) reads
+`ctx.context?.defeatedHostUid`, no-ops if it is absent (a Gear defeated
+directly rather than via a host — e.g. by `defeatGear`, §73 — has no
+sensible "this Unit" and the printed text does not contemplate that path),
+picks the retrieved Unit through the rng exactly like every other
+onDefeat-triggered retrieval (no action-level target exists for `onDefeat`,
+§32), and finally bottom-decks the host uid it was handed.
+
+## 88 — "Search the top N ... act on some of them; the rest go back on top" — a pool-wide reading, from a sibling card's own clarification
+
+Three more batch-4 cards "search" the top of the deck
+(`river-ward-detective-on-the-hunt`'s second ability, `sketchy-ripper`,
+`viktor-vektor-sit-down-and-relax`), joining `the-heist` (which mills without
+looking first) and batch 3's `hanako-arasaka-in-a-gilded-cage`/scripted
+precedent. Two of the three explicitly print "bottom-deck the rest"
+(`sketchy-ripper`, `viktor-vektor-sit-down-and-relax`, the latter further
+specifying "in a random order" — see below); `river-ward-detective-on-the-hunt`
+prints only "search the top 2 cards of your deck and trash 1," with no
+stated fate for the un-trashed card.
+
+**Ruling:** absent an explicit "bottom-deck the rest," a searched-but-not-
+acted-on card returns to the TOP of the deck, in the order encountered. This
+is not invented: it is the plain reading of the sibling card
+`tetratronic-rippler` (Blue, not yet reached by any batch but transcribed and
+sitting in `data/cards.json` since Task 2), whose printed text for the
+identical one-card shape spells out the alternative explicitly — "search the
+top card of your deck. You may trash it. **(Otherwise, keep it on the top of
+your deck.)**". Since the game's "search the top N" phrasing is otherwise
+undocumented in the gameplay guide (grepped; no hits), a sibling card that
+states its own default is the best evidence for what an unstated one means
+for the same shape. `river-ward-detective-on-the-hunt`'s script therefore
+returns its un-trashed card to the front of the deck array (`unshift`, the
+`shift()`-based "top" convention every deck read in this codebase already
+uses); `sketchy-ripper` and `viktor-vektor-sit-down-and-relax` push their
+leftovers to the back (bottom) exactly as their own text says.
+
+`viktor-vektor-sit-down-and-relax`'s "in a random order" is the one place
+this batch needs an explicit shuffle rather than "as encountered" — its
+script draws its leftover cards through `rng.ts`'s existing `shuffle` before
+pushing them to the deck's bottom, the same primitive `reduce.ts`'s
+`mulligan` already uses.
+
+## 89 — `CostReduction.per: 'unitInTrash'`: a second, threshold-free cost-reduction shape
+
+`trauma-team-operatives`: "Play this Unit for -1 €$ for each Unit in your
+trash, to a minimum of 1 €$." Every `costReduction` before this counts Gig
+dice at or above a printed threshold (`friendlyGigValueAtLeast`, §44); this
+one counts a *card type* in a zone, with no threshold at all.
+
+**Ruling:** `CostReduction` widens from a single shape to a discriminated
+union on `per`: the original `{ per: 'friendlyGigValueAtLeast', value,
+amount, minimum }` and a new `{ per: 'unitInTrash', amount, minimum }` (no
+`value` — there is nothing to threshold). `query.ts`'s `reducedCost` gains a
+mandatory `db: CardDb` parameter (needed only for the new branch, to tell a
+Unit from any other card type in the trash) and branches on `reduction.per`;
+`query.effectiveCardCost` and `effects.abilityEddieCost`/`canPayAbility` all
+thread `db` through to it, since every one of their own call sites already
+has `db` in scope (mechanical, not risky — confirmed by `npx tsc --noEmit`
+and the full suite staying green before any card data changed).
+
+## 90 — `firstMatchingPlayDiscount`: a cost reduction on a DIFFERENT card, from another card in play, once per turn
+
+`viktor-vektor-drop-your-illusions`: "Play your first CYBERWARE Gear each
+turn for -3 €$, to a minimum of 1 €$." Grepped pool-wide (`"your first"`) —
+this is the ONLY card among the 141 with this shape: a discount that (a)
+applies to a card OTHER than the one printing it, (b) is gated on a printed
+*category* (card type + keyword) rather than the printing card's own
+identity, and (c) is limited to the first qualifying play each game turn,
+where "qualifying" depends on which card gets played, not on activating an
+ability. §44's existing `costReduction`/`effectiveCardCost` design is
+explicitly self-referential ("a card in hand is not 'in play', so this reads
+the card definition's static defs directly instead of `activeStaticNodes`")
+— it has no path for a card's OWN discount to come from a DIFFERENT,
+already-in-play card's static.
+
+**Ruling:** a new static node, `{ kind: 'firstMatchingPlayDiscount',
+cardType, keyword, amount, minimum }`. `query.ts` gains
+`firstMatchingPlayDiscountSources(db, state, player)`, enumerating every
+such node currently active on `player`'s own field/face-up-Legends, WITH
+provenance (`hostUid`, the node's own `index` in that host's `effects`
+array) — deliberately not folded into the provenance-discarding
+`activeStaticNodes`, because the once-per-turn bookkeeping below needs the
+provenance back. `effectiveCardCost`'s signature changes from `(def, state,
+player)` to `(db, state, player, uid)` (deriving `def` internally) so it can
+also receive `db`, needed both for the new trash-counting `unitInTrash`
+reduction (§89) and to look up `def.type`/`def.keywords` for THIS discount's
+category match — every one of its six call sites (`legal.ts`,
+`reduce.ts` ×2, `effects.ts` ×2, plus its own recursive self-discount loop)
+already had a live `uid` in scope, so the signature change is mechanical.
+For each matching source, `effectiveCardCost` discounts the price being
+computed by `node.amount` (floored at `node.minimum`) UNLESS
+`state.oncePerTurnUsed` already contains `` `${hostUid}:${index}` `` — the
+exact key format `effects.ts`'s existing (now-exported-in-spirit-if-not-
+in-name) `oncePerTurn` bookkeeping already uses for triggered/activated defs,
+reused here for a STATIC def that never itself "fires."
+
+**Marking the allowance used.** Since the discount is unconditional
+whenever it is available (no "you may" — it is baked into the price), the
+allowance is marked spent the moment a matching card is actually played,
+in `effects.ts`'s `playCardOnDraft`, by calling the same (now more widely
+reachable) `markOncePerTurn(draft, hostUid, index)` the ordinary
+`oncePerTurn` path already uses — idempotent, so scanning every
+`firstMatchingPlayDiscountSources` entry on every play and marking any
+category match is always safe even when the allowance was already spent.
+Because `effectiveCardCost` is a pure read consulted identically at
+enumeration time (`legalActions`) and at validation time (`isLegal`), and
+the mark only ever happens inside the one mutating path that actually plays
+a card, the two can never disagree about what a given play costs.
+
+**Scope check against the batch brief's deferral list.** This shape does not
+match any of the three explicitly pre-scoped gaps (floating until-later
+effects, a gig-roll trigger, a post-{Call} pending choice) — it is a plain,
+continuously-active static, fully expressible by extending
+`effectiveCardCost`'s inputs and reusing the existing once-per-turn
+bookkeeping by key rather than by an `EffectDef.oncePerTurn` flag. Building
+it cost six mechanical signature updates and one new node/helper, all
+covered by the full pre-existing suite staying green (`npx tsc --noEmit`,
+`npm test`, `npm run build`) before and after the card's own data/tests
+landed — judged worth doing rather than deferring, unlike the batch's other
+gap (§91), which needs a genuine new state/lifecycle feature no small
+extension can supply.
+
+## 91 — Deferred: `safety-override` (needs the `floatingEffects` gap, §52)
+
+"{Quick} The next time a friendly Unit loses a fight this turn, defeat the
+opposing rival Unit." This is precisely the shape §52 already scoped and
+declined to half-solve for `chrome-fang`/`appetite-for-destruction`, and
+which §79/§80 later made standing policy for: a delayed, conditional,
+one-shot effect that must be remembered across an arbitrary number of future
+actions until either it fires (the next qualifying fight, whichever friendly
+Unit is involved and whichever rival Unit it happens to be fighting) or the
+turn ends unused. Nothing in `GameState` tracks "something will happen later
+this turn, conditionally, to whichever card triggers it" outside a specific
+card instance the way `tempPower`/`tempKeywords`/`oncePerTurnUsed` track
+per-instance or per-turn state — this needs the `floatingEffects` zone (an
+`EffectDef` + controller + expiry + one-shot flag that `draftState` copies
+and `fight()`/turn-boundary code consults) §52 already identified as a
+genuine engine feature, not a vocabulary extension.
+
+**Ruling (scope):** left with `effects: []`, `safety-override` joins
+`chrome-fang`, `appetite-for-destruction` and `cyberpsychosis` on the
+`floatingEffects` deferral list (§52, as updated by §79/§80). Its test in
+`tests/cards/yellow.test.ts` is the same bookkeeping-only assertion those
+three already use.

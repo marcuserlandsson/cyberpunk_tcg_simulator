@@ -33,6 +33,7 @@ import { draftState, drawCards, endGame } from '../engine/game'
 import {
   conditionMet,
   effectiveCardCost,
+  firstMatchingPlayDiscountSources,
   opponentOf,
   reducedCost,
   resolvePowerAmount,
@@ -69,6 +70,14 @@ export interface EffectCtx {
   targets: number[]
   /** The uid bound by an enclosing `sameTarget`, read by `target: 'chosen'`. */
   chosen?: number
+  /**
+   * The `TriggerContext` this def's firing carried, threaded through so a
+   * `scripted` node can read a fact beyond player/sourceUid/targets/chosen —
+   * e.g. `defeatedHostUid` (docs/rulings.md §81 ff.,
+   * the-relic-experimental-biochip). Absent for a def resolved directly
+   * (`resolveEffect`) rather than through a trigger firing.
+   */
+  context?: TriggerContext
 }
 
 /**
@@ -80,6 +89,12 @@ export interface EffectCtx {
  */
 export interface TriggerContext extends ConditionContext {
   payOptionalCosts?: boolean
+  /**
+   * `onDefeat`, when fired for an attached Gear (docs/rulings.md §81 ff.): the
+   * uid of the host Unit that was just defeated (already in the trash) — "this
+   * Unit" in the Gear's own printed text (the-relic-experimental-biochip).
+   */
+  defeatedHostUid?: number
 }
 
 /** Keyword: "usable during the rival's attack" (guide p11 / glossary QUICK). */
@@ -151,7 +166,14 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
         ...node.effects.flatMap(slotSpecs),
       ]
     case 'scripted':
-      return (node.targets ?? []).map((spec) => ({ kind: 'target' as const, spec }))
+      // `filters[i]` narrows `targets[i]` exactly like any other node's
+      // `filter` (docs/rulings.md §81 ff.) — absent (a shorter/omitted array)
+      // means no filter for that slot.
+      return (node.targets ?? []).map((spec, index) => ({
+        kind: 'target' as const,
+        spec,
+        filter: node.filters?.[index],
+      }))
     case 'chooseOne':
       return [
         { kind: 'mode', count: node.modes.length, chooser: node.chooser ?? 'controller' },
@@ -798,14 +820,19 @@ export function applyEffectDefOnDraft(
     if (context.payOptionalCosts !== true) return
     if (!payTriggerCost(db, draft, def, sourceUid, player)) return
   }
-  const ctx: EffectCtx = { player, sourceUid, targets }
+  const ctx: EffectCtx = { player, sourceUid, targets, context }
   const slots = bindSlots(db, draft, def, sourceUid, targets, player)
   applyNode(db, draft, def.effect, ctx, slots)
 }
 
 /** The €$ an EffectDef's cost actually asks for, after its reduction. */
-export function abilityEddieCost(state: GameState, player: PlayerId, def: EffectDef): number {
-  return reducedCost(state, player, def.cost?.eddies ?? 0, def.cost?.reduction)
+export function abilityEddieCost(
+  db: CardDb,
+  state: GameState,
+  player: PlayerId,
+  def: EffectDef
+): number {
+  return reducedCost(db, state, player, def.cost?.eddies ?? 0, def.cost?.reduction)
 }
 
 /**
@@ -819,10 +846,10 @@ function payTriggerCost(
   sourceUid: number,
   player: PlayerId
 ): boolean {
-  if (!canPayAbility(draft, player, def, sourceUid)) return false
+  if (!canPayAbility(db, draft, player, def, sourceUid)) return false
   const host = abilityHost(draft, sourceUid)
   if (def.cost?.selfSpend) spendOnDraft(db, draft, [host])
-  const eddies = abilityEddieCost(draft, player, def)
+  const eddies = abilityEddieCost(db, draft, player, def)
   if (eddies > 0) {
     const payment = canonicalPayment(draft, player, eddies, def.cost?.selfSpend ? host : undefined)
     if (payment === null) return false
@@ -980,7 +1007,7 @@ export function hasPayableOptionalTrigger(
     for (const effect of def.effects) {
       if (effect.trigger !== trigger || effect.cost === undefined) continue
       if (!conditionMet(state, controller, effect, {}, source)) continue
-      if (canPayAbility(state, controller, effect, source)) return true
+      if (canPayAbility(db, state, controller, effect, source)) return true
     }
   }
   return false
@@ -1116,7 +1143,13 @@ export function abilityHost(state: GameState, uid: number): number {
 }
 
 /** Can `player` pay this ability's cost right now? */
-function canPayAbility(state: GameState, player: PlayerId, def: EffectDef, source: number): boolean {
+function canPayAbility(
+  db: CardDb,
+  state: GameState,
+  player: PlayerId,
+  def: EffectDef,
+  source: number
+): boolean {
   const host = abilityHost(state, source)
   if (def.cost?.selfSpend) {
     const card = state.cards[host]
@@ -1124,7 +1157,7 @@ function canPayAbility(state: GameState, player: PlayerId, def: EffectDef, sourc
     // and a card with Lag can't be spent at all this turn.
     if (!card.ready || card.lag) return false
   }
-  const eddies = abilityEddieCost(state, player, def)
+  const eddies = abilityEddieCost(db, state, player, def)
   if (eddies <= 0) return true
   const exclude = def.cost?.selfSpend ? host : undefined
   return canonicalPayment(state, player, eddies, exclude) !== null
@@ -1151,7 +1184,7 @@ export function activatedAbilityActions(
       if (quickOnly && effect.quick !== true) continue
       if (oncePerTurnSpent(state, uid, abilityIndex, effect)) continue
       if (!conditionMet(state, player, effect, {}, uid)) continue
-      if (!canPayAbility(state, player, effect, uid)) continue
+      if (!canPayAbility(db, state, player, effect, uid)) continue
       // A costed ability with a dead target is never worth offering.
       if (hasUnfillableSlot(db, state, uid, effect)) continue
       for (const targets of effectTargetChoices(db, state, uid, effect)) {
@@ -1186,7 +1219,7 @@ export function quickReactionActions(db: CardDb, state: GameState, defender: Pla
   for (const uid of state.players[defender].hand) {
     const def = defOf(db, state, uid)
     if (!def || !isQuickPlayable(def)) continue
-    const payment = canonicalPayment(state, defender, effectiveCardCost(def, state, defender))
+    const payment = canonicalPayment(state, defender, effectiveCardCost(db, state, defender, uid))
     if (payment === null) continue
     for (const targets of triggerTargetChoices(db, state, uid, 'onPlay')) {
       actions.push({ type: 'react', reaction: { type: 'quick', card: uid, payment, targets } })
@@ -1233,7 +1266,7 @@ export function goSoloPayment(
   // to its host, but never {go-solo} (docs/rulings.md §30).
   if (def.type !== 'legend' || !def.keywords.includes('go-solo')) return null
   // The same reduced cost `reduce.ts` validates the payment against (§44).
-  return canonicalPayment(state, player, effectiveCardCost(def, state, player), uid)
+  return canonicalPayment(state, player, effectiveCardCost(db, state, player, uid), uid)
 }
 
 /**
@@ -1340,6 +1373,18 @@ export function playCardOnDraft(
       break
   }
 
+  // "Play your first CYBERWARE Gear each turn for -3 €$, to a minimum of
+  // 1 €$" (viktor-vektor-drop-your-illusions, docs/rulings.md §81 ff.) — mark
+  // every matching, still-unused discount used the moment a qualifying card
+  // is actually played. `effectiveCardCost` already priced (and `isLegal`
+  // already validated) this play with the discount applied; this just
+  // retires the allowance for the rest of the game turn.
+  for (const { hostUid, index, node } of firstMatchingPlayDiscountSources(db, draft, player)) {
+    if (def.type === node.cardType && def.keywords.includes(node.keyword)) {
+      markOncePerTurn(draft, hostUid, index)
+    }
+  }
+
   // A card's own onPlay belongs to the player who played and paid for it — even
   // a Gear card equipped to a rival Unit, whose *ongoing* statics, triggers and
   // abilities do transfer to the host's controller (docs/rulings.md §38). This
@@ -1371,7 +1416,7 @@ export function activateAbilityOnDraft(
   if (!effect) return
 
   const host = abilityHost(draft, cardUid)
-  const eddies = abilityEddieCost(draft, player, effect)
+  const eddies = abilityEddieCost(db, draft, player, effect)
   const payment = eddies > 0
     ? canonicalPayment(draft, player, eddies, effect.cost?.selfSpend ? host : undefined)
     : []

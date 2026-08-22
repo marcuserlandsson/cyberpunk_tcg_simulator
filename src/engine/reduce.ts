@@ -92,7 +92,7 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     if (!shapeMatches) return false
     // The payer is the defender, not the active player.
     const payer = actingPlayer(state)
-    const cost = effectiveCardCost(db[state.cards[reaction.card].defId], state, payer)
+    const cost = effectiveCardCost(db, state, payer, reaction.card)
     return canPayWith(state, payer, reaction.payment, cost)
   }
 
@@ -117,7 +117,7 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     const def = db[state.cards[action.card].defId]
     // A {go-solo} Legend can never help pay its own cost (docs/rulings.md §31).
     const exclude = def.type === 'legend' ? action.card : undefined
-    const cost = effectiveCardCost(def, state, state.activePlayer)
+    const cost = effectiveCardCost(db, state, state.activePlayer, action.card)
     return canPayWith(state, state.activePlayer, action.payment, cost, exclude)
   }
 

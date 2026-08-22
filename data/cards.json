@@ -1955,7 +1955,14 @@
     "sellTag": false,
     "keywords": [],
     "text": "Rival Units can't attack the turn they're played.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "rivalCantAttackWhenPlayed"
+        }
+      }
+    ]
   },
   {
     "id": "meredith-stout-stone-cold-corpo",
@@ -2149,7 +2156,38 @@
       "fixer"
     ],
     "text": "{Call} Choose one effect.\nA friendly Unit can't be defeated in a fight this turn. // Draw 1.\n{Spend} Adjust a Gig by 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onCall",
+        "effect": {
+          "kind": "chooseOne",
+          "modes": [
+            {
+              "kind": "grantKeyword",
+              "keyword": "fight-immune",
+              "target": "friendlyUnit",
+              "duration": "turn"
+            },
+            {
+              "kind": "draw",
+              "count": 1
+            }
+          ]
+        }
+      },
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true
+        },
+        "effect": {
+          "kind": "changeGig",
+          "amount": 1,
+          "target": "anyGigDie",
+          "adjust": true
+        }
+      }
+    ]
   },
   {
     "id": "nadia-fighting-through-grief",
@@ -2245,7 +2283,24 @@
       "ganger"
     ],
     "text": "{Play} Spend this Unit and a rival Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "spendCard",
+              "target": "self"
+            },
+            {
+              "kind": "spendCard",
+              "target": "rivalUnit"
+            }
+          ]
+        }
+      }
+    ]
   },
   {
     "id": "over-the-edge",
@@ -2597,7 +2652,42 @@
       "quick"
     ],
     "text": "{Quick} {Spend} Play a Gear with cost 2 or less from your hand for free.\nWhen a friendly equipped Unit is defeated, search the top 2 cards of your deck and trash 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "activated",
+        "quick": true,
+        "cost": {
+          "selfSpend": true
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "river-ward-detective-on-the-hunt:free-gear",
+          "targets": [
+            "friendlyHandCard",
+            "friendlyUnitOrLegend"
+          ],
+          "filters": [
+            {
+              "cardType": "gear",
+              "maxCost": 2
+            },
+            {}
+          ]
+        }
+      },
+      {
+        "trigger": "onUnitDefeated",
+        "condition": {
+          "defeatedIsFriendly": true,
+          "defeatedWasEquipped": true
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "river-ward-detective-on-the-hunt:defeat-search"
+        }
+      }
+    ],
+    "scripted": "river-ward-detective-on-the-hunt"
   },
   {
     "id": "rockn-rockerboy",
@@ -2637,7 +2727,30 @@
       "merc"
     ],
     "text": "{Go Solo} (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nWhen a friendly Legend steals a Gig, if its value is even, draw 1. If its value is odd, a Rival discards 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyStealDie",
+        "condition": {
+          "stealerIsLegend": true,
+          "stolenDieValueParity": "even"
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      },
+      {
+        "trigger": "onFriendlyStealDie",
+        "condition": {
+          "stealerIsLegend": true,
+          "stolenDieValueParity": "odd"
+        },
+        "effect": {
+          "kind": "discardRandomRival",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "royce-don-t-call-me-simon",
@@ -2989,7 +3102,16 @@
       "ripperdoc"
     ],
     "text": "{Attack} Search the top 3 cards of your deck. Reveal a Gear and add it to your hand. Bottom-deck the rest.\n(Units with power 0 don't steal Gigs.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "effect": {
+          "kind": "scripted",
+          "name": "sketchy-ripper"
+        }
+      }
+    ],
+    "scripted": "sketchy-ripper"
   },
   {
     "id": "swordwise-huscle",
@@ -3060,7 +3182,16 @@
       "netrunner"
     ],
     "text": "{Defeated} Look at all friendly face-down Legends. Then, you may Call a Legend for free. (You can only Call a Legend once per turn.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onDefeat",
+        "effect": {
+          "kind": "scripted",
+          "name": "t-bug-amateur-philosopher"
+        }
+      }
+    ],
+    "scripted": "t-bug-amateur-philosopher"
   },
   {
     "id": "take-control",
@@ -3118,7 +3249,16 @@
       "merc"
     ],
     "text": "Trash 4. Add a Gear from among them to your hand. If that Gear's cost equals the value of a friendly Gig, you may play it for free instead.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "the-heist"
+        }
+      }
+    ],
+    "scripted": "the-heist"
   },
   {
     "id": "the-relic-experimental-biochip",
@@ -3139,7 +3279,16 @@
       "cyberware"
     ],
     "text": "{Defeated} Play another Unit with cost 9 or less from your trash for free. Then, bottom-deck this Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onDefeat",
+        "effect": {
+          "kind": "scripted",
+          "name": "the-relic-experimental-biochip"
+        }
+      }
+    ],
+    "scripted": "the-relic-experimental-biochip"
   },
   {
     "id": "trauma-team-operatives",
@@ -3159,7 +3308,19 @@
       "medtech"
     ],
     "text": "Play this Unit for -1 €$ for each Unit in your trash, to a minimum of 1 €$.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "costReduction",
+          "reduction": {
+            "per": "unitInTrash",
+            "amount": 1,
+            "minimum": 1
+          }
+        }
+      }
+    ]
   },
   {
     "id": "trust-no-one",
@@ -3380,7 +3541,18 @@
       "ripperdoc"
     ],
     "text": "Play your first CYBERWARE Gear each turn for -3 €$, to a minimum of 1 €$.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "firstMatchingPlayDiscount",
+          "cardType": "gear",
+          "keyword": "cyberware",
+          "amount": 3,
+          "minimum": 1
+        }
+      }
+    ]
   },
   {
     "id": "viktor-vektor-sit-down-and-relax",
@@ -3400,7 +3572,16 @@
       "ripperdoc"
     ],
     "text": "{Call} Search the top 5 cards of your deck. Reveal up to 2 Gears with cost 2 or less and add them to your hand. Bottom-deck the rest in a random order.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onCall",
+        "effect": {
+          "kind": "scripted",
+          "name": "viktor-vektor-sit-down-and-relax"
+        }
+      }
+    ],
+    "scripted": "viktor-vektor-sit-down-and-relax"
   },
   {
     "id": "viktor-vektor-you-might-feel-a-little-pinch",
@@ -3420,7 +3601,30 @@
       "ripperdoc"
     ],
     "text": "{Play} Play a CYBERWARE Gear with cost 2 or less from your trash for free. Equip it only to another friendly Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "viktor-vektor-you-might-feel-a-little-pinch",
+          "targets": [
+            "friendlyTrashCard",
+            "friendlyUnit"
+          ],
+          "filters": [
+            {
+              "cardType": "gear",
+              "keyword": "cyberware",
+              "maxCost": 2
+            },
+            {
+              "excludeSelf": true
+            }
+          ]
+        }
+      }
+    ],
+    "scripted": "viktor-vektor-you-might-feel-a-little-pinch"
   },
   {
     "id": "wakako-okada-peace-and-harmony",
@@ -3624,6 +3828,26 @@
       "cyberware"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, adjust a Gig by up to 1. Then, if you control 3 or more Gigs with different values, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onSpend",
+        "effect": {
+          "kind": "changeGig",
+          "amount": 1,
+          "target": "anyGigDie",
+          "adjust": true
+        }
+      },
+      {
+        "trigger": "onSpend",
+        "condition": {
+          "friendlyGigDistinctValuesAtLeast": 3
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      }
+    ]
   }
 ]

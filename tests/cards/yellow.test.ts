@@ -16,6 +16,7 @@
 // Deferred (see the batch report): cyberpsychosis, kerry-eurodyne-axe-attitude-audience.
 
 import { describe, expect, it } from 'vitest'
+import { effectiveCardCost } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
 import type { GameState } from '../../src/engine/types'
 import {
@@ -616,5 +617,583 @@ describe('deferred cards (see the batch-3 report)', () => {
     // here so the completeness test at the end of Task 8 has a single place
     // to look.
     expect(db['kerry-eurodyne-axe-attitude-audience'].effects).toEqual([])
+  })
+})
+
+// ===========================================================================
+// Task 8 — Yellow cards, batch 4: the remaining 18 Yellow cards.
+//
+// Cards covered, in card-id order:
+//   mandibular-upgrade, maxtac-suppression-team, muamar-reyes-el-capita-n,
+//   offduty-malfini, river-ward-detective-on-the-hunt, rockn-rockerboy,
+//   rogue-amendiares-preem-solo, safety-override, secondhand-bombus,
+//   sketchy-ripper, t-bug-amateur-philosopher, the-heist,
+//   the-relic-experimental-biochip, trauma-team-operatives,
+//   viktor-vektor-drop-your-illusions, viktor-vektor-sit-down-and-relax,
+//   viktor-vektor-you-might-feel-a-little-pinch, zetatech-faceplate.
+// Deferred (see the batch-4 report): safety-override.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// mandibular-upgrade — "(Equip to a friendly Unit or face-up Legend.)
+// {Blocker} (reminder)." Pure reminder text, matching riot-shield's identical
+// shape — the {Blocker} keyword is granted via the existing
+// effectiveKeywords/gear machinery, so effects stays [].
+// ---------------------------------------------------------------------------
+
+describe('mandibular-upgrade', () => {
+  it('grants {Blocker} to a host that does not otherwise have it', () => {
+    expect(db['mandibular-upgrade'].effects).toEqual([])
+    const { state } = fixtureWithHand(1, [])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    attachGear(state, host, 'mandibular-upgrade')
+    setGigs(state, 0, [{ size: 6, value: 3 }])
+    const attacker = fieldCard(state, 1, 'rockn-rockerboy')
+
+    const attacked = startAttack(db, state, attacker, 'gigArea')
+    expect(
+      actionsOfType(db, attacked, 'react').some(
+        (a) => a.reaction.type === 'block' && a.reaction.blocker === host
+      )
+    ).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// maxtac-suppression-team — "Rival Units can't attack the turn they're
+// played."
+// ---------------------------------------------------------------------------
+
+describe('maxtac-suppression-team', () => {
+  it("denies a freshly-played rival Unit's {adrenaline} exception to Lag", () => {
+    expect(db['maxtac-suppression-team'].effects).toEqual([
+      { trigger: 'static', effect: { kind: 'rivalCantAttackWhenPlayed' } },
+    ])
+    const { state } = fixtureWithHand(1, ['riding-nomad'])
+    fieldCard(state, 0, 'maxtac-suppression-team')
+    setGigs(state, 0, [{ size: 6, value: 3 }]) // a real attack target must exist
+
+    const next = playCardByDef(db, state, 1, 'riding-nomad')
+    const nomad = findFielded(next, 1, 'riding-nomad')
+    expect(next.cards[nomad].lag).toBe(true)
+    expect(actionsOfType(db, next, 'attack').some((a) => a.attacker === nomad)).toBe(false)
+  })
+
+  it('does not restrict the rival once no MaxTac Suppression Team is in play', () => {
+    const { state } = fixtureWithHand(1, ['riding-nomad'])
+    setGigs(state, 0, [{ size: 6, value: 3 }])
+    const next = playCardByDef(db, state, 1, 'riding-nomad')
+    const nomad = findFielded(next, 1, 'riding-nomad')
+    expect(actionsOfType(db, next, 'attack').some((a) => a.attacker === nomad)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// muamar-reyes-el-capitán — "{Call} Choose one effect. A friendly Unit can't
+// be defeated in a fight this turn. // Draw 1. {Spend} Adjust a Gig by 1."
+// ---------------------------------------------------------------------------
+
+describe('muamar-reyes-el-capita-n', () => {
+  it('resolves one of its two {Call} modes when it flips face-up', () => {
+    const { state } = fixtureWithHand(0, [], { eddies: 3 })
+    state.players[0].legends = []
+    const muamar = mintInto(state, 0, 'legends', 'muamar-reyes-el-capita-n', { faceUp: false })
+    const unit = fieldCard(state, 0, 'japantown-jonin')
+    const handBefore = state.players[0].hand.length
+
+    const next = applyAction(db, state, {
+      type: 'callLegend',
+      payment: [state.players[0].eddies[0]],
+    })
+    expect(next.cards[muamar].faceUp).toBe(true)
+    const granted = next.cards[unit].tempKeywords.includes('fight-immune')
+    const drew = next.players[0].hand.length === handBefore + 1
+    expect(granted !== drew).toBe(true) // exactly one mode, auto-chosen (§32/§45)
+  })
+
+  it('grants immunity that keeps a losing Unit on the field without saving its foe', () => {
+    const { state } = fixtureWithHand(0, ['japantown-jonin'])
+    let next = playCardByDef(db, state, 0, 'japantown-jonin')
+    next = endBothTurnsOnce(db, next)
+    const attacker = findFielded(next, 0, 'japantown-jonin') // power 0
+    next.cards[attacker].tempKeywords.push('fight-immune')
+    setGigs(next, 1, [{ size: 6, value: 3 }])
+    const blocker = fieldCard(next, 1, 'augmented-negotiators') // power 2, {Blocker}
+
+    const attacked = startAttack(db, next, attacker, 'gigArea')
+    const blocked = blockWith(db, attacked, blocker)
+    expect(blocked.players[0].field).toContain(attacker)
+    expect(blocked.players[0].trash).not.toContain(attacker)
+    expect(blocked.players[1].field).toContain(blocker)
+  })
+
+  it('{Spend}s itself to adjust a friendly Gig by 1', () => {
+    const { state } = fixtureWithHand(0, [])
+    state.players[0].legends = []
+    const muamar = mintInto(state, 0, 'legends', 'muamar-reyes-el-capita-n')
+    setGigs(state, 0, [{ size: 6, value: 3 }])
+
+    const next = activate(db, state, muamar, 1, { targets: [0, 1] }) // die 0, +1
+    expect(gigValues(next, 0)).toEqual([4])
+    expect(next.cards[muamar].ready).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// offduty-malfini — "{Play} Spend this Unit and a rival Unit."
+// ---------------------------------------------------------------------------
+
+describe('offduty-malfini', () => {
+  it('spends itself and a chosen rival Unit when played', () => {
+    const { state } = fixtureWithHand(0, ['offduty-malfini'])
+    const rival = fieldCard(state, 1, 'japantown-jonin')
+
+    const next = playCardByDef(db, state, 0, 'offduty-malfini', { targets: [rival] })
+    const self = findFielded(next, 0, 'offduty-malfini')
+    expect(next.cards[self].ready).toBe(false)
+    expect(next.cards[rival].ready).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// river-ward-detective-on-the-hunt — "{Quick} {Spend} Play a Gear with cost
+// 2 or less from your hand for free." / "When a friendly equipped Unit is
+// defeated, search the top 2 cards of your deck and trash 1."
+// ---------------------------------------------------------------------------
+
+describe('river-ward-detective-on-the-hunt', () => {
+  it('plays a cheap Gear from hand for free onto a chosen host', () => {
+    const { state } = fixtureWithHand(0, ['satori-sword-of-saburo'], { eddies: 0 })
+    state.players[0].legends = []
+    const ward = mintInto(state, 0, 'legends', 'river-ward-detective-on-the-hunt')
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    const gear = findInHand(state, 0, 'satori-sword-of-saburo')
+
+    const next = activate(db, state, ward, 0, { targets: [gear, host] })
+    expect(next.cards[host].attachedGear).toContain(gear)
+    expect(next.players[0].hand).not.toContain(gear)
+    expect(next.cards[ward].ready).toBe(false)
+  })
+
+  it('searches the top 2 of the deck and trashes 1 when a friendly equipped Unit is defeated', () => {
+    const { state } = fixtureWithHand(0, [])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    attachGear(state, host, 'mantis-blades')
+    state.players[0].legends = []
+    const ward = mintInto(state, 0, 'legends', 'river-ward-detective-on-the-hunt')
+    const foe = fieldCard(state, 1, 'rockn-rockerboy', { ready: false })
+
+    const top1 = mintInto(state, 0, 'deck', 'animals-wrecker')
+    const top2 = mintInto(state, 0, 'deck', 'secondhand-bombus')
+    state.players[0].deck = [
+      top1,
+      top2,
+      ...state.players[0].deck.filter((uid) => uid !== top1 && uid !== top2),
+    ]
+    const deckBefore = state.players[0].deck.length
+
+    const attacked = startAttack(db, state, host, foe)
+    const resolved = passReact(db, attacked)
+    expect(resolved.players[0].trash).toContain(host) // power 2 vs power 8
+    const trashedFromTop = [top1, top2].filter((uid) => resolved.players[0].trash.includes(uid))
+    expect(trashedFromTop).toHaveLength(1)
+    expect(resolved.players[0].deck.length).toBe(deckBefore - 1)
+  })
+
+  it('does not fire when the defeated friendly Unit was not equipped', () => {
+    const { state } = fixtureWithHand(0, [])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'river-ward-detective-on-the-hunt')
+    const foe = fieldCard(state, 1, 'rockn-rockerboy', { ready: false })
+    const deckBefore = state.players[0].deck.length
+
+    const attacked = startAttack(db, state, host, foe)
+    const resolved = passReact(db, attacked)
+    expect(resolved.players[0].trash).toContain(host)
+    expect(resolved.players[0].deck.length).toBe(deckBefore)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// rockn-rockerboy — flavour-only text (schema.md §9), like animals-wrecker.
+// ---------------------------------------------------------------------------
+
+describe('rockn-rockerboy', () => {
+  it('is a vanilla Rocker Unit', () => {
+    const def = db['rockn-rockerboy']
+    expect(def.effects).toEqual([])
+    const { state } = fixtureWithHand(0, ['rockn-rockerboy'])
+    const next = playCardByDef(db, state, 0, 'rockn-rockerboy')
+    const uid = findFielded(next, 0, 'rockn-rockerboy')
+    expect(next.cards[uid].ready).toBe(true)
+    expect(def.power).toBe(8)
+    expect(def.keywords).toEqual(['rocker'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// rogue-amendiares-preem-solo — "When a friendly Legend steals a Gig, if its
+// value is even, draw 1. If its value is odd, a Rival discards 1."
+// ---------------------------------------------------------------------------
+
+describe('rogue-amendiares-preem-solo', () => {
+  it('draws 1 when it (a Legend) steals a Gig with an even value', () => {
+    const { state } = fixtureWithHand(0, [])
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'rogue-amendiares-preem-solo', { faceUp: true })
+    setGigs(state, 1, [{ size: 6, value: 4 }])
+    let next = playCardByDef(db, state, 0, 'rogue-amendiares-preem-solo')
+    const rogue = findFielded(next, 0, 'rogue-amendiares-preem-solo')
+    const handBefore = next.players[0].hand.length
+
+    next = attackAndSteal(db, next, rogue, 'gigArea', [0])
+    expect(next.players[0].hand.length).toBe(handBefore + 1)
+  })
+
+  it('makes a Rival discard 1 when it steals a Gig with an odd value', () => {
+    const { state } = fixtureWithHand(0, [])
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'rogue-amendiares-preem-solo', { faceUp: true })
+    setGigs(state, 1, [{ size: 6, value: 3 }])
+    mintInto(state, 1, 'hand', 'japantown-jonin')
+    let next = playCardByDef(db, state, 0, 'rogue-amendiares-preem-solo')
+    const rogue = findFielded(next, 0, 'rogue-amendiares-preem-solo')
+    const rivalHandBefore = next.players[1].hand.length
+
+    next = attackAndSteal(db, next, rogue, 'gigArea', [0])
+    expect(next.players[1].hand.length).toBe(rivalHandBefore - 1)
+  })
+
+  it('does not fire when a non-Legend friendly Unit does the stealing', () => {
+    const { state } = fixtureWithHand(0, [])
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'rogue-amendiares-preem-solo', { faceUp: true })
+    const attacker = fieldCard(state, 0, 'rockn-rockerboy')
+    setGigs(state, 1, [{ size: 6, value: 4 }])
+    const handBefore = state.players[0].hand.length
+
+    const next = attackAndSteal(db, state, attacker, 'gigArea', [0])
+    expect(next.players[0].hand.length).toBe(handBefore)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// secondhand-bombus — "{Blocker} (reminder). (Units with power 0 don't steal
+// Gigs.)" Both are reminders of existing mechanics; effects stays [].
+// ---------------------------------------------------------------------------
+
+describe('secondhand-bombus', () => {
+  it('is a 0-power {Blocker} Drone with no additional effect', () => {
+    const def = db['secondhand-bombus']
+    expect(def.effects).toEqual([])
+    expect(def.power).toBe(0)
+    expect(def.keywords).toEqual(expect.arrayContaining(['blocker', 'drone']))
+    const { state } = fixtureWithHand(0, ['secondhand-bombus'])
+    const next = playCardByDef(db, state, 0, 'secondhand-bombus')
+    const uid = findFielded(next, 0, 'secondhand-bombus')
+    expect(next.cards[uid].ready).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// sketchy-ripper — "{Attack} Search the top 3 cards of your deck. Reveal a
+// Gear and add it to your hand. Bottom-deck the rest."
+// ---------------------------------------------------------------------------
+
+describe('sketchy-ripper', () => {
+  it('adds a Gear found among the searched top 3 to hand and bottom-decks the rest', () => {
+    const { state } = fixtureWithHand(0, [])
+    const ripper = fieldCard(state, 0, 'sketchy-ripper')
+    const gear = mintInto(state, 0, 'deck', 'mantis-blades')
+    const nonGearA = mintInto(state, 0, 'deck', 'animals-wrecker')
+    const nonGearB = mintInto(state, 0, 'deck', 'rockn-rockerboy')
+    const three = [gear, nonGearA, nonGearB]
+    state.players[0].deck = [...three, ...state.players[0].deck.filter((u) => !three.includes(u))]
+    const dummy = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+
+    const attacked = startAttack(db, state, ripper, dummy)
+    const resolved = passReact(db, attacked)
+    expect(resolved.players[0].hand).toContain(gear)
+    expect(resolved.players[0].deck).toEqual(expect.arrayContaining([nonGearA, nonGearB]))
+    expect(resolved.players[0].deck).not.toContain(gear)
+  })
+
+  it('bottom-decks everything when no Gear turns up among the searched three', () => {
+    const { state } = fixtureWithHand(0, [])
+    const ripper = fieldCard(state, 0, 'sketchy-ripper')
+    const a = mintInto(state, 0, 'deck', 'animals-wrecker')
+    const b = mintInto(state, 0, 'deck', 'rockn-rockerboy')
+    const c = mintInto(state, 0, 'deck', 'secondhand-bombus')
+    const three = [a, b, c]
+    state.players[0].deck = [...three, ...state.players[0].deck.filter((u) => !three.includes(u))]
+    const dummy = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+
+    const attacked = startAttack(db, state, ripper, dummy)
+    const resolved = passReact(db, attacked)
+    expect(resolved.players[0].hand).toEqual([])
+    expect(resolved.players[0].deck).toEqual(expect.arrayContaining(three))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// t-bug-amateur-philosopher — "{Defeated} Look at all friendly face-down
+// Legends. Then, you may Call a Legend for free."
+// ---------------------------------------------------------------------------
+
+describe('t-bug-amateur-philosopher', () => {
+  it('may Call a Legend for free when defeated', () => {
+    const { state } = fixtureWithHand(0, [])
+    const tbug = fieldCard(state, 0, 't-bug-amateur-philosopher')
+    const foe = fieldCard(state, 1, 'rockn-rockerboy', { ready: false }) // power 8 vs 4
+    expect(state.players[0].legends.some((uid) => !state.cards[uid].faceUp)).toBe(true)
+
+    const attacked = startAttack(db, state, tbug, foe)
+    const resolved = passReact(db, attacked)
+    expect(resolved.players[0].trash).toContain(tbug)
+    expect(resolved.players[0].calledLegendThisTurn).toBe(true)
+    expect(resolved.players[0].legends.some((uid) => resolved.cards[uid].faceUp)).toBe(true)
+  })
+
+  it('does nothing once a Legend has already been Called this turn', () => {
+    const { state } = fixtureWithHand(0, [])
+    const tbug = fieldCard(state, 0, 't-bug-amateur-philosopher')
+    state.players[0].calledLegendThisTurn = true
+    const foe = fieldCard(state, 1, 'rockn-rockerboy', { ready: false })
+
+    const attacked = startAttack(db, state, tbug, foe)
+    const resolved = passReact(db, attacked)
+    expect(resolved.players[0].legends.some((uid) => resolved.cards[uid].faceUp)).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// the-heist — "Trash 4. Add a Gear from among them to your hand. If that
+// Gear's cost equals the value of a friendly Gig, you may play it for free
+// instead."
+// ---------------------------------------------------------------------------
+
+describe('the-heist', () => {
+  it('mills 4, then plays the found Gear for free when its cost matches a friendly Gig', () => {
+    const { state } = fixtureWithHand(0, ['the-heist'])
+    setGigs(state, 0, [{ size: 6, value: 1 }]) // matches mantis-blades' cost 1
+    const gear = mintInto(state, 0, 'deck', 'mantis-blades')
+    const a = mintInto(state, 0, 'deck', 'animals-wrecker')
+    const b = mintInto(state, 0, 'deck', 'rockn-rockerboy')
+    const c = mintInto(state, 0, 'deck', 'secondhand-bombus')
+    const four = [gear, a, b, c]
+    state.players[0].deck = [...four, ...state.players[0].deck.filter((u) => !four.includes(u))]
+    const host = fieldCard(state, 0, 'japantown-jonin')
+
+    const next = playCardByDef(db, state, 0, 'the-heist')
+    expect(next.cards[host].attachedGear).toContain(gear)
+    expect(next.players[0].trash).toEqual(expect.arrayContaining([a, b, c]))
+    expect(next.players[0].hand).not.toContain(gear)
+  })
+
+  it('adds the found Gear to hand instead when its cost does not match a friendly Gig', () => {
+    const { state } = fixtureWithHand(0, ['the-heist'])
+    setGigs(state, 0, [{ size: 6, value: 5 }]) // does not match mantis-blades' cost 1
+    const gear = mintInto(state, 0, 'deck', 'mantis-blades')
+    const a = mintInto(state, 0, 'deck', 'animals-wrecker')
+    const b = mintInto(state, 0, 'deck', 'rockn-rockerboy')
+    const c = mintInto(state, 0, 'deck', 'secondhand-bombus')
+    const four = [gear, a, b, c]
+    state.players[0].deck = [...four, ...state.players[0].deck.filter((u) => !four.includes(u))]
+
+    const next = playCardByDef(db, state, 0, 'the-heist')
+    expect(next.players[0].hand).toContain(gear)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// the-relic-experimental-biochip — "{Defeated} Play another Unit with cost 9
+// or less from your trash for free. Then, bottom-deck this Unit."
+// ---------------------------------------------------------------------------
+
+describe('the-relic-experimental-biochip', () => {
+  it("plays another Unit from trash for free when its host is defeated, then bottom-decks the host", () => {
+    const { state } = fixtureWithHand(0, [])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    attachGear(state, host, 'the-relic-experimental-biochip')
+    const replacement = mintInto(state, 0, 'trash', 'rockn-rockerboy') // cost 5 <= 9, a Unit
+    const foe = fieldCard(state, 1, 'rockn-rockerboy', { ready: false }) // power 8 vs 3
+
+    const attacked = startAttack(db, state, host, foe)
+    const resolved = passReact(db, attacked)
+    expect(resolved.players[0].field).toContain(replacement)
+    expect(resolved.players[0].trash).not.toContain(replacement)
+    expect(resolved.players[0].deck).toContain(host)
+    expect(resolved.players[0].trash).not.toContain(host)
+  })
+
+  it('still bottom-decks the host even with nothing eligible in the trash', () => {
+    const { state } = fixtureWithHand(0, [])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    attachGear(state, host, 'the-relic-experimental-biochip')
+    const foe = fieldCard(state, 1, 'rockn-rockerboy', { ready: false })
+
+    const attacked = startAttack(db, state, host, foe)
+    const resolved = passReact(db, attacked)
+    expect(resolved.players[0].deck).toContain(host)
+    expect(resolved.players[0].field).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// trauma-team-operatives — "Play this Unit for -1 €$ for each Unit in your
+// trash, to a minimum of 1 €$."
+// ---------------------------------------------------------------------------
+
+describe('trauma-team-operatives', () => {
+  it('costs 1 €$ less for each Unit in trash, to a minimum of 1 €$', () => {
+    const { state } = fixtureWithHand(0, ['trauma-team-operatives'])
+    const uid = findInHand(state, 0, 'trauma-team-operatives')
+    expect(effectiveCardCost(db, state, 0, uid)).toBe(6)
+
+    for (let i = 0; i < 3; i++) mintInto(state, 0, 'trash', 'japantown-jonin')
+    expect(effectiveCardCost(db, state, 0, uid)).toBe(3)
+
+    for (let i = 0; i < 10; i++) mintInto(state, 0, 'trash', 'japantown-jonin')
+    expect(effectiveCardCost(db, state, 0, uid)).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// viktor-vektor-drop-your-illusions — "Play your first CYBERWARE Gear each
+// turn for -3 €$, to a minimum of 1 €$."
+// ---------------------------------------------------------------------------
+
+describe('viktor-vektor-drop-your-illusions', () => {
+  it('discounts a CYBERWARE Gear by 3 and leaves a non-CYBERWARE Gear untouched', () => {
+    const { state } = fixtureWithHand(0, ['zetatech-berserk', 'satori-sword-of-saburo'])
+    fieldCard(state, 0, 'viktor-vektor-drop-your-illusions')
+    const berserk = findInHand(state, 0, 'zetatech-berserk')
+    const sword = findInHand(state, 0, 'satori-sword-of-saburo')
+
+    expect(effectiveCardCost(db, state, 0, berserk)).toBe(3) // 6 - 3
+    expect(effectiveCardCost(db, state, 0, sword)).toBe(2) // not CYBERWARE
+  })
+
+  it('only discounts the first matching Gear played each turn', () => {
+    const { state } = fixtureWithHand(0, ['zetatech-berserk', 'gorilla-arms'])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    fieldCard(state, 0, 'viktor-vektor-drop-your-illusions')
+    const gorilla = findInHand(state, 0, 'gorilla-arms')
+    expect(effectiveCardCost(db, state, 0, gorilla)).toBe(1) // 4 - 3
+
+    const next = playCardByDef(db, state, 0, 'zetatech-berserk', { targetDef: 'japantown-jonin' })
+    expect(effectiveCardCost(db, next, 0, gorilla)).toBe(4) // allowance already spent
+  })
+})
+
+// ---------------------------------------------------------------------------
+// viktor-vektor-sit-down-and-relax — "{Call} Search the top 5 cards of your
+// deck. Reveal up to 2 Gears with cost 2 or less and add them to your hand.
+// Bottom-deck the rest in a random order."
+// ---------------------------------------------------------------------------
+
+describe('viktor-vektor-sit-down-and-relax', () => {
+  it('reveals up to 2 cheap Gears from the top 5 and bottom-decks the rest', () => {
+    const { state } = fixtureWithHand(0, [], { eddies: 3 })
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'viktor-vektor-sit-down-and-relax', { faceUp: false })
+    const gearA = mintInto(state, 0, 'deck', 'mantis-blades') // cost 1
+    const gearB = mintInto(state, 0, 'deck', 'kiroshi-optics') // cost 1
+    const expensiveGear = mintInto(state, 0, 'deck', 'the-relic-experimental-biochip') // cost 5
+    const nonGear = mintInto(state, 0, 'deck', 'animals-wrecker')
+    const filler = mintInto(state, 0, 'deck', 'rockn-rockerboy')
+    const five = [gearA, gearB, expensiveGear, nonGear, filler]
+    state.players[0].deck = [...five, ...state.players[0].deck.filter((u) => !five.includes(u))]
+
+    const next = applyAction(db, state, {
+      type: 'callLegend',
+      payment: [state.players[0].eddies[0]],
+    })
+    expect(next.players[0].hand).toEqual(expect.arrayContaining([gearA, gearB]))
+    expect(next.players[0].hand).not.toContain(expensiveGear)
+    expect(next.players[0].hand).not.toContain(nonGear)
+    expect(next.players[0].deck).toEqual(expect.arrayContaining([expensiveGear, nonGear, filler]))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// viktor-vektor-you-might-feel-a-little-pinch — "{Play} Play a CYBERWARE
+// Gear with cost 2 or less from your trash for free. Equip it only to
+// another friendly Unit."
+// ---------------------------------------------------------------------------
+
+describe('viktor-vektor-you-might-feel-a-little-pinch', () => {
+  it('plays a cheap CYBERWARE Gear from trash for free onto another friendly Unit', () => {
+    const { state } = fixtureWithHand(0, ['viktor-vektor-you-might-feel-a-little-pinch'])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    const gear = mintInto(state, 0, 'trash', 'mantis-blades')
+    const nonCyberware = mintInto(state, 0, 'trash', 'satori-sword-of-saburo')
+
+    const next = playCardByDef(db, state, 0, 'viktor-vektor-you-might-feel-a-little-pinch', {
+      targets: [gear, host],
+    })
+    expect(next.cards[host].attachedGear).toContain(gear)
+    expect(next.players[0].trash).toContain(nonCyberware)
+  })
+
+  it('does nothing when no other friendly Unit exists to equip onto', () => {
+    const { state } = fixtureWithHand(0, ['viktor-vektor-you-might-feel-a-little-pinch'])
+    const gear = mintInto(state, 0, 'trash', 'mantis-blades')
+
+    const next = playCardByDef(db, state, 0, 'viktor-vektor-you-might-feel-a-little-pinch')
+    expect(next.players[0].trash).toContain(gear)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// zetatech-faceplate — "(Equip line.) When this Unit or Legend is spent,
+// adjust a Gig by up to 1. Then, if you control 3 or more Gigs with
+// different values, draw 1."
+// ---------------------------------------------------------------------------
+
+describe('zetatech-faceplate', () => {
+  it('adjusts a Gig die by 1 in either direction when its host is spent', () => {
+    const { state } = fixtureWithHand(0, [])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    attachGear(state, host, 'zetatech-faceplate')
+    setGigs(state, 0, [{ size: 6, value: 3 }])
+    const foe = fieldCard(state, 1, 'rockn-rockerboy', { ready: false })
+
+    const attacked = startAttack(db, state, host, foe)
+    expect([2, 4]).toContain(gigValues(attacked, 0)[0])
+  })
+
+  it('draws 1 when the adjustment still leaves 3+ distinct Gig values', () => {
+    const { state } = fixtureWithHand(0, [])
+    const host = fieldCard(state, 0, 'japantown-jonin')
+    attachGear(state, host, 'zetatech-faceplate')
+    setGigs(state, 0, [
+      { size: 20, value: 1 },
+      { size: 20, value: 10 },
+      { size: 20, value: 20 },
+    ])
+    const foe = fieldCard(state, 1, 'rockn-rockerboy', { ready: false })
+    const handBefore = state.players[0].hand.length
+
+    const attacked = startAttack(db, state, host, foe)
+    expect(new Set(gigValues(attacked, 0)).size).toBe(3) // isolated anchors never collide
+    expect(attacked.players[0].hand.length).toBe(handBefore + 1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Batch bookkeeping: the card this batch could not encode.
+// ---------------------------------------------------------------------------
+
+describe('deferred cards (see the batch-4 report)', () => {
+  it('safety-override still carries no effects', () => {
+    // "{Quick} The next time a friendly Unit loses a fight this turn, defeat
+    // the opposing rival Unit." A delayed, conditional, one-shot effect tied
+    // to a future board event rather than to a chosen card — exactly the
+    // `floatingEffects` gap docs/rulings.md §52 already scoped and declined
+    // to half-solve for chrome-fang/appetite-for-destruction (and, per §79,
+    // full-or-defer is the standing policy for any such gap).
+    expect(db['safety-override'].effects).toEqual([])
   })
 })

@@ -97,6 +97,15 @@ export interface ConditionContext {
   attackerTags?: string[]
   /** `onUnitDefeated` only: the defeated Unit's own faction/keyword tags. */
   defeatedTags?: string[]
+  // Batch 4 additions (docs/rulings.md §81 ff.):
+  /** `onFriendlyStealDie` only: the rolled value of the die that was just stolen (not its size). */
+  stolenDieValue?: number
+  /** `onFriendlyStealDie` only: was the stealing card's own type a Legend? */
+  stealerIsLegend?: boolean
+  /** `onUnitDefeated` only: the PlayerId that owned the defeated Unit. */
+  defeatedOwner?: PlayerId
+  /** `onUnitDefeated` only: did the defeated Unit carry ≥1 attached Gear before it left the field? */
+  defeatedWasEquipped?: boolean
 }
 
 /**
@@ -207,6 +216,21 @@ export function conditionMet(
     const source = sourceUid !== undefined ? state.cards[sourceUid] : undefined
     if (source === undefined || source.attachedGear.length === 0) return false
   }
+  // Batch 4 additions (docs/rulings.md §81 ff.):
+  if (condition.stealerIsLegend === true && context.stealerIsLegend !== true) {
+    return false
+  }
+  if (condition.stolenDieValueParity !== undefined) {
+    if (context.stolenDieValue === undefined) return false
+    const wantEven = condition.stolenDieValueParity === 'even'
+    if (context.stolenDieValue % 2 === 0 !== wantEven) return false
+  }
+  if (condition.defeatedIsFriendly === true && context.defeatedOwner !== player) {
+    return false
+  }
+  if (condition.defeatedWasEquipped === true && context.defeatedWasEquipped !== true) {
+    return false
+  }
   return true
 }
 
@@ -215,36 +239,92 @@ export function conditionMet(
 // ---------------------------------------------------------------------------
 
 /**
- * Applies a printed cost reduction ("-1 €$ for each friendly Gig with 8+
- * value, to a minimum of 1 €$") to a base cost (docs/rulings.md §44).
+ * Applies a printed cost reduction to a base cost (docs/rulings.md §44/§81
+ * ff.): "-1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$", or
+ * (batch 4) "-1 €$ for each Unit in your trash" — a flat count with no value
+ * threshold, hence the second `per` variant rather than an overload of
+ * `value`. The trash count needs `db` to tell a Unit from any other card type.
  */
 export function reducedCost(
+  db: CardDb,
   state: GameState,
   player: PlayerId,
   base: number,
   reduction: CostReduction | undefined
 ): number {
   if (reduction === undefined) return base
-  const matching = state.players[player].gigArea.filter(
-    (die) => die.value >= reduction.value
-  ).length
+  const matching =
+    reduction.per === 'friendlyGigValueAtLeast'
+      ? state.players[player].gigArea.filter((die) => die.value >= reduction.value).length
+      : state.players[player].trash.filter((uid) => db[state.cards[uid].defId]?.type === 'unit')
+          .length
   return Math.max(reduction.minimum, base - matching * reduction.amount)
 }
 
 /**
- * What playing `defId` costs `player` right now: its printed cost, less every
- * `costReduction` static node printed on the card itself. Read off the *card
- * definition* rather than `activeStaticNodes`, because a card in hand is not
- * "in play" and so contributes no live statics (docs/rulings.md §44).
+ * Every `firstMatchingPlayDiscount` static node currently active on `player`'s
+ * own side, with the provenance (`hostUid`, its own effect `index`) needed to
+ * check/mark its once-per-turn allowance (docs/rulings.md §81 ff. —
+ * viktor-vektor-drop-your-illusions). Deliberately not folded into
+ * `activeStaticNodes`: that helper discards provenance, which this needs.
  */
-export function effectiveCardCost(def: CardDef, state: GameState, player: PlayerId): number {
+export function firstMatchingPlayDiscountSources(
+  db: CardDb,
+  state: GameState,
+  player: PlayerId
+): { hostUid: number; index: number; node: Extract<EffectNode, { kind: 'firstMatchingPlayDiscount' }> }[] {
+  const p = state.players[player]
+  const hosts = [...p.field, ...p.legends.filter((uid) => state.cards[uid].faceUp)]
+  const results: {
+    hostUid: number
+    index: number
+    node: Extract<EffectNode, { kind: 'firstMatchingPlayDiscount' }>
+  }[] = []
+  for (const hostUid of hosts) {
+    const hostDef = db[state.cards[hostUid].defId]
+    if (!hostDef) continue
+    for (const [index, effect] of hostDef.effects.entries()) {
+      if (effect.trigger !== 'static') continue
+      if (!conditionMet(state, player, effect)) continue
+      for (const node of flattenNodes(effect.effect)) {
+        if (node.kind === 'firstMatchingPlayDiscount') results.push({ hostUid, index, node })
+      }
+    }
+  }
+  return results
+}
+
+/**
+ * What playing `uid` costs `player` right now: its printed cost, less every
+ * `costReduction` static node printed on the card itself (read off the *card
+ * definition* rather than `activeStaticNodes`, because a card in hand is not
+ * "in play" and so contributes no live statics of its own, docs/rulings.md
+ * §44), less every OTHER friendly in-play card's still-unused
+ * `firstMatchingPlayDiscount` whose category this card matches
+ * (docs/rulings.md §81 ff.) — "Play your first CYBERWARE Gear each turn for
+ * -3 €$." The allowance itself is marked used by `effects.playCardOnDraft`
+ * the moment a matching card is actually played, not here (this is a pure
+ * read, consulted both when enumerating and when validating a payment).
+ */
+export function effectiveCardCost(
+  db: CardDb,
+  state: GameState,
+  player: PlayerId,
+  uid: number
+): number {
+  const def = db[state.cards[uid].defId]
   let cost = def.cost
   for (const effect of def.effects) {
     if (effect.trigger !== 'static') continue
     if (!conditionMet(state, player, effect)) continue
     for (const node of flattenNodes(effect.effect)) {
-      if (node.kind === 'costReduction') cost = reducedCost(state, player, cost, node.reduction)
+      if (node.kind === 'costReduction') cost = reducedCost(db, state, player, cost, node.reduction)
     }
+  }
+  for (const { hostUid, index, node } of firstMatchingPlayDiscountSources(db, state, player)) {
+    if (def.type !== node.cardType || !def.keywords.includes(node.keyword)) continue
+    if (state.oncePerTurnUsed.includes(`${hostUid}:${index}`)) continue
+    cost = Math.max(node.minimum, cost - node.amount)
   }
   return cost
 }
@@ -433,6 +513,24 @@ export function attackableReadyKeyword(db: CardDb, state: GameState, uid: number
  */
 export function cantAttackGigArea(db: CardDb, state: GameState, uid: number): boolean {
   return activeStaticNodes(db, state, uid).some((node) => node.kind === 'cantAttackGigArea')
+}
+
+/**
+ * "Rival Units can't attack the turn they're played" (maxtac-suppression-team,
+ * docs/rulings.md §81 ff.) — does `uid`'s owner's OPPONENT have any in-play
+ * card carrying a `rivalCantAttackWhenPlayed` static? Consulted by
+ * `combat.ts`'s `canAttack` to deny the {adrenaline} exception to Lag for
+ * every Unit on that opposing side, while `uid`'s own static defs are
+ * unaffected (the restriction is about the RIVAL of whoever prints it).
+ */
+export function rivalDeniesFreshAttacks(db: CardDb, state: GameState, uid: number): boolean {
+  const card = state.cards[uid]
+  if (!card) return false
+  const rival = state.players[opponentOf(card.owner)]
+  const hosts = [...rival.field, ...rival.legends.filter((u) => state.cards[u].faceUp)]
+  return hosts.some((host) =>
+    activeStaticNodes(db, state, host).some((node) => node.kind === 'rivalCantAttackWhenPlayed')
+  )
 }
 
 /**
