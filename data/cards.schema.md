@@ -15,12 +15,12 @@ prose reference used during transcription and by anyone reading the data).
 | `faction` | `string?` | Set only when one of the card's printed classification tags names a specific in-world organization (gang/corp/movement) — see **Faction tags** below. Omitted for cards whose only tags are generic roles (Merc, Corpo, Netrunner, etc.) or which have no tags. |
 | `type` | `'legend' \| 'unit' \| 'program' \| 'gear'` | Lowercased from the database's `card_type`. |
 | `cost` | `number` | Eddie cost, top-left corner. Non-legends always have a printed cost. **Legends without a "Go Solo" option print "—" for cost and have no cost value; we encode this as `0`** (see `docs/rulings.md`) rather than `null`, because this field is non-nullable in `CardDef`. |
-| `power` | `number \| null` | Bottom-right corner. `null` when not printed (most Programs; Legends without a Go Solo option). Note some Gear print a power-like bonus number (e.g. Mantis Blades' "+2") — that value is stored here per the brief's instruction that Gear/Program power is "usually null unless printed". |
+| `power` | `number \| null` | Bottom-right corner. `null` when the database reports no power: most Programs (genuinely no power box printed) and the 19 Legends without a Go Solo option (**these do print a literal `0`; we keep `null` to match the primary source — see `docs/rulings.md` §11**). Note some Gear print a power-like bonus number (e.g. Mantis Blades' "+2", Mandibular Upgrade's "+0") — the bare number is stored here per the brief's instruction that Gear/Program power is "usually null unless printed". |
 | `ram` | `{ color: string, value: number } \| null` | Non-legend cards only. `color` is always the card's own `color` field (this game has no separate "off-color RAM" concept in the data we found). `null` for legends. |
 | `ramLimit` | `{ color: string, value: number } \| null` | Legends only — the RAM capacity a face-up Legend contributes. `null` for non-legends, and also `null` for the one legend (`rebecca-having-a-moment`) where the source database does not expose a RAM value at all (flagged `uncertain: ramLimit` in the transcription report). |
 | `sellTag` | `boolean` | Whether the card shows the sell-for-1-Eddie icon (top-left, below cost). Mapped 1:1 from the database's `is_eddiable` field; visually confirmed against several print-and-play cards. |
 | `keywords` | `string[]` | Lowercase, kebab-case for multi-word terms. See **Keyword vocabulary** below — this array mixes true rules keywords with classification/role tags, since `CardDef` has no separate tags field. |
-| `text` | `string` | Verbatim rules text from the database's `rules_text` field (empty string `""` for vanilla cards, including the one card — `rebecca-having-a-moment` — whose `rules_text` is `null` in the source). Keyword/timing-trigger markup is preserved as `{Term}`, exactly as the database renders it (this is the plaintext stand-in for the card's colored highlight boxes). |
+| `text` | `string` | Verbatim rules text from the database's `rules_text` field (empty string `""` for vanilla cards, including the one card — `rebecca-having-a-moment` — whose `rules_text` is `null` in the source). Keyword/timing-trigger markup is preserved as `{Term}`, exactly as the database renders it (this is the plaintext stand-in for the card's colored highlight boxes). **4 cards deviate from `rules_text` because the database's own card art proves the field wrong: `kiroshi-optics` (equip line, rulings §8) and `psycho-squad` / `animals-wrecker` / `rockn-rockerboy` (stripped `[Flavour]` annotation, rulings §9). All other 137 are byte-exact.** |
 | `effects` | `EffectDef[]` | Left as `[]` for every card in Task 2. Task 8 populates this from `text` using the vocabulary Task 7 defines. |
 | `scripted` | `string?` | Not used in Task 2 (omitted for all cards). Reserved for cards whose text doesn't fit the effect vocabulary at all. |
 
@@ -68,9 +68,14 @@ card): `6th Street`, `Arasaka`, `Maelstrom`, `Militech`, `NCPD`, `Netwatch`,
 `Trauma Team`, `Tyger Claws`, `Valentino`, `Voodoo Boys`, `Zetatech`,
 `Aldecado`, `Nomad`, `Raffen Shiv`, `Mox`, `Maine's Crew`, `Scavenger`. When a
 card has more than one such tag, the first one (in the database's printed
-order) wins and the others are dropped (rare in practice — checked, no card
-in the 141-card set has two faction tags). This partition of the 38 possible
-classification values is a judgment call — see `docs/rulings.md`.
+order) is promoted to `faction` and **the remaining ones stay in `keywords`**
+(kebab-cased), so no classification tag is ever lost. 8 of the 141 cards have
+two faction tags — `emergency-atlus`, `minotaur`, `octant`,
+`panam-palmer-nomad-cavalry`, `panam-palmer-strength-through-family`,
+`saul-bright-stormrider`, `unlikely-bond`, `wraith-marauders`. (Pass 1
+originally dropped the extra tag and wrongly claimed no card had two; pass 2
+restored all 8 — see `docs/rulings.md` §10.) This partition of the 39
+possible classification values is a judgment call — see `docs/rulings.md` §3.
 
 ## `EffectNode` vocabulary (starting point for Task 7/8)
 

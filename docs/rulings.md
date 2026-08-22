@@ -66,22 +66,30 @@ disagreement with guesses/Alpha material), `data/cards.json` uses
 but the database's `classifications` array can hold 0–3 tags per card, mixing
 specific organization names (Arasaka, Militech, Maelstrom, ...) with generic
 role tags (Merc, Corpo, Netrunner, Weapon, ...). Ruling: promote the
-organization-style tags to `faction` (first one wins if more than one — never
-observed among the 141 cards); fold every other classification tag into
-`keywords` (lowercase, kebab-cased for multi-word tags). See the "Faction
-tags" section of `data/cards.schema.md` for the exact partition and its
-rationale.
+organization-style tags to `faction` (first one wins if more than one); fold
+every other classification tag into `keywords` (lowercase, kebab-cased for
+multi-word tags). See the "Faction tags" section of `data/cards.schema.md`
+for the exact partition and its rationale.
+
+> **Pass-2 correction.** This ruling originally claimed two faction tags on
+> one card were "never observed among the 141 cards". That is false — **8
+> cards carry two**, and the original "first one wins" wording caused the
+> second tag to be dropped from the data entirely. Superseded by §10.
 
 ## 4. Legend `cost`/`power` when there's no "Go Solo" option
 
-19 of the 27 Legends have no Go Solo option; their printed cost/power boxes
-show "—" and the database returns `cost: null, power: null`. `CardDef.cost` is
+19 of the 27 Legends have no Go Solo option; their printed **cost** box shows
+"—" and the database returns `cost: null, power: null`. `CardDef.cost` is
 typed `number` (non-nullable), so we encode "no Go Solo cost" as `cost: 0`.
 `power` stays `null` (the field is nullable). This is a lossy encoding — a
 `0`-cost Go Solo and a "no Go Solo option" both read as `cost: 0` — but there
 is no other legal value given the current schema. Flagged for Task 3/7
 reviewers: if it matters for the engine to distinguish "no Go Solo" from
 "Go Solo costs 0", the schema needs a nullable cost or an explicit boolean.
+
+> **Pass-2 correction.** The claim that the *power* box also shows "—" on
+> these Legends is false: it prints `0`. See §11 — the value is kept as
+> `null` anyway, but for a different (source-precedence) reason.
 
 ## 5. `rebecca-having-a-moment` — missing RAM value
 
@@ -106,3 +114,159 @@ the database puts the card's flavor quote directly in `rules_text` (its
 separate `flavor_text` field is `null`) for vanilla Gear with no functional
 effect. Verified against the print-and-play image — this matches the
 physical card exactly. Kept verbatim in `text`; not stripped.
+
+---
+
+# Pass-2 rulings (independent verification)
+
+The rulings below were made during pass-2 verification. Pass 2 re-fetched the
+netdeck.gg API from scratch and, for every disputed field, read the card
+image the API itself serves (`printings[].image_url`) and/or the
+print-and-play sheets. **Where the API's structured text field contradicts
+the API's own card art, pass 2 treats the art as authoritative** — the art is
+a photograph of the physical card, whereas `rules_text` is a hand-entered
+transcription and is demonstrably imperfect. This is a deliberate refinement
+of pass 1's blanket "database wins" rule, which is retained for everything
+the art cannot settle.
+
+## 8. `kiroshi-optics` — API `rules_text` contradicts the printed equip line
+
+**Fixed in `data/cards.json`.**
+
+All 14 Gear cards with an equip reminder line have the *identical* string in
+the API: `"(Equip to a friendly Unit or face-up Legend.)"`. Pass 2 pulled the
+card art for all 14 and read each line. Thirteen match. `kiroshi-optics` does
+not — it prints:
+
+```
+(Equip to a Unit or friendly face-up Legend.)
+```
+
+The two readings are not cosmetic: the printed version scopes "friendly" to
+the *Legend* only, so Kiroshi Optics may be equipped to **any** Unit
+(including a rival's), whereas the API's wording restricts it to friendly
+Units. Evidence, all agreeing on the printed wording:
+
+- all **five** printing images the API serves for this slug
+  (`welcometonightcitybeta`, `welcometonightcityretail`,
+  `theheistretailstarterdeck`, `theheistbetastarterdeck`, `mercdemodeck`);
+- `docs/rules/print-and-play-mercs.pdf` pages 1 and 2 (3 copies), where
+  Kiroshi Optics sits on the *same sheet, in the same font*, next to
+  `mandibular-upgrade` printing the standard "a friendly Unit" wording — so
+  this is not a rendering or reading artifact.
+
+Ruling: `text` corrected to the printed wording. This is the only card in the
+141 where the API's `rules_text` was found to disagree with its own art;
+every other card's text is byte-exact against the API.
+
+## 9. `[Flavour]` / `[Flavour Text]` / `[Flavor]` are database artifacts
+
+**Fixed in `data/cards.json` (3 cards).**
+
+Three cards' `rules_text` begins with a bracketed editorial marker:
+
+| card | API `rules_text` |
+|---|---|
+| `psycho-squad` | `[Flavour] Their protocol stops at “shoot first.”` |
+| `animals-wrecker` | `[Flavour Text] Takes a lot of juice to break bones like they do.` |
+| `rockn-rockerboy` | `[Flavor] Scream your throat raw for something. Anything.` |
+
+None of these markers is printed on the card — verified on the card art for
+all three (and on `print-and-play-mercs.pdf` p3 for `psycho-squad`, which
+shows only the italic flavour line). The three different spellings, and the
+fact that most flavour-only cards (e.g. `emergency-atlus`, `mantis-blades` —
+see §7) carry no marker at all, confirm these are inconsistent upstream
+data-entry annotations rather than card content.
+
+Ruling: strip the leading marker, keep the flavour line. This matters beyond
+tidiness: `text` is the input Task 8 parses into `effects`, and a stray
+`[Flavour]` token is garbage to that parser. §7 (flavour text belongs in
+`text`) is unchanged — only the bracketed marker is removed.
+
+## 10. Cards with two faction tags must not lose the second one
+
+**Fixed in `data/cards.json` (8 cards).**
+
+Pass 1's rule (§3) promoted the first organization-style classification tag to
+`faction` and asserted no card had two. Eight do, and for each the second tag
+vanished from the data entirely — it was neither in `faction` nor in
+`keywords`, so 8 of the 241 classification-tag instances were unrecoverable:
+
+| card | API `classifications` | `faction` | tag that was lost |
+|---|---|---|---|
+| `emergency-atlus` | Trauma Team, Vehicle, Zetatech | Trauma Team | Zetatech |
+| `minotaur` | Arasaka, Drone, Militech | Arasaka | Militech |
+| `octant` | Drone, Militech, Zetatech | Militech | Zetatech |
+| `panam-palmer-nomad-cavalry` | Aldecado, Merc, Nomad | Aldecado | Nomad |
+| `panam-palmer-strength-through-family` | Aldecado, Merc, Nomad | Aldecado | Nomad |
+| `saul-bright-stormrider` | Aldecado, Nomad | Aldecado | Nomad |
+| `unlikely-bond` | Maelstrom, Mox | Maelstrom | Mox |
+| `wraith-marauders` | Ganger, Nomad, Raffen Shiv | Nomad | Raffen Shiv |
+
+Ruling: `faction` still holds the first organization tag (unchanged, so no
+schema or shape change), and **every remaining classification tag — including
+extra organization tags — goes into `keywords`**, kebab-cased, in the
+database's printed tag order. This is exactly what `data/cards.schema.md`
+already says `keywords` is for ("keywords also carries every
+classification/role tag printed under the card's name"); the faction
+promotion was only ever meant to *add* a lookup field, not to delete tags.
+
+This matters for gameplay: several cards key off these tags (e.g.
+`arasaka-emergency-radioport` checks "if that Legend is ARASAKA"), so a card
+that is mechanically Militech or Nomad has to be findable as such.
+
+## 11. Non-Go-Solo Legends print power `0`; we keep `null` (source precedence)
+
+**Not changed — documented discrepancy.**
+
+The 19 Legends without a Go Solo option print a literal `0` in the
+bottom-right power box, while the API reports `power: null`. Verified on the
+card art for `yorinobu-arasaka-embracing-destruction` and, on the
+print-and-play sheets, for `saburo-arasaka-stubborn-patriarch`,
+`viktor-vektor-sit-down-and-relax` and `jackie-welles-pour-one-out-for-me`.
+The glyph is unambiguous: it sits in the same power box, in the same style, as
+`emergency-atlus`'s `04` and `minotaur`'s `09`, and is identical to the `0`
+printed by `secondhand-bombus` — a card the API *does* report as `power: 0`.
+The reminder text on the rules card ("0 Gigs at power 0") confirms `0` is a
+real, meaningful power value in this game.
+
+Ruling: leave `power: null`. Reasons:
+
+1. It is **mechanically inert**. A Legend with no Go Solo option can never
+   become a Unit, so it can never attack or fight, and its power is never
+   consulted. Nothing in the 141-card pool reads a non-Go-Solo Legend's power.
+2. The API is the designated primary source for scalar fields, and unlike §8
+   this is not a case of the database contradicting its own art on a
+   *meaning-bearing* string — it is the database consistently modelling
+   "this Legend has no power characteristic" as `null` across all 19 cards.
+3. Changing 19 cards on a purely presentational difference would diverge the
+   data from its stated primary source for no behavioural gain.
+
+Flagged for Task 3/7 reviewers: if the engine ever needs a numeric power for
+a face-up Legend (e.g. if a future card lets a non-Go-Solo Legend fight, or if
+Gear power bonuses are summed onto Legends), treat `null` here as `0` rather
+than re-transcribing the data.
+
+## 12. `rebecca-having-a-moment` is an art-only promo — all-null is correct
+
+**Not changed — uncertainty resolved.**
+
+Pass 1 flagged this card `uncertain: ramLimit` because the API returned
+`ram: null`, `cost: null`, `power: null`, `rules_text: null` and
+`classifications: []`, and pass 1 never rendered an image. Pass 2 fetched the
+detail endpoint, which exposes **two** printings (`005` by Narupiti
+Harunsong, `007` by Pandart Studio), and read both CDN renders.
+
+Both are full-art *borderless* "Nova Rare" showcase promos. They print the
+LEGEND banner, the name `REBECCA`, the subtitle `HAVING A MOMENT`, the artist
+credit and the collector footer — and **no gameplay furniture whatsoever**:
+no cost box, no power box, no RAM badge, no classification tags, no
+rules-text box. The API's all-null record is therefore an accurate
+description of the physical card, not a scraping gap.
+
+Ruling: `ramLimit: null` and `text: ""` stand, and the card is no longer
+"uncertain" — it is confirmed to have no printed stats. Caveat for the engine:
+this makes the card **unplayable as data** while every other Legend in the
+pool has RAM 2 (26/26, no exceptions). If a playable value is ever needed,
+`2` is the near-certain intent, but pass 2 declined to invent it. Task 4+
+should either exclude this card from legal decks or special-case it.

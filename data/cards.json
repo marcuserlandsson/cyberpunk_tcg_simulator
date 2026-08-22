@@ -180,7 +180,7 @@
       "animal",
       "ganger"
     ],
-    "text": "[Flavour Text] Takes a lot of juice to break bones like they do.",
+    "text": "Takes a lot of juice to break bones like they do.",
     "effects": []
   },
   {
@@ -619,7 +619,8 @@
     "ramLimit": null,
     "sellTag": false,
     "keywords": [
-      "vehicle"
+      "vehicle",
+      "zetatech"
     ],
     "text": "\"Grab the policyholder, leave the rest for the city meatwagon.\"",
     "effects": []
@@ -1200,7 +1201,7 @@
     "keywords": [
       "cyberware"
     ],
-    "text": "(Equip to a friendly Unit or face-up Legend.)\n{Attack} Look at a friendly face-down Legend. (Don't reveal it.)",
+    "text": "(Equip to a Unit or friendly face-up Legend.)\n{Attack} Look at a friendly face-down Legend. (Don't reveal it.)",
     "effects": []
   },
   {
@@ -1478,7 +1479,8 @@
     "ramLimit": null,
     "sellTag": false,
     "keywords": [
-      "drone"
+      "drone",
+      "militech"
     ],
     "text": "{Play} If you have more ☆ (Street Cred) than a Rival, defeat a rival Unit with power 5 or less.",
     "effects": []
@@ -1661,7 +1663,8 @@
     "ramLimit": null,
     "sellTag": false,
     "keywords": [
-      "drone"
+      "drone",
+      "zetatech"
     ],
     "text": "Play this Unit for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$.",
     "effects": []
@@ -1783,7 +1786,8 @@
     },
     "sellTag": true,
     "keywords": [
-      "merc"
+      "merc",
+      "nomad"
     ],
     "text": "2 €$, {Spend} Move a Gear from this Legend to an unequipped friendly Unit. If you do, ready that Unit.\nAt the end of your turn, if 5 or more friendly Units and/or Legends are equipped, ready them.",
     "effects": []
@@ -1804,7 +1808,8 @@
     "ramLimit": null,
     "sellTag": false,
     "keywords": [
-      "merc"
+      "merc",
+      "nomad"
     ],
     "text": "During your turn, you may Call a Legend for free.\n{Attack} Discard 1. If you do, draw 1 for each friendly face-up Legend.",
     "effects": []
@@ -1884,7 +1889,7 @@
     "ramLimit": null,
     "sellTag": false,
     "keywords": [],
-    "text": "[Flavour] Their protocol stops at “shoot first.”",
+    "text": "Their protocol stops at “shoot first.”",
     "effects": []
   },
   {
@@ -2041,7 +2046,7 @@
     "keywords": [
       "rocker"
     ],
-    "text": "[Flavor] Scream your throat raw for something. Anything.",
+    "text": "Scream your throat raw for something. Anything.",
     "effects": []
   },
   {
@@ -2268,7 +2273,9 @@
     },
     "ramLimit": null,
     "sellTag": false,
-    "keywords": [],
+    "keywords": [
+      "nomad"
+    ],
     "text": "Other friendly Units have +2 power while attacking.\nAt the end of your turn, ready up to 3 friendly Units.",
     "effects": []
   },
@@ -2546,7 +2553,9 @@
     },
     "ramLimit": null,
     "sellTag": true,
-    "keywords": [],
+    "keywords": [
+      "mox"
+    ],
     "text": "Bottom-deck a ready friendly Unit. If you do, bottom-deck a spent rival Unit.",
     "effects": []
   },
@@ -2771,7 +2780,8 @@
     "ramLimit": null,
     "sellTag": false,
     "keywords": [
-      "ganger"
+      "ganger",
+      "raffen-shiv"
     ],
     "text": "When this Unit steals a Gig, ready another friendly Unit with power equal to the Gig's value.",
     "effects": []
