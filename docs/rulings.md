@@ -288,25 +288,3 @@ to them. The engine's `validateDeck` (Task 3) will skip the size check when
 **Rationale:** Demo games deck out faster than constructed games, which is
 authentic to the physical demo product (the PDFs are explicitly designed for
 quick learning and introductory play).
-
-**Not changed — uncertainty resolved.**
-
-Pass 1 flagged this card `uncertain: ramLimit` because the API returned
-`ram: null`, `cost: null`, `power: null`, `rules_text: null` and
-`classifications: []`, and pass 1 never rendered an image. Pass 2 fetched the
-detail endpoint, which exposes **two** printings (`005` by Narupiti
-Harunsong, `007` by Pandart Studio), and read both CDN renders.
-
-Both are full-art *borderless* "Nova Rare" showcase promos. They print the
-LEGEND banner, the name `REBECCA`, the subtitle `HAVING A MOMENT`, the artist
-credit and the collector footer — and **no gameplay furniture whatsoever**:
-no cost box, no power box, no RAM badge, no classification tags, no
-rules-text box. The API's all-null record is therefore an accurate
-description of the physical card, not a scraping gap.
-
-Ruling: `ramLimit: null` and `text: ""` stand, and the card is no longer
-"uncertain" — it is confirmed to have no printed stats. Caveat for the engine:
-this makes the card **unplayable as data** while every other Legend in the
-pool has RAM 2 (26/26, no exceptions). If a playable value is ever needed,
-`2` is the near-certain intent, but pass 2 declined to invent it. Task 4+
-should either exclude this card from legal decks or special-case it.
