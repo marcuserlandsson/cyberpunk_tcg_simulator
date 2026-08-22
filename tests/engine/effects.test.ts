@@ -813,6 +813,47 @@ describe('trigger: onDefeat', () => {
   })
 })
 
+describe('auto-targeting (docs/rulings.md §32)', () => {
+  it('picks uniformly through state.rng, so the same state always resolves the same way', () => {
+    const db = makeDb([
+      def('sniper', 'unit', {
+        power: 3,
+        effects: [{ trigger: 'onAttack', effect: { kind: 'defeat', target: 'rivalUnit' } }],
+      }),
+      def('grunt', 'unit', { power: 1 }),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'sniper')
+    const a = mint(s, 1, 'field', 'grunt')
+    const b = mint(s, 1, 'field', 'grunt')
+    gigs(s, 1, [4])
+
+    const first = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
+    const again = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
+    expect(again.players[1].trash).toEqual(first.players[1].trash)
+    expect(first.players[1].trash).toHaveLength(1)
+    expect([a, b]).toContain(first.players[1].trash[0])
+    // The pick came off the rng, so the rng advanced.
+    expect(first.rng).not.toEqual(s.rng)
+  })
+})
+
+describe('static effects while not in play', () => {
+  it('a face-down legend contributes no statics', () => {
+    const db = makeDb([
+      def('proud', 'legend', {
+        power: 4,
+        effects: [{ trigger: 'static', effect: { kind: 'staticPower', amount: 3 } }],
+      }),
+    ])
+    const s = scenario()
+    const legend = mint(s, 0, 'legends', 'proud', { faceUp: false })
+    expect(effectivePower(db, s, legend)).toBe(4)
+    s.cards[legend].faceUp = true
+    expect(effectivePower(db, s, legend)).toBe(7)
+  })
+})
+
 describe('condition: streetCredAtLeast', () => {
   it('skips a trigger whose street cred requirement is not met', () => {
     const db = makeDb([
@@ -1086,6 +1127,19 @@ describe('quick', () => {
     expect(resolved.players[1].gigArea).toHaveLength(1)
   })
 
+  it('a quick ability is still a normal main-phase ability (docs/rulings.md §33)', () => {
+    const s = scenario()
+    const hitman = mint(s, 0, 'field', 'hitman') // player 0's own turn
+    const victim = mint(s, 1, 'field', 'grunt')
+
+    const actions = abilityActions(db, s)
+    expect(actions).toEqual([
+      { type: 'activateAbility', card: hitman, abilityIndex: 0, targets: [victim] },
+    ])
+    const next = applyAction(db, s, actions[0])
+    expect(next.players[1].trash).toContain(victim)
+  })
+
   it('a non-quick program is never offered as a reaction', () => {
     const slow = makeDb([
       def('grunt', 'unit', { power: 3 }),
@@ -1199,6 +1253,22 @@ describe('go-solo', () => {
     expect(next.players[0].legends).not.toContain(legend)
     expect(next.players[0].removed).toContain(legend)
     expect(next.events.some((e) => e.type === 'cardRemoved' && e.uid === legend)).toBe(true)
+  })
+
+  it('is removed from the game by a bounce too, not just a defeat', () => {
+    const bouncer: CardDb = {
+      ...db,
+      shoo: def('shoo', 'program', {
+        effects: [onPlay({ kind: 'bounce', target: 'rivalUnit' })],
+      }),
+    }
+    const { s, legend } = stage()
+    const src = mint(s, 1, 'trash', 'shoo')
+    const fielded = applyAction(bouncer, s, playActions(bouncer, s).find((a) => a.card === legend)!)
+
+    const next = fireTrigger(bouncer, fielded, 'onPlay', src, [legend])
+    expect(next.players[0].hand).not.toContain(legend)
+    expect(next.players[0].removed).toContain(legend)
   })
 
   it('is not offered without the keyword, while face-down, or while spent', () => {
