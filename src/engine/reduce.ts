@@ -17,9 +17,10 @@ import {
   activateAbilityOnDraft,
   fireTriggerOnDraft,
   playCardOnDraft,
+  spendOnDraft,
 } from '../cards/effects'
 import { blockAttack, declareAttack, resolveAttack, takeStolenGig } from './combat'
-import { CALL_A_LEGEND_COST, canPayWith, pay } from './economy'
+import { CALL_A_LEGEND_COST, canPayWith } from './economy'
 import {
   beginTurn,
   checkOvertimeWin,
@@ -30,7 +31,7 @@ import {
   OPENING_HAND_SIZE,
 } from './game'
 import { legalActions } from './legal'
-import { actingPlayer, opponentOf } from './query'
+import { actingPlayer, effectiveCardCost, opponentOf } from './query'
 import { nextInt, rollDie, shuffle } from './rng'
 import type { Action, CardDb, GameState, PlayerId, Reaction } from './types'
 
@@ -89,8 +90,9 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     )
     if (!shapeMatches) return false
     // The payer is the defender, not the active player.
-    const cost = db[state.cards[reaction.card].defId].cost
-    return canPayWith(state, actingPlayer(state), reaction.payment, cost)
+    const payer = actingPlayer(state)
+    const cost = effectiveCardCost(db[state.cards[reaction.card].defId], state, payer)
+    return canPayWith(state, payer, reaction.payment, cost)
   }
 
   if (action.type === 'react' && action.reaction.type === 'callLegend') {
@@ -114,7 +116,8 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     const def = db[state.cards[action.card].defId]
     // A {go-solo} Legend can never help pay its own cost (docs/rulings.md §31).
     const exclude = def.type === 'legend' ? action.card : undefined
-    return canPayWith(state, state.activePlayer, action.payment, def.cost, exclude)
+    const cost = effectiveCardCost(def, state, state.activePlayer)
+    return canPayWith(state, state.activePlayer, action.payment, cost, exclude)
   }
 
   if (action.type === 'callLegend') {
@@ -264,7 +267,7 @@ function activateAbility(
  */
 function callLegend(draft: GameState, db: CardDb, player: PlayerId, payment: number[]): void {
   const p = draft.players[player]
-  pay(draft, payment)
+  spendOnDraft(db, draft, payment)
 
   const faceDown = p.legends.filter((uid) => !draft.cards[uid].faceUp)
   const [index, rng] = nextInt(draft.rng, faceDown.length)
@@ -386,7 +389,7 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
       react(draft, db, action.reaction)
       break
     case 'chooseGig':
-      takeStolenGig(draft, action.dieIndex)
+      takeStolenGig(draft, db, action.dieIndex)
       break
     case 'endTurn':
       endTurn(draft)

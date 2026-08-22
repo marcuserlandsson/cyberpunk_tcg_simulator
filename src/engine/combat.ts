@@ -27,9 +27,23 @@
 // The card layer (src/cards/effects.ts) is imported for those three; see the
 // import-cycle note at the top of that file.
 
-import { fireCardTrigger, fireTriggerOnDraft, quickReactionActions } from '../cards/effects'
+import {
+  fireCardTrigger,
+  fireTriggerOnDraft,
+  fireWatcherTrigger,
+  quickReactionActions,
+  spendOnDraft,
+} from '../cards/effects'
 import { legendCallPayment } from './economy'
-import { cantAttack, effectivePower, hasKeyword, opponentOf } from './query'
+import {
+  ATTACK_READY,
+  cantAttack,
+  defeatShieldOf,
+  effectivePower,
+  hasKeyword,
+  opponentOf,
+  winsFightRegardless,
+} from './query'
 import type { Action, CardDb, GameState, PendingSteal, PlayerId } from './types'
 
 /** Keyword: "this Unit can attack the turn it's played" (docs/rulings.md §2). */
@@ -79,9 +93,19 @@ function canAttack(db: CardDb, state: GameState, uid: number): boolean {
  * rival Gig area — but only while it actually holds a die (docs/rulings.md
  * §24). Friendly Units and Legends in the legends zone are never targets.
  */
-function attackTargets(state: GameState, attacker: PlayerId): (number | 'gigArea')[] {
+function attackTargets(
+  db: CardDb,
+  state: GameState,
+  attacker: PlayerId,
+  attackerUid: number
+): (number | 'gigArea')[] {
   const rival = state.players[opponentOf(attacker)]
-  const targets: (number | 'gigArea')[] = rival.field.filter((uid) => !state.cards[uid].ready)
+  // "it may attack ready Units" — a granted permission that widens the target
+  // list for that one attacker only (docs/rulings.md §43).
+  const readyTooOk = hasKeyword(db, state, attackerUid, ATTACK_READY)
+  const targets: (number | 'gigArea')[] = rival.field.filter(
+    (uid) => readyTooOk || !state.cards[uid].ready
+  )
   if (rival.gigArea.length > 0) targets.push('gigArea')
   return targets
 }
@@ -89,13 +113,12 @@ function attackTargets(state: GameState, attacker: PlayerId): (number | 'gigArea
 /** One `attack` per (eligible attacker x legal target) pair, for the `main` phase. */
 export function attackActions(db: CardDb, state: GameState): Action[] {
   const player = state.activePlayer
-  const targets = attackTargets(state, player)
-  if (targets.length === 0) return []
-
   const actions: Action[] = []
   for (const attacker of state.players[player].field) {
     if (!canAttack(db, state, attacker)) continue
-    for (const target of targets) actions.push({ type: 'attack', attacker, target })
+    for (const target of attackTargets(db, state, player, attacker)) {
+      actions.push({ type: 'attack', attacker, target })
+    }
   }
   return actions
 }
@@ -189,7 +212,11 @@ export function declareAttack(
   attacker: number,
   target: number | 'gigArea'
 ): void {
-  draft.cards[attacker].ready = false
+  // Spending the attacker is a spend like any other: "When this Unit is spent"
+  // fires here (docs/rulings.md §47).
+  spendOnDraft(db, draft, [attacker])
+  // An on-spend effect can end the game; never open a window over `gameOver`.
+  if (draft.winner !== null) return
   draft.events.push({ type: 'attackDeclared', attacker, target })
 
   // [trigger seam] on-attack effects on the attacking Unit (and its Gear)
@@ -238,6 +265,7 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
   card.attachedGear = []
   card.tempPower = 0
   card.permPower = 0
+  card.tempKeywords = []
 
   if (db[card.defId].type === 'legend') {
     owner.removed.push(uid)
@@ -269,6 +297,17 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
  * on-defeat effects.
  */
 export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
+  // "If this Unit would be defeated, defeat its DEADMAN TRANSMITTER instead":
+  // the Gear soaks the hit and the Unit stays put (docs/rulings.md §46).
+  const shield = defeatShieldOf(db, draft, uid)
+  if (shield !== null) {
+    const host = draft.cards[uid]
+    host.attachedGear = host.attachedGear.filter((gearUid) => gearUid !== shield)
+    draft.players[draft.cards[shield].owner].trash.push(shield)
+    draft.events.push({ type: 'cardTrashed', uid: shield })
+    return
+  }
+
   const controller = draft.cards[uid].owner
   // `leaveField` detaches the Gear, so capture it first: a Gear card's
   // "{Defeated} ..." text is about the Unit wearing it being defeated
@@ -296,14 +335,29 @@ export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
 function fight(draft: GameState, db: CardDb, attacker: number, defender: number): void {
   const attackPower = effectivePower(db, draft, attacker)
   const defendPower = effectivePower(db, draft, defender)
+  // "This Unit wins all fights against CORPO Units" overrides the power
+  // comparison in that Unit's favour (docs/rulings.md §41).
+  const attackerAlwaysWins = winsFightRegardless(db, draft, attacker, defender)
+  const defenderAlwaysWins = winsFightRegardless(db, draft, defender, attacker)
   const defeated: number[] = []
-  if (attackPower >= defendPower) defeated.push(defender)
-  if (defendPower >= attackPower) defeated.push(attacker)
+  if (!defenderAlwaysWins && (attackerAlwaysWins || attackPower >= defendPower)) {
+    defeated.push(defender)
+  }
+  if (!attackerAlwaysWins && (defenderAlwaysWins || defendPower >= attackPower)) {
+    defeated.push(attacker)
+  }
   for (const uid of defeated) {
     // An on-defeat effect from the first casualty could already have removed
     // the second one from the field; never defeat a card twice.
     if (!onField(draft, uid)) continue
     defeatUnit(draft, db, uid)
+  }
+
+  // [trigger seam] "when this Unit wins a fight": the survivor of a fight that
+  // defeated the other side (docs/rulings.md §41). A tie has no winner.
+  const winner = defeated.length === 1 ? (defeated[0] === defender ? attacker : defender) : null
+  if (winner !== null && onField(draft, winner)) {
+    fireTriggerOnDraft(db, draft, 'onWinFight', winner, [])
   }
 }
 
@@ -320,9 +374,12 @@ export function blockAttack(draft: GameState, db: CardDb, blocker: number): void
   // Unreachable: `legalActions` only offers `block` inside a react window.
   if (attack === null) return
 
-  draft.cards[blocker].ready = false
+  spendOnDraft(db, draft, [blocker])
   attack.redirectedTo = blocker
   draft.events.push({ type: 'attackBlocked', blocker })
+  // [trigger seam] "When this Unit uses {Blocker}, ..." — before the fight, so
+  // a buff or a Gig gain it grants is live for that fight (docs/rulings.md §41).
+  fireTriggerOnDraft(db, draft, 'onBlock', blocker, [])
   resolveAttack(draft, db)
 }
 
@@ -373,7 +430,7 @@ export function resolveAttack(draft: GameState, db: CardDb): void {
  * attacker's. The attack closes when the last die of the steal is taken, or
  * early if the victim's Gig area runs out first.
  */
-export function takeStolenGig(draft: GameState, dieIndex: number): void {
+export function takeStolenGig(draft: GameState, db: CardDb, dieIndex: number): void {
   const steal = draft.pendingSteal
   // Unreachable: `legalActions` only offers `chooseGig` with a pending steal.
   if (steal === null) return
@@ -385,6 +442,10 @@ export function takeStolenGig(draft: GameState, dieIndex: number): void {
   const [die] = draft.players[victim].gigArea.splice(dieIndex, 1)
   draft.players[thief].gigArea.push(die)
   draft.events.push({ type: 'gigStolen', from: victim, die: { ...die } })
+
+  // [trigger seam] "When a friendly Unit steals a d6, ..." — a watcher trigger,
+  // fired on every in-play card of the thief (docs/rulings.md §42).
+  fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, { stolenDieSize: die.size })
 
   steal.remaining -= 1
   if (steal.remaining > 0 && draft.players[victim].gigArea.length > 0) return

@@ -69,6 +69,7 @@ function makeInstance(uid: number, defId: string, owner: PlayerId, faceUp: boole
     attachedGear: [],
     tempPower: 0,
     permPower: 0,
+    tempKeywords: [],
   }
 }
 
@@ -166,6 +167,7 @@ export function newGame(db: CardDb, config: NewGameConfig): GameState {
     phase: 'chooseOrder',
     pendingAttack: null,
     pendingSteal: null,
+    oncePerTurnUsed: [],
     winner: null,
     rng,
     events,
@@ -212,7 +214,11 @@ export function draftState(state: GameState): GameState {
   for (const key of Object.keys(state.cards)) {
     const uid = Number(key)
     const card = state.cards[uid]
-    cards[uid] = { ...card, attachedGear: card.attachedGear.slice() }
+    cards[uid] = {
+      ...card,
+      attachedGear: card.attachedGear.slice(),
+      tempKeywords: card.tempKeywords.slice(),
+    }
   }
   return {
     ...state,
@@ -220,6 +226,7 @@ export function draftState(state: GameState): GameState {
     cards,
     pendingAttack: state.pendingAttack ? { ...state.pendingAttack } : null,
     pendingSteal: clonePendingSteal(state.pendingSteal),
+    oncePerTurnUsed: state.oncePerTurnUsed.slice(),
     events: state.events.slice(),
   }
 }
@@ -281,7 +288,12 @@ function readySpentCards(draft: GameState, player: PlayerId, turnNumber: number)
 export function clearTurnBuffs(draft: GameState): void {
   for (const key of Object.keys(draft.cards)) {
     draft.cards[Number(key)].tempPower = 0
+    // Granted keywords have exactly the same lifetime as a turn power buff
+    // (docs/rulings.md §43), and "the first time ... each turn" allowances
+    // refresh with them (docs/rulings.md §40).
+    draft.cards[Number(key)].tempKeywords = []
   }
+  draft.oncePerTurnUsed = []
 }
 
 /**

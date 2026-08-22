@@ -30,10 +30,18 @@
 import { defeatUnit, leaveField } from '../engine/combat'
 import { canonicalPayment, pay } from '../engine/economy'
 import { draftState, drawCards, endGame } from '../engine/game'
-import { conditionMet, opponentOf } from '../engine/query'
+import {
+  conditionMet,
+  effectiveCardCost,
+  maxGigValue,
+  opponentOf,
+  reducedCost,
+  streetCred,
+  type ConditionContext,
+} from '../engine/query'
 import { nextInt, rollDie } from '../engine/rng'
 import { scriptedCards } from './scripted/index'
-import { gearEquipTargets, targetsFor } from './targets'
+import { filterTargets, gearEquipTargets, isGigDieSpec, targetsFor } from './targets'
 import type {
   Action,
   CardDb,
@@ -43,6 +51,7 @@ import type {
   GameState,
   PlayerId,
   PlayerState,
+  TargetFilter,
   TargetSpec,
   Trigger,
 } from '../engine/types'
@@ -69,10 +78,25 @@ const MAX_TARGET_TUPLES = 256
 // ---------------------------------------------------------------------------
 
 /**
- * The target specs an EffectNode tree needs, in resolution order. `self` needs
- * no decision (it is always the source card) and so takes no slot.
+ * One decision an EffectNode tree needs. Two shapes:
+ *   * `target` — a card uid, or (for the two Gig-die specs) an index into a
+ *     player's Gig area (docs/rulings.md §39);
+ *   * `mode`   — which branch of a "Choose one effect" node to take
+ *     (docs/rulings.md §45).
  */
-function targetSpecs(node: EffectNode): TargetSpec[] {
+type SlotSpec =
+  | { kind: 'target'; spec: TargetSpec; filter?: TargetFilter }
+  | { kind: 'mode'; count: number; chooser: 'controller' | 'rivalIfBehindStreetCred' }
+
+/**
+ * The slots an EffectNode tree needs, in resolution order. `self` needs no
+ * decision (it is always the source card) and so takes no slot. A `chooseOne`
+ * contributes its own mode slot followed by the slots of **every** mode, in
+ * printed order: only the chosen mode's slots are consumed at resolution time,
+ * but reserving them all keeps the slot list state-independent, which is what
+ * lets enumeration and binding agree (docs/rulings.md §45).
+ */
+function slotSpecs(node: EffectNode): SlotSpec[] {
   switch (node.kind) {
     case 'buffPower':
     case 'defeat':
@@ -80,12 +104,52 @@ function targetSpecs(node: EffectNode): TargetSpec[] {
     case 'readyCard':
     case 'spendCard':
     case 'bottomDeck':
-      return node.target === 'self' ? [] : [node.target]
+    case 'grantKeyword':
+      return node.target === 'self' ? [] : [{ kind: 'target', spec: node.target, filter: node.filter }]
+    case 'changeGig':
+      return [{ kind: 'target', spec: node.target }]
+    case 'scripted':
+      return (node.targets ?? []).map((spec) => ({ kind: 'target' as const, spec }))
+    case 'chooseOne':
+      return [
+        { kind: 'mode', count: node.modes.length, chooser: node.chooser ?? 'controller' },
+        ...node.modes.flatMap(slotSpecs),
+      ]
     case 'sequence':
-      return node.effects.flatMap(targetSpecs)
+      return node.effects.flatMap(slotSpecs)
     default:
       return []
   }
+}
+
+/** How many slots a node subtree reserves (used to skip past unchosen modes). */
+function slotWidth(node: EffectNode): number {
+  return slotSpecs(node).length
+}
+
+/** The candidates a slot admits right now (empty = no decision to offer). */
+function candidatesFor(
+  db: CardDb,
+  state: GameState,
+  slot: SlotSpec,
+  sourceUid: number,
+  controller: PlayerId
+): number[] {
+  if (slot.kind === 'mode') {
+    // "If you have less ☆ than a Rival, they instead choose one effect for
+    // you" — a rival's private choice is not ours to enumerate, so the slot
+    // offers nothing and resolution falls back to the rng (docs/rulings.md §45).
+    if (
+      slot.chooser === 'rivalIfBehindStreetCred' &&
+      streetCred(state, controller) < streetCred(state, opponentOf(controller))
+    ) {
+      return []
+    }
+    return Array.from({ length: slot.count }, (_value, index) => index)
+  }
+  const candidates = targetsFor(db, state, slot.spec, sourceUid, controller)
+  if (isGigDieSpec(slot.spec)) return candidates
+  return filterTargets(db, state, candidates, slot.filter, sourceUid, controller)
 }
 
 /**
@@ -101,10 +165,10 @@ function fillableSlots(
   sourceUid: number,
   def: EffectDef,
   controller: PlayerId
-): { spec: TargetSpec; candidates: number[] }[] {
-  return targetSpecs(def.effect).map((spec) => ({
-    spec,
-    candidates: targetsFor(db, state, spec, sourceUid, controller),
+): { slot: SlotSpec; candidates: number[] }[] {
+  return slotSpecs(def.effect).map((slot) => ({
+    slot,
+    candidates: candidatesFor(db, state, slot, sourceUid, controller),
   }))
 }
 
@@ -244,12 +308,17 @@ function note(draft: GameState, sourceUid: number, description: string): void {
   draft.events.push({ type: 'effectResolved', sourceUid, description })
 }
 
+/** The next bound slot value, or null when it could not be filled. */
+function takeSlot(slots: Slots): number | null {
+  const value = slots.assigned[slots.next]
+  slots.next += 1
+  return value ?? null
+}
+
 /** The next bound target for a node, or null when the slot could not be filled. */
 function takeTarget(node: { target: TargetSpec }, ctx: EffectCtx, slots: Slots): number | null {
   if (node.target === 'self') return ctx.sourceUid
-  const target = slots.assigned[slots.next]
-  slots.next += 1
-  return target ?? null
+  return takeSlot(slots)
 }
 
 function randomIndex(draft: GameState, length: number): number {
@@ -303,10 +372,56 @@ function applyNode(
     case 'buffPower': {
       const target = takeTarget(node, ctx, slots)
       if (target === null || !draft.cards[target]) return
-      if (node.duration === 'turn') draft.cards[target].tempPower += node.amount
-      else draft.cards[target].permPower += node.amount
-      const sign = node.amount >= 0 ? '+' : ''
-      note(draft, ctx.sourceUid, `${sign}${node.amount} power (${node.duration}) on ${target}`)
+      // "gains power equal to a friendly max Gig" — an amount read off the
+      // board instead of printed (docs/rulings.md §39).
+      const amount =
+        node.amount === 'friendlyMaxGig' ? maxGigValue(draft, ctx.player) : node.amount
+      if (node.duration === 'turn') draft.cards[target].tempPower += amount
+      else draft.cards[target].permPower += amount
+      const sign = amount >= 0 ? '+' : ''
+      note(draft, ctx.sourceUid, `${sign}${amount} power (${node.duration}) on ${target}`)
+      return
+    }
+
+    case 'grantKeyword': {
+      const target = takeTarget(node, ctx, slots)
+      if (target === null || !draft.cards[target]) return
+      if (!draft.cards[target].tempKeywords.includes(node.keyword)) {
+        draft.cards[target].tempKeywords.push(node.keyword)
+      }
+      note(draft, ctx.sourceUid, `grant {${node.keyword}} to ${target} this turn`)
+      return
+    }
+
+    case 'changeGig': {
+      const index = takeSlot(slots)
+      if (index === null) return
+      const owner = node.target === 'friendlyGigDie' ? ctx.player : opponentOf(ctx.player)
+      const die = draft.players[owner].gigArea[index]
+      if (die === undefined) return
+      // "by up to N": the full amount, clamped to the faces the die actually
+      // has (docs/rulings.md §39).
+      const before = die.value
+      die.value = Math.max(1, Math.min(die.size, die.value + node.amount))
+      note(draft, ctx.sourceUid, `gig ${before} -> ${die.value}`)
+      return
+    }
+
+    case 'chooseOne': {
+      const base = slots.next
+      const chosen = takeSlot(slots)
+      const index = chosen ?? randomIndex(draft, node.modes.length)
+      const mode = node.modes[index]
+      if (mode === undefined) return
+      // Jump the cursor onto the chosen mode's own slots, then past all of them
+      // (docs/rulings.md §45).
+      let offset = base + 1
+      for (let i = 0; i < index; i++) offset += slotWidth(node.modes[i])
+      const end = base + 1 + node.modes.reduce((sum, child) => sum + slotWidth(child), 0)
+      slots.next = offset
+      note(draft, ctx.sourceUid, `chose mode ${index}`)
+      applyNode(db, draft, mode, ctx, slots)
+      slots.next = end
       return
     }
 
@@ -337,12 +452,20 @@ function applyNode(
       return
     }
 
-    case 'readyCard':
+    case 'readyCard': {
+      const target = takeTarget(node, ctx, slots)
+      if (target === null || !draft.cards[target]) return
+      draft.cards[target].ready = true
+      note(draft, ctx.sourceUid, `ready ${target}`)
+      return
+    }
+
     case 'spendCard': {
       const target = takeTarget(node, ctx, slots)
       if (target === null || !draft.cards[target]) return
-      draft.cards[target].ready = node.kind === 'readyCard'
-      note(draft, ctx.sourceUid, `${node.kind === 'readyCard' ? 'ready' : 'spend'} ${target}`)
+      note(draft, ctx.sourceUid, `spend ${target}`)
+      // Being spent by an effect is still being spent (docs/rulings.md §47).
+      spendOnDraft(db, draft, [target])
       return
     }
 
@@ -446,7 +569,15 @@ function applyNode(
       if (!script) {
         throw new Error(`Unknown scripted card effect "${node.name}" (src/cards/scripted).`)
       }
-      const result = script(db, draft, ctx)
+      // A scripted node may declare its own target slots; the script reads the
+      // bound uids off `ctx.targets` (docs/rulings.md §48).
+      const declared = node.targets ?? []
+      const bound = declared.map(() => takeSlot(slots))
+      const scriptCtx: EffectCtx =
+        declared.length === 0
+          ? ctx
+          : { ...ctx, targets: bound.filter((uid): uid is number => uid !== null) }
+      const result = script(db, draft, scriptCtx)
       // Scripts may mutate the draft or return a fresh state; fold either in.
       if (result !== draft) Object.assign(draft, result)
       note(draft, ctx.sourceUid, `scripted:${node.name}`)
@@ -455,6 +586,9 @@ function applyNode(
 
     case 'staticPower':
     case 'cantAttack':
+    case 'defeatShield':
+    case 'winsFightVsKeyword':
+    case 'costReduction':
       // Static layers, read by query.ts — nothing to do at resolution time.
       return
   }
@@ -472,16 +606,76 @@ export function applyEffectDefOnDraft(
   def: EffectDef,
   sourceUid: number,
   targets: number[],
-  controller?: PlayerId
+  controller?: PlayerId,
+  context: ConditionContext = {}
 ): void {
   const card = draft.cards[sourceUid]
   if (!card) return
   if (draft.winner !== null) return
   const player = controller ?? effectController(draft, sourceUid)
-  if (!conditionMet(draft, player, def)) return
+  if (!conditionMet(draft, player, def, context)) return
+  // A *triggered* def may carry an optional cost ("{Attack} You may pay 2 €$.
+  // If you do, ..."). The engine takes the option whenever it is affordable and
+  // skips the def otherwise (docs/rulings.md §49). An activated ability's cost
+  // is paid by `activateAbilityOnDraft` instead, before this runs.
+  if (def.trigger !== 'activated' && def.cost !== undefined) {
+    if (!payTriggerCost(db, draft, def, sourceUid, player)) return
+  }
   const ctx: EffectCtx = { player, sourceUid, targets }
   const slots = bindSlots(db, draft, def, sourceUid, targets, player)
   applyNode(db, draft, def.effect, ctx, slots)
+}
+
+/** The €$ an EffectDef's cost actually asks for, after its reduction. */
+export function abilityEddieCost(state: GameState, player: PlayerId, def: EffectDef): number {
+  return reducedCost(state, player, def.cost?.eddies ?? 0, def.cost?.reduction)
+}
+
+/**
+ * Pays a triggered def's optional cost on the draft, or reports that it could
+ * not be paid (in which case the def does not resolve at all).
+ */
+function payTriggerCost(
+  db: CardDb,
+  draft: GameState,
+  def: EffectDef,
+  sourceUid: number,
+  player: PlayerId
+): boolean {
+  if (!canPayAbility(draft, player, def, sourceUid)) return false
+  const host = abilityHost(draft, sourceUid)
+  if (def.cost?.selfSpend) spendOnDraft(db, draft, [host])
+  const eddies = abilityEddieCost(draft, player, def)
+  if (eddies > 0) {
+    const payment = canonicalPayment(draft, player, eddies, def.cost?.selfSpend ? host : undefined)
+    if (payment === null) return false
+    spendOnDraft(db, draft, payment)
+  }
+  return true
+}
+
+/** The `oncePerTurnUsed` key of one EffectDef of one card instance. */
+function oncePerTurnKey(sourceUid: number, index: number): string {
+  return `${sourceUid}:${index}`
+}
+
+/**
+ * Has this `oncePerTurn` def already fired this game turn? ("The first time
+ * this Unit wins a fight each turn, ready it" — docs/rulings.md §40.)
+ */
+export function oncePerTurnSpent(
+  state: GameState,
+  sourceUid: number,
+  index: number,
+  def: EffectDef
+): boolean {
+  if (def.oncePerTurn !== true) return false
+  return state.oncePerTurnUsed.includes(oncePerTurnKey(sourceUid, index))
+}
+
+function markOncePerTurn(draft: GameState, sourceUid: number, index: number): void {
+  const key = oncePerTurnKey(sourceUid, index)
+  if (!draft.oncePerTurnUsed.includes(key)) draft.oncePerTurnUsed.push(key)
 }
 
 /**
@@ -496,24 +690,22 @@ export function fireCardTrigger(
   trigger: Trigger,
   sourceUid: number,
   targets: number[],
-  controller?: PlayerId
+  controller?: PlayerId,
+  context: ConditionContext = {}
 ): void {
   const def = defOf(db, draft, sourceUid)
   if (!def) return
   const player = controller ?? effectController(draft, sourceUid)
   let offset = 0
-  for (const effect of def.effects) {
+  for (const [index, effect] of def.effects.entries()) {
     if (effect.trigger !== trigger) continue
     const demand = slotDemand(db, draft, sourceUid, effect, player)
-    applyEffectDefOnDraft(
-      db,
-      draft,
-      effect,
-      sourceUid,
-      targets.slice(offset, offset + demand),
-      player
-    )
+    const slice = targets.slice(offset, offset + demand)
     offset += demand
+    if (oncePerTurnSpent(draft, sourceUid, index, effect)) continue
+    if (!conditionMet(draft, player, effect, context)) continue
+    if (effect.oncePerTurn === true) markOncePerTurn(draft, sourceUid, index)
+    applyEffectDefOnDraft(db, draft, effect, sourceUid, slice, player, context)
   }
 }
 
@@ -525,7 +717,13 @@ export function fireCardTrigger(
  * card's own onPlay already fired when the Gear itself was played, and re-firing
  * it because its host entered the field would double up.
  */
-const GEAR_PROPAGATED_TRIGGERS: readonly Trigger[] = ['onAttack', 'onDefeat']
+const GEAR_PROPAGATED_TRIGGERS: readonly Trigger[] = [
+  'onAttack',
+  'onDefeat',
+  'onBlock',
+  'onWinFight',
+  'onSpend',
+]
 
 /**
  * Fires `trigger` for `sourceUid` *and* for its attached Gear (for the triggers
@@ -550,6 +748,50 @@ export function fireTriggerOnDraft(
   if (!GEAR_PROPAGATED_TRIGGERS.includes(trigger)) return
   for (const gearUid of [...card.attachedGear]) {
     fireCardTrigger(db, draft, trigger, gearUid, [], controller)
+  }
+}
+
+/** Is `uid` on the field, or a face-up Legend in the legends zone? */
+function inPlay(state: GameState, uid: number): boolean {
+  const card = state.cards[uid]
+  if (!card) return false
+  const p = state.players[card.owner]
+  if (p.field.includes(uid)) return true
+  return p.legends.includes(uid) && card.faceUp
+}
+
+/**
+ * Spends cards (a payment, an attacker, a {Spend} cost) and fires their
+ * `onSpend` triggers. Only a card *in play* triggers: a face-down eddie has no
+ * revealed identity and no live abilities (docs/rulings.md §47).
+ */
+export function spendOnDraft(db: CardDb, draft: GameState, uids: number[]): void {
+  pay(draft, uids)
+  for (const uid of uids) {
+    if (!inPlay(draft, uid)) continue
+    fireTriggerOnDraft(db, draft, 'onSpend', uid, [])
+  }
+}
+
+/**
+ * Fires a **watcher** trigger: one that lives on a card but is about something
+ * another card did. Every in-play card of `player` (and its Gear) gets a look,
+ * in field order (docs/rulings.md §42).
+ */
+export function fireWatcherTrigger(
+  db: CardDb,
+  draft: GameState,
+  trigger: Trigger,
+  player: PlayerId,
+  context: ConditionContext
+): void {
+  const p = draft.players[player]
+  const watchers = [...p.field, ...p.legends.filter((uid) => draft.cards[uid].faceUp)]
+  for (const uid of watchers) {
+    const hosts = [uid, ...draft.cards[uid].attachedGear]
+    for (const host of hosts) {
+      fireCardTrigger(db, draft, trigger, host, [], player, context)
+    }
   }
 }
 
@@ -637,8 +879,8 @@ function canPayAbility(state: GameState, player: PlayerId, def: EffectDef, sourc
     // and a card with Lag can't be spent at all this turn.
     if (!card.ready || card.lag) return false
   }
-  const eddies = def.cost?.eddies ?? 0
-  if (eddies === 0) return true
+  const eddies = abilityEddieCost(state, player, def)
+  if (eddies <= 0) return true
   const exclude = def.cost?.selfSpend ? host : undefined
   return canonicalPayment(state, player, eddies, exclude) !== null
 }
@@ -662,6 +904,7 @@ export function activatedAbilityActions(
     for (const [abilityIndex, effect] of def.effects.entries()) {
       if (effect.trigger !== 'activated') continue
       if (quickOnly && effect.quick !== true) continue
+      if (oncePerTurnSpent(state, uid, abilityIndex, effect)) continue
       if (!conditionMet(state, player, effect)) continue
       if (!canPayAbility(state, player, effect, uid)) continue
       // A costed ability with a dead target is never worth offering.
@@ -698,7 +941,7 @@ export function quickReactionActions(db: CardDb, state: GameState, defender: Pla
   for (const uid of state.players[defender].hand) {
     const def = defOf(db, state, uid)
     if (!def || !isQuickPlayable(def)) continue
-    const payment = canonicalPayment(state, defender, def.cost)
+    const payment = canonicalPayment(state, defender, effectiveCardCost(def, state, defender))
     if (payment === null) continue
     for (const targets of triggerTargetChoices(db, state, uid, 'onPlay')) {
       actions.push({ type: 'react', reaction: { type: 'quick', card: uid, payment, targets } })
@@ -744,7 +987,8 @@ export function goSoloPayment(
   // Printed keywords only, deliberately: Gear may grant {blocker}/{adrenaline}
   // to its host, but never {go-solo} (docs/rulings.md §30).
   if (def.type !== 'legend' || !def.keywords.includes('go-solo')) return null
-  return canonicalPayment(state, player, def.cost, uid)
+  // The same reduced cost `reduce.ts` validates the payment against (§44).
+  return canonicalPayment(state, player, effectiveCardCost(def, state, player), uid)
 }
 
 /**
@@ -827,7 +1071,7 @@ export function playCardOnDraft(
 
   p.hand = p.hand.filter((uid) => uid !== cardUid)
   p.legends = p.legends.filter((uid) => uid !== cardUid)
-  pay(draft, payment)
+  spendOnDraft(db, draft, payment)
   draft.events.push({ type: 'cardPlayed', player, uid: cardUid })
 
   let effectTargets = targets
@@ -882,14 +1126,16 @@ export function activateAbilityOnDraft(
   if (!effect) return
 
   const host = abilityHost(draft, cardUid)
-  if (effect.cost?.selfSpend) draft.cards[host].ready = false
-  const eddies = effect.cost?.eddies ?? 0
-  if (eddies > 0) {
-    const exclude = effect.cost?.selfSpend ? host : undefined
-    const payment = canonicalPayment(draft, player, eddies, exclude)
-    if (payment !== null) pay(draft, payment)
-  }
+  const eddies = abilityEddieCost(draft, player, effect)
+  const payment = eddies > 0
+    ? canonicalPayment(draft, player, eddies, effect.cost?.selfSpend ? host : undefined)
+    : []
 
   draft.events.push({ type: 'abilityActivated', player, uid: cardUid, abilityIndex })
+  if (effect.oncePerTurn === true) markOncePerTurn(draft, cardUid, abilityIndex)
+  // The self-spend and the €$ are one cost: pay them both before anything
+  // resolves, so an `onSpend` trigger cannot see a half-paid cost.
+  if (effect.cost?.selfSpend) spendOnDraft(db, draft, [host])
+  if (payment !== null && payment.length > 0) spendOnDraft(db, draft, payment)
   applyEffectDefOnDraft(db, draft, effect, cardUid, targets)
 }

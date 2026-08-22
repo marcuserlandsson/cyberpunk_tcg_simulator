@@ -17,7 +17,19 @@
       "ganger"
     ],
     "text": "When a friendly Unit steals a d6, increase a Gig by up to 6.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyStealDie",
+        "condition": {
+          "stolenDieSize": 6
+        },
+        "effect": {
+          "kind": "changeGig",
+          "amount": 6,
+          "target": "friendlyGigDie"
+        }
+      }
+    ]
   },
   {
     "id": "adam-smasher-ender-of-legends",
@@ -39,7 +51,15 @@
       "merc"
     ],
     "text": "{Go Solo} (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\n{Play} Defeat a rival Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "defeat",
+          "target": "rivalUnit"
+        }
+      }
+    ]
   },
   {
     "id": "adam-smasher-metal-over-meat",
@@ -119,7 +139,16 @@
     "sellTag": true,
     "keywords": [],
     "text": "Trash 3. Add a Unit from among them to your hand.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "all-is-lost"
+        }
+      }
+    ],
+    "scripted": "all-is-lost"
   },
   {
     "id": "alt-cunningham-mother-of-daemons",
@@ -221,7 +250,16 @@
       "cyberware"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, you may look at a friendly face-down Legend. If that Legend is ARASAKA or has {Go Solo}, you may Call it for free. (You may only Call a Legend once per turn.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onSpend",
+        "effect": {
+          "kind": "scripted",
+          "name": "arasaka-emergency-radioport"
+        }
+      }
+    ],
+    "scripted": "arasaka-emergency-radioport"
   },
   {
     "id": "augmented-negotiators",
@@ -261,7 +299,31 @@
       "braindance"
     ],
     "text": "Defeat a rival Unit with power 4 or less. You may defeat 2 instead if a Rival controls at least 2 Gigs more than you.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "defeat",
+          "target": "rivalUnit",
+          "filter": {
+            "maxPower": 4
+          }
+        }
+      },
+      {
+        "trigger": "onPlay",
+        "condition": {
+          "rivalGigLeadAtLeast": 2
+        },
+        "effect": {
+          "kind": "defeat",
+          "target": "rivalUnit",
+          "filter": {
+            "maxPower": 4
+          }
+        }
+      }
+    ]
   },
   {
     "id": "bootleg-black-sapphire-show",
@@ -321,7 +383,30 @@
       "extreme"
     ],
     "text": "Play this Program for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$.\nDefeat a rival Unit with less power than a friendly Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "costReduction",
+          "reduction": {
+            "per": "friendlyGigValueAtLeast",
+            "value": 8,
+            "amount": 1,
+            "minimum": 1
+          }
+        }
+      },
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "defeat",
+          "target": "rivalUnit",
+          "filter": {
+            "weakerThanAFriendlyUnit": true
+          }
+        }
+      }
+    ]
   },
   {
     "id": "chrome-fang",
@@ -440,7 +525,14 @@
       "cyberware"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nIf this Unit would be defeated, defeat its \"DEADMAN TRANSMITTER\" instead.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "defeatShield"
+        }
+      }
+    ]
   },
   {
     "id": "delamain-cab",
@@ -499,7 +591,37 @@
       "fixer"
     ],
     "text": "{Call} Choose one effect.\nGive a friendly Unit +2 power this turn. // Draw 1.\n{Spend}: Increase a Gig by up to 2.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onCall",
+        "effect": {
+          "kind": "chooseOne",
+          "modes": [
+            {
+              "kind": "buffPower",
+              "amount": 2,
+              "target": "friendlyUnit",
+              "duration": "turn"
+            },
+            {
+              "kind": "draw",
+              "count": 1
+            }
+          ]
+        }
+      },
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true
+        },
+        "effect": {
+          "kind": "changeGig",
+          "amount": 2,
+          "target": "friendlyGigDie"
+        }
+      }
+    ]
   },
   {
     "id": "dexter-deshawn-one-last-chance",
@@ -602,7 +724,20 @@
       "ganger"
     ],
     "text": "{Attack} You may pay 2 €$. If you do, this Unit gains power equal to a friendly max Gig this turn.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "cost": {
+          "eddies": 2
+        },
+        "effect": {
+          "kind": "buffPower",
+          "amount": "friendlyMaxGig",
+          "target": "self",
+          "duration": "turn"
+        }
+      }
+    ]
   },
   {
     "id": "emergency-atlus",
@@ -850,7 +985,29 @@
       "plan"
     ],
     "text": "Give a friendly Unit these effects. If you have less ☆ (Street Cred) than a Rival, they instead choose one effect for you.\nThe next time this Unit attacks this turn, it may attack ready Units. // Give this Unit +3 power this turn.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "chooseOne",
+          "chooser": "rivalIfBehindStreetCred",
+          "modes": [
+            {
+              "kind": "grantKeyword",
+              "keyword": "attack-ready",
+              "target": "friendlyUnit",
+              "duration": "turn"
+            },
+            {
+              "kind": "buffPower",
+              "amount": 3,
+              "target": "friendlyUnit",
+              "duration": "turn"
+            }
+          ]
+        }
+      }
+    ]
   },
   {
     "id": "hacked-corpo",
@@ -953,7 +1110,26 @@
       "braindance"
     ],
     "text": "Increase a Gig by up to 4. If you control a Gig with 8+ value, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "changeGig",
+          "amount": 4,
+          "target": "friendlyGigDie"
+        }
+      },
+      {
+        "trigger": "onPlay",
+        "condition": {
+          "friendlyGigValueAtLeast": 8
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "jacked-in-voodoo-boy",
@@ -1053,7 +1229,17 @@
     "sellTag": false,
     "keywords": [],
     "text": "{Play} Give a friendly Unit +2 power this turn.\n(Units with power 0 don't steal Gigs.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "buffPower",
+          "amount": 2,
+          "target": "friendlyUnit",
+          "duration": "turn"
+        }
+      }
+    ]
   },
   {
     "id": "johnny-silverhand-never-stop-fighting",
@@ -1075,7 +1261,23 @@
       "samurai"
     ],
     "text": "The first time this Unit wins a fight each turn, ready it.\nThis Unit wins all fights against CORPO Units.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onWinFight",
+        "oncePerTurn": true,
+        "effect": {
+          "kind": "readyCard",
+          "target": "self"
+        }
+      },
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "winsFightVsKeyword",
+          "keyword": "corpo"
+        }
+      }
+    ]
   },
   {
     "id": "johnny-silverhand-rocking-renegade",
@@ -1097,7 +1299,29 @@
       "samurai"
     ],
     "text": "2 €$, {Spend} A friendly Unit can attack spent rival Units the turn it's played. If it's a ROCKER Unit, also give it +2 power this turn. This effect costs -1 €$ for each friendly Gig with 8+ value.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true,
+          "eddies": 2,
+          "reduction": {
+            "per": "friendlyGigValueAtLeast",
+            "value": 8,
+            "amount": 1,
+            "minimum": 0
+          }
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "johnny-silverhand-rocking-renegade",
+          "targets": [
+            "friendlyUnit"
+          ]
+        }
+      }
+    ],
+    "scripted": "johnny-silverhand-rocking-renegade"
   },
   {
     "id": "judy-a-lvarez-braindance-maestro",
@@ -1183,7 +1407,21 @@
       "samurai"
     ],
     "text": "{Spend} If you control a Gig with 8+ value, draw 2.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true
+        },
+        "condition": {
+          "friendlyGigValueAtLeast": 8
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 2
+        }
+      }
+    ]
   },
   {
     "id": "kiroshi-optics",
@@ -1224,7 +1462,16 @@
       "ganger"
     ],
     "text": "{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nWhen this Unit uses {Blocker}, increase a Gig by up to 3.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onBlock",
+        "effect": {
+          "kind": "changeGig",
+          "amount": 3,
+          "target": "friendlyGigDie"
+        }
+      }
+    ]
   },
   {
     "id": "les-e-le-mens",

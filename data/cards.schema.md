@@ -21,8 +21,8 @@ prose reference used during transcription and by anyone reading the data).
 | `sellTag` | `boolean` | Whether the card shows the sell-for-1-Eddie icon (top-left, below cost). Mapped 1:1 from the database's `is_eddiable` field; visually confirmed against several print-and-play cards. |
 | `keywords` | `string[]` | Lowercase, kebab-case for multi-word terms. See **Keyword vocabulary** below — this array mixes true rules keywords with classification/role tags, since `CardDef` has no separate tags field. |
 | `text` | `string` | Verbatim rules text from the database's `rules_text` field (empty string `""` for vanilla cards, including the one card — `rebecca-having-a-moment` — whose `rules_text` is `null` in the source). Keyword/timing-trigger markup is preserved as `{Term}`, exactly as the database renders it (this is the plaintext stand-in for the card's colored highlight boxes). **4 cards deviate from `rules_text` because the database's own card art proves the field wrong: `kiroshi-optics` (equip line, rulings §8) and `psycho-squad` / `animals-wrecker` / `rockn-rockerboy` (stripped `[Flavour]` annotation, rulings §9). All other 137 are byte-exact.** |
-| `effects` | `EffectDef[]` | Left as `[]` for every card in Task 2. Task 8 populates this from `text` using the vocabulary Task 7 defines. |
-| `scripted` | `string?` | Not used in Task 2 (omitted for all cards). Reserved for cards whose text doesn't fit the effect vocabulary at all. |
+| `effects` | `EffectDef[]` | Left as `[]` for every card in Task 2. Task 8 populates this from `text` using the vocabulary below. `[]` is also the *correct* value for a vanilla card (no rules text) and for `animals-wrecker`, whose printed line is flavour (`docs/rulings.md` §51). |
+| `scripted` | `string?` | The `scriptedCards` key of a card whose text needs a hand-written implementation (`src/cards/scripted/index.ts`). Informational: the interpreter dispatches on the `{ kind: 'scripted', name }` node inside `effects`, not on this field. Set for `all-is-lost`, `arasaka-emergency-radioport`, `johnny-silverhand-rocking-renegade`. |
 
 ## Keyword vocabulary
 
@@ -77,12 +77,63 @@ originally dropped the extra tag and wrongly claimed no card had two; pass 2
 restored all 8 — see `docs/rulings.md` §10.) This partition of the 39
 possible classification values is a judgment call — see `docs/rulings.md` §3.
 
-## `EffectNode` vocabulary (starting point for Task 7/8)
+## `EffectNode` vocabulary
 
-Not defined in Task 2 — `effects` is `[]` for all 141 cards. Task 7 introduces
-`EffectNode`/`TargetSpec`/`Trigger` types; Task 8 fills `effects` in using that
-vocabulary. This document's **Keyword vocabulary** section above records the
-trigger/keyword words Task 7 will need to recognize when parsing `text`.
+The authoritative types are in `src/engine/types.ts` and the authoritative
+(strict) schema in `src/engine/cardDb.ts` — every node/field below is validated
+at load time, and an unknown key is a load error. The judgment calls behind each
+are in `docs/rulings.md` (§29–§38 from Task 7, §39–§52 from Task 8).
+
+### `EffectDef`
+
+| Field | Notes |
+|---|---|
+| `trigger` | `onPlay` \| `onCall` \| `onAttack` \| `onDefeat` \| `onBlock` \| `onWinFight` \| `onSpend` \| `onFriendlyStealDie` \| `activated` \| `static`. The last four triggers were added in Task 8 (§41, §42, §47); `onFriendlyStealDie` is a *watcher* — it fires on every in-play card of the thief, not on the card that stole. |
+| `cost` | `{ selfSpend?, eddies?, reduction? }`. On an `activated` def this is the printed `{Spend}` / €$ cost; on a *triggered* def it is an optional "You may pay N €$" that the engine takes whenever it is affordable (§49). |
+| `condition` | `{ streetCredAtLeast?, friendlyGigValueAtLeast?, rivalGigLeadAtLeast?, stolenDieSize? }` — "☆ N or more", "if you control a Gig with 8+ value", "if a Rival controls at least 2 Gigs more than you", and the watcher-only die-size gate (§42, §50). |
+| `quick` | `{Quick}` — usable in the rival's react window. |
+| `oncePerTurn` | "The first time … each turn" (§40). Tracked per card instance + effect index in `GameState.oncePerTurnUsed`, cleared at the end of the game turn. |
+| `effect` | The `EffectNode` tree. |
+
+### `TargetSpec`
+
+`self`, `friendlyUnit`, `rivalUnit`, `rivalSpentUnit`, `anyUnit`,
+`friendlyUnitOrLegend`, and (Task 8) `friendlyGigDie` / `rivalGigDie` — the two
+Gig-die specs bind an **index into that player's `gigArea`**, not a card uid
+(§39). Card specs may be narrowed by a `filter`:
+`{ maxPower?, minPower?, keyword?, excludeSelf?, weakerThanAFriendlyUnit? }`,
+covering "with power 4 or less", "a CORPO Unit", "*another* friendly Unit" and
+"with less power than a friendly Unit".
+
+### Nodes
+
+| Kind | Printed text it encodes |
+|---|---|
+| `draw` | "Draw N." |
+| `discardRandomRival` | "A Rival discards N at random." |
+| `buffPower` | "Give a … +N power this turn / permanently". `amount` may be the string `'friendlyMaxGig'` for "power equal to a friendly max Gig" (§39). |
+| `staticPower` | An ongoing power bonus (a Gear card's printed power box is *not* restated — §29). |
+| `defeat` / `bounce` / `bottomDeck` | Defeat a Unit / return it to hand / put it under its deck. |
+| `readyCard` / `spendCard` | Ready or spend a card ("{Spend} it", "ready it"). |
+| `stealGig` / `returnGig` / `rerollGig` | Steal a rival Gig (§32's `chooseGig` flow), send a friendly Gig back to the fixer, reroll a Gig. |
+| `changeGig` | "Increase/decrease a Gig by up to N" — the full amount, clamped to `[1, die size]`, on a chosen die (§39). |
+| `trashFromDeck` / `gainEddieFromTopDeck` | Mill from a deck / bank the top card as €$. |
+| `grantKeyword` | "… can attack the turn it's played" ({adrenaline}), "it may attack ready Units" (the granted-only `attack-ready` keyword) — until end of turn (§43). |
+| `chooseOne` | "Choose one effect. A // B". `chooser: 'rivalIfBehindStreetCred'` covers "If you have less ☆ than a Rival, they instead choose one for you" (§45). |
+| `defeatShield` | *static, on Gear*: "If this Unit would be defeated, defeat its `<gear>` instead" (§46). |
+| `winsFightVsKeyword` | *static*: "This Unit wins all fights against CORPO Units" (§41). |
+| `costReduction` | *static*: "Play this for -1 €$ for each friendly Gig with 8+ value, to a minimum of 1 €$" (§44). |
+| `cantAttack` | *static*: "This Unit can't attack" (§35). |
+| `sequence` | Several nodes in printed order, sharing one target slot list. |
+| `scripted` | A hand-written implementation, optionally with its own `targets` slots (§48). |
+
+A card whose text has two independent clauses ("Increase a Gig by up to 4. If
+you control a Gig with 8+ value, draw 1.") is encoded as **two EffectDefs on the
+same trigger**, so the second can carry its own `condition`; they fire in
+printed order, each binding its own targets after the previous one resolved.
+
+This document's **Keyword vocabulary** section above records the trigger/keyword
+words the transcription preserves in `text`.
 
 ## Deck list format
 

@@ -71,6 +71,7 @@ function putUnit(state: GameState, player: PlayerId, defId: string, opts: UnitOp
     attachedGear: [],
     tempPower: opts.tempPower ?? 0,
     permPower: 0,
+    tempKeywords: [],
   }
   state.players[player].field.push(uid)
   return uid
@@ -89,6 +90,7 @@ function attachGear(state: GameState, player: PlayerId, defId: string, host: num
     attachedGear: [],
     tempPower: 0,
     permPower: 0,
+    tempKeywords: [],
   }
   state.cards[host].attachedGear.push(uid)
   return uid
@@ -848,6 +850,7 @@ describe('the react window', () => {
       attachedGear: [],
       tempPower: 0,
       permPower: 0,
+      tempKeywords: [],
     }
     withQuick.players[1].hand.push(quickUid)
 

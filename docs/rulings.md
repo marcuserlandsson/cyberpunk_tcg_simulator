@@ -965,3 +965,321 @@ controller, rather than letting `effectController` derive it from the (already
 attached) host — and `playCardTargetChoices` enumerates with the same explicit
 controller. Both sides of the enumerate/resolve pair name the player, so they
 cannot drift the way §34 describes.
+
+# Task 8 rulings (card implementation)
+
+Batch 1 (Red, 19 cards) needed twelve vocabulary extensions and one data call.
+Each is listed with the printed text that forced it and how many of the 141
+cards share it, because the ratio is what decided *vocabulary* vs *scripted*
+(§48).
+
+## 39 — "Increase/decrease a Gig by up to N" is a `changeGig` node whose die is a real target
+
+Seven cards move a Gig die's face: `6th-street-recruits`,
+`dexter-deshawn-off-the-grid`, `industrial-assembly`,
+`la-llorona-ghost-of-the-past` ("increase … by up to N") and
+`dying-night-v-s-pistol`, `trust-no-one`, `wakako-okada-peace-and-harmony`
+("decrease"). §32 deferred the die-targeting question until a real card demanded
+it; these do.
+
+**Rulings:**
+
+- the vocabulary gains `{ kind: 'changeGig', amount, target }` with
+  `amount > 0` increasing and `amount < 0` decreasing, and `TargetSpec` gains
+  `friendlyGigDie` / `rivalGigDie`;
+- **a Gig-die spec binds an index into that player's `gigArea`, not a card
+  uid.** A die is not a card and has no uid, but *which* die you raise is as
+  real a decision as which Unit you buff — it moves street cred, the "8+ value"
+  conditions and (via `stealCount`) the win condition. Reusing the ordinary slot
+  machinery means `legalActions` offers one `playCard`/`activateAbility` entry
+  per die for free, and triggered uses (a `{Blocker}` or watcher trigger) fall
+  back to §32's uniform-random pick like every other trigger target. The
+  alternative — a second bespoke pending-decision phase alongside `chooseGig` —
+  was rejected for exactly the reason §32 gives;
+- **"up to N" takes the full N.** The engine applies the whole printed amount
+  and clamps it to the faces the die actually has: `[1, die.size]`. A d6 showing
+  5 "increased by up to 4" shows 6, not 9, and a decrease never goes below 1,
+  because a die's top face is a physical face. Choosing a *smaller* amount is
+  never better for the player who is increasing their own Gig or decreasing a
+  rival's, so the choice is resolved to its maximum rather than enumerated (it
+  would multiply the action list by N for no gain). The one card that could care
+  — `chrome-fang`, whose text punishes high-value friendly Gigs — is deferred,
+  and if it lands the amount becomes a slot;
+- `buffPower.amount` may also be the string `'friendlyMaxGig'`
+  (`el-sombrero-n-la-venganza-lenta`, `sasha-yakovleva-won-t-let-you-down`:
+  "gains power equal to a friendly max Gig this turn"), read off the board at
+  resolution time. An empty Gig area reads 0.
+
+## 40 — "The first time … each turn" is `oncePerTurn` on the EffectDef
+
+Six cards say it (`gorilla-arms`, `jackie-welles-pour-one-out-for-me`,
+`johnny-silverhand-never-stop-fighting`, `rita-wheeler-no-stupid-questions`, both
+`yorinobu-arasaka` Legends).
+
+**Ruling:** `EffectDef` gains `oncePerTurn?: boolean`, and `GameState` gains
+`oncePerTurnUsed: string[]` holding `"<uid>:<effectIndex>"` keys. The allowance
+is per **card instance and per printed effect**, and it is cleared by
+`clearTurnBuffs` — i.e. at the end of the *game* turn, the same lifetime as an
+until-end-of-turn buff (§20). A def whose condition is not met does not consume
+the allowance; an activated ability that has consumed it is not offered at all.
+
+Keying on the effect index (rather than the card id) keeps two copies of the
+same card independent, which is what "this Unit" means.
+
+## 41 — {Blocker} and winning a fight are triggers; "wins all fights against X" is a static
+
+Three cards trigger off their own block (`augmented-negotiators`,
+`goro-takemura-vengeful-bodyguard`, `la-llorona-ghost-of-the-past`) and three off
+winning a fight (`appetite-for-destruction`, `satori-sword-of-saburo`,
+`johnny-silverhand-never-stop-fighting`).
+
+**Rulings:**
+
+- `onBlock` fires for the blocking Unit inside `blockAttack`, **after** it is
+  spent and **before** the redirected fight resolves, so a buff or Gig gain it
+  produces is live for that fight. (An `onBlock` effect that *steals* would
+  collide with the steal `resolveAttack` sets up moments later; no card in the
+  pool does, and the two that could are covered by this note.)
+- `onWinFight` fires for the survivor of a fight that defeated the other side.
+  A tie has no winner (both are defeated), and a Unit that won but has since
+  left the field does not trigger. It fires after the loser's `onDefeat`, since
+  the loser is defeated first.
+- "This Unit wins all fights against CORPO Units" becomes the static node
+  `{ kind: 'winsFightVsKeyword', keyword }`, consulted by `fight()` *instead of*
+  the power comparison in that Unit's favour — it wins and survives whatever the
+  numbers say. Only one card prints it, but a static cannot be scripted (scripts
+  only run at resolution time), so it must be a node; it is as narrow as §35's
+  `cantAttack`.
+- Both new triggers are propagated by attached Gear (§37), because both are
+  about the host acting.
+
+## 42 — `onFriendlyStealDie` is the one *watcher* trigger
+
+`6th-street-recruits`: "When a friendly Unit steals a d6, increase a Gig by up
+to 6." Every other trigger in the pool is about the card it is printed on; this
+one watches what *another* card did.
+
+**Rulings:**
+
+- the trigger fires from `takeStolenGig`, on every in-play card of the **thief**
+  (their field and face-up Legends, plus the Gear on either), in field order —
+  so the stealing Unit's own copy fires too ("a friendly Unit" includes itself);
+- it fires **once per die taken**, after that die has joined the thief's Gig
+  area. So the just-stolen die is itself a candidate for the increase, which is
+  correct: it is a friendly Gig by then;
+- the die's *size* is not readable from the state after the fact, so
+  `EffectDef.condition` gains `stolenDieSize`, supplied through a new
+  `ConditionContext` argument that only the watcher seam passes. An effect gated
+  on `stolenDieSize` can therefore never fire outside a steal — the condition is
+  unsatisfiable without the context.
+
+## 43 — `grantKeyword` gives a keyword until end of turn; `attack-ready` is the granted-only one
+
+`johnny-silverhand-rocking-renegade` ("A friendly Unit can attack spent rival
+Units the turn it's played"), `gunpoint-diplomacy` and `valentino-guerrera`
+("it may attack ready Units").
+
+**Rulings:**
+
+- `CardInstance` gains `tempKeywords`, cleared exactly when `tempPower` is
+  (`clearTurnBuffs`, and on any field exit), and `effectiveKeywords` unions it
+  in — so a granted {adrenaline} or {blocker} works everywhere the printed one
+  does. The node is `{ kind: 'grantKeyword', keyword, target, duration: 'turn' }`;
+- "can attack … the turn it's played" **is** {adrenaline} — that is the printed
+  keyword's own rule — so `johnny-silverhand-rocking-renegade` grants
+  `adrenaline`. "Spent rival Units" in that text is the normal targeting
+  restriction (guide p11), not an extra permission;
+- "it may attack ready Units" is a *new* permission with no printed keyword, so
+  it gets the internal keyword `attack-ready` (`query.ATTACK_READY`), which
+  widens `attackTargets` for that one attacker only. It is never printed on a
+  card, so it can never be granted by Gear by accident;
+- **known over-approximation:** `gunpoint-diplomacy` says "the **next time** this
+  Unit attacks this turn", and the grant lasts the whole turn. Narrowing it
+  needs the same one-shot floating-effect machinery the two deferred cards need
+  (§52); a Unit attacking twice in one turn is rare (it must be readied first).
+
+## 44 — Cost reduction: a static node for card costs, a `cost.reduction` for ability costs
+
+Five cards print "for -1 €$ for each friendly Gig with 8+ value"
+(`carnage-at-the-colosseum`, `octant`, `trauma-team-operatives`,
+`viktor-vektor-drop-your-illusions`, `zetatech-berserk`) and
+`johnny-silverhand-rocking-renegade` prints the same clause on an *ability*.
+
+**Rulings:**
+
+- one shape, `CostReduction { per: 'friendlyGigValueAtLeast', value, amount,
+  minimum }`, used two ways: as a `static` `costReduction` node (the card's own
+  play cost) and as `EffectDef.cost.reduction` (an ability's €$ cost);
+- `query.effectiveCardCost(def, state, player)` is the single authority on what
+  a play costs, and every payer path goes through it: `legalActions`'s
+  `playCard`, `reduce`'s legality check for `playCard` and for the `quick`
+  reaction, and `quickReactionActions`. A card in **hand** is not "in play", so
+  this reads the card definition's static defs directly instead of
+  `activeStaticNodes` (§29);
+- the printed minimum is data, not policy: `carnage-at-the-colosseum` says "to a
+  minimum of 1 €$" so its `minimum` is 1, while
+  `johnny-silverhand-rocking-renegade` states no floor, so its `minimum` is 0
+  (a free activation is possible with two 8+ Gigs).
+
+## 45 — "Choose one effect" is a `chooseOne` node whose mode is a slot
+
+Five cards are modal: `dexter-deshawn-off-the-grid`, `gunpoint-diplomacy`,
+`muamar-reyes-el-capita-n`, `padre-man-of-the-cross`, `pyramid-song`,
+`wakako-okada-peace-and-harmony`.
+
+**Rulings:**
+
+- `{ kind: 'chooseOne', modes, chooser? }` contributes a **mode slot** (its
+  candidates are the mode indices) followed by the slots of *every* mode, in
+  printed order. Only the chosen mode's slots are consumed at resolution: the
+  cursor jumps to that mode's slice and then past all of them, so the nodes
+  after the `chooseOne` still line up. Reserving all the modes' slots keeps the
+  slot list independent of the choice, which is what lets enumeration and
+  binding agree (§34). The cost is a slightly redundant action list — a
+  two-mode card with a target in each mode offers a target for both — never a
+  wrong one;
+- a `chooseOne` reached from a trigger that carries no player choice
+  (`dexter-deshawn-off-the-grid`'s `{Call}`) picks its mode off the rng, exactly
+  like any other unsupplied slot (§32);
+- **"If you have less ☆ than a Rival, they instead choose one effect for you"**
+  (`gunpoint-diplomacy`) is `chooser: 'rivalIfBehindStreetCred'`. While the
+  controller is behind, the mode slot offers **no** candidates — a rival's
+  private choice is not the acting player's to enumerate — and resolution falls
+  back to the rng. That is strictly better than either alternative (letting the
+  controller pick anyway, or fizzling the card): the rival is modelled as an
+  unpredictable agent, and the enumerated action list stays honest about who
+  decides.
+
+**Known limitation:** an *activated* ability whose `chooseOne` has any
+unfillable slot is not offered at all (§32's "never charge for nothing" rule
+reads the whole def, not the chosen mode). No card in the pool is both activated
+and modal with per-mode targets; if one lands, `hasUnfillableSlot` needs to
+become mode-aware.
+
+## 46 — A `defeatShield` Gear is destroyed in its host's place
+
+`deadman-transmitter` ("If this Unit would be defeated, defeat its DEADMAN
+TRANSMITTER instead") and `jackie-welles-mama-s-favorite`.
+
+**Ruling:** the static node `{ kind: 'defeatShield' }` on an attached Gear makes
+`defeatUnit` trash **that Gear** and return, leaving the host on the field with
+no `unitDefeated` event and no `onDefeat` triggers — the Unit was never
+defeated. Consequences:
+
+- it replaces *every* defeat, from a fight or an effect alike ("would be
+  defeated" names no source);
+- the first shield in attach order takes the hit, and one shield soaks one
+  defeat: the Gear is gone afterwards;
+- the host keeps its buffs and its other Gear, because it never left the field
+  (§29's reset only happens on a field exit).
+
+## 47 — `onSpend` fires wherever a card in play becomes spent
+
+Seven cards trigger off being spent (`alt-cunningham-mother-of-daemons`,
+`arasaka-emergency-radioport`, `maxtac-squadron`, `netwatch-netdriver`,
+`rita-wheeler-no-stupid-questions`, `tetratronic-rippler`, `zetatech-faceplate`).
+
+**Ruling:** every route that spends a card goes through one helper,
+`effects.spendOnDraft(db, draft, uids)` — declaring an attack, blocking, a
+`{Spend}` ability cost, a `spendCard` effect, and paying €$ with eddies or
+Legends — and that helper fires `onSpend` for each uid. Two limits:
+
+- **only a card *in play* triggers**: on the field, or a **face-up** Legend in
+  the legends zone. A face-down card in the Eddies area has no revealed identity
+  and no live abilities, so paying with eddies never triggers anything;
+- the whole cost is paid before the trigger's effect resolves (self-spend and
+  €$ together), so an `onSpend` effect can never see a half-paid cost.
+
+`economy.pay` stays the dumb primitive (it has no card-layer dependency); the
+trigger lives in the card layer, which every caller of `pay` already imports.
+This keeps the engine's import graph unchanged.
+
+## 48 — A `scripted` node may declare target slots
+
+Three batch-1 cards are scripted: `all-is-lost` (trash 3, take a Unit from among
+*those three* — a search over cards that were not in a targetable zone when the
+action was enumerated), `arasaka-emergency-radioport` (look at a face-down
+Legend, then maybe Call it for free) and
+`johnny-silverhand-rocking-renegade` (two clauses that must land on the *same*
+chosen Unit, the second gated on that Unit's tags).
+
+**Rulings:**
+
+- `{ kind: 'scripted', name, targets? }` may declare `TargetSpec`s. They are
+  enumerated and bound exactly like any node's targets, so a scripted card can
+  still take a real player decision (`johnny-silverhand-rocking-renegade`'s
+  Unit), and the script reads them off `ctx.targets`. Unfillable slots are
+  dropped rather than passed as null, so a script must tolerate a short array;
+- the choices a script makes *internally* (which Unit `all-is-lost` retrieves,
+  which face-down Legend the radioport looks at) go through `state.rng` per §32.
+  They are real decisions the action space cannot express, because the
+  candidates only come into existence while the effect resolves;
+- vocabulary beats scripting whenever ≥2 cards share a shape — that is why
+  `changeGig`, `chooseOne`, `grantKeyword`, `defeatShield`, cost reduction and
+  the four new triggers are nodes, and why only these three cards are scripts.
+
+## 49 — An optional cost on a *triggered* effect is paid automatically when affordable
+
+`el-sombrero-n-la-venganza-lenta`: "{Attack} You may pay 2 €$. If you do, this
+Unit gains power equal to a friendly max Gig this turn."
+
+**Ruling:** an `EffectDef` with a `cost` and a trigger other than `activated` is
+resolved by paying the cost first: if the payment cannot be made the def does
+not resolve at all, and nothing is spent. Triggers carry no player decision
+(§32), and the option is never a downside on the card that has it — it converts
+€$ into power at the moment the Unit is already committed to a fight. When a
+future card makes the option genuinely two-sided, this is the line to promote
+into an explicit decision, and `attack` would grow an options field.
+
+## 50 — "You may …" is taken whenever it can be
+
+Beyond §49's costed option, three batch-1 cards print a bare "you may":
+`bonnie-and-clyde` ("You may defeat 2 instead if …") and
+`arasaka-emergency-radioport` (twice: "you may look", "you may Call it for
+free").
+
+**Ruling:** an optional clause with no cost and no drawback resolves as taken.
+`bonnie-and-clyde` therefore encodes as two `onPlay` defeats, the second gated
+on `condition.rivalGigLeadAtLeast: 2` — one defeat normally, two when the Gig
+deficit is there ("defeat 2 **instead**" = the first one plus one more, both
+still bound by the "power 4 or less" filter). Where an optional clause ever
+becomes a real dilemma, it should become a `chooseOne` with a do-nothing mode
+rather than a new kind of prompt.
+
+`EffectDef.condition` also gained `friendlyGigValueAtLeast` ("If you control a
+Gig with 8+ value" — 6 cards) and `rivalGigLeadAtLeast` ("if a Rival controls at
+least 2 Gigs more than you" — `bonnie-and-clyde`, `adrenaline-converter`), both
+plain reads over the Gig areas.
+
+## 51 — `animals-wrecker`'s printed line is flavour, not rules
+
+"Takes a lot of juice to break bones like they do." The transcription already
+stripped a `[Flavour]` annotation from this card's `rules_text` (schema doc,
+`docs/rulings.md` §9), and the sentence names no game object.
+
+**Ruling:** `animals-wrecker` is a **vanilla** card — `effects: []` on purpose.
+Task 8's completeness test must treat it as a fourth allowed case alongside
+"has effects", "is scripted" and "has empty text": a card whose text is flavour
+only. It is the only such card in the Red pool; later batches should extend the
+list rather than invent effects for a flavour line.
+
+## 52 — Deferred: floating "until later" effects (`chrome-fang`, `appetite-for-destruction`)
+
+Two batch-1 cards create an effect that outlives its own resolution and is
+attached to *nothing on the board*:
+
+- `chrome-fang` — "{Play} Until your next turn, rival Units can't steal friendly
+  Gigs with value higher than their power." A lasting restriction on the rival's
+  `chooseGig` options, expiring at a specific future turn boundary;
+- `appetite-for-destruction` — "The next time a friendly Unit wins a fight by 3+
+  power this turn, it also steals a Gig." A one-shot delayed trigger, plus the
+  fight *margin*, which `fight()` does not currently expose.
+
+**Ruling (scope):** both are left with `effects: []` for now. They need a
+`GameState.floatingEffects` zone (an EffectDef plus a controller, an expiry and a
+one-shot flag) that `draftState` copies, `beginTurn`/`endTurn` expire, and the
+`chooseGig` enumeration and `fight()` consult — a genuine engine feature rather
+than a vocabulary extension, and one that wants its own test pass. Pool-wide it
+would also subsume §43's `gunpoint-diplomacy` over-approximation and the
+"next time" clauses in `gorilla-arms` / `jackie-welles-pour-one-out-for-me`, so
+it is worth doing once, properly, rather than three ad-hoc times.

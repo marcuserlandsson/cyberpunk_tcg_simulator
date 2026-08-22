@@ -260,11 +260,18 @@ describe('playCard: payment flexibility', () => {
 
     expect(canonicalPayment(state, 0, 1)).toEqual([eddieUid]) // eddies come first, canonically
 
+    // The card's own effect targets are whatever legalActions offers (since
+    // Task 8 the card has an effect); only the *payment* is being varied here.
+    const offered = legalActions(db, state).find(
+      (a): a is Extract<Action, { type: 'playCard' }> => a.type === 'playCard' && a.card === uid
+    )
+    if (offered === undefined) throw new Error('expected the card to be playable')
+
     const next = applyAction(db, state, {
       type: 'playCard',
       card: uid,
       payment: [readyLegend],
-      targets: [],
+      targets: offered.targets,
     })
     expect(next.cards[readyLegend].ready).toBe(false)
     expect(next.cards[eddieUid].ready).toBe(true) // untouched

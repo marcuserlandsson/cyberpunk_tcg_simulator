@@ -95,6 +95,7 @@ function scenario(seed = 7): GameState {
     phase: 'main',
     pendingAttack: null,
     pendingSteal: null,
+    oncePerTurnUsed: [],
     winner: null,
     rng: createRng(seed),
     events: [],
@@ -129,6 +130,7 @@ function mint(
     attachedGear: [],
     tempPower: opts.tempPower ?? 0,
     permPower: 0,
+    tempKeywords: [],
   }
   state.players[player][zone].push(uid)
   return uid
@@ -147,6 +149,7 @@ function mintGear(state: GameState, player: PlayerId, defId: string, host: numbe
     attachedGear: [],
     tempPower: 0,
     permPower: 0,
+    tempKeywords: [],
   }
   state.cards[host].attachedGear.push(uid)
   return uid
@@ -1751,5 +1754,746 @@ describe('kiroshi-optics equip exception (docs/rulings.md §8)', () => {
     expect(next.players[0].trash).toContain(gear)
     expect(next.players[1].trash).not.toContain(gear)
     void attacker
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 8 vocabulary extensions (synthetic cards; the real cards that use them
+// are driven end-to-end in tests/cards/*.test.ts)
+// ---------------------------------------------------------------------------
+
+describe('EffectNode: changeGig (docs/rulings.md §39)', () => {
+  it('takes the full "up to" amount, clamped to the faces the die has', () => {
+    const db = makeDb([
+      def('boost', 'program', {
+        effects: [onPlay({ kind: 'changeGig', amount: 4, target: 'friendlyGigDie' })],
+      }),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'boost')
+    gigs(s, 0, [1, 5])
+
+    const first = fire(db, s, src, [0])
+    expect(first.players[0].gigArea.map((d) => d.value)).toEqual([5, 5])
+    // 5 + 4 on a d6 stops at 6, never 9.
+    const second = fire(db, s, src, [1])
+    expect(second.players[0].gigArea.map((d) => d.value)).toEqual([1, 6])
+  })
+
+  it('a negative amount decreases a rival gig, never below 1', () => {
+    const db = makeDb([
+      def('drain', 'program', {
+        effects: [onPlay({ kind: 'changeGig', amount: -2, target: 'rivalGigDie' })],
+      }),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'drain')
+    gigs(s, 1, [6, 2])
+
+    expect(fire(db, s, src, [0]).players[1].gigArea.map((d) => d.value)).toEqual([4, 2])
+    expect(fire(db, s, src, [1]).players[1].gigArea.map((d) => d.value)).toEqual([6, 1])
+  })
+
+  it('enumerates one playCard entry per gig die (the die is a real choice)', () => {
+    const db = makeDb([
+      def('boost', 'program', {
+        cost: 0,
+        effects: [onPlay({ kind: 'changeGig', amount: 2, target: 'friendlyGigDie' })],
+      }),
+    ])
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'boost')
+    gigs(s, 0, [1, 2, 3])
+
+    const actions = playActions(db, s).filter((a) => a.card === card)
+    expect(actions.map((a) => a.targets)).toEqual([[0], [1], [2]])
+
+    const next = applyAction(db, s, actions[2])
+    expect(next.players[0].gigArea.map((d) => d.value)).toEqual([1, 2, 5])
+  })
+
+  it('fizzles with an empty gig area', () => {
+    const db = makeDb([
+      def('boost', 'program', {
+        effects: [onPlay({ kind: 'changeGig', amount: 2, target: 'friendlyGigDie' })],
+      }),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'boost')
+    expect(fire(db, s, src).players[0].gigArea).toEqual([])
+  })
+})
+
+describe('TargetFilter', () => {
+  const db = makeDb([
+    def('hit', 'program', {
+      effects: [onPlay({ kind: 'defeat', target: 'rivalUnit', filter: { maxPower: 4 } })],
+    }),
+    def('corpokiller', 'program', {
+      effects: [onPlay({ kind: 'defeat', target: 'rivalUnit', filter: { keyword: 'corpo' } })],
+    }),
+    def('buffer', 'unit', {
+      power: 1,
+      effects: [
+        onPlay({
+          kind: 'buffPower',
+          amount: 1,
+          target: 'friendlyUnit',
+          filter: { excludeSelf: true },
+          duration: 'turn',
+        }),
+      ],
+    }),
+    def('picky', 'program', {
+      effects: [
+        onPlay({
+          kind: 'defeat',
+          target: 'rivalUnit',
+          filter: { weakerThanAFriendlyUnit: true },
+        }),
+      ],
+    }),
+    def('weak', 'unit', { power: 3 }),
+    def('strong', 'unit', { power: 7 }),
+    def('suit', 'unit', { power: 3, keywords: ['corpo'] }),
+  ])
+
+  it('maxPower excludes candidates above the printed ceiling', () => {
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'hit')
+    const weak = mint(s, 1, 'field', 'weak')
+    mint(s, 1, 'field', 'strong')
+
+    const choices = effectTargetChoices(
+      db,
+      s,
+      src,
+      onPlay({ kind: 'defeat', target: 'rivalUnit', filter: { maxPower: 4 } })
+    )
+    expect(choices).toEqual([[weak]])
+  })
+
+  it('maxPower is judged on effectivePower, so a buff can save a unit', () => {
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'hit')
+    const weak = mint(s, 1, 'field', 'weak', { tempPower: 2 }) // 3 + 2 = 5
+    expect(fire(db, s, src, [weak]).players[1].field).toEqual([weak])
+  })
+
+  it('keyword narrows to the printed classification', () => {
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'corpokiller')
+    mint(s, 1, 'field', 'weak')
+    const suit = mint(s, 1, 'field', 'suit')
+    expect(fire(db, s, src).players[1].trash).toEqual([suit])
+  })
+
+  it('excludeSelf implements "another friendly Unit"', () => {
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'buffer')
+    const mate = mint(s, 0, 'field', 'weak')
+    const actions = playActions(db, s).filter((a) => a.card === card)
+    expect(actions.map((a) => a.targets)).toEqual([[mate]])
+  })
+
+  it('weakerThanAFriendlyUnit compares against the best friendly power', () => {
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'picky')
+    mint(s, 0, 'field', 'weak') // friendly best = 3
+    const equal = mint(s, 1, 'field', 'weak') // 3 is not *less* than 3
+    expect(fire(db, s, src, [equal]).players[1].field).toEqual([equal])
+
+    const stronger = structuredClone(s)
+    mint(stronger, 0, 'field', 'strong') // friendly best = 7
+    expect(fire(db, stronger, src, [equal]).players[1].trash).toEqual([equal])
+  })
+})
+
+describe('EffectNode: grantKeyword (docs/rulings.md §43)', () => {
+  it('grants {adrenaline} for the turn, letting a lagged unit attack', () => {
+    const db = makeDb([
+      def('rally', 'program', {
+        cost: 0,
+        effects: [
+          onPlay({
+            kind: 'grantKeyword',
+            keyword: 'adrenaline',
+            target: 'friendlyUnit',
+            duration: 'turn',
+          }),
+        ],
+      }),
+      def('grunt', 'unit', { power: 2 }),
+    ])
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'rally')
+    const lagged = mint(s, 0, 'field', 'grunt', { lag: true })
+    mint(s, 1, 'field', 'grunt', { ready: false })
+
+    expect(legalActions(db, s).some((a) => a.type === 'attack')).toBe(false)
+    const next = applyAction(db, s, { type: 'playCard', card, payment: [], targets: [lagged] })
+    expect(effectiveKeywords(db, next, lagged)).toContain('adrenaline')
+    expect(legalActions(db, next).some((a) => a.type === 'attack' && a.attacker === lagged)).toBe(
+      true
+    )
+
+    // The grant dies with the game turn, exactly like a power buff.
+    const later = applyAction(db, next, { type: 'endTurn' })
+    expect(later.cards[lagged].tempKeywords).toEqual([])
+  })
+
+  it("grants the attack-ready permission, widening that attacker's targets", () => {
+    const db = makeDb([
+      def('plan', 'program', {
+        cost: 0,
+        effects: [
+          onPlay({
+            kind: 'grantKeyword',
+            keyword: 'attack-ready',
+            target: 'friendlyUnit',
+            duration: 'turn',
+          }),
+        ],
+      }),
+      def('grunt', 'unit', { power: 2 }),
+    ])
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'plan')
+    const mine = mint(s, 0, 'field', 'grunt')
+    const readyRival = mint(s, 1, 'field', 'grunt', { ready: true })
+
+    expect(legalActions(db, s).some((a) => a.type === 'attack')).toBe(false)
+    const next = applyAction(db, s, { type: 'playCard', card, payment: [], targets: [mine] })
+    const attacks = legalActions(db, next).flatMap((a) =>
+      a.type === 'attack' ? [[a.attacker, a.target]] : []
+    )
+    expect(attacks).toEqual([[mine, readyRival]])
+  })
+})
+
+describe('EffectNode: chooseOne (docs/rulings.md §45)', () => {
+  const db = makeDb([
+    def('modal', 'program', {
+      cost: 0,
+      effects: [
+        onPlay({
+          kind: 'chooseOne',
+          modes: [
+            { kind: 'buffPower', amount: 2, target: 'friendlyUnit', duration: 'turn' },
+            { kind: 'draw', count: 1 },
+          ],
+        }),
+      ],
+    }),
+    def('forced', 'program', {
+      cost: 0,
+      effects: [
+        onPlay({
+          kind: 'chooseOne',
+          chooser: 'rivalIfBehindStreetCred',
+          modes: [
+            { kind: 'buffPower', amount: 2, target: 'friendlyUnit', duration: 'turn' },
+            { kind: 'draw', count: 1 },
+          ],
+        }),
+      ],
+    }),
+    def('grunt', 'unit', { power: 1 }),
+  ])
+
+  it('enumerates the mode as a slot, with each mode own targets after it', () => {
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'modal')
+    const unit = mint(s, 0, 'field', 'grunt')
+    mint(s, 0, 'deck', 'grunt')
+
+    const actions = playActions(db, s).filter((a) => a.card === card)
+    // slots: [mode, mode-0's friendlyUnit]; mode 1 reserves none.
+    expect(actions.map((a) => a.targets)).toEqual([
+      [0, unit],
+      [1, unit],
+    ])
+
+    const buffed = applyAction(db, s, actions[0])
+    expect(buffed.cards[unit].tempPower).toBe(2)
+    expect(buffed.players[0].hand).toEqual([])
+
+    const drawn = applyAction(db, s, actions[1])
+    expect(drawn.cards[unit].tempPower).toBe(0)
+    expect(drawn.players[0].hand).toHaveLength(1)
+  })
+
+  it('offers no mode choice while the rival chooses, and still resolves one', () => {
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'forced')
+    const unit = mint(s, 0, 'field', 'grunt')
+    mint(s, 0, 'deck', 'grunt')
+    gigs(s, 1, [6]) // player 0 has 0 street cred, player 1 has 6
+
+    const actions = playActions(db, s).filter((a) => a.card === card)
+    expect(actions.map((a) => a.targets)).toEqual([[unit]]) // no mode entry
+
+    const next = applyAction(db, s, actions[0])
+    const buffed = next.cards[unit].tempPower === 2
+    const drew = next.players[0].hand.length === 1
+    expect(buffed !== drew).toBe(true) // exactly one mode resolved
+    expect(next.rng).not.toEqual(s.rng) // ... chosen off the seeded rng
+  })
+
+  it('lets the controller choose while they are not behind on street cred', () => {
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'forced')
+    const unit = mint(s, 0, 'field', 'grunt')
+    mint(s, 0, 'deck', 'grunt')
+    gigs(s, 0, [6])
+
+    const actions = playActions(db, s).filter((a) => a.card === card)
+    expect(actions.map((a) => a.targets)).toEqual([
+      [0, unit],
+      [1, unit],
+    ])
+  })
+})
+
+describe('trigger: onBlock (docs/rulings.md §41)', () => {
+  it('fires for the blocking unit before the fight', () => {
+    const db = makeDb([
+      def('wall', 'unit', {
+        power: 3,
+        keywords: ['blocker'],
+        effects: [
+          { trigger: 'onBlock', effect: { kind: 'changeGig', amount: 3, target: 'friendlyGigDie' } },
+        ],
+      }),
+      def('grunt', 'unit', { power: 2 }),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'grunt')
+    const wall = mint(s, 1, 'field', 'wall')
+    gigs(s, 1, [1])
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
+    next = applyAction(db, next, { type: 'react', reaction: { type: 'block', blocker: wall } })
+    expect(next.players[1].gigArea.map((d) => d.value)).toEqual([4])
+    expect(next.players[0].trash).toContain(attacker) // 2 vs 3: the blocker won
+  })
+})
+
+describe('trigger: onWinFight + oncePerTurn (docs/rulings.md §40, §41)', () => {
+  const db = makeDb([
+    def('duelist', 'unit', {
+      power: 5,
+      effects: [
+        {
+          trigger: 'onWinFight',
+          oncePerTurn: true,
+          effect: { kind: 'readyCard', target: 'self' },
+        },
+      ],
+    }),
+    def('grunt', 'unit', { power: 1 }),
+  ])
+
+  it('readies the winner once, then not again in the same turn', () => {
+    const s = scenario()
+    const duelist = mint(s, 0, 'field', 'duelist')
+    const a = mint(s, 1, 'field', 'grunt', { ready: false })
+    const b = mint(s, 1, 'field', 'grunt', { ready: false })
+
+    let next = applyAction(db, s, { type: 'attack', attacker: duelist, target: a })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.cards[duelist].ready).toBe(true) // spent by attacking, readied by winning
+    expect(next.oncePerTurnUsed).toEqual([duelist + ':0'])
+
+    next = applyAction(db, next, { type: 'attack', attacker: duelist, target: b })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.cards[duelist].ready).toBe(false) // the once-per-turn ready is used up
+  })
+
+  it('does not fire on a tie, and the allowance refreshes next turn', () => {
+    const s = scenario()
+    const duelist = mint(s, 0, 'field', 'duelist')
+    const equal = mint(s, 1, 'field', 'duelist', { ready: false })
+
+    let next = applyAction(db, s, { type: 'attack', attacker: duelist, target: equal })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.players[0].trash).toContain(duelist)
+    expect(next.oncePerTurnUsed).toEqual([])
+
+    const ended = applyAction(db, next, { type: 'endTurn' })
+    expect(ended.oncePerTurnUsed).toEqual([])
+  })
+})
+
+describe('EffectNode: defeatShield (docs/rulings.md §46)', () => {
+  it('the gear is trashed instead of the unit, once', () => {
+    const db = makeDb([
+      def('brute', 'unit', { power: 9 }),
+      def('grunt', 'unit', { power: 1 }),
+      def('transmitter', 'gear', {
+        power: 0,
+        effects: [{ trigger: 'static', effect: { kind: 'defeatShield' } }],
+      }),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'brute')
+    const victim = mint(s, 1, 'field', 'grunt', { ready: false })
+    const shield = mintGear(s, 1, 'transmitter', victim)
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.players[1].field).toEqual([victim]) // survived
+    expect(next.players[1].trash).toEqual([shield])
+    expect(next.cards[victim].attachedGear).toEqual([])
+    expect(next.events.some((e) => e.type === 'unitDefeated')).toBe(false)
+
+    // The shield is gone: the next hit lands.
+    next.cards[attacker].ready = true
+    let again = applyAction(db, next, { type: 'attack', attacker, target: victim })
+    again = applyAction(db, again, { type: 'react', reaction: pass })
+    expect(again.players[1].trash).toContain(victim)
+  })
+})
+
+describe('EffectNode: winsFightVsKeyword (docs/rulings.md §41)', () => {
+  it('beats a matching unit whatever the power says', () => {
+    const db = makeDb([
+      def('nemesis', 'unit', {
+        power: 1,
+        effects: [{ trigger: 'static', effect: { kind: 'winsFightVsKeyword', keyword: 'corpo' } }],
+      }),
+      def('suit', 'unit', { power: 9, keywords: ['corpo'] }),
+      def('punk', 'unit', { power: 9 }),
+    ])
+    const s = scenario()
+    const nemesis = mint(s, 0, 'field', 'nemesis')
+    const suit = mint(s, 1, 'field', 'suit', { ready: false })
+    const punk = mint(s, 1, 'field', 'punk', { ready: false })
+
+    let next = applyAction(db, s, { type: 'attack', attacker: nemesis, target: suit })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.players[1].trash).toEqual([suit])
+    expect(next.players[0].field).toEqual([nemesis]) // and it survived
+
+    // A non-CORPO unit of the same power still crushes it.
+    let other = applyAction(db, s, { type: 'attack', attacker: nemesis, target: punk })
+    other = applyAction(db, other, { type: 'react', reaction: pass })
+    expect(other.players[0].trash).toEqual([nemesis])
+  })
+})
+
+describe('cost reduction (docs/rulings.md §44)', () => {
+  it('reduces a card play cost per matching gig, never below the minimum', () => {
+    const db = makeDb([
+      def('bigplay', 'program', {
+        cost: 6,
+        effects: [
+          {
+            trigger: 'static',
+            effect: {
+              kind: 'costReduction',
+              reduction: { per: 'friendlyGigValueAtLeast', value: 8, amount: 1, minimum: 1 },
+            },
+          },
+        ],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const card = mint(s, 0, 'hand', 'bigplay')
+    for (let i = 0; i < 6; i++) mint(s, 0, 'eddies', 'grunt', { faceUp: false })
+    s.players[0].gigArea = [
+      { size: 10, value: 9 },
+      { size: 10, value: 8 },
+      { size: 10, value: 3 },
+    ]
+
+    const action = playActions(db, s).find((a) => a.card === card)
+    expect(action!.payment).toHaveLength(4) // 6 - 2 matching gigs
+
+    const cheap = structuredClone(s)
+    cheap.players[0].gigArea = Array.from({ length: 9 }, () => ({ size: 10 as const, value: 10 }))
+    expect(playActions(db, cheap).find((a) => a.card === card)!.payment).toHaveLength(1) // floor
+  })
+
+  it('reduces an activated ability eddie cost', () => {
+    const db = makeDb([
+      def('boss', 'unit', {
+        power: 1,
+        effects: [
+          {
+            trigger: 'activated',
+            cost: {
+              eddies: 2,
+              reduction: { per: 'friendlyGigValueAtLeast', value: 8, amount: 1, minimum: 0 },
+            },
+            effect: { kind: 'draw', count: 1 },
+          },
+        ],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const boss = mint(s, 0, 'field', 'boss')
+    const eddie = mint(s, 0, 'eddies', 'grunt', { faceUp: false })
+    mint(s, 0, 'deck', 'grunt')
+    s.players[0].gigArea = [{ size: 10, value: 9 }]
+
+    // 2 €$ reduced to 1 by the single 9-value gig: affordable with one eddie.
+    expect(abilityActions(db, s)).toHaveLength(1)
+    const next = applyAction(db, s, {
+      type: 'activateAbility',
+      card: boss,
+      abilityIndex: 0,
+      targets: [],
+    })
+    expect(next.cards[eddie].ready).toBe(false)
+    expect(next.players[0].hand).toHaveLength(1)
+  })
+})
+
+describe('buffPower with a dynamic amount', () => {
+  it("'friendlyMaxGig' reads the controller best gig value", () => {
+    const db = makeDb([
+      def('pump', 'program', {
+        effects: [
+          onPlay({
+            kind: 'buffPower',
+            amount: 'friendlyMaxGig',
+            target: 'friendlyUnit',
+            duration: 'turn',
+          }),
+        ],
+      }),
+      def('grunt', 'unit', { power: 2 }),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'pump')
+    const unit = mint(s, 0, 'field', 'grunt')
+    gigs(s, 0, [3, 6, 2])
+
+    const next = fire(db, s, src, [unit])
+    expect(effectivePower(db, next, unit)).toBe(8)
+  })
+})
+
+describe('an optional cost on a triggered effect (docs/rulings.md §49)', () => {
+  const db = makeDb([
+    def('mercenary', 'unit', {
+      power: 4,
+      effects: [
+        {
+          trigger: 'onAttack',
+          cost: { eddies: 2 },
+          effect: { kind: 'buffPower', amount: 3, target: 'self', duration: 'turn' },
+        },
+      ],
+    }),
+    def('grunt', 'unit', { power: 1 }),
+  ])
+
+  it('is paid automatically when affordable', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'mercenary')
+    const victim = mint(s, 1, 'field', 'grunt', { ready: false })
+    const a = mint(s, 0, 'eddies', 'grunt', { faceUp: false })
+    const b = mint(s, 0, 'eddies', 'grunt', { faceUp: false })
+
+    const next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    expect(next.cards[attacker].tempPower).toBe(3)
+    expect(next.cards[a].ready).toBe(false)
+    expect(next.cards[b].ready).toBe(false)
+  })
+
+  it('is skipped entirely when it cannot be paid', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'mercenary')
+    const victim = mint(s, 1, 'field', 'grunt', { ready: false })
+    mint(s, 0, 'eddies', 'grunt', { faceUp: false }) // only 1 €$
+
+    const next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    expect(next.cards[attacker].tempPower).toBe(0)
+    expect(next.players[0].eddies.every((uid) => next.cards[uid].ready)).toBe(true)
+  })
+})
+
+describe('trigger: onSpend (docs/rulings.md §47)', () => {
+  const db = makeDb([
+    def('informant', 'unit', {
+      power: 2,
+      effects: [{ trigger: 'onSpend', effect: { kind: 'draw', count: 1 } }],
+    }),
+    def('grunt', 'unit', { power: 1 }),
+  ])
+
+  it('fires when the unit is spent by attacking', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'informant')
+    const victim = mint(s, 1, 'field', 'grunt', { ready: false })
+    mint(s, 0, 'deck', 'grunt')
+
+    const next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    expect(next.players[0].hand).toHaveLength(1)
+  })
+
+  it('fires when a face-up legend is spent to pay a cost, but never from the eddies area', () => {
+    const legendDb = makeDb([
+      def('patron', 'legend', {
+        power: null,
+        effects: [{ trigger: 'onSpend', effect: { kind: 'draw', count: 1 } }],
+      }),
+      def('grunt', 'unit', { cost: 1, power: 1 }),
+      def('spy', 'unit', {
+        cost: 1,
+        power: 1,
+        effects: [{ trigger: 'onSpend', effect: { kind: 'draw', count: 1 } }],
+      }),
+    ])
+    const s = scenario()
+    const legend = mint(s, 0, 'legends', 'patron')
+    const card = mint(s, 0, 'hand', 'grunt')
+    mint(s, 0, 'deck', 'grunt')
+
+    const next = applyAction(legendDb, s, { type: 'playCard', card, payment: [legend], targets: [] })
+    expect(next.cards[legend].ready).toBe(false)
+    expect(next.players[0].hand).toHaveLength(1) // the drawn card
+
+    // A card sitting face-down in the eddies area is not in play: no trigger.
+    const eddieState = scenario()
+    const eddie = mint(eddieState, 0, 'eddies', 'spy', { faceUp: false })
+    const play = mint(eddieState, 0, 'hand', 'grunt')
+    mint(eddieState, 0, 'deck', 'grunt')
+    const after = applyAction(legendDb, eddieState, {
+      type: 'playCard',
+      card: play,
+      payment: [eddie],
+      targets: [],
+    })
+    expect(after.players[0].hand).toEqual([])
+  })
+})
+
+describe('watcher trigger: onFriendlyStealDie (docs/rulings.md §42)', () => {
+  const db = makeDb([
+    def('recruits', 'unit', {
+      power: 6,
+      effects: [
+        {
+          trigger: 'onFriendlyStealDie',
+          condition: { stolenDieSize: 6 },
+          effect: { kind: 'changeGig', amount: 6, target: 'friendlyGigDie' },
+        },
+      ],
+    }),
+    def('grunt', 'unit', { power: 3 }),
+  ])
+
+  it('fires on a matching die stolen by *another* friendly unit', () => {
+    const s = scenario()
+    mint(s, 0, 'field', 'recruits', { ready: false })
+    const thiefUnit = mint(s, 0, 'field', 'grunt')
+    s.players[1].gigArea = [{ size: 6, value: 2 }]
+    s.players[0].gigArea = [{ size: 12, value: 1 }]
+
+    let next = applyAction(db, s, { type: 'attack', attacker: thiefUnit, target: 'gigArea' })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
+    // The d12 the watcher increased, plus the stolen d6.
+    expect(next.players[0].gigArea.map((d) => 'd' + d.size + '=' + d.value).sort()).toEqual([
+      'd12=7',
+      'd6=2',
+    ])
+  })
+
+  it('does not fire for a die of another size', () => {
+    const s = scenario()
+    mint(s, 0, 'field', 'recruits', { ready: false })
+    const thiefUnit = mint(s, 0, 'field', 'grunt')
+    s.players[1].gigArea = [{ size: 8, value: 2 }]
+    s.players[0].gigArea = [{ size: 12, value: 1 }]
+
+    let next = applyAction(db, s, { type: 'attack', attacker: thiefUnit, target: 'gigArea' })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
+    expect(next.players[0].gigArea.map((d) => d.value).sort()).toEqual([1, 2])
+  })
+})
+
+describe('scripted nodes may declare target slots (docs/rulings.md §48)', () => {
+  it('binds them like any other slot and hands them to the script', () => {
+    scriptedCards['test-slots'] = (_db, state, ctx) => {
+      const target = ctx.targets[0]
+      if (target === undefined) return state
+      state.cards[target].tempPower += 7
+      return state
+    }
+    try {
+      const db = makeDb([
+        def('script', 'program', {
+          cost: 0,
+          effects: [onPlay({ kind: 'scripted', name: 'test-slots', targets: ['rivalUnit'] })],
+        }),
+        def('grunt', 'unit', { power: 1 }),
+      ])
+      const s = scenario()
+      const card = mint(s, 0, 'hand', 'script')
+      const a = mint(s, 1, 'field', 'grunt')
+      const b = mint(s, 1, 'field', 'grunt')
+
+      const actions = playActions(db, s).filter((x) => x.card === card)
+      expect(actions.map((x) => x.targets)).toEqual([[a], [b]])
+
+      const next = applyAction(db, s, actions[1])
+      expect(next.cards[b].tempPower).toBe(7)
+      expect(next.cards[a].tempPower).toBe(0)
+    } finally {
+      delete scriptedCards['test-slots']
+    }
+  })
+})
+
+describe('conditions added in Task 8', () => {
+  it('friendlyGigValueAtLeast gates on the best friendly gig value', () => {
+    const db = makeDb([
+      def('rocker', 'unit', {
+        power: 5,
+        effects: [
+          {
+            trigger: 'activated',
+            cost: { selfSpend: true },
+            condition: { friendlyGigValueAtLeast: 8 },
+            effect: { kind: 'draw', count: 2 },
+          },
+        ],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    mint(s, 0, 'field', 'rocker')
+    mint(s, 0, 'deck', 'grunt')
+    mint(s, 0, 'deck', 'grunt')
+    s.players[0].gigArea = [{ size: 10, value: 7 }]
+    expect(abilityActions(db, s)).toEqual([])
+
+    s.players[0].gigArea = [{ size: 10, value: 8 }]
+    expect(abilityActions(db, s)).toHaveLength(1)
+  })
+
+  it('rivalGigLeadAtLeast gates on the rival gig-count lead', () => {
+    const db = makeDb([
+      def('desperate', 'program', {
+        effects: [onPlay({ kind: 'draw', count: 1 }, { condition: { rivalGigLeadAtLeast: 2 } })],
+      }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'desperate')
+    mint(s, 0, 'deck', 'grunt')
+    gigs(s, 0, [1])
+    gigs(s, 1, [1, 2]) // lead of 1
+    expect(fire(db, s, src).players[0].hand).toEqual([])
+
+    gigs(s, 1, [1, 2, 3]) // lead of 2
+    expect(fire(db, s, src).players[0].hand).toHaveLength(1)
   })
 })

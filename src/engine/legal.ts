@@ -15,6 +15,7 @@
 import { activatedAbilityActions, goSoloPayment, playCardTargetChoices } from '../cards/effects'
 import { attackActions, chooseGigActions, reactActions } from './combat'
 import { canonicalPayment, legendCallPayment } from './economy'
+import { effectiveCardCost } from './query'
 import type { Action, CardDb, DieSize, GameState } from './types'
 
 const D20: DieSize = 20
@@ -60,7 +61,9 @@ function mainPhaseActions(db: CardDb, state: GameState): Action[] {
 
   for (const uid of p.hand) {
     const def = db[state.cards[uid].defId]
-    const payment = canonicalPayment(state, player, def.cost)
+    // "Play this Program for -1 €$ for each friendly Gig with 8+ value" — the
+    // cost a play actually asks for is the reduced one (docs/rulings.md §44).
+    const payment = canonicalPayment(state, player, effectiveCardCost(def, state, player))
     if (payment === null) continue
     for (const targets of playCardTargetChoices(db, state, uid)) {
       actions.push({ type: 'playCard', card: uid, payment, targets })

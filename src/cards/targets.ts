@@ -13,8 +13,8 @@
 // to the *source card's owner*, never to the active player: a Gear card equipped
 // to a rival Unit still targets its own owner's side (docs/rulings.md §8).
 
-import { opponentOf } from '../engine/query'
-import type { CardDb, GameState, PlayerId, TargetSpec } from '../engine/types'
+import { effectivePower, hasKeyword, opponentOf } from '../engine/query'
+import type { CardDb, GameState, PlayerId, TargetFilter, TargetSpec } from '../engine/types'
 
 /** The player an effect acts for: the owner of the card the effect is on. */
 export function controllerOf(state: GameState, sourceUid: number): PlayerId {
@@ -65,7 +65,59 @@ export function targetsFor(
       return [...fieldOf(state, me), ...fieldOf(state, rival)]
     case 'friendlyUnitOrLegend':
       return [...fieldOf(state, me), ...faceUpLegendsOf(state, me)]
+    // Gig-die specs bind an *index* into the gig area, not a card uid
+    // (docs/rulings.md §39).
+    case 'friendlyGigDie':
+      return state.players[me].gigArea.map((_die, index) => index)
+    case 'rivalGigDie':
+      return state.players[rival].gigArea.map((_die, index) => index)
   }
+}
+
+/** Does `spec` bind a Gig-die index rather than a card uid? */
+export function isGigDieSpec(spec: TargetSpec): boolean {
+  return spec === 'friendlyGigDie' || spec === 'rivalGigDie'
+}
+
+/** The highest `effectivePower` among `player`'s field Units, or null if none. */
+function bestFriendlyPower(db: CardDb, state: GameState, player: PlayerId): number | null {
+  const powers = fieldOf(state, player).map((uid) => effectivePower(db, state, uid))
+  return powers.length === 0 ? null : Math.max(...powers)
+}
+
+/**
+ * Narrows a card-target candidate list by a printed restriction
+ * ("with power 4 or less", "CORPO", "another friendly Unit", "with less power
+ * than a friendly Unit"). Gig-die candidates are never filtered — no card in
+ * the pool restricts *which* die it may touch.
+ */
+export function filterTargets(
+  db: CardDb,
+  state: GameState,
+  candidates: number[],
+  filter: TargetFilter | undefined,
+  sourceUid: number,
+  controller: PlayerId
+): number[] {
+  if (filter === undefined) return candidates
+  const friendlyBest = filter.weakerThanAFriendlyUnit
+    ? bestFriendlyPower(db, state, controller)
+    : null
+  return candidates.filter((uid) => {
+    if (filter.excludeSelf === true && uid === sourceUid) return false
+    if (filter.keyword !== undefined && !hasKeyword(db, state, uid, filter.keyword)) return false
+    if (filter.maxPower !== undefined && effectivePower(db, state, uid) > filter.maxPower) {
+      return false
+    }
+    if (filter.minPower !== undefined && effectivePower(db, state, uid) < filter.minPower) {
+      return false
+    }
+    if (filter.weakerThanAFriendlyUnit === true) {
+      if (friendlyBest === null) return false
+      if (effectivePower(db, state, uid) >= friendlyBest) return false
+    }
+    return true
+  })
 }
 
 // ---------------------------------------------------------------------------

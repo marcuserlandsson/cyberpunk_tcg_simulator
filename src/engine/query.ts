@@ -7,7 +7,22 @@
 // rather than there so combat.ts/legal.ts can consult them without importing
 // the card layer.
 
-import type { CardDb, CardDef, EffectDef, EffectNode, GameState, Keyword, PlayerId } from './types'
+import type {
+  CardDb,
+  CardDef,
+  CostReduction,
+  EffectDef,
+  EffectNode,
+  GameState,
+  Keyword,
+  PlayerId,
+} from './types'
+
+/**
+ * Granted-only keyword (never printed): "it may attack ready Units" — see
+ * `gunpoint-diplomacy` and `valentino-guerrera` (docs/rulings.md §43).
+ */
+export const ATTACK_READY = 'attack-ready'
 
 /** The rival of `player`. */
 export function opponentOf(player: PlayerId): PlayerId {
@@ -41,15 +56,96 @@ export function actingPlayer(state: GameState): PlayerId {
 // Conditions
 // ---------------------------------------------------------------------------
 
+/** The highest value among `player`'s Gig dice (0 with an empty Gig area). */
+export function maxGigValue(state: GameState, player: PlayerId): number {
+  return state.players[player].gigArea.reduce((best, die) => Math.max(best, die.value), 0)
+}
+
+/**
+ * Extra facts a watcher trigger's condition needs, which no read of the state
+ * can supply: the size of the Gig die that was just stolen
+ * (docs/rulings.md §42).
+ */
+export interface ConditionContext {
+  stolenDieSize?: number
+}
+
 /**
  * Is an EffectDef's `condition` satisfied for `player` right now? Checked both
  * when an activated ability is offered and again when any effect resolves, so a
  * condition that lapses between the two never fires.
+ *
+ * A `stolenDieSize` condition can only ever be met with a matching `context`,
+ * so an effect gated on it never fires outside the steal that triggered it.
  */
-export function conditionMet(state: GameState, player: PlayerId, def: EffectDef): boolean {
-  const needed = def.condition?.streetCredAtLeast
-  if (needed === undefined) return true
-  return streetCred(state, player) >= needed
+export function conditionMet(
+  state: GameState,
+  player: PlayerId,
+  def: EffectDef,
+  context: ConditionContext = {}
+): boolean {
+  const condition = def.condition
+  if (condition === undefined) return true
+  if (
+    condition.streetCredAtLeast !== undefined &&
+    streetCred(state, player) < condition.streetCredAtLeast
+  ) {
+    return false
+  }
+  if (
+    condition.friendlyGigValueAtLeast !== undefined &&
+    maxGigValue(state, player) < condition.friendlyGigValueAtLeast
+  ) {
+    return false
+  }
+  if (condition.rivalGigLeadAtLeast !== undefined) {
+    const mine = state.players[player].gigArea.length
+    const theirs = state.players[opponentOf(player)].gigArea.length
+    if (theirs - mine < condition.rivalGigLeadAtLeast) return false
+  }
+  if (condition.stolenDieSize !== undefined && context.stolenDieSize !== condition.stolenDieSize) {
+    return false
+  }
+  return true
+}
+
+// ---------------------------------------------------------------------------
+// Cost reduction
+// ---------------------------------------------------------------------------
+
+/**
+ * Applies a printed cost reduction ("-1 €$ for each friendly Gig with 8+
+ * value, to a minimum of 1 €$") to a base cost (docs/rulings.md §44).
+ */
+export function reducedCost(
+  state: GameState,
+  player: PlayerId,
+  base: number,
+  reduction: CostReduction | undefined
+): number {
+  if (reduction === undefined) return base
+  const matching = state.players[player].gigArea.filter(
+    (die) => die.value >= reduction.value
+  ).length
+  return Math.max(reduction.minimum, base - matching * reduction.amount)
+}
+
+/**
+ * What playing `defId` costs `player` right now: its printed cost, less every
+ * `costReduction` static node printed on the card itself. Read off the *card
+ * definition* rather than `activeStaticNodes`, because a card in hand is not
+ * "in play" and so contributes no live statics (docs/rulings.md §44).
+ */
+export function effectiveCardCost(def: CardDef, state: GameState, player: PlayerId): number {
+  let cost = def.cost
+  for (const effect of def.effects) {
+    if (effect.trigger !== 'static') continue
+    if (!conditionMet(state, player, effect)) continue
+    for (const node of flattenNodes(effect.effect)) {
+      if (node.kind === 'costReduction') cost = reducedCost(state, player, cost, node.reduction)
+    }
+  }
+  return cost
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +254,8 @@ export function effectiveKeywords(db: CardDb, state: GameState, uid: number): Ke
   if (!card) return []
   const def = db[card.defId]
   const keywords = new Set<Keyword>(def ? def.keywords : [])
+  // Until-end-of-turn grants (docs/rulings.md §43) are as real as printed ones.
+  for (const keyword of card.tempKeywords) keywords.add(keyword)
   for (const gearUid of card.attachedGear) {
     const gear = state.cards[gearUid]
     const gearDef = gear ? db[gear.defId] : undefined
@@ -181,4 +279,40 @@ export function hasKeyword(db: CardDb, state: GameState, uid: number, keyword: K
  */
 export function cantAttack(db: CardDb, state: GameState, uid: number): boolean {
   return activeStaticNodes(db, state, uid).some((node) => node.kind === 'cantAttack')
+}
+
+/**
+ * The attached Gear that would soak a defeat for `uid` — "If this Unit would be
+ * defeated, defeat its DEADMAN TRANSMITTER instead" (docs/rulings.md §46), or
+ * null when nothing is protecting it. The *first* such Gear (in attach order)
+ * takes the hit.
+ */
+export function defeatShieldOf(db: CardDb, state: GameState, uid: number): number | null {
+  const card = state.cards[uid]
+  if (!card) return null
+  for (const gearUid of card.attachedGear) {
+    const gear = state.cards[gearUid]
+    const gearDef = gear ? db[gear.defId] : undefined
+    if (!gear || !gearDef) continue
+    const shields = staticNodes(state, gearDef, gear.owner).some(
+      (node) => node.kind === 'defeatShield'
+    )
+    if (shields) return gearUid
+  }
+  return null
+}
+
+/**
+ * "This Unit wins all fights against CORPO Units": does `uid` beat `foe` in a
+ * fight whatever the two powers say?
+ */
+export function winsFightRegardless(
+  db: CardDb,
+  state: GameState,
+  uid: number,
+  foe: number
+): boolean {
+  return activeStaticNodes(db, state, uid).some(
+    (node) => node.kind === 'winsFightVsKeyword' && hasKeyword(db, state, foe, node.keyword)
+  )
 }
