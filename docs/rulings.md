@@ -769,8 +769,17 @@ cannot be a coin flip. Consequences, all in `combat.ts`:
   attack still pending; one fired by an on-attack effect is taken *before* the
   react window opens; one fired by an on-defeat effect inside a fight outlives
   the attack that caused it (`endAttack` keeps it and resumes into `main`);
-- a steal with an empty victim Gig area never enters `chooseGig` at all, and two
-  `stealGig` nodes in one effect accumulate into one choice.
+- a steal with an empty victim Gig area never enters `chooseGig` at all;
+- **steals for different thieves queue, they never overwrite.** `PendingSteal`
+  gained an optional `queue` holding the steals waiting behind the head, oldest
+  first, and `combat.ts`'s `finishSteal` promotes the next one when the head is
+  done (inheriting the head's `resumePhase`, because the interrupted phase only
+  resumes after the *last* steal). A tied fight that defeats two "{Defeated}
+  steal a Gig" Units owes each controller a choice, in the order the triggers
+  fired — the defender's casualty first, per the fight loop — and neither may be
+  dropped. Two steals for the *same* thief with nothing queued between them
+  merge into one longer choice sequence instead. `draftState` deep-copies the
+  queue, so a reducer's `shift()` can never reach into the caller's state.
 
 The rest of the effect resolves immediately, before the dice are picked — the
 same deferral the attack steal has always had (guide step 04 is the last step of
@@ -825,7 +834,8 @@ targets. `effectController(state, uid)` (the owner of `abilityHost(state, uid)`)
 is the single helper every path uses — enumeration, payment, gating and
 resolution — so they cannot disagree. The Gear card is still the effect's
 *source* (`ctx.sourceUid`), so `self` targeting and event attribution point at
-the Gear.
+the Gear. This covers a Gear card's *ongoing* text only — its own **onPlay**
+effect belongs to whoever played it, see §38.
 
 `abilityIndex` indexes the card def's **`effects` array**, not a filtered list of
 activated abilities, so an index is stable no matter what else the card does.
@@ -934,3 +944,24 @@ Details:
 - `fireCardTrigger` (own defs only) and `fireTriggerOnDraft` (own + propagated
   Gear) are separate entry points, so a caller that must not double-fire — the
   defeat path, which fires the Gear explicitly — can say so.
+
+## 38 — A Gear card's own onPlay belongs to the player who played it, not the host's controller
+
+§33 hands an attached Gear card's abilities and triggers to the Unit's
+controller. Its **onPlay** effect is the exception, and the distinction is not a
+detail: `kiroshi-optics` may be equipped to a rival Unit (§8), so the two
+readings differ every time that happens.
+
+**Ruling:** a Gear card's own onPlay effect resolves for the player who played
+and paid for the card — its owner — whatever it ends up attached to. What
+transfers to the host's controller is only the Gear's *ongoing* contribution:
+statics and keywords (§29, §30), propagated triggers (§37) and activated
+abilities (§33). "When you play this, do X" is an act by the player taking the
+action; "while this is equipped" is a property of the equipped card.
+
+Mechanically, `playCardOnDraft` fires the onPlay through
+`fireCardTrigger(..., player)` with the playing player as an explicit
+controller, rather than letting `effectController` derive it from the (already
+attached) host — and `playCardTargetChoices` enumerates with the same explicit
+controller. Both sides of the enumerate/resolve pair name the player, so they
+cannot drift the way §34 describes.

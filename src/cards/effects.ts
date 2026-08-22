@@ -119,10 +119,12 @@ export function effectTargetChoices(
   db: CardDb,
   state: GameState,
   uid: number,
-  def: EffectDef
+  def: EffectDef,
+  controller?: PlayerId
 ): number[][] {
   let tuples: number[][] = [[]]
-  for (const slot of fillableSlots(db, state, uid, def, effectController(state, uid))) {
+  const player = controller ?? effectController(state, uid)
+  for (const slot of fillableSlots(db, state, uid, def, player)) {
     if (slot.candidates.length === 0) continue
     const next: number[][] = []
     for (const tuple of tuples) {
@@ -153,14 +155,15 @@ export function triggerTargetChoices(
   db: CardDb,
   state: GameState,
   uid: number,
-  trigger: Trigger
+  trigger: Trigger,
+  controller?: PlayerId
 ): number[][] {
   const def = defOf(db, state, uid)
   if (!def) return [[]]
   let tuples: number[][] = [[]]
   for (const effect of def.effects) {
     if (effect.trigger !== trigger) continue
-    const own = effectTargetChoices(db, state, uid, effect)
+    const own = effectTargetChoices(db, state, uid, effect, controller)
     const next: number[][] = []
     for (const tuple of tuples) {
       for (const extra of own) {
@@ -352,11 +355,8 @@ function applyNode(
       const available = draft.players[victim].gigArea.length
       const count = Math.min(node.count, available)
       if (count <= 0) return
-      const pending = draft.pendingSteal
-      if (pending !== null && pending.thief === ctx.player) {
-        // A second steal in the same effect just adds to the pending choice.
-        pending.remaining += count
-      } else {
+      const head = draft.pendingSteal
+      if (head === null) {
         draft.pendingSteal = {
           attacker: ctx.sourceUid,
           remaining: count,
@@ -364,6 +364,17 @@ function applyNode(
           resumePhase: draft.phase === 'chooseGig' ? 'main' : draft.phase,
         }
         draft.phase = 'chooseGig'
+      } else if (head.thief === ctx.player && (head.queue ?? []).length === 0) {
+        // Same controller, nothing queued behind: one longer choice sequence.
+        head.remaining += count
+      } else {
+        // A steal for a *different* thief (a tied fight defeating two stealing
+        // Units) waits its turn instead of overwriting — docs/rulings.md §32.
+        const queue = head.queue ?? []
+        const last = queue[queue.length - 1]
+        if (last !== undefined && last.thief === ctx.player) last.remaining += count
+        else queue.push({ attacker: ctx.sourceUid, remaining: count, thief: ctx.player })
+        head.queue = queue
       }
       note(draft, ctx.sourceUid, `steal ${count} gig(s)`)
       return
@@ -746,8 +757,17 @@ export function playCardTargetChoices(db: CardDb, state: GameState, uid: number)
   // onPlay effects resolve *after* the card has entered its zone, so their
   // targets must be enumerated against that same state — otherwise a Unit could
   // never target itself, and a slot that only fills once the card is on the
-  // field would shift every later slot (docs/rulings.md §34).
-  const effectTuples = triggerTargetChoices(db, stateAfterEntry(db, state, uid), uid, 'onPlay')
+  // field would shift every later slot (docs/rulings.md §34). The controller is
+  // always the player *playing* the card, even for a Gear card equipped to a
+  // rival Unit (docs/rulings.md §38).
+  const player = state.cards[uid].owner
+  const effectTuples = triggerTargetChoices(
+    db,
+    stateAfterEntry(db, state, uid),
+    uid,
+    'onPlay',
+    player
+  )
   if (def.type !== 'gear') return effectTuples
 
   const tuples: number[][] = []
@@ -831,7 +851,12 @@ export function playCardOnDraft(
       break
   }
 
-  fireTriggerOnDraft(db, draft, 'onPlay', cardUid, effectTargets)
+  // A card's own onPlay belongs to the player who played and paid for it — even
+  // a Gear card equipped to a rival Unit, whose *ongoing* statics, triggers and
+  // abilities do transfer to the host's controller (docs/rulings.md §38). This
+  // is `fireCardTrigger`, not `fireTriggerOnDraft`, for the same reason: onPlay
+  // never propagates to the host's other Gear (docs/rulings.md §37).
+  fireCardTrigger(db, draft, 'onPlay', cardUid, effectTargets, player)
 
   if (def.type === 'program') {
     p.trash.push(cardUid)

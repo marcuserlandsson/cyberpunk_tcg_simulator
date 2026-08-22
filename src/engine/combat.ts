@@ -30,7 +30,7 @@
 import { fireCardTrigger, fireTriggerOnDraft, quickReactionActions } from '../cards/effects'
 import { legendCallPayment } from './economy'
 import { cantAttack, effectivePower, hasKeyword, opponentOf } from './query'
-import type { Action, CardDb, GameState, PlayerId } from './types'
+import type { Action, CardDb, GameState, PendingSteal, PlayerId } from './types'
 
 /** Keyword: "this Unit can attack the turn it's played" (docs/rulings.md §2). */
 const ADRENALINE = 'adrenaline'
@@ -388,14 +388,34 @@ export function takeStolenGig(draft: GameState, dieIndex: number): void {
 
   steal.remaining -= 1
   if (steal.remaining > 0 && draft.players[victim].gigArea.length > 0) return
+  finishSteal(draft, steal)
+}
 
-  if (steal.resumePhase === undefined) {
+/**
+ * The head steal is done. If another steal is queued behind it (a tied fight
+ * where both casualties steal — docs/rulings.md §32), it becomes the new head
+ * and inherits the resume target, because the interrupted phase only resumes
+ * after the *last* steal. Otherwise: an attack steal closes the attack, and an
+ * effect steal hands control back to whatever it interrupted (the main phase, or
+ * a react window whose attack is still pending).
+ */
+function finishSteal(draft: GameState, head: PendingSteal): void {
+  const queue = head.queue ?? []
+  const next = queue.shift()
+  if (next !== undefined) {
+    next.resumePhase = next.resumePhase ?? head.resumePhase
+    if (queue.length > 0) next.queue = queue
+    else delete next.queue
+    draft.pendingSteal = next
+    draft.phase = 'chooseGig'
+    return
+  }
+
+  if (head.resumePhase === undefined) {
     // An attack steal: the last die closes the attack.
     endAttack(draft)
     return
   }
-  // An effect steal: hand control back to whatever was interrupted (the main
-  // phase, or a react window whose attack is still pending).
   draft.pendingSteal = null
-  draft.phase = steal.resumePhase
+  draft.phase = head.resumePhase
 }

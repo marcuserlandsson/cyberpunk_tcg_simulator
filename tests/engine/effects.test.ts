@@ -12,7 +12,7 @@
 import { describe, expect, it } from 'vitest'
 import { effectTargetChoices, fireTrigger, resolveEffect } from '../../src/cards/effects'
 import { scriptedCards } from '../../src/cards/scripted/index'
-import { gearEquipTargets } from '../../src/cards/targets'
+import { gearEquipTargets, gearTargetOverrides } from '../../src/cards/targets'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { createRng } from '../../src/engine/rng'
 import { legalActions } from '../../src/engine/legal'
@@ -823,6 +823,50 @@ describe('onPlay targets are enumerated against the post-entry state', () => {
   })
 })
 
+describe('a gear card own onPlay belongs to the player who played it', () => {
+  const db = makeDb([
+    def('grunt', 'unit', { power: 2 }),
+    def('spycam', 'gear', {
+      power: 0,
+      effects: [
+        onPlay({ kind: 'buffPower', amount: 3, target: 'friendlyUnit', duration: 'turn' }),
+      ],
+    }),
+  ])
+
+  it('enumerates and resolves against the *player* friendlies, not the host controller', () => {
+    // A synthetic cross-owner-equippable gear, registered the same way
+    // kiroshi-optics is (docs/rulings.md §34).
+    gearTargetOverrides['spycam'] = (_db, state, gearUid) => [
+      ...state.players[0].field,
+      ...state.players[1].field,
+    ]
+    try {
+      const s = scenario()
+      const gear = mint(s, 0, 'hand', 'spycam')
+      const mine = mint(s, 0, 'field', 'grunt')
+      const theirs = mint(s, 1, 'field', 'grunt')
+
+      // Two equip targets (own unit, rival unit); the buff slot only ever
+      // offers player 0's own unit, whichever host is chosen.
+      const actions = playActions(db, s).filter((a) => a.card === gear)
+      expect(actions.map((a) => a.targets)).toEqual([
+        [mine, mine],
+        [theirs, mine],
+      ])
+
+      // Equip to the RIVAL's unit: the buff still belongs to the player who
+      // paid for and played the gear.
+      const next = applyAction(db, s, actions[1])
+      expect(next.cards[theirs].attachedGear).toEqual([gear])
+      expect(next.cards[mine].tempPower).toBe(3)
+      expect(next.cards[theirs].tempPower).toBe(0)
+    } finally {
+      delete gearTargetOverrides['spycam']
+    }
+  })
+})
+
 describe('attached gear triggers', () => {
   it("a gear onAttack effect fires when its host attacks", () => {
     const db = makeDb([
@@ -1041,6 +1085,44 @@ describe('trigger: onDefeat', () => {
     expect(next.players[0].gigArea).toEqual([])
     expect(next.phase).toBe('main')
     expect(next.activePlayer).toBe(0) // the attacker's turn carries on
+  })
+
+  it('queues both steals when a tied fight kills two stealing units', () => {
+    const db = makeDb([
+      def('martyr', 'unit', {
+        power: 3,
+        effects: [{ trigger: 'onDefeat', effect: { kind: 'stealGig', count: 1 } }],
+      }),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'martyr')
+    const victim = mint(s, 1, 'field', 'martyr', { ready: false })
+    gigs(s, 0, [1, 2])
+    gigs(s, 1, [5, 6])
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: victim })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    // A tie defeats both; each casualty owes its own controller a die choice,
+    // resolved in the order the triggers fired (the defender's first).
+    expect(next.players[0].trash).toContain(attacker)
+    expect(next.players[1].trash).toContain(victim)
+    expect(next.phase).toBe('chooseGig')
+    expect(actingPlayer(next)).toBe(1)
+
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 }) // p1 takes p0's 1
+    // The second steal is still owed, now to player 0.
+    expect(next.phase).toBe('chooseGig')
+    expect(actingPlayer(next)).toBe(0)
+    // Player 1's area is now 5, 6 and the die they just took.
+    expect(gigChoices(db, next)).toEqual([0, 1, 2])
+
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 1 }) // p0 takes p1's 6
+    expect(next.phase).toBe('main')
+    expect(next.pendingSteal).toBeNull()
+    expect(next.pendingAttack).toBeNull()
+    expect(next.players[0].gigArea.map((d) => d.value).sort()).toEqual([2, 6])
+    expect(next.players[1].gigArea.map((d) => d.value).sort()).toEqual([1, 5])
+    expect(next.events.filter((e) => e.type === 'gigStolen')).toHaveLength(2)
   })
 
   it('fires when an effect defeats the unit', () => {

@@ -31,6 +31,7 @@ import type {
   GameEvent,
   GameState,
   GigDie,
+  PendingSteal,
   PlayerId,
   PlayerState,
 } from './types'
@@ -191,6 +192,17 @@ function clonePlayer(player: PlayerState): PlayerState {
 }
 
 /**
+ * A pending steal and every steal queued behind it. The queue must be copied
+ * too, or a reducer's `queue.shift()` would reach back into the caller's state.
+ */
+function clonePendingSteal(steal: PendingSteal | null): PendingSteal | null {
+  if (steal === null) return null
+  const copy: PendingSteal = { ...steal }
+  if (steal.queue !== undefined) copy.queue = steal.queue.map((queued) => ({ ...queued }))
+  return copy
+}
+
+/**
  * A mutable working copy of `state`. Every array, dice object, card instance
  * and the events log are freshly allocated, so a reducer can mutate the draft
  * freely without ever touching the caller's state.
@@ -207,7 +219,7 @@ export function draftState(state: GameState): GameState {
     players: [clonePlayer(state.players[0]), clonePlayer(state.players[1])],
     cards,
     pendingAttack: state.pendingAttack ? { ...state.pendingAttack } : null,
-    pendingSteal: state.pendingSteal ? { ...state.pendingSteal } : null,
+    pendingSteal: clonePendingSteal(state.pendingSteal),
     events: state.events.slice(),
   }
 }
