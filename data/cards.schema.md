@@ -83,7 +83,7 @@ The authoritative types are in `src/engine/types.ts` and the authoritative
 (strict) schema in `src/engine/cardDb.ts` — every node/field below is validated
 at load time, and an unknown key is a load error. The judgment calls behind each
 are in `docs/rulings.md` (§29–§38 from Task 7, §39–§52 from Task 8 batch 1,
-§55–§66 from Task 8 batch 2).
+§55–§67 from Task 8 batch 2, §67 from its fix round).
 
 ### `EffectDef`
 
@@ -94,6 +94,7 @@ are in `docs/rulings.md` (§29–§38 from Task 7, §39–§52 from Task 8 batch
 | `condition` | `{ streetCredAtLeast?, friendlyGigValueAtLeast?, rivalGigLeadAtLeast?, stolenDieSize?, streetCredAheadOfRival?, streetCredBelow?, duringOwnTurn?, sourcePowerAtLeast?, selfIsStealer?, attackerKeyword?, defeatedKeyword?, friendlyGigsAtLeastValueCount? }` — "☆ N or more", "if you control a Gig with 8+ value", "if a Rival controls at least 2 Gigs more than you", the watcher-only die-size gate (§42, §50), "if you have more/less ☆ than a Rival" and "less than N ☆" (§55), "during your turn" (§59), the attacking Unit's own power (§61), "when THIS Unit steals" (§61), the attacking/defeated Unit's own faction-or-keyword tag (§60/§66), and "2 or more Gigs with 8+ value" (§62). |
 | `quick` | `{Quick}` — usable in the rival's react window. |
 | `oncePerTurn` | "The first time … each turn" (§40). Tracked per card instance + effect index in `GameState.oncePerTurnUsed`, cleared at the end of the game turn. |
+| `onceKey` | Groups several `oncePerTurn` defs on the same card into ONE shared allowance, for a single compound printed sentence spanning multiple defs (§67) — e.g. "The first time X, draw 1. Then, if Y, discard 1." is one event, not two independently-gated ones. Any not-yet-spent member's condition holding marks the whole group spent, whether or not every member's own (possibly narrower) condition also held. |
 | `effect` | The `EffectNode` tree. |
 
 ### `TargetSpec`

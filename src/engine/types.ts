@@ -258,6 +258,19 @@ export interface EffectDef {
   quick?: boolean
   /** "The first time ... each turn" — one firing per game turn, per source. */
   oncePerTurn?: boolean
+  /**
+   * Groups this `oncePerTurn` def with every other def on the same card
+   * (same `sourceUid`) carrying the identical string, into ONE shared
+   * allowance for a single compound printed sentence spanning several defs
+   * (docs/rulings.md §67 — "The first time a friendly ARASAKA Unit attacks
+   * each turn, draw 1. Then, if you have less than 20 ☆, discard 1." is one
+   * event, not two independently-gated ones). The first def in the group
+   * whose OWN `condition` is met "evaluates the group": every def sharing the
+   * key is marked used from that moment, whether or not each one's own
+   * (possibly narrower) condition also held — so a later qualifying event
+   * this turn cannot re-open a clause the group already decided.
+   */
+  onceKey?: string
   effect: EffectNode
 }
 

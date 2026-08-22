@@ -2125,6 +2125,79 @@ describe('trigger: onWinFight + oncePerTurn (docs/rulings.md §40, §41)', () =>
   })
 })
 
+describe('EffectDef.onceKey: a shared once-per-turn allowance across several defs (docs/rulings.md §67)', () => {
+  // Mirrors yorinobu-arasaka-embracing-destruction's shape: one wide
+  // "eligibility" def (draw) and one narrower sibling sharing the same gate
+  // plus an extra Street-Cred condition (discard) — "The first time X, draw
+  // 1. Then, if <condition>, discard 1." must be ONE event, not two
+  // independently-gated ones.
+  const db = makeDb([
+    def('watcher', 'unit', {
+      power: 1,
+      effects: [
+        {
+          trigger: 'onFriendlyAttack',
+          oncePerTurn: true,
+          onceKey: 'grp',
+          condition: { attackerKeyword: 'flagged' },
+          effect: { kind: 'buffPower', amount: 1, target: 'self', duration: 'permanent' },
+        },
+        {
+          trigger: 'onFriendlyAttack',
+          oncePerTurn: true,
+          onceKey: 'grp',
+          condition: { attackerKeyword: 'flagged', streetCredBelow: 20 },
+          effect: { kind: 'buffPower', amount: 100, target: 'self', duration: 'permanent' },
+        },
+      ],
+    }),
+    def('flagged', 'unit', { power: 1, keywords: ['flagged'] }),
+  ])
+
+  it('spends the whole group at the first qualifying event, even when the narrower sibling does not fire', () => {
+    const s = scenario()
+    const watcher = mint(s, 0, 'field', 'watcher')
+    const a = mint(s, 0, 'field', 'flagged')
+    const b = mint(s, 0, 'field', 'flagged')
+    const v1 = mint(s, 1, 'field', 'flagged', { ready: false })
+    const v2 = mint(s, 1, 'field', 'flagged', { ready: false })
+    gigs(s, 0, [20]) // Street Cred 20: the narrower sibling's own condition fails
+
+    let next = applyAction(db, s, { type: 'attack', attacker: a, target: v1 })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.cards[watcher].permPower).toBe(1) // only the wide (eligibility) def fired
+    expect(next.oncePerTurnUsed.sort()).toEqual([`${watcher}:0`, `${watcher}:1`].sort())
+
+    // Street Cred drops below 20 before a second qualifying attack this turn.
+    gigs(next, 0, [5])
+    next = applyAction(db, next, { type: 'attack', attacker: b, target: v2 })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    // Without the fix, the narrower sibling — never marked used the first
+    // time, since its own condition failed then — would fire now that its
+    // condition finally holds. The shared onceKey means the group already
+    // decided: neither def re-fires this turn.
+    expect(next.cards[watcher].permPower).toBe(1)
+  })
+
+  it('fires every def in the group together, once, when the narrower condition already holds', () => {
+    const s = scenario()
+    const watcher = mint(s, 0, 'field', 'watcher')
+    const a = mint(s, 0, 'field', 'flagged')
+    const b = mint(s, 0, 'field', 'flagged')
+    const v1 = mint(s, 1, 'field', 'flagged', { ready: false })
+    const v2 = mint(s, 1, 'field', 'flagged', { ready: false })
+    gigs(s, 0, [5]) // Street Cred 5 < 20 already
+
+    let next = applyAction(db, s, { type: 'attack', attacker: a, target: v1 })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.cards[watcher].permPower).toBe(101) // both defs fired together
+
+    next = applyAction(db, next, { type: 'attack', attacker: b, target: v2 })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.cards[watcher].permPower).toBe(101) // not fired again
+  })
+})
+
 describe('EffectNode: defeatShield (docs/rulings.md §46)', () => {
   it('the gear is trashed instead of the unit, once', () => {
     const db = makeDb([

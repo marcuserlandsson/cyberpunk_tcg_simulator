@@ -3162,12 +3162,14 @@
       {
         "trigger": "onFriendlyAttack",
         "oncePerTurn": true,
+        "onceKey": "embracing-destruction",
         "condition": { "attackerKeyword": "arasaka" },
         "effect": { "kind": "draw", "count": 1 }
       },
       {
         "trigger": "onFriendlyAttack",
         "oncePerTurn": true,
+        "onceKey": "embracing-destruction",
         "condition": { "attackerKeyword": "arasaka", "streetCredBelow": 20 },
         "effect": { "kind": "discardCard", "target": "friendlyHandCard" }
       }

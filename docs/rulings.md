@@ -1499,6 +1499,32 @@ same-trigger `EffectDef`s the same way**, not a `sequence`; a `sequence` is
 only safe when no later node's target set depends on an earlier node's
 zone mutation within the same `EffectDef`.
 
+**Residual note (flagged during batch-2 review, not yet a real bug).** The
+same split-into-two-defs fix works for `v-streetkid` because `onCall` carries
+no player-supplied `targets` at all — every slot falls back to the rng
+(§32), so there is no *enumeration* to keep in sync with *resolution*, only
+the resolution-time candidate list needs to see the right zone contents.
+That is not true of `onPlay` or `activated`, whose `targets` array is a
+flat, positional list the calling action commits to *before* any node runs
+(§34's `playCardTargetChoices` / `effectTargetChoices` enumerate against one
+snapshot of the board, and the action's `targets` are bound against the
+*same* snapshot at resolution — see `bindSlots`). Two same-trigger `onPlay`/
+`activated` defs where the **second** def's candidate *count* depends on
+what the **first** def's node did to a zone (not just *which* cards qualify,
+but *how many* slots exist) would desync `legalActions`' enumerated tuple
+shape from what `bindSlots` sees when the action actually resolves — the
+same class of bug §34 already solved for a card targeting itself via
+`stateAfterEntry`, but for a *second* def watching the *first* def's
+zone-mutation rather than the play itself entering a zone. No card in the
+pool (through batch 2) has this shape — every real "split into two defs"
+case found so far is either `onCall`/watcher-triggered (no enumeration to
+keep in sync, as here) or a fixed-shape node (`sameTarget`, §53) where the
+child's `chosen` reference needs no independent candidate list at all.
+Whichever batch first needs this exact shape must either avoid it (fold the
+first def's effect into a `scripted` node instead, per §48) or extend
+`effectTargetChoices`/`bindSlots` to recompute a later def's candidate count
+against the *post-first-def* board rather than the pre-firing snapshot.
+
 ## 58 — Attack-permission statics: `attackReadyWithKeyword`, `cantAttackGigArea`
 
 - `valentino-guerrera`: "If you have more ☆ than a Rival, this Unit can
@@ -1738,3 +1764,54 @@ something its equipped Gear can change, unlike the keywords Gear grants
 (§30). `EffectDef.condition.attackerKeyword`/`defeatedKeyword` (named to match
 the existing `filter.keyword` convention, even though the check is really
 "keyword-or-faction") match against these lists.
+
+# Task 8 fix-round-1 rulings (batch 2 review)
+
+## 67 — A compound printed sentence spanning several `EffectDef`s needs ONE shared once-per-turn allowance, not one each
+
+`yorinobu-arasaka-embracing-destruction`: "The first time a friendly ARASAKA
+Unit attacks each turn, draw 1. Then, if you have less than 20 ☆ (Street
+Cred), discard 1." §66 encoded this as two independent `onFriendlyAttack`
+defs, each its own `oncePerTurn` — which desyncs from the printed text: §40
+says a def whose `condition` is not met does not consume its allowance, so
+if Street Cred is 20+ at the first ARASAKA attack (the draw def fires and is
+marked used; the discard def's *own* condition fails, so *its* allowance is
+untouched) and then drops below 20 before a **second** ARASAKA attack the
+same turn, the discard def's condition now holds and it incorrectly fires —
+even though the text describes **one** event, evaluated **once**, at the
+first qualifying attack.
+
+**Ruling:** `EffectDef` gains `onceKey?: string`. Defs on the same card
+sharing an identical `onceKey` (and `oncePerTurn: true`) form one allowance
+group. `fireCardTrigger` pre-scans, before any def in the firing resolves,
+which not-yet-spent groups this firing "evaluates" — a group is evaluated
+the moment **any** not-yet-spent member's own `condition` holds, even a
+narrower sibling's (using the board state as it stood before any group
+member ran, so the check cannot see a sibling's own side effects). Every
+member of an evaluated group is marked spent from that point on, whether or
+not each member's own condition individually held — so the draw def (whose
+condition is just "attacker is ARASAKA") is what actually evaluates
+Yorinobu's group, and the discard def is marked spent alongside it even on
+a turn where its own Street-Cred check happened to fail. A later qualifying
+attack the same turn cannot re-open either clause, matching "the first
+time … draw 1. Then, if …, discard 1." as the single compound event the
+text describes. Ungrouped `oncePerTurn` defs (no `onceKey`) are completely
+unaffected — the fix is additive, verified by the full pre-existing suite
+staying green.
+
+`yorinobu-arasaka-embracing-destruction`'s two defs now share
+`onceKey: "embracing-destruction"`. Proven with a synthetic two-def card
+(`tests/engine/effects.test.ts`, "EffectDef.onceKey") before the re-encode,
+plus a real-card regression test (`tests/cards/red.test.ts`) driving the
+exact desync scenario the review flagged: Street Cred 20+ at the first
+ARASAKA attack (draw only), Street Cred dropped below 20, a second ARASAKA
+attack the same turn (nothing fires) — confirmed to fail without the fix by
+temporarily reverting `fireCardTrigger` and re-running.
+
+**Residual note, ledgered rather than fixed (out of scope for this round):**
+§57 already flagged the general risk of a later same-trigger def's
+*candidate count* depending on an earlier def's zone mutation, for
+`onPlay`/`activated` triggers whose `targets` are positional and bound
+against one pre-firing snapshot; `onceKey` does not touch that — it only
+shares an allowance flag, never a target list. No card needs both shapes at
+once yet.

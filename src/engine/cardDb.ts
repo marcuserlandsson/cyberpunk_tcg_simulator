@@ -207,6 +207,7 @@ const effectDefSchema: z.ZodType<EffectDef> = z.strictObject({
     .optional(),
   quick: z.boolean().optional(),
   oncePerTurn: z.boolean().optional(),
+  onceKey: z.string().optional(),
   effect: effectNodeSchema,
 })
 

@@ -1150,18 +1150,20 @@ describe('yorinobu-arasaka-embracing-destruction', () => {
     expect(next.players[0].hand).toHaveLength(handBefore + 1) // no second draw
   })
 
-  it('also discards while under 20 Street Cred', () => {
+  it('draws AND discards together at the first qualifying attack when already under 20 Street Cred', () => {
     const { state } = fixtureWithHand(0, [])
     state.players[0].legends = []
     mintInto(state, 0, 'legends', 'yorinobu-arasaka-embracing-destruction')
     mintInto(state, 0, 'hand', 'animals-wrecker')
     const minotaurUid = fieldCard(state, 0, 'minotaur')
     const victim = fieldCard(state, 1, 'japantown-jonin', { ready: false })
-    setGigs(state, 0, [{ size: 20, value: 5 }]) // 5 ☆ < 20
+    setGigs(state, 0, [{ size: 20, value: 5 }]) // 5 ☆ < 20 already
+    const deckBefore = state.players[0].deck.length
     const trashBefore = state.players[0].trash.length
 
     const next = passReact(db, startAttack(db, state, minotaurUid, victim))
-    expect(next.players[0].trash).toHaveLength(trashBefore + 1)
+    expect(next.players[0].deck).toHaveLength(deckBefore - 1) // drew 1
+    expect(next.players[0].trash).toHaveLength(trashBefore + 1) // discarded 1
   })
 
   it('does not fire for a non-ARASAKA attacker', () => {
@@ -1174,6 +1176,40 @@ describe('yorinobu-arasaka-embracing-destruction', () => {
 
     const next = passReact(db, startAttack(db, state, attacker, victim))
     expect(next.players[0].hand).toHaveLength(handBefore)
+  })
+
+  // Fix round 1 (docs/rulings.md §67): the printed text is ONE compound event
+  // — draw 1, then (at that SAME moment) check Street Cred for the discard —
+  // evaluated once at the first qualifying attack each turn. Before the
+  // `onceKey` fix, the draw and discard were two independently-gated
+  // `oncePerTurn` defs: if Street Cred was 20+ at the first ARASAKA attack
+  // (no discard, and the discard def's own allowance was never marked used),
+  // then dropped below 20 before a SECOND ARASAKA attack the same turn, the
+  // discard would incorrectly fire on that second attack.
+  it('never re-opens the compound event later the same turn, even if Street Cred then drops below 20', () => {
+    const { state } = fixtureWithHand(0, [])
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'yorinobu-arasaka-embracing-destruction')
+    mintInto(state, 0, 'hand', 'animals-wrecker')
+    const m1 = fieldCard(state, 0, 'minotaur')
+    const m2 = fieldCard(state, 0, 'minotaur')
+    const v1 = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+    const v2 = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+    setGigs(state, 0, [{ size: 20, value: 20 }]) // 20 ☆: no discard at the first attack
+    const deckBefore = state.players[0].deck.length
+    const trashBefore = state.players[0].trash.length
+
+    let next = passReact(db, startAttack(db, state, m1, v1))
+    expect(next.players[0].deck).toHaveLength(deckBefore - 1) // the draw fired
+    expect(next.players[0].trash).toHaveLength(trashBefore) // no discard yet — SC was 20+
+
+    // Street Cred drops below 20 before the second ARASAKA attack this turn.
+    setGigs(next, 0, [{ size: 20, value: 5 }])
+    next = passReact(db, startAttack(db, next, m2, v2))
+    // The compound event already happened once this turn: nothing fires the
+    // second time, even though the discard's own condition now holds.
+    expect(next.players[0].deck).toHaveLength(deckBefore - 1) // no second draw
+    expect(next.players[0].trash).toHaveLength(trashBefore) // still no discard
   })
 })
 

@@ -835,6 +835,15 @@ function markOncePerTurn(draft: GameState, sourceUid: number, index: number): vo
  * printed order. `targets` is one flat array shared by all of them, consumed
  * left to right (each def taking as many entries as it has fillable slots) —
  * the same order `triggerTargetChoices` enumerates.
+ *
+ * `EffectDef.onceKey` (docs/rulings.md §67) groups several `oncePerTurn` defs
+ * on this card into one shared allowance for a single compound printed
+ * sentence ("The first time ... draw 1. Then, if ..., discard 1."). A
+ * pre-scan decides, group by group, whether THIS firing "evaluates" it — any
+ * not-yet-spent member whose own `condition` holds counts, even a narrower
+ * sibling's — using the state as it stood before any of this firing's defs
+ * resolved, so a sibling that fires later in this same pass is never blocked
+ * by its own group's marking (only a LATER firing is).
  */
 export function fireCardTrigger(
   db: CardDb,
@@ -848,15 +857,34 @@ export function fireCardTrigger(
   const def = defOf(db, draft, sourceUid)
   if (!def) return
   const player = controller ?? effectController(draft, sourceUid)
+
+  // Snapshot "already spent before this event", and which onceKey groups
+  // this event evaluates (docs/rulings.md §67), before any def resolves.
+  const alreadySpent = def.effects.map((effect, index) =>
+    oncePerTurnSpent(draft, sourceUid, index, effect)
+  )
+  const groupEvaluated = new Set<string>()
+  for (const [index, effect] of def.effects.entries()) {
+    if (effect.trigger !== trigger || effect.oncePerTurn !== true) continue
+    if (effect.onceKey === undefined || alreadySpent[index]) continue
+    if (conditionMet(draft, player, effect, context, sourceUid)) {
+      groupEvaluated.add(effect.onceKey)
+    }
+  }
+
   let offset = 0
   for (const [index, effect] of def.effects.entries()) {
     if (effect.trigger !== trigger) continue
     const demand = slotDemand(db, draft, sourceUid, effect, player)
     const slice = targets.slice(offset, offset + demand)
     offset += demand
-    if (oncePerTurnSpent(draft, sourceUid, index, effect)) continue
-    if (!conditionMet(draft, player, effect, context, sourceUid)) continue
-    if (effect.oncePerTurn === true) markOncePerTurn(draft, sourceUid, index)
+    if (alreadySpent[index]) continue
+    const met = conditionMet(draft, player, effect, context, sourceUid)
+    if (effect.oncePerTurn === true) {
+      const groupSpent = effect.onceKey !== undefined && groupEvaluated.has(effect.onceKey)
+      if (groupSpent || met) markOncePerTurn(draft, sourceUid, index)
+    }
+    if (!met) continue
     applyEffectDefOnDraft(db, draft, effect, sourceUid, slice, player, context)
   }
 }
