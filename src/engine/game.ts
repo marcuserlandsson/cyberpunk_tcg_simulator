@@ -273,6 +273,14 @@ function readySpentCards(draft: GameState, player: PlayerId, turnNumber: number)
   }
   for (const uid of [...p.field, ...p.legends, ...p.eddies]) {
     if (penalised.has(uid)) continue
+    // "Can't ready until your next turn" (pacifica-netrunner, docs/rulings.md
+    // §92 ff.) — a one-shot flag, consumed (never re-applied) the first time
+    // it would otherwise block this exact ready step, the same shape as the
+    // hardcoded first-player-legend penalty above but per card instance.
+    if (draft.cards[uid].skipNextReady === true) {
+      draft.cards[uid].skipNextReady = false
+      continue
+    }
     draft.cards[uid].ready = true
   }
 }

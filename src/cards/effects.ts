@@ -31,6 +31,7 @@ import { defeatUnit, leaveField } from '../engine/combat'
 import { canonicalPayment, pay } from '../engine/economy'
 import { draftState, drawCards, endGame } from '../engine/game'
 import {
+  conditionHolds,
   conditionMet,
   effectiveCardCost,
   firstMatchingPlayDiscountSources,
@@ -95,6 +96,11 @@ export interface TriggerContext extends ConditionContext {
    * Unit" in the Gear's own printed text (the-relic-experimental-biochip).
    */
   defeatedHostUid?: number
+  /**
+   * `onLoseFight` only (docs/rulings.md §92 ff.): the specific card this loser
+   * just fought, read by the `'fightFoe'` `TargetSpec` (maelstrom-zealots).
+   */
+  fightFoeUid?: number
 }
 
 /** Keyword: "usable during the rival's attack" (guide p11 / glossary QUICK). */
@@ -149,8 +155,9 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
     case 'grantKeyword':
     case 'retrieveFromTrash':
     case 'discardCard':
-      // `self` and `chosen` are references, not decisions: no slot.
-      return node.target === 'self' || node.target === 'chosen'
+    case 'skipNextReady':
+      // `self`, `chosen` and `fightFoe` are references, not decisions: no slot.
+      return node.target === 'self' || node.target === 'chosen' || node.target === 'fightFoe'
         ? []
         : [{ kind: 'target', spec: node.target, filter: node.filter }]
     case 'changeGig':
@@ -158,9 +165,22 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
         { kind: 'target', spec: node.target },
         ...(node.adjust === true ? [{ kind: 'amount' as const, options: adjustOptions(node.amount) }] : []),
       ]
+    // "Swap a friendly Gig with a rival Gig": two fixed-role die slots
+    // (docs/rulings.md §92 ff.).
+    case 'swapGig':
+      return [
+        { kind: 'target', spec: 'friendlyGigDie' },
+        { kind: 'target', spec: 'rivalGigDie' },
+      ]
+    // Gates its single child's slots on a board condition, without gating the
+    // whole enclosing EffectDef (docs/rulings.md §92 ff.) — the child's slots
+    // are still reserved either way, matching `sameTarget`'s "step over the
+    // fizzled construct's own slots" rule.
+    case 'conditionalEffect':
+      return slotSpecs(node.effect)
     case 'sameTarget':
       return [
-        ...(node.target === 'self' || node.target === 'chosen'
+        ...(node.target === 'self' || node.target === 'chosen' || node.target === 'fightFoe'
           ? []
           : [{ kind: 'target' as const, spec: node.target, filter: node.filter }]),
         ...node.effects.flatMap(slotSpecs),
@@ -414,6 +434,10 @@ function takeTarget(node: { target: TargetSpec }, ctx: EffectCtx, slots: Slots):
   // A `chosen` reference reads the enclosing sameTarget's binding, and consumes
   // no slot (docs/rulings.md §53).
   if (node.target === 'chosen') return ctx.chosen ?? null
+  // `fightFoe` reads the specific card this fight-loser just fought, carried
+  // through `EffectCtx.context` (docs/rulings.md §92 ff.) — also consumes no
+  // slot, the same reference-not-decision shape as `chosen`.
+  if (node.target === 'fightFoe') return ctx.context?.fightFoeUid ?? null
   return takeSlot(slots)
 }
 
@@ -520,6 +544,50 @@ function applyNode(
       if (dieOwner !== ctx.player) {
         fireWatcherTrigger(db, draft, 'onRivalAdjustFriendlyGig', dieOwner, {})
       }
+      return
+    }
+
+    case 'swapGig': {
+      const friendlyIndex = takeSlot(slots)
+      const rivalIndex = takeSlot(slots)
+      if (friendlyIndex === null || rivalIndex === null) return
+      const mine = draft.players[ctx.player].gigArea
+      const theirs = draft.players[opponentOf(ctx.player)].gigArea
+      const mineDie = mine[friendlyIndex]
+      const theirDie = theirs[rivalIndex]
+      if (mineDie === undefined || theirDie === undefined) return
+      mine[friendlyIndex] = theirDie
+      theirs[rivalIndex] = mineDie
+      note(
+        draft,
+        ctx.sourceUid,
+        `swap gig d${mineDie.size}:${mineDie.value} <-> d${theirDie.size}:${theirDie.value}`
+      )
+      // "When a Rival adjusts or swaps 1 or more friendly Gigs" — the rival's
+      // own die was just reached into by this effect's controller
+      // (docs/rulings.md §55 ff./§92 ff.).
+      fireWatcherTrigger(db, draft, 'onRivalAdjustFriendlyGig', opponentOf(ctx.player), {})
+      return
+    }
+
+    case 'skipNextReady': {
+      const target = takeTarget(node, ctx, slots)
+      if (target === null || !draft.cards[target]) return
+      draft.cards[target].skipNextReady = true
+      note(draft, ctx.sourceUid, `${target} skips its next ready step`)
+      return
+    }
+
+    case 'conditionalEffect': {
+      // Consumes the child's slots whether or not the condition holds, so a
+      // later sibling still reads the right ones (docs/rulings.md §92 ff.,
+      // the same "step over a fizzled construct's slots" rule as sameTarget).
+      const width = slotWidth(node.effect)
+      if (!conditionHolds(draft, ctx.player, node.condition, ctx.context ?? {}, ctx.sourceUid)) {
+        slots.next += width
+        return
+      }
+      applyNode(db, draft, node.effect, ctx, slots)
       return
     }
 
@@ -786,6 +854,7 @@ function applyNode(
     case 'powerVsCardType':
     case 'attackReadyWithKeyword':
     case 'cantAttackGigArea':
+    case 'attackGigAreaDespiteLag':
       // Static layers, read by query.ts — nothing to do at resolution time.
       return
   }
@@ -955,6 +1024,9 @@ const GEAR_PROPAGATED_TRIGGERS: readonly Trigger[] = [
   'onBlock',
   'onWinFight',
   'onSpend',
+  // Batch 5 (docs/rulings.md §92 ff.): "when this Unit loses a fight" is about
+  // the host acting (losing), the same shape as onWinFight's mirror image.
+  'onLoseFight',
 ]
 
 /**

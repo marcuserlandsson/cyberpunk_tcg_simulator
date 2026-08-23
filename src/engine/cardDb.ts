@@ -20,6 +20,9 @@ const triggerSchema = z.enum([
   'onRivalAdjustFriendlyGig',
   'onEndTurn',
   'onFriendlyEquippedSpend',
+  'onLoseFight',
+  'onStartTurn',
+  'onFriendlyBlock',
   'activated',
   'static',
 ])
@@ -42,6 +45,8 @@ const targetSpecSchema = z.enum([
   'friendlyHandOrTrashUnit',
   'friendlyGear',
   'anyGear',
+  'fightFoe',
+  'friendlyFaceUpLegend',
 ])
 
 const gigDieSpecSchema = z.enum(['friendlyGigDie', 'rivalGigDie', 'anyGigDie'])
@@ -76,6 +81,7 @@ const costReductionSchema = z.discriminatedUnion('per', [
 
 const dynamicAmountSchema = z.union([
   z.literal('friendlyMaxGig'),
+  z.literal('friendlyGigValuePairCount'),
   z.strictObject({ perEquippedGear: z.number() }),
   z.strictObject({
     perFriendlyGigParity: z.strictObject({
@@ -95,6 +101,39 @@ const dieSizeSchema = z.union([
   z.literal(12),
   z.literal(20),
 ])
+
+/**
+ * The board facts an `EffectDef`/`conditionalEffect` can gate on
+ * (`EffectCondition` in types.ts). Factored out so `conditionalEffect`
+ * (docs/rulings.md §92 ff.) can reuse the exact same shape.
+ */
+const conditionSchema = z.strictObject({
+  streetCredAtLeast: z.number().optional(),
+  friendlyGigValueAtLeast: z.number().optional(),
+  rivalGigLeadAtLeast: z.number().optional(),
+  stolenDieSize: dieSizeSchema.optional(),
+  streetCredAheadOfRival: z.boolean().optional(),
+  streetCredBelow: z.number().optional(),
+  duringOwnTurn: z.boolean().optional(),
+  sourcePowerAtLeast: z.number().optional(),
+  selfIsStealer: z.boolean().optional(),
+  attackerKeyword: z.string().optional(),
+  defeatedKeyword: z.string().optional(),
+  friendlyGigsAtLeastValueCount: z.strictObject({ value: z.number(), count: z.number() }).optional(),
+  friendlyGigDistinctValuesAtLeast: z.number().optional(),
+  friendlyGigEvenAndOdd: z.boolean().optional(),
+  friendlyGigValueEquals: z.number().optional(),
+  streetCredDiffAtLeast: z.number().optional(),
+  sourceEquipped: z.boolean().optional(),
+  stealerIsLegend: z.boolean().optional(),
+  stolenDieValueParity: z.enum(['even', 'odd']).optional(),
+  defeatedIsFriendly: z.boolean().optional(),
+  defeatedWasEquipped: z.boolean().optional(),
+  streetCredParity: z.enum(['even', 'odd']).optional(),
+  allFriendlyLegendsFaceUp: z.boolean().optional(),
+  sourceSpent: z.boolean().optional(),
+  friendlyGigValuePair: z.boolean().optional(),
+})
 
 export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
   z.discriminatedUnion('kind', [
@@ -205,6 +244,18 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       amount: z.number(),
       minimum: z.number(),
     }),
+    z.strictObject({ kind: z.literal('swapGig') }),
+    z.strictObject({
+      kind: z.literal('skipNextReady'),
+      target: targetSpecSchema,
+      filter: targetFilterSchema.optional(),
+    }),
+    z.strictObject({ kind: z.literal('attackGigAreaDespiteLag') }),
+    z.strictObject({
+      kind: z.literal('conditionalEffect'),
+      condition: conditionSchema,
+      effect: effectNodeSchema,
+    }),
   ])
 )
 
@@ -217,33 +268,7 @@ const effectDefSchema: z.ZodType<EffectDef> = z.strictObject({
       reduction: costReductionSchema.optional(),
     })
     .optional(),
-  condition: z
-    .strictObject({
-      streetCredAtLeast: z.number().optional(),
-      friendlyGigValueAtLeast: z.number().optional(),
-      rivalGigLeadAtLeast: z.number().optional(),
-      stolenDieSize: dieSizeSchema.optional(),
-      streetCredAheadOfRival: z.boolean().optional(),
-      streetCredBelow: z.number().optional(),
-      duringOwnTurn: z.boolean().optional(),
-      sourcePowerAtLeast: z.number().optional(),
-      selfIsStealer: z.boolean().optional(),
-      attackerKeyword: z.string().optional(),
-      defeatedKeyword: z.string().optional(),
-      friendlyGigsAtLeastValueCount: z
-        .strictObject({ value: z.number(), count: z.number() })
-        .optional(),
-      friendlyGigDistinctValuesAtLeast: z.number().optional(),
-      friendlyGigEvenAndOdd: z.boolean().optional(),
-      friendlyGigValueEquals: z.number().optional(),
-      streetCredDiffAtLeast: z.number().optional(),
-      sourceEquipped: z.boolean().optional(),
-      stealerIsLegend: z.boolean().optional(),
-      stolenDieValueParity: z.enum(['even', 'odd']).optional(),
-      defeatedIsFriendly: z.boolean().optional(),
-      defeatedWasEquipped: z.boolean().optional(),
-    })
-    .optional(),
+  condition: conditionSchema.optional(),
   quick: z.boolean().optional(),
   oncePerTurn: z.boolean().optional(),
   onceKey: z.string().optional(),

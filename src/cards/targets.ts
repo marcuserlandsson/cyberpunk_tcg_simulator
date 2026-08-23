@@ -119,6 +119,15 @@ export function targetsFor(
           (uid) => state.cards[uid].attachedGear
         ),
       ]
+    // Batch 5 additions (docs/rulings.md §92 ff.):
+    // Never enumerated: reads `TriggerContext.fightFoeUid` via `EffectCtx.context`,
+    // exactly like `chosen` reads a `sameTarget` binding (maelstrom-zealots).
+    case 'fightFoe':
+      return []
+    // "a friendly face-up Legend" as its own zone — the legends zone only,
+    // unlike `friendlyUnitOrLegend` (which also includes the field).
+    case 'friendlyFaceUpLegend':
+      return faceUpLegendsOf(state, me)
   }
 }
 

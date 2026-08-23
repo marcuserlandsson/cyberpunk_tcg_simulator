@@ -180,14 +180,27 @@ function mulligan(draft: GameState): void {
  * The first player keeps first; once the second player keeps too, the first
  * player's turn 1 begins.
  */
-function keepHand(draft: GameState): void {
+function keepHand(draft: GameState, db: CardDb): void {
   const player = draft.activePlayer
   draft.events.push({ type: 'handKept', player })
   if (player === draft.firstPlayer) {
     draft.activePlayer = opponentOf(player)
     return
   }
-  beginTurn(draft, draft.firstPlayer, 1)
+  startTurn(draft, db, draft.firstPlayer, 1)
+}
+
+/**
+ * `beginTurn`, plus the "At the start of your turn, ..." watcher trigger
+ * (docs/rulings.md §92 ff.) — fired from here (not `game.ts`) to avoid a new
+ * `game.ts` -> `cards/effects.ts` import-cycle direction; `reduce.ts` already
+ * imports both. Skipped if `beginTurn` itself already ended the game (the
+ * 7-Gigs win check, or a deckout on the automatic draw).
+ */
+function startTurn(draft: GameState, db: CardDb, player: PlayerId, turnNumber: number): void {
+  beginTurn(draft, player, turnNumber)
+  if (draft.winner !== null) return
+  fireWatcherTrigger(db, draft, 'onStartTurn', player, {})
 }
 
 /** Gain a gig: take the chosen die from the fixer, roll it, keep the result. */
@@ -338,7 +351,7 @@ function endTurn(draft: GameState, db: CardDb): void {
   // turnNumber counts each player's own turns and advances when the first
   // player begins a turn — see the comment at the top of game.ts.
   const nextTurn = next === draft.firstPlayer ? draft.turnNumber + 1 : draft.turnNumber
-  beginTurn(draft, next, nextTurn)
+  startTurn(draft, db, next, nextTurn)
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +377,7 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
       mulligan(draft)
       break
     case 'keepHand':
-      keepHand(draft)
+      keepHand(draft, db)
       break
     case 'chooseGigDie':
       chooseGigDie(draft, action.size)

@@ -29,7 +29,7 @@ import { endGame, drawCards } from '../../engine/game'
 import { hasKeyword, opponentOf } from '../../engine/query'
 import { nextInt, shuffle } from '../../engine/rng'
 import type { CardDb, GameState, PlayerId } from '../../engine/types'
-import { fireTriggerOnDraft, type EffectCtx } from '../effects'
+import { fireTriggerOnDraft, spendOnDraft, type EffectCtx } from '../effects'
 
 export type ScriptedCard = (db: CardDb, state: GameState, ctx: EffectCtx) => GameState
 
@@ -619,6 +619,128 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     state.cards[host].attachedGear.push(gear)
     state.events.push({ type: 'cardPlayed', player: ctx.player, uid: gear })
     fireTriggerOnDraft(db, state, 'onPlay', gear, [])
+    return state
+  },
+
+  // -------------------------------------------------------------------------
+  // Task 8 batch 5 (Green) — docs/rulings.md §92 ff.
+  // -------------------------------------------------------------------------
+
+  /**
+   * `don-t-fear-the-reaper` — "Spend all rival Units. Then, defeat a spent
+   * Unit." A mass, unconditional spend with no per-target decision (the same
+   * shape as `adam-smasher-metal-over-meat`'s mass defeat, docs/rulings.md
+   * §68 ff., but a different verb/scope), followed by "a spent Unit" — bare,
+   * either side, and only meaningfully choosable once the mass-spend above
+   * has actually happened (a fresh rival Unit only becomes "spent" mid-
+   * resolution). Per docs/rulings.md §57's residual note, splitting this into
+   * two same-trigger `EffectDef`s would desync `legalActions`' enumerated
+   * targets from what actually resolves, so both clauses are scripted
+   * together; which spent Unit to defeat is picked through the rng, exactly
+   * like `all-is-lost`'s "candidates only exist mid-resolution" case
+   * (docs/rulings.md §48).
+   */
+  'don-t-fear-the-reaper': (db, state, ctx) => {
+    const rival = opponentOf(ctx.player)
+    spendOnDraft(db, state, [...state.players[rival].field])
+    const spentUnits = [0, 1]
+      .flatMap((player) => state.players[player as PlayerId].field)
+      .filter((uid) => !state.cards[uid].ready)
+    const target = pick(state, spentUnits)
+    if (target !== undefined) defeatUnit(state, db, target)
+    return state
+  },
+
+  /**
+   * `overwatch-panam-s-gift` — "{Quick} 1 €$, {Spend} Discard 1. Defeat a
+   * spent rival Unit with cost equal to or less than the discarded card's
+   * cost." "Its cost" names a property of whichever card was just discarded,
+   * the same "read a property of what a prior step touched" shape §73
+   * already forced into a script for `heywood-ripperdoc`'s "its cost" — no
+   * vocabulary node reads a target's numeric property into a later filter.
+   * Which card to discard is a real, declared target (`friendlyHandCard`,
+   * docs/rulings.md §73/§80's "a real decision when the firing action can
+   * carry one"); which rival Unit to defeat afterward has no filtered
+   * scripted-target support yet (docs/rulings.md §73), so it is picked
+   * through the rng among the cards that qualify once the discard's cost is
+   * known.
+   */
+  'overwatch-panam-s-gift': (db, state, ctx) => {
+    const discarded = ctx.targets[0]
+    if (discarded === undefined) return state
+    const p = state.players[ctx.player]
+    if (!p.hand.includes(discarded)) return state
+    p.hand = p.hand.filter((uid) => uid !== discarded)
+    p.trash.push(discarded)
+    state.events.push({ type: 'cardTrashed', uid: discarded })
+    const cost = db[state.cards[discarded].defId].cost
+    const rival = opponentOf(ctx.player)
+    const candidates = state.players[rival].field.filter(
+      (uid) => !state.cards[uid].ready && db[state.cards[uid].defId].cost <= cost
+    )
+    const target = pick(state, candidates)
+    if (target !== undefined) defeatUnit(state, db, target)
+    return state
+  },
+
+  /**
+   * `fool-on-the-hill` — "Reveal the top 2 cards of your deck. A Rival
+   * chooses whether you add them to your hand or trash them. If you trash
+   * them, draw 2." No other pool card shares this "reveal, RIVAL picks the
+   * outcome" shape, and the two candidate cards only exist once revealed
+   * mid-resolution (docs/rulings.md §48). The rival's choice is never the
+   * controller's to enumerate (docs/rulings.md §45), so it is resolved off
+   * the rng exactly like every other unenumerable rival decision. "Draw 2" on
+   * the trash branch is unconditional (no "may"), so it is a genuine
+   * required draw that can end the game on an empty deck (docs/rulings.md
+   * §17/§36).
+   */
+  'fool-on-the-hill': (_db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const revealed: number[] = []
+    for (let i = 0; i < 2; i++) {
+      const uid = p.deck.shift()
+      if (uid === undefined) break
+      revealed.push(uid)
+    }
+    if (revealed.length === 0) return state
+    const [modeIndex, rng] = nextInt(state.rng, 2)
+    state.rng = rng
+    if (modeIndex === 0) {
+      p.hand.push(...revealed)
+    } else {
+      for (const uid of revealed) {
+        p.trash.push(uid)
+        state.events.push({ type: 'cardTrashed', uid })
+      }
+      if (!drawCards(state, ctx.player, 2)) {
+        endGame(state, opponentOf(ctx.player), 'deckout')
+      }
+    }
+    return state
+  },
+
+  /**
+   * `goro-takemura-vengeful-bodyguard` — "When a friendly Unit uses
+   * {Blocker}, you may discard 1. If you do, draw 1." Fired from the new
+   * `onFriendlyBlock` watcher trigger, which (like every watcher) carries no
+   * player-supplied target — "which card to discard" is picked through the
+   * rng (docs/rulings.md §32). "If you do" makes the draw depend on whether
+   * the discard actually happened (an empty hand declines the "you may" by
+   * having nothing to give up), the same target-slot-dependency shape §73
+   * already forced into a script for `dum-dum-maelstrom-triggerman`/
+   * `gilded-mato-n`'s "if you do, X".
+   */
+  'goro-takemura-vengeful-bodyguard': (_db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const discarded = pick(state, p.hand)
+    if (discarded === undefined) return state
+    p.hand = p.hand.filter((uid) => uid !== discarded)
+    p.trash.push(discarded)
+    state.events.push({ type: 'cardTrashed', uid: discarded })
+    if (!drawCards(state, ctx.player, 1)) {
+      endGame(state, opponentOf(ctx.player), 'deckout')
+    }
     return state
   },
 }

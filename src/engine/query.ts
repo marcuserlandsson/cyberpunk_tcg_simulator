@@ -13,6 +13,7 @@ import type {
   CardType,
   CostReduction,
   DynamicAmount,
+  EffectCondition,
   EffectDef,
   EffectNode,
   GameState,
@@ -123,7 +124,21 @@ export function conditionMet(
   context: ConditionContext = {},
   sourceUid?: number
 ): boolean {
-  const condition = def.condition
+  return conditionHolds(state, player, def.condition, context, sourceUid)
+}
+
+/**
+ * The same check as `conditionMet`, against a bare `EffectCondition` rather
+ * than an `EffectDef` — what `conditionalEffect` (docs/rulings.md §92 ff.)
+ * needs to gate a single child node without gating its whole enclosing def.
+ */
+export function conditionHolds(
+  state: GameState,
+  player: PlayerId,
+  condition: EffectCondition | undefined,
+  context: ConditionContext = {},
+  sourceUid?: number
+): boolean {
   if (condition === undefined) return true
   if (
     condition.streetCredAtLeast !== undefined &&
@@ -229,6 +244,21 @@ export function conditionMet(
     return false
   }
   if (condition.defeatedWasEquipped === true && context.defeatedWasEquipped !== true) {
+    return false
+  }
+  // Batch 5 additions (docs/rulings.md §92 ff.):
+  if (condition.streetCredParity !== undefined) {
+    const wantEven = condition.streetCredParity === 'even'
+    if (streetCred(state, player) % 2 === 0 !== wantEven) return false
+  }
+  if (condition.allFriendlyLegendsFaceUp === true) {
+    if (state.players[player].legends.some((uid) => !state.cards[uid].faceUp)) return false
+  }
+  if (condition.sourceSpent === true) {
+    const source = sourceUid !== undefined ? state.cards[sourceUid] : undefined
+    if (source === undefined || source.ready) return false
+  }
+  if (condition.friendlyGigValuePair === true && valuePairCount(state, player) < 1) {
     return false
   }
   return true
@@ -447,6 +477,9 @@ export function resolvePowerAmount(
 ): number {
   if (typeof amount === 'number') return amount
   if (amount === 'friendlyMaxGig') return maxGigValue(state, player)
+  // "Draw 1 for each friendly value-pair of Gigs" (hanako-arasaka-daughter-of-
+  // the-emperor, docs/rulings.md §92 ff.).
+  if (amount === 'friendlyGigValuePairCount') return valuePairCount(state, player)
   if ('perEquippedGear' in amount) {
     return state.cards[subjectUid].attachedGear.length * amount.perEquippedGear
   }
@@ -457,6 +490,22 @@ export function resolvePowerAmount(
     parity === 'even' ? die.value % 2 === 0 : die.value % 2 === 1
   ).length
   return matching * perDie
+}
+
+/**
+ * How many "value-pairs" of Gig dice `player` controls — two dice sharing a
+ * value counts as one pair; a third die of the same value adds no further
+ * pair (docs/rulings.md §92 ff.). Used both by the `friendlyGigValuePair`
+ * boolean condition (≥1) and the `friendlyGigValuePairCount` dynamic amount.
+ */
+function valuePairCount(state: GameState, player: PlayerId): number {
+  const counts = new Map<number, number>()
+  for (const die of state.players[player].gigArea) {
+    counts.set(die.value, (counts.get(die.value) ?? 0) + 1)
+  }
+  let pairs = 0
+  for (const count of counts.values()) pairs += Math.floor(count / 2)
+  return pairs
 }
 
 /**
@@ -513,6 +562,21 @@ export function attackableReadyKeyword(db: CardDb, state: GameState, uid: number
  */
 export function cantAttackGigArea(db: CardDb, state: GameState, uid: number): boolean {
   return activeStaticNodes(db, state, uid).some((node) => node.kind === 'cantAttackGigArea')
+}
+
+/**
+ * "This Unit can attack their Gig area the turn it's played" (nadia-fighting-
+ * through-grief, docs/rulings.md §92 ff.) — narrower than {adrenaline}: it
+ * only ever unlocks the rival Gig area despite Lag, never a rival Unit, and
+ * only while the owning `EffectDef`'s `condition` currently holds (already
+ * enforced by `activeStaticNodes` only returning live static nodes). Callers
+ * check this ONLY when the ordinary `canAttack` already failed on Lag alone.
+ */
+export function canAttackGigAreaDespiteLag(db: CardDb, state: GameState, uid: number): boolean {
+  const card = state.cards[uid]
+  if (!card || !card.ready || !card.lag) return false
+  if (cantAttack(db, state, uid)) return false
+  return activeStaticNodes(db, state, uid).some((node) => node.kind === 'attackGigAreaDespiteLag')
 }
 
 /**

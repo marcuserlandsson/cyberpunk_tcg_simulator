@@ -2637,3 +2637,317 @@ genuine engine feature, not a vocabulary extension.
 `floatingEffects` deferral list (§52, as updated by §79/§80). Its test in
 `tests/cards/yellow.test.ts` is the same bookkeeping-only assertion those
 three already use.
+
+# Task 8 rulings, batch 5 (Green, 17 cards)
+
+The first Green batch. Two cards print "Swap a friendly Gig with a rival
+Gig" — the shape §60 flagged as a still-open gap in
+`meredith-stout-stone-cold-corpo`'s "or swaps" wording, now closed. One card
+(`jackie-welles-mama-s-favorite`) is fully deferred; the other sixteen needed
+eleven vocabulary/engine extensions and three scripts.
+
+## 92 — `swapGig`: two fixed-role die slots, closing §60's "or swaps" gap
+
+`maxtac-av` ("{Play} You may swap a friendly Gig with a rival Gig.") and
+`hanako-arasaka-daughter-of-the-emperor` ("{Spend} Swap a friendly Gig with a
+rival Gig.") are the two cards §60 named as pending when it scoped
+`onRivalAdjustFriendlyGig` to `changeGig` only.
+
+**Ruling:** a new node, `{ kind: 'swapGig' }`, contributes two fixed-role
+target slots (`friendlyGigDie` then `rivalGigDie`, reusing the existing
+Gig-die `TargetSpec`s verbatim — no new spec needed since the two roles are
+always "give up one of my own, take one of a Rival's", never a bare/either
+choice). Resolution exchanges the two `GigDie` objects between the two
+players' `gigArea` arrays in place (the whole die — size *and* value — moves,
+unlike `changeGig`'s in-place value mutation), then fires
+`onRivalAdjustFriendlyGig` on the RIVAL side (the die reached into), exactly
+mirroring `changeGig`'s wiring — closing §60's gap for real, not just for the
+one card that already existed then. `maxtac-av`'s "you may" is free and
+auto-taken per §50; a missing die on either side (e.g. an empty Gig area)
+simply drops that slot, so the whole swap fizzles (both `takeSlot` calls
+still run to keep the cursor aligned, per the standing "consume the slot
+either way" rule).
+
+## 93 — "Value-pair of Gigs": a boolean condition and a dynamic amount, both counting pairs
+
+`goro-takemura-vengeful-bodyguard` ("If you control a value-pair of Gigs,
+also give it +1 power") and `hanako-arasaka-daughter-of-the-emperor` ("draw 1
+for each friendly value-pair of Gigs") both need "two Gig dice sharing a
+value" — a shape distinct from every existing Gig condition (`friendlyGigEvenAndOdd`
+is a parity shape, `friendlyGigDistinctValuesAtLeast` counts *unique* values,
+neither counts *duplicates*). Grepping the pool-wide `text` field for
+"value-pair" turns up five more future cards (`meredith-stout-stone-cold-corpo`,
+`peace-offering`, `pepe-najarro-working-doubles`, `sandayu-oda-hanako-s-guardian`),
+confirming this is shared vocabulary, not a two-card one-off.
+
+**Ruling:** a shared helper, `query.ts`'s `valuePairCount(state, player)`,
+counts `⌊count/2⌋` for every distinct Gig value in `player`'s own Gig area
+(three dice of the same value is one pair, not three) — feeding both:
+
+- `EffectDef.condition.friendlyGigValuePair?: boolean` — true when the count
+  is ≥1 (goro-takemura-vengeful-bodyguard);
+- `DynamicAmount`'s new bare-string variant, `'friendlyGigValuePairCount'`,
+  resolved by the existing `resolvePowerAmount` (hanako's `draw` count).
+
+## 94 — `onStartTurn`: the mirror-image watcher of `onEndTurn`
+
+`hanako-arasaka-daughter-of-the-emperor`: "At the start of your turn, draw 1
+for each friendly value-pair of Gigs." §60 built `onEndTurn` from
+`reduce.ts`'s `endTurn`; nothing yet fires an equivalent trigger from the
+start-of-turn sequence.
+
+**Ruling:** a new watcher trigger, `onStartTurn`, fired the same way
+(`fireWatcherTrigger`) from a new `reduce.ts` helper, `startTurn(draft, db,
+player, turnNumber)`, which wraps `game.ts`'s `beginTurn` and fires the
+trigger immediately after — **in `reduce.ts`, not `game.ts`**, specifically
+to avoid adding a new `game.ts -> cards/effects.ts` import-cycle direction;
+`reduce.ts` already imports both modules for exactly this reason (`effects.ts`'s
+own header already documents the existing `combat.ts`/`reduce.ts` ->
+`effects.ts` cycle, and `game.ts` is deliberately kept out of it). `startTurn`
+replaces the two existing `beginTurn(...)` call sites (`keepHand`'s first-turn
+kickoff and `endTurn`'s hand-off) and skips firing if `beginTurn` itself
+already ended the game (the 7-Gigs win check, or a start-of-turn deckout) —
+the same `draft.winner !== null` guard every other trigger seam uses. It
+fires before the Gig-gain decision (`chooseGigDie`), matching the guide's
+"ready → draw → gain a gig" ordering read as "the turn's automatic part,
+then the player's own actions."
+
+## 95 — `onFriendlyBlock` (a watcher) and `conditionalEffect` (a gated child node)
+
+`goro-takemura-vengeful-bodyguard`: "{Quick} 1 €$, {Spend} Give a friendly
+Unit with cost 4 or less {Blocker} this turn. If you control a value-pair of
+Gigs, also give it +1 power this turn. When a friendly Unit uses {Blocker},
+you may discard 1. If you do, draw 1." Two new needs in one card:
+
+- the second sentence is "when A FRIENDLY Unit blocks", a watcher — unlike
+  the existing self-referential `onBlock` (fired only for the specific
+  blocking card's own `EffectDef`s, per §41). **Ruling:** a new watcher
+  trigger, `onFriendlyBlock`, fired from `combat.ts`'s `blockAttack` right
+  alongside the existing `onBlock` self-fire, broadcast to every in-play card
+  of the blocker's own controller (§42's template). "You may discard 1. If
+  you do, draw 1." is the same target-slot-dependency shape §73 already
+  forced into a script (no vocabulary node reads "did an earlier node's slot
+  get filled") — scripted, with the card to discard picked through the rng
+  (a watcher carries no player-supplied target, §32) and the draw following
+  automatically from whether that pick found anything;
+- the first sentence's "also give it +1 power" is conditional on a board fact
+  (a value-pair), but must land on the **same** chosen Unit as the
+  unconditional {Blocker} grant, ruling out splitting into two `EffectDef`s
+  (§53's whole point for this exact card, cited there as motivation but not
+  yet actually encoded). No existing node lets ONE child of a `sameTarget`
+  resolve conditionally while a SIBLING child stays unconditional — an
+  `EffectDef`-level `condition` would gate the {Blocker} grant too, which is
+  wrong. **Ruling:** a new node, `{ kind: 'conditionalEffect', condition,
+  effect }`, wraps a single child and only applies it while `condition` holds
+  (checked via a new `query.ts` export, `conditionHolds`, factored out of
+  `conditionMet`'s body so a bare `EffectCondition` — the type extracted from
+  `EffectDef.condition` for exactly this reuse — can be checked without an
+  enclosing `EffectDef`). It still consumes its child's slots whether or not
+  the condition holds, the same "step over a fizzled construct's slots" rule
+  `sameTarget` already established, so a sibling after it is never misaligned.
+
+## 96 — `streetCredParity`: even/odd Street Cred as a condition
+
+`field-operator` ("If your ☆ is an even number, draw 1") and
+`pacifica-netrunner` ("If your ☆ is an even number, a rival Unit can't ready
+until your next turn") both gate on the *parity* of Street Cred — a shape
+none of §55's/§69's existing comparisons (`streetCredAtLeast`,
+`streetCredAheadOfRival`, `streetCredBelow`, `streetCredDiffAtLeast`) can
+express, and two cards in this one batch need it.
+
+**Ruling:** `EffectDef.condition` gains `streetCredParity?: 'even' | 'odd'`,
+a plain `streetCred(state, player) % 2 === 0` read.
+
+## 97 — `allFriendlyLegendsFaceUp`: a plain board-read condition
+
+`goro-takemura-losing-his-way`: "{Attack} If all friendly Legends are
+face-up, this Unit has +5 power this turn." A one-card shape (no other pool
+card checks "all", only "an ARASAKA Legend" style membership), but a plain
+read over `state.players[player].legends`, following the exact shape of
+every other condition field before it — no reason to script a single boolean
+board fact.
+
+**Ruling:** `EffectDef.condition` gains `allFriendlyLegendsFaceUp?: boolean`,
+true when every uid in the controller's `legends` zone is face-up (vacuously
+true with an empty zone — nothing left to be face-down).
+
+## 98 — `sourceSpent` condition and `friendlyFaceUpLegend` target spec
+
+`maxtac-squadron`: "At the end of your turn, if this Unit is spent, ready a
+friendly face-up Legend." Two small gaps:
+
+- "if **this Unit** is spent" reads the firing card's own readiness — no
+  existing condition inspects `sourceUid` this way (`sourceEquipped`,
+  §69, is the nearest precedent: same shape, different fact). **Ruling:**
+  `EffectDef.condition` gains `sourceSpent?: boolean`, reading
+  `!state.cards[sourceUid].ready`;
+- "a friendly **face-up Legend**" as the ready target is not quite
+  `friendlyUnitOrLegend` (which also includes the field) — this needs the
+  legends zone alone. **Ruling:** `TargetSpec` gains `friendlyFaceUpLegend`,
+  returning exactly the controller's face-up legends-zone uids (the same list
+  `targets.ts`'s existing internal `faceUpLegendsOf` helper already computes
+  for `friendlyUnitOrLegend`/`friendlyGear`, now exposed as its own spec).
+
+## 99 — `skipNextReady`: a one-shot per-instance flag, generalizing §18's hardcoded penalty
+
+`pacifica-netrunner`: "{Play} If your ☆ is an even number, a rival Unit can't
+ready until your next turn." Read literally this spans an arbitrary number of
+future actions (a `floatingEffects`-shaped gap, §52) — but unpacked against
+the actual turn order it reduces to exactly ONE concrete event: the target's
+own very next ready step (at the start of ITS owner's next turn, since ready
+happens only on the owner's own turn and no other ready step falls inside the
+"until your next turn" window). §18 already implements precisely this shape,
+just hardcoded to two specific uids (the first player's opening two spent
+Legends) rather than a general per-card flag.
+
+**Ruling:** `CardInstance` gains `skipNextReady?: boolean`, and a new node,
+`{ kind: 'skipNextReady'; target; filter? }`, sets it. `game.ts`'s
+`readySpentCards` checks it right alongside the existing `penalised` set: a
+flagged card's ready step is skipped once and the flag is cleared (never
+re-armed) the moment it is consulted, so the very next skip is also the last.
+This is deliberately NOT built on the `floatingEffects` machinery §52/§79/§91
+reserved for *conditional, multi-action-window* delayed effects (the pending
+list for those: `chrome-fang`, `appetite-for-destruction`, `cyberpsychosis`,
+`safety-override`) — `skipNextReady` has no condition to re-check later and
+no "whichever action triggers it" ambiguity, just one guaranteed future
+event, so the one-shot flag already used for the opening-Legend penalty
+suffices and is reused rather than duplicated.
+
+## 100 — `attackGigAreaDespiteLag`: a narrower Lag exception than {adrenaline}
+
+`nadia-fighting-through-grief`: "If a Rival controls more Gigs than you, this
+Unit can attack their Gig area the turn it's played." Superficially close to
+{adrenaline} ("can attack the turn it's played") but two ways narrower: (1)
+conditional, live only while the printed comparison holds, and (2) scoped to
+the Gig area alone — it must never unlock an attack on a rival Unit, which
+{adrenaline} always would. Neither `grantKeywordWhile` (§68 ff., which only
+ever widens {adrenaline}/{blocker}-shaped *keywords*, and {adrenaline} itself
+grants full attack permission) nor any existing static fits.
+
+**Ruling:** a new static node, `{ kind: 'attackGigAreaDespiteLag' }`, read by
+a new `query.ts` helper, `canAttackGigAreaDespiteLag`, consulted by
+`combat.ts`'s `attackActions` ONLY once the general `canAttack` has already
+failed on Lag — never as an alternative to it, so a Unit with no Lag at all
+is completely unaffected. `attackTargets` gained a `gigAreaOnly` parameter
+that, when set, returns `['gigArea']` (or `[]` with an empty/forbidden Gig
+area) instead of computing the ordinary Unit-inclusive target list, so this
+exception can never leak into a rival-Unit attack. The printed "if a Rival
+controls more Gigs than you" reuses the existing `rivalGigLeadAtLeast: 1`
+condition verbatim (already the exact ">" comparison needed).
+
+## 101 — `onLoseFight` and `fightFoe`: the mirror image of `onWinFight`, with a foe reference
+
+`maelstrom-zealots`: "When this Unit loses a fight, defeat the opposing rival
+Unit." §41 built `onWinFight` for the survivor of a fight; nothing fires for
+the loser, and even if something did, "the opposing rival Unit" names a
+specific card no existing `TargetSpec` can reach (it is not `self`, not
+`chosen` — no enclosing `sameTarget` — and not a candidate list, since it is
+a single, already-known card the instant the trigger fires).
+
+**Rulings:**
+
+- a new trigger, `onLoseFight`, fired from `combat.ts`'s `fight()` for every
+  uid in the (fight-immune-filtered) `defeated` list, **before** either
+  combatant is actually moved to the trash — so a retaliation this trigger
+  causes (defeating the foe) safely pre-empts the main defeat loop's own
+  `onField` guard for that same uid, exactly like an `onDefeat` effect from
+  one casualty already removing the other (the existing comment right above
+  the loop). It propagates from attached Gear alongside `onWinFight`
+  (§37's "about the host acting" test);
+- a new `TargetSpec`, `'fightFoe'`, is never enumerated (like `'chosen'`) —
+  it reads a new `TriggerContext.fightFoeUid` field, threaded through
+  `EffectCtx.context` exactly the way `defeatedHostUid` already is (§87),
+  populated with "whichever of the two combatants isn't this uid." A tied
+  fight (both sides in `defeated`) fires this for both, each naming the OTHER
+  as its foe, which correctly resolves to a no-op defeat for whichever side
+  a retaliation reaches after the other has already gone.
+
+## 102 — `don-t-fear-the-reaper`: scripted mass-spend, then a real "which spent Unit" fizzle-to-rng
+
+"Spend all rival Units. Then, defeat a spent Unit." The mass, unconditional
+"spend all" half has no per-target decision, the same shape §74 already
+scripted for `adam-smasher-metal-over-meat`'s mass defeat (different verb and
+scope, but the same "no vocabulary node for an unconditional 'all'" reasoning
+— and the exact card §74 named as the pool's other mass effect, now reached).
+"A spent Unit" (bare, either side) is a real decision in principle, but
+§57's residual note applies precisely here: splitting this into two
+same-trigger `EffectDef`s (spend-all, then defeat-a-spent-Unit) would let a
+freshly-spent rival Unit exist only *after* the first def resolves, while
+`legalActions`' `onPlay` enumeration commits to a target tuple **before**
+either def runs — exactly the "later def's candidate count depends on an
+earlier def's zone mutation" gap §57 flagged as unresolved for `onPlay`/
+`activated` triggers. Per that note's own recommended escape ("fold the
+first def's effect into a scripted node instead"), the whole card is
+scripted: the mass spend runs first, then a spent Unit (either side,
+candidates that only stabilize once the mass spend has happened) is picked
+through the rng, mirroring `all-is-lost`'s "candidates only exist
+mid-resolution" precedent (§48).
+
+## 103 — `overwatch-panam-s-gift`: a real discard target, an rng'd defeat gated on its cost
+
+"{Quick} 1 €$, {Spend} Discard 1. Defeat a spent rival Unit with cost equal
+to or less than the discarded card's cost." "The discarded card's cost" is a
+numeric property of whatever the first clause chose, feeding a *filter* on
+the second — the same "read a property of what a prior step touched" problem
+§73 already forced into a script for `heywood-ripperdoc`'s "its cost" (no
+vocabulary node carries a target's own field into a later filter).
+
+**Ruling:** scripted, with `targets: ['friendlyHandCard']` declared for the
+discard — a real, enumerated decision, since this activated ability's action
+already commits to a `targets` array (§73/§80's "a real decision when the
+firing action can carry one"). Which rival Unit to defeat afterward has no
+filtered *scripted*-target support yet (§73 already flagged this exact gap,
+still unclosed — no card needs it enough to justify extending `{ kind:
+'scripted' }`'s `targets`/`filters` with a *cross-slot* dependency), so it is
+picked through the rng among the candidates that satisfy the cost bound once
+the discard's cost is actually known.
+
+## 104 — `fool-on-the-hill`: scripted, the rival's choice resolved off the rng
+
+"Reveal the top 2 cards of your deck. A Rival chooses whether you add them to
+your hand or trash them. If you trash them, draw 2." No other pool card
+reveals a specific top-N zone and then hands an UNCONDITIONAL choice to the
+Rival over what happens to it (contrast `chooseOne`'s `'rivalIfBehindStreetCred'`
+and `'allUnlessBehindStreetCred'` choosers, both of which are conditional on
+Street Cred) — a one-card shape, and the two revealed cards only exist once
+the deck has actually been looked at (mid-resolution), so per §48 this is
+scripted rather than grown into a `chooseOne` chooser variant nobody else
+needs. The Rival's decision is never the controller's to enumerate (§45's
+standing rule for a private rival choice), so it resolves off the rng exactly
+like every other unenumerable rival decision in the pool. "If you trash them,
+draw 2" carries no "may", so that branch's draw is a genuine required draw
+that can end the game on an empty deck (§17/§36), unlike `shattered-memories`'s
+optional "may draw 5" (§65).
+
+## 105 — Deferred: `jackie-welles-mama-s-favorite` (needs a "would be defeated" interception point)
+
+"{Go Solo} ... If a friendly Unit would be defeated, you may spend 1 €$ to
+defeat this Legend instead. (Remove it from the game.)" This is the direct
+structural mirror of §72's deferred second clause on
+`alt-cunningham-mother-of-daemons` ("When a rival Unit would steal a Gig, you
+may discard 1 ... the Gig isn't stolen"): both need a genuine interception
+decision point BEFORE a mutation (there, a steal; here, a defeat) actually
+happens, where the answering player may pay an optional cost to redirect or
+cancel it. `defeatUnit` is called synchronously from many unrelated sites
+(fights, on-play/on-defeat effect nodes, mass-defeat scripts) with no
+existing seam for "pause here, offer the controller a pay-to-redirect
+choice, then continue" — unlike `defeatShield` (§46), which is unconditional
+and costless and so needs no *decision* at all, only a static substitution.
+Building that seam generically (who answers, what it costs, how declining it
+differs from an unconditional shield) is a genuine engine feature, not a
+vocabulary extension, and — unlike `alt-cunningham-mother-of-daemons`, whose
+FIRST clause (`onFriendlyEquippedSpend` → draw 1) is an independent,
+unconditionally-encodable upside — this card's entire functional text IS the
+gap: there is no other clause to keep. §79/§80's "full or defer" policy
+therefore applies with nothing left on the "full" side.
+
+**Ruling (scope):** left with `effects: []`. Its {Go Solo} keyword is still
+fully live (handled entirely by the existing keyword/legends-zone machinery,
+no card data required — the same "vanilla except for the reminder" shape as
+`goro-takemura-hands-unclean`). Its test in `tests/cards/green.test.ts` is
+the same bookkeeping-only assertion the `floatingEffects` deferrals use,
+though this gap is a different engine feature (a would-be-mutation
+interception point, not a delayed/floating effect) and is not added to the
+§52 list, which is specifically about effects that outlive their own
+resolution across a turn boundary — this one is a same-instant redirect
+missing only its decision seam.

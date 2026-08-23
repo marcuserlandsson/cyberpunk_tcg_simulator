@@ -568,7 +568,9 @@
       "corpo"
     ],
     "text": "This Unit can't attack.\n{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
-    "effects": []
+    "effects": [
+      { "trigger": "static", "effect": { "kind": "cantAttack" } }
+    ]
   },
   {
     "id": "corporate-surveillance",
@@ -587,7 +589,12 @@
       "corpo"
     ],
     "text": "Spend a rival Unit with cost 4 or less.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": { "kind": "spendCard", "target": "rivalUnit", "filter": { "maxCost": 4 } }
+      }
+    ]
   },
   {
     "id": "cyberpsychosis",
@@ -791,7 +798,13 @@
       "samurai"
     ],
     "text": "Spend all rival Units. Then, defeat a spent Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": { "kind": "scripted", "name": "don-t-fear-the-reaper" }
+      }
+    ],
+    "scripted": "don-t-fear-the-reaper"
   },
   {
     "id": "dum-dum-maelstrom-triggerman",
@@ -975,7 +988,13 @@
       "techie"
     ],
     "text": "{Play} If your ☆ (Street Cred) is an even number, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "condition": { "streetCredParity": "even" },
+        "effect": { "kind": "draw", "count": 1 }
+      }
+    ]
   },
   {
     "id": "floor-it",
@@ -1015,7 +1034,13 @@
       "merc"
     ],
     "text": "Reveal the top 2 cards of your deck. A Rival chooses whether you add them to your hand or trash them. If you trash them, draw 2.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": { "kind": "scripted", "name": "fool-on-the-hill" }
+      }
+    ],
+    "scripted": "fool-on-the-hill"
   },
   {
     "id": "gilded-mato-n",
@@ -1123,7 +1148,13 @@
       "corpo"
     ],
     "text": "{Attack} If all friendly Legends are face-up, this Unit has +5 power this turn.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "condition": { "allFriendlyLegendsFaceUp": true },
+        "effect": { "kind": "buffPower", "amount": 5, "target": "self", "duration": "turn" }
+      }
+    ]
   },
   {
     "id": "goro-takemura-vengeful-bodyguard",
@@ -1146,7 +1177,31 @@
       "corpo"
     ],
     "text": "{Quick} 1 €$, {Spend} Give a friendly Unit with cost 4 or less {Blocker} this turn. If you control a value-pair of Gigs, also give it +1 power this turn.\nWhen a friendly Unit uses {Blocker}, you may discard 1. If you do, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "activated",
+        "quick": true,
+        "cost": { "selfSpend": true, "eddies": 1 },
+        "effect": {
+          "kind": "sameTarget",
+          "target": "friendlyUnit",
+          "filter": { "maxCost": 4 },
+          "effects": [
+            { "kind": "grantKeyword", "keyword": "blocker", "target": "chosen", "duration": "turn" },
+            {
+              "kind": "conditionalEffect",
+              "condition": { "friendlyGigValuePair": true },
+              "effect": { "kind": "buffPower", "amount": 1, "target": "chosen", "duration": "turn" }
+            }
+          ]
+        }
+      },
+      {
+        "trigger": "onFriendlyBlock",
+        "effect": { "kind": "scripted", "name": "goro-takemura-vengeful-bodyguard" }
+      }
+    ],
+    "scripted": "goro-takemura-vengeful-bodyguard"
   },
   {
     "id": "gunpoint-diplomacy",
@@ -1236,7 +1291,17 @@
       "netrunner"
     ],
     "text": "{Spend} Swap a friendly Gig with a rival Gig.\nAt the start of your turn, draw 1 for each friendly value-pair of Gigs.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "activated",
+        "cost": { "selfSpend": true },
+        "effect": { "kind": "swapGig" }
+      },
+      {
+        "trigger": "onStartTurn",
+        "effect": { "kind": "draw", "count": "friendlyGigValuePairCount" }
+      }
+    ]
   },
   {
     "id": "hanako-arasaka-in-a-gilded-cage",
@@ -1838,7 +1903,12 @@
       "ganger"
     ],
     "text": "When this Unit loses a fight, defeat the opposing rival Unit.\n(Units with power 0 don't steal Gigs.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onLoseFight",
+        "effect": { "kind": "defeat", "target": "fightFoe" }
+      }
+    ]
   },
   {
     "id": "maman-brigitte-spirit-of-death",
@@ -1919,7 +1989,12 @@
       "vehicle"
     ],
     "text": "{Play} You may swap a friendly Gig with a rival Gig.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": { "kind": "swapGig" }
+      }
+    ]
   },
   {
     "id": "maxtac-squadron",
@@ -1937,7 +2012,13 @@
     "sellTag": false,
     "keywords": [],
     "text": "At the end of your turn, if this Unit is spent, ready a friendly face-up Legend.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onEndTurn",
+        "condition": { "sourceSpent": true },
+        "effect": { "kind": "readyCard", "target": "friendlyFaceUpLegend" }
+      }
+    ]
   },
   {
     "id": "maxtac-suppression-team",
@@ -2208,7 +2289,13 @@
       "medtech"
     ],
     "text": "If a Rival controls more Gigs than you, this Unit can attack their Gig area the turn it's played.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "condition": { "rivalGigLeadAtLeast": 1 },
+        "effect": { "kind": "attackGigAreaDespiteLag" }
+      }
+    ]
   },
   {
     "id": "netwatch-netdriver",
@@ -2351,7 +2438,19 @@
       "weapon"
     ],
     "text": "{Quick} 1 €$, {Spend} Discard 1. Defeat a spent rival Unit with cost equal to or less than the discarded card's cost.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "activated",
+        "quick": true,
+        "cost": { "selfSpend": true, "eddies": 1 },
+        "effect": {
+          "kind": "scripted",
+          "name": "overwatch-panam-s-gift",
+          "targets": ["friendlyHandCard"]
+        }
+      }
+    ],
+    "scripted": "overwatch-panam-s-gift"
   },
   {
     "id": "pacifica-netrunner",
@@ -2370,7 +2469,13 @@
       "netrunner"
     ],
     "text": "{Play} If your ☆ (Street Cred) is an even number, a rival Unit can't ready until your next turn.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "condition": { "streetCredParity": "even" },
+        "effect": { "kind": "skipNextReady", "target": "rivalUnit" }
+      }
+    ]
   },
   {
     "id": "padre-man-of-the-cross",

@@ -61,6 +61,20 @@ export type Trigger =
   // play, type Unit/Legend, attachedGear.length > 0) is spent, from the same
   // `spendOnDraft` seam that already fires the self-referential `onSpend`.
   | 'onFriendlyEquippedSpend'
+  // Batch 5 (docs/rulings.md §92 ff.):
+  //   * onLoseFight — "When this Unit loses a fight, ..." (maelstrom-zealots) —
+  //     self-referential (like onWinFight's mirror image), fired for the
+  //     loser(s) of a fight with the specific foe carried in
+  //     `TriggerContext.fightFoeUid` so the effect can target "the opposing
+  //     rival Unit" via the new `'fightFoe'` TargetSpec;
+  //   * onStartTurn — "At the start of your turn, ..." — a watcher, fired on
+  //     every in-play card of the player whose turn just began;
+  //   * onFriendlyBlock — "When a friendly Unit uses {Blocker}, ..." — a
+  //     watcher (unlike self-referential `onBlock`), broadcast to every
+  //     in-play card of the blocking Unit's own controller.
+  | 'onLoseFight'
+  | 'onStartTurn'
+  | 'onFriendlyBlock'
   | 'activated'
   | 'static'
 
@@ -96,6 +110,15 @@ export type TargetSpec =
   // never left to the rng when the firing action can carry a target.
   | 'friendlyGear'
   | 'anyGear'
+  // Batch 5 (docs/rulings.md §92 ff.):
+  //   * fightFoe — never enumerated (like 'chosen'): reads
+  //     `TriggerContext.fightFoeUid`, the specific card a fight-loser just
+  //     fought, threaded through `EffectCtx.context` (maelstrom-zealots);
+  //   * friendlyFaceUpLegend — "a friendly face-up Legend" as its own zone
+  //     (the legends zone only, unlike `friendlyUnitOrLegend` which also
+  //     includes the field) — maxtac-squadron.
+  | 'fightFoe'
+  | 'friendlyFaceUpLegend'
 
 /** The three Gig-die scopes a card's text can name (docs/rulings.md §39). */
 export type GigDieSpec = 'friendlyGigDie' | 'rivalGigDie' | 'anyGigDie'
@@ -152,6 +175,11 @@ export type DynamicAmount =
   // docs/rulings.md §68 ff.) — `amount` times the count of the controller's
   // own Gig dice matching `parity`.
   | { perFriendlyGigParity: { parity: 'even' | 'odd'; amount: number } }
+  // "Draw 1 for each friendly value-pair of Gigs" (hanako-arasaka-daughter-of-
+  // the-emperor, docs/rulings.md §92 ff.) — the number of value-pairs in the
+  // controller's own Gig area (two dice sharing a value; a third die of the
+  // same value adds no further pair, matching the printed "each" reading).
+  | 'friendlyGigValuePairCount'
 
 export type EffectNode =
   // "Draw 1 for each friendly Gig with an odd value" needs a board-read count
@@ -281,11 +309,42 @@ export type EffectNode =
   // the allowance used the moment a matching card is actually played, reusing
   // the same `oncePerTurnUsed` array/key convention as `oncePerTurn` defs.
   | { kind: 'firstMatchingPlayDiscount'; cardType: CardType; keyword: string; amount: number; minimum: number }
+  // Batch 5 additions (docs/rulings.md §92 ff.):
+  // "Swap a friendly Gig with a rival Gig" (maxtac-av, hanako-arasaka-
+  // daughter-of-the-emperor) — two real target slots (a friendly die to give
+  // up, a rival die to take), always in that fixed friendly-then-rival role,
+  // exchanging their positions between the two Gig areas. Fires
+  // `onRivalAdjustFriendlyGig` on the rival (whose die was reached into),
+  // exactly like `changeGig` (docs/rulings.md §60's still-open "or swaps" gap
+  // is now covered for both cards that need it).
+  | { kind: 'swapGig' }
+  // "A rival Unit can't ready until your next turn" (pacifica-netrunner) —
+  // marks the target to skip its own next ready step (consumed the first
+  // time `game.ts`'s `readySpentCards` would otherwise ready it), the same
+  // one-shot-flag shape as the first player's penalised opening legends
+  // (docs/rulings.md §18), generalized to any card instance.
+  | { kind: 'skipNextReady'; target: TargetSpec; filter?: TargetFilter }
+  // Static: "this Unit can attack their Gig area the turn it's played" while
+  // gated by an ordinary `condition` (nadia-fighting-through-grief) — unlike
+  // {adrenaline} (which unlocks *any* legal attack despite Lag), this only
+  // ever unlocks the rival Gig area, never a rival Unit, and only while the
+  // owning EffectDef's condition currently holds.
+  | { kind: 'attackGigAreaDespiteLag' }
+  // "Give a friendly Unit {Blocker} this turn. If you control a value-pair of
+  // Gigs, also give it +1 power this turn." (goro-takemura-vengeful-
+  // bodyguard) — wraps a child node so it only resolves while `condition`
+  // holds, without gating the whole enclosing EffectDef (docs/rulings.md §53
+  // already flagged this card as sameTarget's motivating case; the *value-
+  // pair* half of it needed this to land). Consumes its child's slots whether
+  // or not the condition holds, so later siblings still read the right ones.
+  | { kind: 'conditionalEffect'; condition: EffectCondition; effect: EffectNode }
 
-export interface EffectDef {
-  trigger: Trigger
-  cost?: { selfSpend?: boolean; eddies?: number; reduction?: CostReduction }
-  condition?: {
+/**
+ * The board facts an `EffectDef`/`conditionalEffect` node can gate on. Named
+ * separately from `EffectDef` so `conditionalEffect` (a plain `EffectNode`)
+ * can carry one too, without an `EffectDef['condition']` indexed-access alias.
+ */
+export interface EffectCondition {
     streetCredAtLeast?: number
     /** "If you control a Gig with 8+ value" */
     friendlyGigValueAtLeast?: number
@@ -328,9 +387,23 @@ export interface EffectDef {
     stolenDieValueParity?: 'even' | 'odd'
     /** `onUnitDefeated` only: was the defeated Unit on the WATCHING card's own side? */
     defeatedIsFriendly?: boolean
-    /** `onUnitDefeated` only: did the defeated Unit carry ≥1 attached Gear before it left the field? */
-    defeatedWasEquipped?: boolean
-  }
+  /** `onUnitDefeated` only: did the defeated Unit carry ≥1 attached Gear before it left the field? */
+  defeatedWasEquipped?: boolean
+  // Batch 5 additions (docs/rulings.md §92 ff.):
+  /** "if your ☆ (Street Cred) is an even/odd number" (field-operator, pacifica-netrunner). */
+  streetCredParity?: 'even' | 'odd'
+  /** "if all friendly Legends are face-up" (goro-takemura-losing-his-way). */
+  allFriendlyLegendsFaceUp?: boolean
+  /** "if this Unit is spent" — reads the SOURCE card's own readiness (maxtac-squadron). */
+  sourceSpent?: boolean
+  /** "if you control a value-pair of Gigs" — two dice sharing a value (goro-takemura-vengeful-bodyguard). */
+  friendlyGigValuePair?: boolean
+}
+
+export interface EffectDef {
+  trigger: Trigger
+  cost?: { selfSpend?: boolean; eddies?: number; reduction?: CostReduction }
+  condition?: EffectCondition
   quick?: boolean
   /** "The first time ... each turn" — one firing per game turn, per source. */
   oncePerTurn?: boolean
@@ -399,6 +472,13 @@ export interface CardInstance {
   // Keywords granted until the end of the game turn (`grantKeyword`), cleared
   // alongside `tempPower` and wiped on a field exit (docs/rulings.md §43).
   tempKeywords: Keyword[]
+  // "Can't ready until your next turn" (pacifica-netrunner, docs/rulings.md
+  // §92 ff.): a one-shot flag consumed the next time `game.ts`'s
+  // `readySpentCards` would otherwise ready this card — the same shape as the
+  // first player's penalised opening legends (docs/rulings.md §18), just
+  // per-instance instead of hardcoded to two uids. Optional so every existing
+  // `CardInstance` literal (tests included) stays valid without a field.
+  skipNextReady?: boolean
 }
 
 // ---------------------------------------------------------------------------

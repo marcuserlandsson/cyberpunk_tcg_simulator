@@ -39,6 +39,7 @@ import { legendCallPayment } from './economy'
 import {
   attackableReadyKeyword,
   ATTACK_READY,
+  canAttackGigAreaDespiteLag,
   cantAttack,
   cantAttackGigArea,
   cardTags,
@@ -116,9 +117,19 @@ function attackTargets(
   db: CardDb,
   state: GameState,
   attacker: PlayerId,
-  attackerUid: number
+  attackerUid: number,
+  gigAreaOnly = false
 ): (number | 'gigArea')[] {
   const rival = state.players[opponentOf(attacker)]
+  // "this Unit can attack their Gig area the turn it's played" (nadia-
+  // fighting-through-grief, docs/rulings.md §92 ff.) — a Lag exception
+  // narrower than {adrenaline}: it never unlocks a rival Unit, only the Gig
+  // area.
+  if (gigAreaOnly) {
+    return rival.gigArea.length > 0 && !cantAttackGigArea(db, state, attackerUid)
+      ? ['gigArea']
+      : []
+  }
   // "it may attack ready Units" — a granted permission that widens the target
   // list for that one attacker only (docs/rulings.md §43).
   const readyTooOk = hasKeyword(db, state, attackerUid, ATTACK_READY)
@@ -149,9 +160,14 @@ export function attackActions(db: CardDb, state: GameState): Action[] {
   const player = state.activePlayer
   const actions: Action[] = []
   for (const attacker of state.players[player].field) {
-    if (!canAttack(db, state, attacker)) continue
+    const full = canAttack(db, state, attacker)
+    // "This Unit can attack their Gig area the turn it's played" — a narrower
+    // Lag exception consulted only once the general one has already failed
+    // (docs/rulings.md §92 ff.).
+    const gigAreaOnly = !full && canAttackGigAreaDespiteLag(db, state, attacker)
+    if (!full && !gigAreaOnly) continue
     const optional = hasPayableOptionalTrigger(db, state, attacker, 'onAttack')
-    for (const target of attackTargets(db, state, player, attacker)) {
+    for (const target of attackTargets(db, state, player, attacker, gigAreaOnly)) {
       actions.push({ type: 'attack', attacker, target })
       if (optional) actions.push({ type: 'attack', attacker, target, payOptionalCosts: true })
     }
@@ -472,9 +488,21 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // still happens normally for the OTHER combatant — this only saves whichever
   // side(s) carry the granted keyword right now.
   const defeated = wouldDefeat.filter((uid) => !hasKeyword(db, draft, uid, FIGHT_IMMUNE))
+
+  // [trigger seam] "When this Unit loses a fight, ..." (maelstrom-zealots,
+  // docs/rulings.md §92 ff.) — fired for each loser BEFORE either combatant
+  // actually leaves the field, so "the opposing rival Unit" (`fightFoeUid`)
+  // is still resolvable through the ordinary `defeat` node even when both
+  // sides lose a tie.
   for (const uid of defeated) {
-    // An on-defeat effect from the first casualty could already have removed
-    // the second one from the field; never defeat a card twice.
+    const foe = uid === attacker ? defender : attacker
+    fireTriggerOnDraft(db, draft, 'onLoseFight', uid, [], { fightFoeUid: foe })
+  }
+
+  for (const uid of defeated) {
+    // An on-defeat effect from the first casualty (or a retaliation from
+    // `onLoseFight` above) could already have removed the second one from
+    // the field; never defeat a card twice.
     if (!onField(draft, uid)) continue
     defeatUnit(draft, db, uid)
   }
@@ -509,6 +537,11 @@ export function blockAttack(draft: GameState, db: CardDb, blocker: number): void
   // [trigger seam] "When this Unit uses {Blocker}, ..." — before the fight, so
   // a buff or a Gig gain it grants is live for that fight (docs/rulings.md §41).
   fireTriggerOnDraft(db, draft, 'onBlock', blocker, [])
+  // [trigger seam] "When a FRIENDLY Unit uses {Blocker}, ..." — a watcher,
+  // broadcast to every in-play card of the blocking Unit's own controller
+  // (goro-takemura-vengeful-bodyguard, docs/rulings.md §92 ff.), unlike the
+  // self-referential `onBlock` fired just above.
+  fireWatcherTrigger(db, draft, 'onFriendlyBlock', draft.cards[blocker].owner, {})
   resolveAttack(draft, db)
 }
 
