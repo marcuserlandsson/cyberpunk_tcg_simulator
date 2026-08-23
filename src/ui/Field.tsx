@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 import { CardFrame, type CardFrameOwner } from './CardFrame'
 import { effectivePower } from '../engine/query'
 import { AI } from './useGame'
@@ -32,8 +32,14 @@ export function BoardCard(props: {
   handlers: BoardHandlers
   useOfficialImages: boolean
   faceDown?: boolean
+  /** The hand fan's `--i`/`--n` custom properties (board.css), set on THIS
+   *  element deliberately — it is the actual flex item inside `.zone__cards`,
+   *  so a margin computed off those vars here is what pulls fanned siblings
+   *  into their overlap; a margin set one wrapper div further out would not
+   *  (mirrors ZonePanels.tsx's own note on `.eddie-card` vs `.card-frame`). */
+  style?: CSSProperties
 }): ReactElement | null {
-  const { db, state, uid, zone, affordances, handlers, useOfficialImages } = props
+  const { db, state, uid, zone, affordances, handlers, useOfficialImages, style } = props
   const instance = state.cards[uid]
   if (instance === undefined) return null
   const def = db[instance.defId]
@@ -73,6 +79,7 @@ export function BoardCard(props: {
   return (
     <div
       className={classes}
+      style={style}
       data-testid="board-card"
       data-uid={uid}
       data-zone={zone}
@@ -108,6 +115,18 @@ export function BoardCard(props: {
               }
             : undefined
         }
+        // Drives the zoom panel (Task 6). Wired on every BoardCard — field,
+        // legend, and (the human's own) hand — not just clickable ones: the
+        // brief's own worked example hovers a `board-card-hit` (non-legal)
+        // card just as readily as a `playable-card` one. `onFocus`/`onBlur`
+        // give the same reveal to keyboard navigation, not just a mouse.
+        // Info hygiene is ZoomPanel's job, not this handler's: a face-down
+        // card's uid is just as safe to report as any other, since ZoomPanel
+        // renders nothing but the back for one.
+        onMouseEnter={() => handlers.onHover?.(uid)}
+        onMouseLeave={() => handlers.onHover?.(null)}
+        onFocus={() => handlers.onHover?.(uid)}
+        onBlur={() => handlers.onHover?.(null)}
       >
         <CardFrame
           def={def}

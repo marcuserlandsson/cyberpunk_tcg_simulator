@@ -121,3 +121,80 @@ describe('PlayView feed', () => {
     expect(lines.some((l) => l.className.includes('log-line--sys'))).toBe(true)
   })
 })
+
+describe('PlayView hover zoom panel', () => {
+  // `choosePlayOrder` is the action that actually deals the opening hands
+  // (reduce.ts) — `GOOD_RECORD`'s bare `actions: []` leaves both hands empty
+  // (still in `chooseOrder`), so this record advances one action further,
+  // into `mulligan`, specifically so the human's hand is non-empty.
+  const HOVER_RECORD: GameRecord = {
+    config: { decks: [arasaka, mercs], seed: 20260822 },
+    actions: [{ type: 'choosePlayOrder', goFirst: true }],
+  }
+
+  function humanHandCard(container: HTMLElement): HTMLElement {
+    const hand = container.querySelector('[data-testid="hand"][data-player="0"]')
+    if (hand === null) throw new Error('human hand zone not found')
+    const card = hand.querySelector<HTMLElement>(
+      '[data-testid="playable-card"], [data-testid="board-card-hit"]'
+    )
+    if (card === null) throw new Error('no human hand card found to hover')
+    return card
+  }
+
+  it('hovering a hand card opens the zoom panel', () => {
+    saveGameRecord('hover-slot', HOVER_RECORD)
+    const { container } = render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+    fireEvent.click(screen.getByTestId('resume-game'))
+
+    const card = humanHandCard(container)
+    expect(screen.queryByTestId('zoom-panel')).toBeNull()
+
+    fireEvent.mouseEnter(card)
+    expect(screen.queryByTestId('zoom-panel')).not.toBeNull()
+
+    fireEvent.mouseLeave(card)
+    expect(screen.queryByTestId('zoom-panel')).toBeNull()
+  })
+
+  it('focusing a hand card (keyboard parity) opens the zoom panel the same as hovering', () => {
+    saveGameRecord('hover-slot', HOVER_RECORD)
+    const { container } = render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+    fireEvent.click(screen.getByTestId('resume-game'))
+
+    const card = humanHandCard(container)
+    fireEvent.focus(card)
+    expect(screen.queryByTestId('zoom-panel')).not.toBeNull()
+
+    fireEvent.blur(card)
+    expect(screen.queryByTestId('zoom-panel')).toBeNull()
+  })
+
+  it('never leaks a face-down legend past its back, even when hovered', () => {
+    saveGameRecord('hover-slot', HOVER_RECORD)
+    const { container } = render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+    fireEvent.click(screen.getByTestId('resume-game'))
+
+    const rivalLegends = container.querySelector('[data-testid="legends"][data-player="1"]')
+    if (rivalLegends === null) throw new Error('rival legends zone not found')
+    const legendCard = rivalLegends.querySelector<HTMLElement>('[data-testid="board-card-hit"]')
+    if (legendCard === null) throw new Error('no rival legend card-hit found')
+
+    fireEvent.mouseEnter(legendCard)
+    const panel = screen.getByTestId('zoom-panel')
+    expect(panel.querySelector('.card-frame__back')).not.toBeNull()
+    expect(panel.textContent).toBe('')
+  })
+
+  it("keeps the rival's hidden hand backs red-keyed to the rival, testid intact", () => {
+    saveGameRecord('hover-slot', HOVER_RECORD)
+    const { container } = render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+    fireEvent.click(screen.getByTestId('resume-game'))
+
+    const backs = container.querySelectorAll('[data-testid="hand-back"]')
+    expect(backs.length).toBeGreaterThan(0)
+    for (const back of backs) {
+      expect(back.querySelector('.card-frame--rival')).not.toBeNull()
+    }
+  })
+})

@@ -27,6 +27,7 @@ import { LogPanel } from './LogPanel'
 import { ReactionBar } from './ReactionBar'
 import { StreetStrip } from './StreetStrip'
 import { ZonePanels } from './ZonePanels'
+import { ZoomPanel } from './ZoomPanel'
 import { AI, HUMAN, useGame } from './useGame'
 import { deleteGameRecord, listDecks, listGameRecords } from './storage'
 import { deckPickerLabel, isDeckPickable } from './deckPicker'
@@ -129,6 +130,12 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
   const { state, record, legal } = game
 
   const [pending, setPending] = useState<Pending | null>(null)
+  // The uid the board/hand is currently hovering (or focused on, for
+  // keyboard parity) — drives the zoom panel (Task 6). Not reset by the
+  // `actionCount` effect below: leaving a hover open across an action is
+  // harmless (the next mouseleave/blur clears it), and resetting it there
+  // would fight a hover that's still genuinely live.
+  const [zoomUid, setZoomUid] = useState<number | null>(null)
   const [setupOpen, setSetupOpen] = useState(true)
   const [saveName, setSaveName] = useState('')
   const [savedNote, setSavedNote] = useState<string | null>(null)
@@ -313,6 +320,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
       const option = options.find((candidate) => candidate.gigArea === true)
       if (option !== undefined) option.pick()
     },
+    onHover: setZoomUid,
   }
 
   // ---- new game / resume --------------------------------------------------
@@ -579,6 +587,12 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
         </div>
 
         <div className="playmat__rail" data-testid="control-bar">
+          <ZoomPanel
+            db={db}
+            state={state}
+            uid={zoomUid}
+            useOfficialImages={useOfficialImages}
+          />
           <LogPanel
             lines={game.eventsForLog}
             headerExtra={

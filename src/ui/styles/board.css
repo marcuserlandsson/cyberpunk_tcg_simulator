@@ -208,27 +208,19 @@
   color: var(--rival);
 }
 
-/* The rival's hidden hand renders as a compact fan of backs: same overlap
-   technique the eddies row uses (a fixed overlap here, rather than eddies'
-   count-gated one, since hand size swings less and this row never needs to
-   hold as many cards as a spent-eddie pile eventually can). Shrunk to the
-   same 46px width the deck/trash piles already use (cards.css's `.pile`) —
-   a face-down back has no internal proportional content to break, so this is
-   a plain resize (height follows from `.card-frame__back`'s aspect-ratio),
-   and it is what actually keeps the rival strip within its ~40%-of-board
-   share: at full card size, four stacked rival rows (meta/zones/field/hand)
-   outweigh the fixed board height on their own and starve the player's own
-   zone down to nothing (verified in a real browser before this rule). */
-.rival-strip .zone--hand-hidden .zone__cards {
-  flex-wrap: nowrap;
-}
-
+/* The rival's hidden hand renders the same hand-fan (below) as the human's,
+   at half scale: shrunk to the same 46px width the deck/trash piles already
+   use (cards.css's `.pile`) — a face-down back has no internal proportional
+   content to break, so this is a plain resize (height follows from
+   `.card-frame__back`'s aspect-ratio) — with a correspondingly shallower
+   `min-height` reservation on its `.zone__cards` (below the shared fan rules)
+   than the human's. This is what actually keeps the rival strip within its
+   ~40%-of-board share: at full card size/height, four stacked rival rows
+   (meta/zones/field/hand) outweigh the fixed board height on their own and
+   starve the player's own zone down to nothing (verified in a real browser
+   before this rule). */
 .rival-strip .zone--hand-hidden .card-frame {
   width: 46px;
-}
-
-.rival-strip .zone--hand-hidden .board-card--hand-back:not(:last-child) {
-  margin-right: -27px;
 }
 
 /* Legends read as a small badge rather than a full card on the table itself
@@ -298,11 +290,17 @@
 .playmat__board .zone--hand .card-frame {
   gap: 2px;
   padding: 4px;
-  /* Fills whatever width the shrink-then-wrap grid track below settles on
-     (56–92px) instead of the global `.card-frame--small`'s fixed 92px —
-     that fixed width is exactly what made a crowded row wrap instead of
-     shrinking, which is the one thing the binding "no clipping/overlap"
-     rule rules out. */
+}
+
+/* Fills whatever width the shrink-then-wrap grid track below settles on
+   (56–92px) instead of the global `.card-frame--small`'s fixed 92px — that
+   fixed width is exactly what made a crowded row wrap instead of shrinking,
+   which is the one thing the binding "no clipping/overlap" rule rules out.
+   Field only, since Task 6: the hand fan below gives `.zone--hand` its own
+   flex-based layout with fixed-width, overlapping cards instead of a
+   shrink-then-wrap grid — a `width: 100%` there would stretch every hand
+   card to the full width of the (unwrapped) flex row. */
+.playmat__board .zone--field .card-frame {
   width: 100%;
 }
 
@@ -326,21 +324,22 @@
 }
 
 /* The binding rule's own mechanism ("cards shrink evenly to keep one row,
-   down to a 56px-width floor, then the row wraps") — both sides, field and
-   hand. `flex-wrap` cannot do this: a wrapping flex row decides how many
-   items fit a line from each item's *unshrunk* basis size, so it wraps to a
-   second (taller) line well before shrinking ever kicks in — the opposite
-   of "shrink first". `repeat(auto-fill, minmax(56px, 92px))` is the layout
-   primitive that actually does it: it fits as many 56–92px columns as the
-   row's width allows, letting every column grow toward 92px while there's
-   room to spare, and only starts a second row once even 56px columns don't
-   fit. `align-items: end` keeps the base-of-card alignment `.zone__cards`
-   used under flex; `grid-auto-rows: max-content` (rather than the implicit
+   down to a 56px-width floor, then the row wraps") — field only since Task 6
+   (the hand fan below replaces this for `.zone--hand`, with its own overflow
+   strategy — overlap, not shrink — for a wide hand). `flex-wrap` cannot do
+   this: a wrapping flex row decides how many items fit a line from each
+   item's *unshrunk* basis size, so it wraps to a second (taller) line well
+   before shrinking ever kicks in — the opposite of "shrink first".
+   `repeat(auto-fill, minmax(56px, 92px))` is the layout primitive that
+   actually does it: it fits as many 56–92px columns as the row's width
+   allows, letting every column grow toward 92px while there's room to
+   spare, and only starts a second row once even 56px columns don't fit.
+   `align-items: end` keeps the base-of-card alignment `.zone__cards` used
+   under flex; `grid-auto-rows: max-content` (rather than the implicit
    default, which would stretch every row to match the tallest) lets a
    wrapped second row size to its own content instead of inheriting the
    first row's height. */
-.playmat__board .zone--field .zone__cards,
-.playmat__board .zone--hand .zone__cards {
+.playmat__board .zone--field .zone__cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(56px, 92px));
   grid-auto-rows: max-content;
@@ -354,10 +353,74 @@
    min-width based on its content's min-content size (the "Sell"/"Ability"
    button text beneath a card) unless told otherwise — this is what actually
    lets it shrink down to the 56px floor instead of refusing to go below
-   whatever "Ability" renders at. */
+   whatever "Ability" renders at. Harmless to leave scoped to both zones: the
+   hand fan below never relies on `.board-card` shrinking, but nothing there
+   needs a content-driven min-width floor held up either. */
 .playmat__board .zone--field .board-card,
 .playmat__board .zone--hand .board-card {
   min-width: 0;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Hand fan (Task 6, design spec's Play view row 4) — an arced, overlapping */
+/* fan rather than the field's shrink-then-wrap grid: `--i`/`--n` (set by    */
+/* HandStrip.tsx's `fanStyle`, inherited down from the `.board-card` they're */
+/* declared on) drive a per-card rotation/lift and an overlap that tightens  */
+/* as the hand grows, so 10+ cards stay inside the strip instead of          */
+/* overflowing it or wrapping to a second row. Shared by both hands (both    */
+/* carry the base `.zone--hand` class) — the rival's is the same fan at half */
+/* scale: its `.card-frame` is already shrunk to 46px above, and its own     */
+/* `min-height` reservation below is halved to match.                        */
+/* ---------------------------------------------------------------------- */
+
+.zone--hand .zone__cards {
+  display: flex;
+  justify-content: center;
+  min-height: 150px;
+  align-items: flex-end;
+  /* Real (layout, not paint-only) headroom for the fan's own worst-case
+     droop — verified in a real browser: `transform` never inflates an
+     element's own box, so without this the outer cards' downward
+     rotate+translateY paints straight past this row's bottom edge and gets
+     clipped by `.playmat__board`'s `overflow-y: auto` ancestor, with no way
+     to scroll to it (only *flow* height counts toward a scrollable area).
+     `(--n - 1) / 2` squared times the transform's own 1.4px is the
+     translateY half of that worst case (the fan's two outermost cards,
+     `i = 0` or `i = n - 1`); the flat `+ 46px` on top covers the rotation
+     half — up to ±22deg at a 12-card hand, around a `transform-origin`
+     *below* the card, which swings the card's rendered bounding box lower
+     still than translateY alone predicts (measured directly against a real
+     12-card hand in a real browser: translateY-only headroom left the
+     fan's outer cards clipped by ~18px past this row's own edge; +46px was
+     the smallest round number that cleared it with a little margin). */
+  padding-bottom: calc(((var(--n, 1) - 1) / 2) * ((var(--n, 1) - 1) / 2) * 1.4px + 46px);
+}
+
+.zone--hand .board-card {
+  margin: 0 calc(-6px - 14px * clamp(0, (var(--n) - 7) / 5, 1));
+  transform-origin: 50% 140%;
+  transform: rotate(calc((var(--i) - (var(--n) - 1) / 2) * 4deg))
+             translateY(calc(((var(--i) - (var(--n) - 1) / 2) * (var(--i) - (var(--n) - 1) / 2)) * 1.4px));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .zone--hand .board-card {
+    transition: transform 160ms ease;
+  }
+}
+
+.zone--hand .board-card:hover {
+  transform: translateY(-18px) scale(1.18);
+  z-index: 3;
+}
+
+/* Half scale for the rival's face-down fan (the human's own reserves 150px,
+   above): a fan of 46px-wide backs never needs that much vertical room, and
+   reserving it anyway would blow the rival strip's ~40%-of-board share the
+   comment above `.rival-strip .zone--hand-hidden .card-frame` already
+   guards. */
+.rival-strip .zone--hand-hidden .zone__cards {
+  min-height: 75px;
 }
 
 .playmat__meta {
@@ -380,6 +443,7 @@
 /* ---------------------------------------------------------------------- */
 
 .playmat__rail {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -390,6 +454,36 @@
 .playmat__rail .log-panel {
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* The zoom panel (Task 6, "Card renditions" §3 ZoomCard / "Play view" row 4):
+   a board/hand hover's full-size rendition. Absolutely positioned so it
+   never participates in the rail's own flex flow (it renders nothing —
+   `null` — while nothing is hovered, and mounting it "above the feed" per
+   the brief means DOM order, not layout flow) and anchored to the RAIL's
+   left edge (`right: 100%`, i.e. as far right as the rail is wide, which
+   places this panel's own right edge exactly there) so it floats out over
+   the board rather than shrinking the 290px rail or the feed beneath it.
+   `pointer-events: none` — a card the player is already hovering must never
+   have its own zoomed copy steal the hover/click that opened it in the
+   first place. */
+.zoom-panel {
+  position: absolute;
+  top: 10px;
+  right: 100%;
+  margin-right: 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.zoom-panel__strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: 250px;
 }
 
 .action-rail {

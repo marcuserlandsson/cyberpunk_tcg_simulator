@@ -48,6 +48,11 @@ export interface BoardHandlers {
   onFixerDie: (size: DieSize) => void
   onGigDie: (index: number) => void
   onGigArea: () => void
+  /** Board/hand hover (and focus, for keyboard parity) — drives the zoom
+   *  panel (Task 6). Optional so every existing handler literal (deck
+   *  builder call sites, test fixtures built before this task) stays valid
+   *  without threading a no-op through each of them. */
+  onHover?: (uid: number | null) => void
 }
 
 export const NO_AFFORDANCES: BoardAffordances = {
