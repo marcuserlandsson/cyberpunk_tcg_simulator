@@ -30,10 +30,18 @@ describe('buildImageIndex', () => {
 })
 
 describe('getOfficialImageUrl', () => {
-  it('returns undefined for any card id, since data/images/ is empty until Task 16', () => {
-    // Real behavior against the actual (gitignored, empty) images directory —
-    // not mocked. This is the state CardFrame sees today for every card.
-    expect(getOfficialImageUrl('mantis-blades')).toBeUndefined()
+  // Real behavior against the actual `data/images/` directory — not mocked.
+  // The directory is gitignored, so what's in it (nothing on a fresh clone,
+  // up to 141 files after `node scripts/fetch-images.mjs`) varies by
+  // environment. Both outcomes are legitimate: assert only what's true of
+  // BOTH — a resolved URL is a non-empty string when present, and an id that
+  // is not a real card id is never resolved.
+  it('returns undefined for an id that is not a real card', () => {
     expect(getOfficialImageUrl('does-not-exist')).toBeUndefined()
+  })
+
+  it('returns undefined or a non-empty URL for a real card id, never anything else', () => {
+    const url = getOfficialImageUrl('mantis-blades')
+    expect(url === undefined || (typeof url === 'string' && url.length > 0)).toBe(true)
   })
 })
