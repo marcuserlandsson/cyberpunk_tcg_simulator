@@ -11,24 +11,35 @@
 /* ---------------------------------------------------------------------- */
 
 .die {
-  color: var(--neon-cyan);
+  /* Color comes from the ancestor `.street__side--you`/`.street__side--rival`
+     via currentColor — a die never picks its own side. */
   overflow: visible;
 }
 
 .die--unrolled {
-  opacity: 0.5;
+  opacity: 0.85;
 }
 
 .die__shape {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
+  fill: currentColor;
+  stroke: none;
 }
 
 .die__value {
-  fill: currentColor;
+  fill: var(--void);
   font-family: var(--font-display);
+  font-weight: 700;
   font-size: 1.1rem;
+}
+
+.die--unrolled .die__shape {
+  fill: none;
+  stroke: var(--line-bright);
+  stroke-width: 1.5;
+}
+
+.die--unrolled .die__value {
+  fill: var(--muted);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -154,14 +165,75 @@
   border-color: rgba(255, 42, 109, 0.35);
 }
 
-.playmat__center {
+/* ---------------------------------------------------------------------- */
+/* Street strip — both players' Gig/Fixer dice, facing each other, with the */
+/* contested win condition centered between them (docs/superpowers/specs/  */
+/* 2026-08-23-visual-overhaul-design.md, "Play view" / "Street strip").    */
+/* ---------------------------------------------------------------------- */
+
+.street {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.street__side {
+  display: grid;
+  gap: 5px;
+}
+
+.street__side--you {
+  color: var(--you);
+}
+
+.street__side--rival {
+  color: var(--rival);
+}
+
+.street__label {
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.street__pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+/* The Gig area and Fixer testid groups stay separate elements (the E2E
+   suite targets them directly), but visually read as one pool — their die
+   buttons flow straight into `.street__pool`'s row. */
+.street__pool .zone--gig,
+.street__pool .zone--fixer {
+  display: contents;
+}
+
+.street__vs {
   text-align: center;
-  font-size: 0.8em;
-  letter-spacing: 0.15em;
-  opacity: 0.7;
-  border-top: 1px dashed rgba(0, 240, 255, 0.3);
-  border-bottom: 1px dashed rgba(0, 240, 255, 0.3);
-  padding: 0.2em 0;
+  font-family: var(--font-display);
+  flex: 0 0 auto;
+}
+
+.street__turn {
+  font-weight: 700;
+  font-size: 0.95em;
+  letter-spacing: 0.1em;
+  color: var(--act);
+}
+
+.street__win-condition {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
 }
 
 .zone-panels {
@@ -212,9 +284,12 @@
   padding: 0.15em 0.45em;
 }
 
-.zone--gig.is-target {
-  outline: 2px solid var(--neon-magenta);
-  outline-offset: 2px;
+/* `.zone--gig` itself is `display: contents` inside `.street__pool` (see
+   above), so the "this Gig area is a legal attack target" outline has to
+   live on the box that still has one: its `.street__side` wrapper. */
+.street__side.is-target {
+  outline: 2px solid var(--rival);
+  outline-offset: 4px;
 }
 
 .zone__attack-gig {
@@ -229,28 +304,31 @@
   border: none;
   background: transparent;
   padding: 0;
-  color: var(--neon-cyan);
+  color: inherit;
   cursor: default;
   line-height: 0;
+  border-radius: 4px;
 }
 
 .die-slot:disabled {
   opacity: 0.85;
 }
 
+/* Actionable-now dice pulse yellow (`--act`) — the same glow whether the
+   decision is "take this fixer die" or "steal this Gig die", per the
+   cyan/red/yellow semantics in tokens.css. */
 .die-slot.is-choosable,
 .die-slot.is-stealable {
   cursor: pointer;
   opacity: 1;
-  filter: drop-shadow(0 0 6px currentColor);
+  box-shadow: 0 0 10px rgba(252, 238, 10, 0.5);
 }
 
-.die-slot.is-choosable {
-  color: var(--neon-cyan);
-}
-
-.die-slot.is-stealable {
-  color: var(--neon-yellow);
+@media (prefers-reduced-motion: no-preference) {
+  .die-slot.is-choosable,
+  .die-slot.is-stealable {
+    animation: pulse-act 1.6s infinite;
+  }
 }
 
 /* --- one in-play/hand card -------------------------------------------- */

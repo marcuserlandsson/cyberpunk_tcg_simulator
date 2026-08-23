@@ -1,3 +1,17 @@
 /* Motion: animations and transitions, added task-by-task.
    Every animation here must be gated behind
    @media (prefers-reduced-motion: no-preference). */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Actionable-now pulse: a choosable Fixer die or a stealable Gig die
+     (src/ui/styles/board.css `.die-slot.is-choosable`/`.is-stealable`). */
+  @keyframes pulse-act {
+    0%,
+    100% {
+      box-shadow: 0 0 10px rgba(252, 238, 10, 0.5);
+    }
+    50% {
+      box-shadow: 0 0 18px rgba(252, 238, 10, 0.85);
+    }
+  }
+}

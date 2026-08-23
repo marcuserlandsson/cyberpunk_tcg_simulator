@@ -25,6 +25,7 @@ import { Field } from './Field'
 import { HandStrip } from './HandStrip'
 import { LogPanel } from './LogPanel'
 import { ReactionBar } from './ReactionBar'
+import { StreetStrip } from './StreetStrip'
 import { ZonePanels } from './ZonePanels'
 import { AI, HUMAN, useGame } from './useGame'
 import { deleteGameRecord, listDecks, listGameRecords } from './storage'
@@ -560,9 +561,6 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               affordances={affordances}
               handlers={handlers}
               useOfficialImages={useOfficialImages}
-              fixerInteractive={false}
-              gigStealInteractive={affordances.stealableGigIndexes.size > 0}
-              gigAreaTargetable={affordances.gigAreaTarget}
             />
             <Field
               db={db}
@@ -574,11 +572,15 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             />
           </div>
 
-          <div className="playmat__center" data-testid="center-strip">
-            <span data-testid="center-turn">
-              Turn {state.turnNumber} · {PHASE_LABELS[state.phase] ?? state.phase}
-            </span>
-          </div>
+          <StreetStrip
+            db={db}
+            state={state}
+            affordances={affordances}
+            handlers={handlers}
+            humanFixerInteractive={affordances.fixerSizes.size > 0}
+            rivalGigStealInteractive={affordances.stealableGigIndexes.size > 0}
+            rivalGigAreaTargetable={affordances.gigAreaTarget}
+          />
 
           <div className="playmat__side playmat__side--human" data-testid="human-side">
             <Field
@@ -596,9 +598,6 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               affordances={affordances}
               handlers={handlers}
               useOfficialImages={useOfficialImages}
-              fixerInteractive={affordances.fixerSizes.size > 0}
-              gigStealInteractive={false}
-              gigAreaTargetable={false}
             />
             <HandStrip
               db={db}
