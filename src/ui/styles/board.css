@@ -498,20 +498,10 @@
   width: 100%;
 }
 
-/* Pins the prompt bars (choice/reaction/intercept/etc.) over the board column
-   instead of in normal flow — "pinned above the hand" per the design spec.
-   Only positioning lives here: prompts.css (Task 7's file) still owns the
-   bars' own look, and these properties don't collide with anything it sets.
-   Overlaying rather than stacking in flow keeps a bar that only exists while
-   a decision is pending from growing the page past the viewport every time
-   one opens. */
-.playmat__prompts {
-  position: absolute;
-  left: 12px;
-  right: calc(290px + 12px);
-  bottom: 10px;
-  z-index: 5;
-}
+/* `.playmat__prompts`'s position (pinned over the board, above the hand) and
+   the game-over overlay's own full-board position now live in prompts.css
+   (Task 7) alongside the bars' look — consolidated there rather than split
+   across this file and that one (a Task 5 deferral). */
 
 /* ---------------------------------------------------------------------- */
 /* Street strip — both players' Gig/Fixer dice, facing each other, with the */

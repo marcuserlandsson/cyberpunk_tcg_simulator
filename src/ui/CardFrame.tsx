@@ -259,7 +259,7 @@ export function CardFrame(props: CardFrameProps): ReactElement {
       style={style}
       onClick={onClick}
       data-testid="card-frame"
-      data-def-id={def.id}
+      data-def-id={faceDown ? undefined : def.id}
     >
       {faceDown ? (
         <div className="card-frame__back" aria-label="Face-down card" />

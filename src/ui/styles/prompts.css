@@ -1,51 +1,119 @@
-/* --- prompt bars ------------------------------------------------------- */
+/* --- prompt bars: the spotlight (docs/superpowers/specs/2026-08-23-visual- */
+/* overhaul-design.md, "Prompt bars" + "Game over"; mockup's `.reaction`)    */
+/* ------------------------------------------------------------------------ */
+/*
+   Positioning AND look both live here now (Task 7 consolidates board.css's
+   half of this — a Task 5 deferral — into this file, which already owned the
+   bars' own appearance).
+*/
 
+/* Pins the prompt bars (choice/reaction/intercept/etc.) over the board
+   column instead of in normal flow — "pinned above the hand" per the design
+   spec. Overlaying rather than stacking in flow keeps a bar that only exists
+   while a decision is pending from growing the page past the viewport every
+   time one opens. */
 .playmat__prompts {
+  position: absolute;
+  left: 12px;
+  right: calc(290px + 12px);
+  bottom: 10px;
+  z-index: 5;
   display: flex;
   flex-direction: column;
-  gap: 0.3em;
+  gap: 0.4em;
 }
 
+/* The spotlight bar itself: cyan-bordered, matching the mockup's `.reaction`
+   (border/background/padding/gap lifted verbatim). `.prompt-bar--react` (the
+   reaction window) is visually IDENTICAL to every other prompt bar now — the
+   thing that used to set it apart (a magenta border) is gone; what actually
+   distinguishes it is its label, which ReactionBar.tsx now derives from the
+   real attack instead of a static sentence. */
 .prompt-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6em;
-  border: 1px solid var(--neon-yellow);
-  border-radius: 4px;
-  background: var(--panel-bg);
-  padding: 0.45em 0.7em;
+  gap: 14px;
+  border: 1px solid var(--you);
+  background: rgba(0, 229, 255, 0.06);
+  padding: 10px 14px;
 }
 
 .prompt-bar__label {
-  font-size: 0.85em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-size: 0.95em;
 }
 
 .prompt-bar__options {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35em;
+  gap: 0.5em;
 }
 
 .prompt-bar__options button {
   font-size: 0.8em;
-  padding: 0.25em 0.7em;
-}
-
-.prompt-bar--react {
-  border-color: var(--neon-magenta);
+  padding: 0.35em 0.9em;
 }
 
 .prompt-bar__option--pass {
-  border-color: rgba(0, 240, 255, 0.5);
+  box-shadow: inset 0 0 0 1.5px var(--line-bright);
 }
 
 .prompt-bar__option--cancel {
   opacity: 0.7;
 }
 
-.prompt-bar--over {
-  border-color: var(--neon-magenta);
-  color: var(--neon-magenta);
-  font-size: 1.1em;
+/* --- board dimming while a prompt is open ------------------------------- */
+/*
+   `.playmat--prompting` goes on the `.playmat` section (PlayView.tsx)
+   whenever any prompt bar above is on screen. Every board card dims except
+   the ones the pending decision is actually about — `.is-target`/
+   `.is-selected` are per-card classes already driven by the same `legal`
+   list (playAffordances.ts), so excluding them from the dimming selector
+   keeps them lit without a second, parent-dependent rule to keep in sync.
+*/
+.playmat--prompting .board-card:not(.is-target):not(.is-selected) {
+  opacity: 0.45;
+}
+
+/* --- game over: full-board overlay -------------------------------------- */
+/*
+   A child of `.playmat__board` (already `position: relative`, board.css) so
+   `inset: 0` covers exactly the board column and nothing past it — the rail
+   (feed, seed chip, action buttons) sits in a separate grid column and is
+   never touched by this element. The showpiece red/cyan glitch flash is
+   Task 8's; here the overlay itself is static except for the optional fade.
+*/
+.game-over-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(7, 7, 13, 0.88);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .game-over-overlay {
+    animation: game-over-fade-in 220ms ease-out;
+  }
+}
+
+.game-over-overlay__result {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 3em;
+  color: var(--text);
+}
+
+.game-over-overlay__reason {
+  font-size: 0.95em;
+  color: var(--muted);
 }

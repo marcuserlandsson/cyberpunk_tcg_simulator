@@ -54,7 +54,7 @@ import {
 } from './playAffordances'
 import type { GameRecord } from '../engine/replay'
 import type { DeckList } from '../engine/deck'
-import type { Action, CardDb, DieSize, GameState } from '../engine/types'
+import type { Action, CardDb, DieSize, GameEvent, GameState } from '../engine/types'
 
 export interface PlayViewProps {
   db: CardDb
@@ -123,6 +123,38 @@ function targetLabel(db: CardDb, state: GameState, value: number): string {
   const instance = state.cards[value]
   if (instance === undefined) return `Gig die #${value}`
   return `${nameOf(db, state, value)} (${sideLabel(instance.owner, HUMAN)})`
+}
+
+/**
+ * The game's final event, which carries the winner and the reason it ended —
+ * a reverse loop rather than `Array.prototype.findLast`, which the project's
+ * `lib` (ES2022) does not type. Exported so tests/ui/playview.test.tsx can
+ * exercise the reason-string mapping below directly, without needing to
+ * fabricate every one of the four endings through a real playthrough.
+ */
+export function lastGameEnded(
+  state: GameState
+): Extract<GameEvent, { type: 'gameEnded' }> | undefined {
+  for (let index = state.events.length - 1; index >= 0; index -= 1) {
+    const event = state.events[index]
+    if (event.type === 'gameEnded') return event
+  }
+  return undefined
+}
+
+/** The winning condition in words, for the game-over overlay. */
+export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> | undefined): string {
+  if (event === undefined) return ''
+  switch (event.reason) {
+    case 'sevenGigs':
+      return '7 Gigs at the start of turn'
+    case 'overtimeMajority':
+      return 'Overtime majority'
+    case 'deckout':
+      return event.winner === HUMAN ? 'Rival deck ran out' : 'You ran out of cards'
+    case 'concede':
+      return 'Conceded'
+  }
 }
 
 export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): ReactElement {
@@ -484,13 +516,29 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
   const endTurn = findAction(legal, 'endTurn')
   const callLegend = findAction(legal, 'callLegend')
   const yourTurn = state.activePlayer === HUMAN
+  const gameOver = state.phase === 'gameOver'
+
+  // Whether ANY prompt bar (including the game-over overlay) is on screen —
+  // mirrors, one for one, every condition below that actually renders a bar.
+  // Drives `.playmat--prompting`, which dims the board down to the cards a
+  // pending decision is actually about (prompts.css).
+  const promptOpen =
+    gameOver ||
+    (chooseOrder && legal.length > 0) ||
+    (state.phase === 'mulligan' && legal.length > 0) ||
+    (state.phase === 'start' && legal.length > 0) ||
+    (state.phase === 'chooseGig' && legal.length > 0) ||
+    (state.phase === 'gigReroll' && legal.length > 0) ||
+    (state.phase === 'intercept' && legal.length > 0 && state.pendingIntercept !== null) ||
+    reactions.length > 0 ||
+    (pending !== null && options.length > 0)
 
   return (
     // `data-awaiting` is the machine-readable form of "whose click is the game
     // waiting for" — the single fact any automated driver (the E2E suite, and
     // Task 15's) needs in order to never race the AI's own timer.
     <section
-      className="playmat"
+      className={`playmat${promptOpen ? ' playmat--prompting' : ''}`}
       aria-label="Playmat"
       data-testid="playmat"
       data-awaiting={legal.length > 0 ? 'human' : state.phase === 'gameOver' ? 'over' : 'ai'}
@@ -584,6 +632,26 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             handlers={handlers}
             useOfficialImages={useOfficialImages}
           />
+
+          {gameOver && (
+            // Covers the board only (`.playmat__board` is this element's own
+            // positioning ancestor) — never the rail, so the feed and the
+            // seed chip stay legible right beside it per the brief.
+            <div className="game-over-overlay" data-testid="game-over">
+              <div className="game-over-overlay__result">
+                {state.winner === HUMAN ? 'WIN' : 'LOSS'}
+              </div>
+              <div className="game-over-overlay__reason">{endReasonLabel(lastGameEnded(state))}</div>
+              <button
+                type="button"
+                className="btn--primary"
+                data-testid="game-over-new-game"
+                onClick={() => setSetupOpen(true)}
+              >
+                New game
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="playmat__rail" data-testid="control-bar">
@@ -661,12 +729,6 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
       </div>
 
       <div className="playmat__prompts">
-        {state.phase === 'gameOver' && (
-          <div className="prompt-bar prompt-bar--over" data-testid="game-over">
-            {state.winner === HUMAN ? 'You win!' : 'Rival wins.'}
-          </div>
-        )}
-
         {chooseOrder && legal.length > 0 && (
           <div className="prompt-bar" data-testid="choose-order-bar">
             <span className="prompt-bar__label">

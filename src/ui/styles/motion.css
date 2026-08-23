@@ -14,4 +14,15 @@
       box-shadow: 0 0 18px rgba(252, 238, 10, 0.85);
     }
   }
+
+  /* Game-over overlay (Task 7, src/ui/styles/prompts.css `.game-over-overlay`)
+     — a brief, simple fade; the full red/cyan glitch showpiece is Task 8's. */
+  @keyframes game-over-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 }

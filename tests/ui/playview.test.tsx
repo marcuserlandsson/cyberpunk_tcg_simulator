@@ -9,17 +9,80 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { PlayView } from '../../src/ui/PlayView'
+import { PlayView, endReasonLabel, lastGameEnded } from '../../src/ui/PlayView'
 import { loadCardDb } from '../../src/engine/cardDb'
+import { newGame } from '../../src/engine/game'
+import { legalActions } from '../../src/engine/legal'
+import { actingPlayer, effectivePower } from '../../src/engine/query'
+import { applyAction } from '../../src/engine/reduce'
+import { AI, HUMAN } from '../../src/ui/useGame'
 import { listGameRecords, saveGameRecord } from '../../src/ui/storage'
 import type { DeckList } from '../../src/engine/deck'
 import type { GameRecord } from '../../src/engine/replay'
+import type { Action, GameEvent, GameState } from '../../src/engine/types'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import mercsDeck from '../../data/decks/mercs-the-heist.json'
 
 const db = loadCardDb()
 const arasaka = arasakaDeck as unknown as DeckList
 const mercs = mercsDeck as unknown as DeckList
+
+/**
+ * A single deterministic step of a very dumb "always try to attack, always
+ * pass a reaction" policy, applied to WHICHEVER side `legalActions` currently
+ * belongs to (mirrors e2e/play.spec.ts's scripted driver, but over the pure
+ * engine instead of the DOM) — used below to build real `GameRecord`s that
+ * land on a react window or a real game-over, rather than hand-fabricating
+ * states an actual game could never reach.
+ */
+function pickAction(actions: Action[]): Action {
+  const pass = actions.find((a) => a.type === 'react' && a.reaction.type === 'pass')
+  if (pass !== undefined) return pass
+  const attackGig = actions.find((a) => a.type === 'attack' && a.target === 'gigArea')
+  if (attackGig !== undefined) return attackGig
+  const anyAttack = actions.find((a) => a.type === 'attack')
+  if (anyAttack !== undefined) return anyAttack
+  // Without ever playing a card, no Unit is ever on the field to attack with
+  // — a pure die/turn-passing walk decks out around turn 20 without a single
+  // `attackDeclared` event (verified against this exact seed/deck pair).
+  const playCard = actions.find((a) => a.type === 'playCard')
+  if (playCard !== undefined) return playCard
+  const declineIntercept = actions.find((a) => a.type === 'answerIntercept' && a.answer === -1)
+  if (declineIntercept !== undefined) return declineIntercept
+  const rerollNo = actions.find((a) => a.type === 'chooseGigReroll' && !a.reroll)
+  if (rerollNo !== undefined) return rerollNo
+  const goFirst = actions.find((a) => a.type === 'choosePlayOrder' && a.goFirst)
+  if (goFirst !== undefined) return goFirst
+  const keepHand = actions.find((a) => a.type === 'keepHand')
+  if (keepHand !== undefined) return keepHand
+  const endTurn = actions.find((a) => a.type === 'endTurn')
+  if (endTurn !== undefined) return endTurn
+  return actions[0]
+}
+
+/**
+ * Plays a real game from `seed` with the policy above, recording every action
+ * taken, until `stop` says to halt or the game runs out of legal actions
+ * (gameOver). The returned `actions` is a genuine `GameRecord.actions` — a
+ * `saveGameRecord` + `resume-game` round-trip through `PlayView` replays it
+ * through the exact same engine functions, landing on the exact same state.
+ */
+function driveToRecord(
+  seed: number,
+  stop: (state: GameState) => boolean,
+  maxSteps = 3000
+): { actions: Action[]; state: GameState } {
+  let state = newGame(db, { decks: [arasaka, mercs], seed })
+  const recorded: Action[] = []
+  for (let step = 0; step < maxSteps; step += 1) {
+    const actions = legalActions(db, state)
+    if (stop(state) || actions.length === 0) return { actions: recorded, state }
+    const chosen = pickAction(actions)
+    state = applyAction(db, state, chosen)
+    recorded.push(chosen)
+  }
+  throw new Error('driveToRecord exceeded maxSteps without reaching the stop condition')
+}
 
 /** A genuinely replayable record — a fresh deal, no actions yet. */
 const GOOD_RECORD: GameRecord = {
@@ -196,5 +259,134 @@ describe('PlayView hover zoom panel', () => {
     for (const back of backs) {
       expect(back.querySelector('.card-frame--rival')).not.toBeNull()
     }
+  })
+})
+
+describe('PlayView spotlight prompts (Task 7)', () => {
+  it('sets playmat--prompting while the mulligan bar is open', () => {
+    const seed = 20260822
+    // `choosePlayOrder` deals both hands and enters `mulligan`, but which side
+    // decides first depends on the roll — drive to whichever real state has
+    // it genuinely be the human's turn to answer, rather than assuming it.
+    const { actions, state } = driveToRecord(
+      seed,
+      (s) => s.phase === 'mulligan' && actingPlayer(s) === HUMAN
+    )
+    expect(state.phase).toBe('mulligan')
+
+    const record: GameRecord = { config: { decks: [arasaka, mercs], seed }, actions }
+    saveGameRecord('mulligan-slot', record)
+    render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+    fireEvent.click(screen.getByTestId('resume-game'))
+
+    expect(screen.getByTestId('mulligan-bar')).not.toBeNull()
+    expect(screen.getByTestId('playmat').className).toContain('playmat--prompting')
+  })
+
+  it("derives the reaction bar's label from the real attackDeclared event, naming attacker/target and power, and never a hidden name", () => {
+    // Drive a real game until it lands on a react window that is actually the
+    // HUMAN's own decision (`useGame.legal` — and so the ReactionBar — is only
+    // populated when `actingPlayer` is the human; see src/ui/useGame.ts).
+    const seed = 20260822
+    const { actions, state } = driveToRecord(
+      seed,
+      (s) => s.phase === 'react' && actingPlayer(s) === HUMAN
+    )
+    expect(state.phase).toBe('react')
+
+    const declared = [...state.events]
+      .reverse()
+      .find((e): e is Extract<GameEvent, { type: 'attackDeclared' }> => e.type === 'attackDeclared')
+    if (declared === undefined) throw new Error('no attackDeclared event on a react-window state')
+
+    const record: GameRecord = { config: { decks: [arasaka, mercs], seed }, actions }
+    saveGameRecord('react-slot', record)
+    render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+    fireEvent.click(screen.getByTestId('resume-game'))
+
+    const bar = screen.getByTestId('reaction-bar')
+    const attackerName = db[state.cards[declared.attacker].defId].name
+    expect(bar.textContent).toContain(attackerName)
+    expect(bar.textContent).toContain(String(effectivePower(db, state, declared.attacker)))
+    expect(bar.textContent).toContain('react or pass:')
+    if (declared.target === 'gigArea') {
+      expect(bar.textContent).toContain('your Gig area')
+    } else {
+      const targetName = db[state.cards[declared.target].defId].name
+      expect(bar.textContent).toContain(targetName)
+      expect(bar.textContent).toContain(String(effectivePower(db, state, declared.target)))
+    }
+    // Info hygiene: whatever the label says, it must never be built from an
+    // instance's real name while that instance is face-down.
+    for (const uid of [declared.attacker, declared.target].filter(
+      (v): v is number => typeof v === 'number'
+    )) {
+      expect(state.cards[uid]?.faceUp).not.toBe(false)
+    }
+
+    expect(screen.getByTestId('playmat').className).toContain('playmat--prompting')
+  })
+
+  it('reaches a real game over, and shows a full-board overlay with WIN/LOSS, the reason, and its own New game button — leaving the rail (and its own New game) intact', () => {
+    const seed = 20260822
+    const { actions, state } = driveToRecord(seed, (s) => s.phase === 'gameOver')
+    expect(state.phase).toBe('gameOver')
+    expect(state.winner).not.toBeNull()
+
+    const record: GameRecord = { config: { decks: [arasaka, mercs], seed }, actions }
+    saveGameRecord('gameover-slot', record)
+    render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+    fireEvent.click(screen.getByTestId('resume-game'))
+
+    const overlay = screen.getByTestId('game-over')
+    expect(overlay.textContent).toContain(state.winner === HUMAN ? 'WIN' : 'LOSS')
+    expect(overlay.textContent).toContain(endReasonLabel(lastGameEnded(state)))
+    expect(screen.getByTestId('playmat').className).toContain('playmat--prompting')
+
+    // The rail survives untouched behind/beside the overlay: its own
+    // "New game" testid is exactly where it always was, distinct from the
+    // overlay's own button.
+    expect(screen.getByTestId('new-game')).not.toBeNull()
+    const overlayNewGame = screen.getByTestId('game-over-new-game')
+    expect(overlay.contains(overlayNewGame)).toBe(true)
+
+    fireEvent.click(overlayNewGame)
+    expect(screen.getByTestId('play-setup')).not.toBeNull()
+  })
+})
+
+describe('endReasonLabel / lastGameEnded (pure — the game-over overlay reason text)', () => {
+  function stateWithEvents(events: GameEvent[]): GameState {
+    return { events } as unknown as GameState
+  }
+
+  it('finds the LAST gameEnded event, not the first', () => {
+    const first: GameEvent = { type: 'gameEnded', winner: AI, reason: 'deckout' }
+    const last: GameEvent = { type: 'gameEnded', winner: HUMAN, reason: 'sevenGigs' }
+    const state = stateWithEvents([first, { type: 'turnEnded', player: HUMAN }, last])
+    expect(lastGameEnded(state)).toBe(last)
+  })
+
+  it('returns undefined, and an empty label, when the game has not ended', () => {
+    const state = stateWithEvents([{ type: 'turnEnded', player: HUMAN }])
+    expect(lastGameEnded(state)).toBeUndefined()
+    expect(endReasonLabel(undefined)).toBe('')
+  })
+
+  it('maps every ending reason to its words, including the deckout direction', () => {
+    expect(endReasonLabel({ type: 'gameEnded', winner: HUMAN, reason: 'sevenGigs' })).toBe(
+      '7 Gigs at the start of turn'
+    )
+    expect(endReasonLabel({ type: 'gameEnded', winner: AI, reason: 'overtimeMajority' })).toBe(
+      'Overtime majority'
+    )
+    // deckout: the winner is whoever DIDN'T run out.
+    expect(endReasonLabel({ type: 'gameEnded', winner: HUMAN, reason: 'deckout' })).toBe(
+      'Rival deck ran out'
+    )
+    expect(endReasonLabel({ type: 'gameEnded', winner: AI, reason: 'deckout' })).toBe(
+      'You ran out of cards'
+    )
+    expect(endReasonLabel({ type: 'gameEnded', winner: HUMAN, reason: 'concede' })).toBe('Conceded')
   })
 })

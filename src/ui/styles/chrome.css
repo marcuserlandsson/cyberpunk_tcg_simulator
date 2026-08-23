@@ -21,6 +21,19 @@ button:hover:not(:disabled) { background: rgba(0, 229, 255, 0.12); }
 button:disabled { color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-bright); cursor: default; }
 .btn--primary, button.btn--primary { background: var(--act); color: #131200; box-shadow: none; }
 .btn--primary:hover:not(:disabled) { background: #fff65e; }
+/* A disabled primary (e.g. End Turn while it isn't legal) must read as
+   inert, not as the screen's one yellow "do this now" — otherwise a
+   disabled `.btn--primary` still paints its unconditional yellow background
+   (pre-existing gap: `button:disabled` above only ever touched color/box-
+   shadow/cursor, never background, so `.btn--primary`'s own background
+   always won on specificity). Found while verifying the game-over overlay
+   (Task 7) in a real browser: End Turn is disabled there, but was still
+   rendering fully yellow beside the overlay's own primary "New game". */
+.btn--primary:disabled, button.btn--primary:disabled {
+  background: var(--line-bright);
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1.5px var(--line-bright);
+}
 .btn--ghost, button.btn--ghost { background: transparent; color: var(--you); box-shadow: inset 0 0 0 1.5px var(--you); }
 .btn--ghost:hover:not(:disabled) { background: rgba(0, 229, 255, 0.12); }
 .btn--danger, button.btn--danger { color: var(--rival); box-shadow: inset 0 0 0 1.5px var(--rival); }

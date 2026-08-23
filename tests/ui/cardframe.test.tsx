@@ -104,6 +104,14 @@ describe('CardFrame', () => {
     expect(container.querySelector('.card-frame__back')).not.toBeNull()
   })
 
+  it('carries no data-def-id when face down (a face-down card must not leak its identity into the DOM)', () => {
+    const { container } = render(
+      <CardFrame def={GORO} size="medium" faceDown useOfficialImages={false} />
+    )
+    const frame = container.querySelector('[data-testid="card-frame"]') as HTMLElement
+    expect(frame.hasAttribute('data-def-id')).toBe(false)
+  })
+
   it('shows a sell-tag icon when the card def has sellTag: true', () => {
     expect(MANTIS_BLADES.sellTag).toBe(true)
     const { container } = render(
