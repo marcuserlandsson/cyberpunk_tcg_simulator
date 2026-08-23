@@ -8,7 +8,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { StreetStrip } from '../../src/ui/StreetStrip'
 import { NO_AFFORDANCES, type BoardHandlers } from '../../src/ui/playAffordances'
-import { db, startedGame } from '../engine/gameHelpers'
+import { AI, HUMAN } from '../../src/ui/useGame'
+import { db, drive, startedGame } from '../engine/gameHelpers'
 
 const noopHandlers: BoardHandlers = {
   onCard: () => {},
@@ -54,5 +55,40 @@ describe('StreetStrip', () => {
       />
     )
     expect(screen.getByTestId('center-turn').textContent).toContain(String(state.turnNumber))
+  })
+
+  it("shows whose turn it is, colored by side", () => {
+    const yours = startedGame()
+    expect(yours.activePlayer).toBe(HUMAN)
+    render(
+      <StreetStrip
+        db={db}
+        state={yours}
+        affordances={NO_AFFORDANCES}
+        handlers={noopHandlers}
+        humanFixerInteractive={false}
+        rivalGigStealInteractive={false}
+        rivalGigAreaTargetable={false}
+      />
+    )
+    const yourActive = screen.getByText('Your turn')
+    expect(yourActive.className).toContain('street__active--you')
+    cleanup()
+
+    const rivals = drive(yours, (s) => s.activePlayer === AI)
+    expect(rivals.activePlayer).toBe(AI)
+    render(
+      <StreetStrip
+        db={db}
+        state={rivals}
+        affordances={NO_AFFORDANCES}
+        handlers={noopHandlers}
+        humanFixerInteractive={false}
+        rivalGigStealInteractive={false}
+        rivalGigAreaTargetable={false}
+      />
+    )
+    const rivalActive = screen.getByText("Rival's turn")
+    expect(rivalActive.className).toContain('street__active--rival')
   })
 })

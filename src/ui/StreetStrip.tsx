@@ -68,24 +68,20 @@ function GigPool(props: GigPoolProps): ReactElement {
   const p = state.players[player]
 
   return (
-    <div
-      className={`street__side street__side--${side}${gigAreaTargetable ? ' is-target' : ''}`}
-    >
+    <div className={`street__side street__side--${side}`}>
       <span className="street__label">
         {label} · <span data-testid="gig-count">{p.gigArea.length}</span>{' '}
         <span aria-hidden="true">★</span>{' '}
         <span data-testid="street-cred">{streetCred(state, player)}</span>
       </span>
       <div className="street__pool">
-        {p.gigArea.length === 0 && p.fixer.length === 0 && (
-          <span className="zone__empty">empty</span>
-        )}
         <div
           className={`zone zone--gig${gigAreaTargetable ? ' is-target' : ''}`}
           data-testid="gig-area"
           data-player={player}
           data-target={gigAreaTargetable ? 'true' : undefined}
         >
+          {p.gigArea.length === 0 && <span className="zone__empty">empty</span>}
           {p.gigArea.map((die, index) => {
             const stealable = gigStealInteractive && affordances.stealableGigIndexes.has(index)
             return (
@@ -106,6 +102,7 @@ function GigPool(props: GigPoolProps): ReactElement {
           })}
         </div>
         <div className="zone zone--fixer" data-testid="fixer" data-player={player}>
+          {p.fixer.length === 0 && <span className="zone__empty">empty</span>}
           {p.fixer.map((die, index) => {
             const choosable = fixerInteractive && affordances.fixerSizes.has(die.size)
             return (
@@ -166,6 +163,11 @@ export function StreetStrip(props: StreetStripProps): ReactElement {
       <div className="street__vs">
         <div className="street__turn" data-testid="center-turn">
           Turn {state.turnNumber} · {PHASE_LABELS[state.phase] ?? state.phase}
+        </div>
+        <div
+          className={`street__active street__active--${state.activePlayer === HUMAN ? 'you' : 'rival'}`}
+        >
+          {state.activePlayer === HUMAN ? 'Your turn' : "Rival's turn"}
         </div>
         <div className="street__win-condition">
           {isOvertime(state) ? 'OVERTIME — majority wins' : `first to ${GIGS_TO_WIN} gigs wins`}

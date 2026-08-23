@@ -210,11 +210,16 @@
 }
 
 /* The Gig area and Fixer testid groups stay separate elements (the E2E
-   suite targets them directly), but visually read as one pool — their die
-   buttons flow straight into `.street__pool`'s row. */
+   suite targets them directly, and each needs a real box so its own
+   `is-target` outline can render), but read as one uninterrupted row of dice
+   — same gap, no border between them. */
 .street__pool .zone--gig,
 .street__pool .zone--fixer {
-  display: contents;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
 }
 
 .street__vs {
@@ -228,6 +233,20 @@
   font-size: 0.95em;
   letter-spacing: 0.1em;
   color: var(--act);
+}
+
+.street__active {
+  font-size: 0.8em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.street__active--you {
+  color: var(--you);
+}
+
+.street__active--rival {
+  color: var(--rival);
 }
 
 .street__win-condition {
@@ -284,12 +303,9 @@
   padding: 0.15em 0.45em;
 }
 
-/* `.zone--gig` itself is `display: contents` inside `.street__pool` (see
-   above), so the "this Gig area is a legal attack target" outline has to
-   live on the box that still has one: its `.street__side` wrapper. */
-.street__side.is-target {
+.zone--gig.is-target {
   outline: 2px solid var(--rival);
-  outline-offset: 4px;
+  outline-offset: 2px;
 }
 
 .zone__attack-gig {
