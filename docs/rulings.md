@@ -1029,9 +1029,16 @@ it; these do.
   slot dies with its die slot (no die, no "how much"), and a trigger that
   supplies no amount falls back to the rng like any other slot (§32);
 - `buffPower.amount` may also be the string `'friendlyMaxGig'`
-  (`el-sombrero-n-la-venganza-lenta`, `sasha-yakovleva-won-t-let-you-down`:
-  "gains power equal to a friendly max Gig this turn"), read off the board at
-  resolution time. An empty Gig area reads 0.
+  (`el-sombrero-n-la-venganza-lenta`: "this Unit gains power equal to a
+  friendly max Gig this turn"), read off the board at resolution time. An
+  empty Gig area reads 0. **Citation corrected in the deferred slice
+  (§141 ff.):** this bullet originally also named
+  `sasha-yakovleva-won-t-let-you-down` as a `'friendlyMaxGig'` user, from a
+  batch-1 guess at her text. Her printed line is "This Unit gains power equal
+  to **that card's cost**" — the card her own {Attack} just revealed — which
+  §139 encodes as a `scripted` node reading that specific card's printed
+  cost, not a Gig-die reading at all. `el-sombrero-n-la-venganza-lenta` is
+  the only `'friendlyMaxGig'` card in the pool.
 
 ## 40 — "The first time … each turn" is `oncePerTurn` on the EffectDef
 
@@ -1330,6 +1337,15 @@ than a vocabulary extension, and one that wants its own test pass. Pool-wide it
 would also subsume §43's `gunpoint-diplomacy` over-approximation and the
 "next time" clauses in `gorilla-arms` / `jackie-welles-pour-one-out-for-me`, so
 it is worth doing once, properly, rather than three ad-hoc times.
+
+**IMPLEMENTED (deferred slice, docs/rulings.md §141).** `GameState.floatingEffects`
+exists, and every card on this list is encoded in full: `chrome-fang`,
+`appetite-for-destruction`, `cyberpsychosis`, `safety-override`,
+`reboot-optics` (§140) and `chrome-reverie`'s attack-denial clause (§132). The
+two over-approximations this ruling also mentions (§43's `gunpoint-diplomacy`,
+and the "next time" wording in `gorilla-arms` /
+`jackie-welles-pour-one-out-for-me`) are deliberately left alone — see §141's
+"out of scope" note.
 
 **Batch 3 addition (fix round 1, docs/rulings.md §79):** `cyberpsychosis`
 ("If that Unit steals or fights, defeat it at the end of this turn") needs the
@@ -2005,6 +2021,11 @@ unconditional interception, §46) is a genuine engine feature, not a
 vocabulary extension — left with only clause 1 encoded, `effects: []` for
 the rest, exactly like §52's floating-effects deferral.
 
+**IMPLEMENTED (deferred slice, §144).** Clause 2 is now a
+`stealInterceptByDiscard` static, answered at a real interception point in
+`takeStolenGig` via the roll-back-and-replay seam §144 describes. The card is
+encoded in full.
+
 **Re-verified this partial encoding against §79's new policy (fix round
 1).** §79 forbids a partial encoding whenever the missing clause changes
 how the *encoded* clause should be played around. Here the two clauses are
@@ -2188,6 +2209,12 @@ every other batch-3 card's text did — this is an engine gap in the same
 family as §52's floating effects, and should be scoped and built once
 rather than half-solved for one card.
 
+**IMPLEMENTED (deferred slice, §143).** All three pieces exist: the `onGigRoll`
+watcher trigger, the `gigReroll` phase carrying the "you may ignore the result
+and reroll it once" decision, and the
+`rolledExtremeValue`/`rolledDieSizeAnyOf` conditions. The card is encoded in
+full.
+
 ## 79 — `cyberpsychosis`: fully deferred — a gameplay-affecting partial encoding is forbidden
 
 "{Quick} Give an equipped Unit +3 power this turn for each of its equipped
@@ -2240,6 +2267,12 @@ but "does the gap change how the encoded part should be played around."
 Building `floatingEffects` once would let this card's clause,
 `chrome-fang`, `appetite-for-destruction` and §43's `gunpoint-diplomacy`
 over-approximation all be finished together, per §52's own recommendation.
+
+**IMPLEMENTED (deferred slice, §141).** `cyberpsychosis` is encoded in full:
+the `buffPower` clause and the delayed `defeatIfActed` self-destruct share one
+`sameTarget` slot, so "that Unit" is provably the Unit that was buffed. The
+full-or-defer POLICY this ruling established stands unchanged — it simply has
+no cards left to apply to.
 
 # Task 8 fix-round-1 rulings (batch 3 review)
 
@@ -2638,6 +2671,10 @@ genuine engine feature, not a vocabulary extension.
 `tests/cards/yellow.test.ts` is the same bookkeeping-only assertion those
 three already use.
 
+**IMPLEMENTED (deferred slice, §141).** A one-shot `loseFightDefeatFoe` floating
+entry, consumed by the first fight a friendly Unit loses. The card is encoded
+in full, and its bookkeeping-only test is replaced by two real ones.
+
 # Task 8 rulings, batch 5 (Green, 17 cards)
 
 The first Green batch. Two cards print "Swap a friendly Gig with a rival
@@ -2951,6 +2988,14 @@ interception point, not a delayed/floating effect) and is not added to the
 §52 list, which is specifically about effects that outlive their own
 resolution across a turn boundary — this one is a same-instant redirect
 missing only its decision seam.
+
+**IMPLEMENTED (deferred slice, §144).** The interception point exists — a
+roll-back-and-replay seam in `defeatUnit` that every defeat path funnels
+through — and the card is encoded in full as a single `defeatInterceptSelf`
+static. This ruling's reading of the problem was exactly right; what it
+assumed impossible (asking mid-mutation without capturing a continuation)
+turned out to be reachable by discarding the draft and replaying the action
+with the answer in hand.
 
 # Task 8 batch 5 fix round 1
 
@@ -3860,6 +3905,16 @@ never stronger, so both stay partially encoded rather than fully deferred:
   clause when it lands. `evelyn-parker-beautiful-enigma`'s first clause
   (the watcher/ready-Eddie) is independent and encoded in full.
 
+**IMPLEMENTED (deferred slice, §141/§142).** Both partial encodings are now
+complete: `chrome-reverie`'s attack denial is a `unitCantAttack` floating entry
+(§141), and `evelyn-parker-beautiful-enigma`'s {Spend} ability — plus the
+`mox-inciters` clause this ruling anticipated by name — is a `mustAttack`
+floating entry enforced by `legalActions` withholding `endTurn` (§142). This
+ruling's call that the two capabilities are different PRIMITIVES holds: they
+share the floating-entry storage but nothing else, one being a restriction
+consulted by a mutation and the other an obligation consulted by the
+legal-action list.
+
 # Task 8 batch 7 fix round 1 (batch review)
 
 The batch review found 2 Critical + 1 Important issue, all fixed in place
@@ -4324,6 +4379,11 @@ assertion (`expect(db['<id>'].effects).toEqual([])`) the existing deferred
 cards already use, plus (for `mox-inciters`) a confirmation that its
 `{Blocker}` keyword still functions normally despite the deferred clause.
 
+**IMPLEMENTED (deferred slice, §141/§142).** `mox-inciters` is a `mustAttack`
+floating entry (§142) and `reboot-optics` a one-shot `rivalFightNoDefeat` one
+(§141); both cards are encoded in full and both bookkeeping-only tests are
+replaced by real ones.
+
 ## Task 8 batch 8 summary
 
 **Cards:** `modded-kusanagi`, `modded-muramasa`, `mox-inciters`,
@@ -4387,3 +4447,324 @@ purity grep (`Math.random`/`Date.now`) clean on every touched file
 (`src/engine/types.ts`, `src/engine/query.ts`, `src/engine/combat.ts`,
 `src/engine/cardDb.ts`, `src/cards/effects.ts`, `src/cards/targets.ts`,
 `src/cards/scripted/index.ts`, `data/cards.json`).
+
+# Task 8, deferred slice — the four engine capabilities eight batches deferred
+
+Batches 1-8 encoded 130 of the 141 cards and left a standing deferral list,
+every entry of which named one of four engine capabilities nobody had built:
+a floating-effect zone (§52, as extended by §79, §91, §132, §140), a
+forced-action mechanism (§132/§140), a trigger seam on the Gig-die roll (§78),
+and a would-be-mutation interception point (§72/§105). This slice builds all
+four and finishes every card that needed them. **No card in `data/cards.json`
+is deferred any more** — see `tests/cards/completeness.test.ts`.
+
+## 141 — `GameState.floatingEffects`: effects that outlive their own resolution
+
+Six clauses across five cards print an effect that is attached to nothing on
+the board and outlives the resolution that created it:
+
+| Card | Printed clause | Entry kind | Expiry |
+|---|---|---|---|
+| `chrome-fang` | "Until your next turn, rival Units can't steal friendly Gigs with value higher than their power." | `rivalStealCappedByPower` | `ownerNextTurnStart` |
+| `appetite-for-destruction` | "The next time a friendly Unit wins a fight by 3+ power this turn, it also steals a Gig." | `winFightMarginSteal` | `endOfTurn` |
+| `safety-override` | "{Quick} The next time a friendly Unit loses a fight this turn, defeat the opposing rival Unit." | `loseFightDefeatFoe` | `endOfTurn` |
+| `reboot-optics` | "{Quick} The next time a rival Unit fights this turn, it doesn't defeat the opposing friendly Unit." | `rivalFightNoDefeat` | `endOfTurn` |
+| `cyberpsychosis` | "... If that Unit steals or fights, defeat it at the end of this turn." | `defeatIfActed` | `endOfTurn` |
+| `chrome-reverie` | "A rival Unit can't attack until your next turn." | `unitCantAttack` | `ownerNextTurnStart` |
+
+**Rulings:**
+
+- **the zone.** `GameState.floatingEffects: FloatingEffect[]` — a flat list on
+  the state, not per player, because several entries are about the *rival's*
+  cards and every consumer already knows which player it is asking about. Each
+  entry carries its `kind`, its `controller`, the `sourceDefId` that created it
+  (provenance for the event log; the source card itself is routinely gone by
+  the time the entry fires — `cyberpsychosis` is a Program that trashes itself
+  on resolution), its printed `expiry`, and the extra facts its own kind needs
+  (`unitUid`, `margin`/`count`, the mutable `acted` bit). `draftState`
+  deep-copies every entry, so a reducer marking `acted` cannot reach back into
+  the caller's state (asserted directly by a test);
+- **the card-data node** is `{ kind: 'floatingEffect', floating: FloatingSpec }`,
+  where `FloatingSpec` is a strict discriminated union — one variant per
+  printed clause shape, with its own `expiry` and, for the three
+  instance-scoped variants, a `target`/`filter` pair. The spec carrying the
+  target is what makes `cyberpsychosis`'s "**that** Unit" work: the node goes
+  through the ordinary `takeTarget` path, so `target: 'chosen'` inside a
+  `sameTarget` (§53) resolves to the same Unit the buff landed on and consumes
+  no slot of its own, while `chrome-reverie`'s `target: 'rivalUnit'` is a real,
+  enumerated `playCard` decision;
+- **expiry is printed, never inferred.** `endOfTurn` ("this turn", "at the end
+  of this turn") lapses in `clearTurnBuffs`, alongside `tempPower` — the same
+  end-of-GAME-turn boundary §20 fixed for buffs, which is what makes a
+  {Quick} entry created during the rival's turn (`safety-override`,
+  `reboot-optics`) die at the end of *that* turn rather than surviving into its
+  controller's own. `ownerNextTurnStart` ("until your next turn", "next turn")
+  lapses in `beginTurn`, for its controller only, so it spans exactly the
+  rival's intervening turn;
+- **a one-shot needs no flag.** "The next time ..." entries are removed by
+  whoever consumes them, which is the same thing as a spent flag with less
+  state to copy and no chance of a stale entry lingering;
+- **the consumers are the specific seams each clause names**, never a generic
+  dispatcher: `combat.ts`'s `stealableDieIndexes` (chrome-fang),
+  `fight()` (the three fight clauses, plus `defeatIfActed`'s "or fights"),
+  `takeStolenGig` (`defeatIfActed`'s "steals"), `query.cantAttack`
+  (chrome-reverie) and `reduce.ts`'s `endTurn` (cyberpsychosis's actual
+  defeat). This keeps every clause's timing reviewable against its own printed
+  text instead of hidden behind an abstraction.
+
+**Sub-rulings the individual clauses forced:**
+
+- **chrome-fang caps a *Unit's* steal, and is a hard prohibition.** The
+  printed subject is "rival **Units**", so the cap applies only while the
+  stealing card is a Unit on the field — or a {Go Solo} Legend, which is played
+  "as a ready Unit" (§31) — and never to a Program/Gear whose own effect
+  steals (`query.isUnitStealer`). Unlike `distinctValueOnly`'s preference
+  semantics (§68 ff., which falls back to the whole list rather than deadlock),
+  a value above the thief's power is simply not stealable even if that leaves
+  *nothing* stealable: `stealableDieIndexes` is the single authority, and
+  `resolveAttack`/`stealGig` cap their counts by it while `takeStolenGig` ends
+  an episode early when it runs empty — so `chooseGig` is never reached with a
+  pending steal and no legal choice;
+- **"wins a fight by 3+ power" is the raw power margin**, `winnerPower -
+  loserPower`, computed from the same two numbers `fight()` already compares
+  (buffs, Gear and attack bonuses included). A win that came from
+  `winsFightVsKeyword` (§41) rather than power can therefore have a margin of
+  0 or less and does not qualify — the card asks for a 3+ power win, not for
+  "won convincingly";
+- **the delayed fight consequences resolve after the fight is settled** (the
+  defeats, then `onWinFight`), because both printed texts speak of a fight
+  already won or lost. `appetite-for-destruction`'s bonus steal reuses the
+  ordinary `stealGig` node through a new `resolveNodeOnDraft` helper, so it
+  merges into a pending attack steal exactly like an on-defeat steal (§32);
+- **reboot-optics reuses `fight-immune`'s seam** (§83): the protected
+  combatant is filtered out of the would-be-defeated set before any defeat is
+  applied, so a loser who was never defeated leaves nobody to have "won"
+  (§46's `defeatShield` reading). It is consumed by the first fight its
+  controller has a combatant in, whether or not a defeat would actually have
+  happened — the printed trigger is "the next time a rival Unit fights", not
+  "the next time it would defeat something";
+- **cyberpsychosis marks, then acts.** "If that Unit steals or fights" is
+  watched from the moment the entry lands (a steal earlier in the same turn
+  does not count), by setting `acted` in `fight()` — for BOTH combatants, win
+  or lose — and in `takeStolenGig` for the card that actually stole. The
+  defeat itself runs from `reduce.ts`'s `endTurn`, after the `onEndTurn`
+  watcher (a card's own end-of-turn ability is still its own turn's business)
+  and before `clearTurnBuffs` drops the entry. `TargetFilter.equipped` ("an
+  equipped Unit") is the mirror image of §107's `unequipped`, and the target is
+  bare `anyUnit` — either side's, per §107's `spentOnly` precedent for a bare
+  "a spent Unit";
+- **chrome-reverie's denial goes in `query.cantAttack`**, not in
+  `combat.canAttack`: that one function is what every attack path already
+  funnels through (`canAttack` plus both `...DespiteLag` Lag exceptions), so a
+  turn-spanning denial cannot leak past one of them — the same "one gate, every
+  path" lesson §106 learned the hard way. Its second clause (the free Call) is
+  unchanged and stays on its own conditioned `EffectDef`, since only the first
+  clause is unconditional.
+
+**Out of scope, deliberately.** §52 also suggested this zone would subsume
+§43's `gunpoint-diplomacy` over-approximation and the "next time" wording in
+`gorilla-arms` / `jackie-welles-pour-one-out-for-me`. Those three cards are
+already encoded and green; re-encoding them is a behaviour change to working
+cards rather than a gap being closed, so they are left exactly as they are and
+flagged here for whoever revisits them.
+
+## 142 — Forced actions: `mustAttack` and a withheld `endTurn`
+
+`mox-inciters` ("{Play} A rival Unit must attack next turn if it can.") and
+`evelyn-parker-beautiful-enigma`'s "1 €$, {Spend} A rival Unit must attack
+next turn if it can." print the pool's only positive OBLIGATION — §132 named
+it as a different engine primitive from a floating restriction, and it is, but
+it is not a different *storage* problem: it is one more floating entry
+(`mustAttack`, with the chosen Unit's uid and an `ownerNextTurnStart` expiry)
+whose consumer happens to be `legalActions` rather than a mutation.
+
+**Rulings:**
+
+- **the obligation is enforced by withholding `endTurn`**, and by nothing
+  else. While a `mustAttack` entry names a Unit that (a) belongs to the player
+  whose turn it currently is and (b) appears as the attacker of at least one
+  entry in the attack list `mainPhaseActions` just enumerated, `endTurn` is not
+  offered. Everything else that player could do stays legal: the card says the
+  Unit must attack, not that nothing else may happen first;
+- **deriving it from the enumerated attacks is what makes it safe.** The
+  legality question "does this Unit still have an attack available" is answered
+  by the very list being built, so there is no second implementation of
+  readiness/Lag/`cantAttack`/target-availability to drift out of sync, and a
+  vacuous obligation (nothing to attack, the Unit spent, defeated, bounced, or
+  under a `cantAttack`) silently returns `endTurn` instead of deadlocking the
+  turn. "If it can" is therefore not a separate check at all — it is the
+  absence of any legal attack;
+- **"next turn" is the target's own controller's next turn**, which
+  `ownerNextTurnStart` gives for free: the entry is created by the OPPOSING
+  player during their own turn, is inert while `activePlayer` is not the
+  target's owner (`query.forcedAttackers` returns nothing then), covers exactly
+  the intervening rival turn, and lapses at its creator's next turn start;
+- **attacking discharges it immediately** (`declareAttack` drops the entry), so
+  a Unit readied again mid-turn by some other effect is not forced to attack
+  twice for one printed sentence.
+
+## 143 — `onGigRoll` and the `gigReroll` decision
+
+`kerry-eurodyne-axe-attitude-audience` — "When you roll in a Gig from your
+fixer area, you may ignore the result and reroll it once. When you roll a min
+or max value on a Gig, draw 1. If it's a d20, draw 3 instead." — was deferred
+by §78 for needing two things nothing exposed: a trigger fired *during* the
+roll, and a player decision layered on top of it.
+
+**Rulings:**
+
+- **clause 2 is a watcher trigger, `onGigRoll`**, carrying the die's `size` and
+  the `value` it landed on, fired on the ROLLER's own in-play cards. It fires
+  wherever a Gig die's value is actually rolled: the start-of-turn fixer roll,
+  the reroll decision below, and the `rerollGig` EffectNode. `rerollGig` can
+  reroll a *rival's* die, and the trigger still fires for the effect's
+  controller there, because the printed subject is "when **you** roll" — the
+  roller, not the die's owner;
+- **"a min or max value" is `condition.rolledExtremeValue`**: the rolled value
+  equals 1 or equals the die's own size. Both facts come from the trigger
+  context, so the condition is unsatisfiable outside a roll, exactly like
+  §42's `stolenDieSize`;
+- **"If it's a d20, draw 3 instead" is two defs, not a negation primitive.**
+  `condition.rolledDieSizeAnyOf` takes a SET of die sizes: one def names
+  `[20]` and draws 3, its sibling names `[4, 6, 8, 10, 12]` and draws 1. The
+  six die sizes are a closed set, so enumerating the complement is exact and
+  reads like the card; the alternative ("draw 1, and 2 more if it's a d20")
+  would be arithmetically equivalent but would not say what the card says, and
+  a `not` operator for one card's sake is a worse trade than one extra field;
+- **clause 1 is a real decision, not a policy.** "You may ignore the result and
+  reroll it once" is exactly the kind of costless-but-consequential option §50
+  refuses to auto-take on the player's behalf when it genuinely cuts both ways
+  (rerolling a 6 on a d6 is a disaster; rerolling a 1 is free). It is
+  implemented as a static permission node (`gigRerollOption`, read by
+  `query.friendlyGigRerollOption`) plus a new `Phase` `'gigReroll'` and a new
+  two-option `Action` (`chooseGigReroll`), reached only when the roller
+  actually has that static live — so every other player's gig-gain step still
+  ends in `main` exactly as before. `pendingGigRoll` remembers which die the
+  decision is about, and the phase ends after one answer, whichever it was:
+  "once" is once. This is the seam §78 asked for, built once rather than
+  half-solved for one card.
+
+## 144 — Would-be-mutation interceptions: roll back, ask, replay
+
+Two cards answer a mutation that is *about to* happen with an optional, costed
+decision by the player it would hurt: `jackie-welles-mama-s-favorite` ("If a
+friendly Unit would be defeated, you may spend 1 €$ to defeat this Legend
+instead.", deferred by §105) and `alt-cunningham-mother-of-daemons`'s second
+clause ("When a rival Unit would steal a Gig, you may discard 1 with cost equal
+to that Gig's value. If you do, the Gig isn't stolen.", deferred by §72).
+
+Both interception points sit deep inside a synchronous mutation — `defeatUnit`
+is reached from fights, effect nodes and mass-defeat scripts, and every caller
+goes on to fire triggers that depend on the answer — so neither can simply
+return to the reducer to ask a question. §105 called that the whole problem,
+and it is: capturing a continuation for "the rest of this fight" is not
+something this engine's design supports.
+
+**Ruling: roll back and replay, rather than capture a continuation.**
+
+- the mutation calls `askIntercept`, which consumes the next pre-supplied
+  answer for the action currently being applied. When there is none it throws
+  `InterceptRequired` (`src/engine/intercept.ts`), which `reduce.ts`'s
+  `runAction` catches: the half-finished draft is discarded **wholesale** and
+  the ORIGINAL pre-action state comes back with the question attached
+  (`phase: 'intercept'`, `pendingIntercept`). Nothing the aborted run touched
+  — the rng included — can leak out, which a test asserts directly by checking
+  the board is untouched while the question is pending;
+- answering re-applies the identical action from that same original state with
+  one more answer appended. This is deterministic **because** the rng lives in
+  the state being replayed, so the replay retraces the original run exactly up
+  to the interception. An action containing several interceptions simply asks
+  several times, each round trip adding one answer, which terminates;
+- `interceptAnswers` is a transient `GameState` field, always `[]` in any state
+  a caller ever sees: `applyAction` fills it for the duration of one replay and
+  empties it again before returning. It lives on the state rather than in a
+  module-level variable so the engine keeps its "no hidden mutable globals"
+  property;
+- **`-1` declines**, and any other answer accepts and names what the card asks
+  for: the protector's own uid for jackie (self-documenting — "defeat *this
+  Legend*"), the discarded hand card's uid for alt. `legalActions` enumerates
+  the options with the decline first, and `query.actingPlayer` reports the
+  intercepting card's controller for the duration, so the pending decision
+  belongs to the right player even in the middle of the *other* player's
+  action.
+
+**Sub-rulings:**
+
+- **the seam is `defeatUnit` itself**, after the `defeatShield` check (§46's
+  substitution is unconditional and costless, so it settles the question before
+  any decision is offered — a shielded Unit is never "would be defeated") and
+  before anything else. Every defeat path in the engine therefore passes
+  through it, fights and effects and scripts alike, which a dedicated
+  `bonnie-and-clyde` test pins down;
+- **an unaffordable option is never offered.** `defeatInterceptorFor` returns
+  nothing unless the would-be-defeated card is a friendly Unit on the field,
+  the interceptor is some OTHER card (defeating jackie to save jackie is not a
+  choice), and the controller can actually pay — with the interceptor itself
+  barred from paying, the same rule §31 gives a {Go Solo} Legend's own play;
+- **"defeat this Legend instead. (Remove it from the game.)"** reaches a
+  face-up Legend sitting in the legends zone, not just a {Go Solo}'d one on the
+  field, so `leaveField` now filters the `legends` array as well as `field`.
+  §31's "remove it from the game" already routes every Legend exit to
+  `removed`, and §139 already confirmed that includes a defeat; the substitute
+  defeat runs with the interception disabled, which is what guarantees a chain
+  of interceptors cannot recurse;
+- **alt-cunningham's clause asks the die's owner, before the die moves.** The
+  candidates are the victim's hand cards whose printed cost equals the die's
+  value exactly, and the clause applies only while the stealing card is a rival
+  **Unit** (`isUnitStealer` again, §141). A prevented die stays where it is and
+  still consumes one of the steal's `remaining` attempts: "the Gig isn't
+  stolen" negates that attempt, and nothing on the card offers the thief
+  another pick in its place;
+- **an episode can now steal nothing**, which `PendingSteal.taken` records:
+  `onFriendlyStealComplete` ("When a friendly Unit steals 1 or more Gigs",
+  §133) does not fire for an episode whose every die was intercepted, while the
+  per-die `onFriendlyStealDie` simply never fires for a die that never moved.
+
+**Not deferred, and why it matters.** §105 concluded that this card's "entire
+functional text IS the gap", so a §79 full-or-defer meant deferring it whole.
+That is now moot: the gap is closed, and `jackie-welles-mama-s-favorite` is
+encoded in full (one static node) rather than by an rng'd stand-in. The
+alternative considered and rejected was §32/§138's "a genuine decision with no
+channel to carry it falls to the rng" — legitimate for a card-data-level
+choice, but wrong here: spending €$ and removing your own power-8 Legend at
+random is a materially different card from the printed one, and unlike
+`tetratronic-rippler`'s keep-or-trash there IS a channel available once the
+replay seam exists.
+
+## Deferred slice summary
+
+**Cards completed (11 clauses across 11 cards):** `appetite-for-destruction`,
+`chrome-fang`, `cyberpsychosis`, `safety-override`, `reboot-optics` (§141);
+`chrome-reverie`'s attack-denial clause (§141);
+`evelyn-parker-beautiful-enigma`'s {Spend} ability and `mox-inciters` (§142);
+`kerry-eurodyne-axe-attitude-audience` (§143);
+`jackie-welles-mama-s-favorite` and
+`alt-cunningham-mother-of-daemons`'s steal-interception clause (§144).
+
+**Vocabulary extensions:** `floatingEffect`, `gigRerollOption`,
+`defeatInterceptSelf`, `stealInterceptByDiscard` (`EffectNode`);
+`FloatingSpec`/`FloatingExpiry` (a new strict union carried by
+`floatingEffect`); `onGigRoll` (`Trigger`); `rolledExtremeValue`,
+`rolledDieSizeAnyOf` (`EffectCondition`); `equipped` (`TargetFilter`).
+
+**Engine (non-vocabulary):** `GameState.floatingEffects`, `pendingGigRoll`,
+`pendingIntercept`, `interceptAnswers`; `PendingSteal.taken`; `Phase`
+`'gigReroll'`/`'intercept'`; `Action` `chooseGigReroll`/`answerIntercept`;
+`src/engine/intercept.ts` (the ask/abort primitive); `reduce.ts`'s
+`runAction`/`dispatch` split with the replay loop;
+`combat.ts`'s `stealableDieIndexes` (the single authority on what a steal may
+take), the fight-consequence hooks, and the `defeatUnit`/`takeStolenGig`
+interception seams; `effects.ts`'s `resolveNodeOnDraft` and
+`fireGigRollTrigger`.
+
+**Deferral rulings closed:** §52 (with §79/§91/§132/§140's additions), §72's
+clause 2, §78, §105, §132's two partial encodings, §140's two cards. Each now
+carries an "implemented" pointer to the ruling above that closed it.
+
+**Completeness:** `tests/cards/completeness.test.ts` asserts 141/141 — every
+card either carries an `EffectDef` or appears in an explicit, per-card
+`NO_RULES_TEXT` list (11 cards whose whole printed text is flavour, an
+equip/keyword reminder, or empty). There are **no deferral allowances**. The
+same file checks that every `scripted` node name resolves in `scriptedCards`,
+that no script is dead, and that every card's informational `scripted` field
+matches a node it actually uses.
