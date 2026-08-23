@@ -24,6 +24,7 @@ const triggerSchema = z.enum([
   'onStartTurn',
   'onFriendlyBlock',
   'onFriendlyCardPlayed',
+  'onFriendlyStealComplete',
   'activated',
   'static',
 ])

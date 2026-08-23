@@ -651,22 +651,33 @@ export function takeStolenGig(draft: GameState, db: CardDb, dieIndex: number): v
   if (draft.cards[steal.attacker]) draft.cards[steal.attacker].stoleGigThisTurn = true
 
   // [trigger seam] "When a friendly Unit steals a d6, ..." — a watcher trigger,
-  // fired on every in-play card of the thief (docs/rulings.md §42).
-  // `stealerUid` answers "When THIS Unit steals a Gig" (docs/rulings.md §55 ff.).
-  // `stolenDieValue`/`stealerIsLegend` answer "if its value is even/odd" and
-  // "a friendly LEGEND steals" (rogue-amendiares-preem-solo, docs/rulings.md
-  // §81 ff.). `stealerTags` answers "a CORPO or GANGER Unit steals"
-  // (evelyn-parker-beautiful-enigma, docs/rulings.md §120 ff.).
+  // fired on every in-play card of the thief (docs/rulings.md §42), ONCE PER
+  // DIE. `stealerUid` answers "When THIS Unit steals a Gig" (docs/rulings.md
+  // §55 ff.). `stolenDieValue`/`stealerIsLegend` answer "if its value is
+  // even/odd" and "a friendly LEGEND steals" (rogue-amendiares-preem-solo,
+  // docs/rulings.md §81 ff.).
   fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
     stolenDieSize: die.size,
     stolenDieValue: die.value,
     stealerUid: steal.attacker,
     stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
-    stealerTags: db[draft.cards[steal.attacker].defId] ? cardTags(db[draft.cards[steal.attacker].defId]) : [],
   })
 
   steal.remaining -= 1
   if (steal.remaining > 0 && draft.players[victim].gigArea.length > 0) return
+
+  // [trigger seam] "When a friendly Unit steals 1 or more Gigs, ..." — a
+  // watcher trigger fired ONCE, when the whole steal EPISODE this
+  // `takeStolenGig` call is resolving finishes (however many dice it took),
+  // unlike `onFriendlyStealDie` above (docs/rulings.md §133 — batch 7 fix
+  // round 1, evelyn-parker-beautiful-enigma). `stealerTags` answers "a
+  // CORPO or GANGER Unit steals."
+  fireWatcherTrigger(db, draft, 'onFriendlyStealComplete', thief, {
+    stealerUid: steal.attacker,
+    stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
+    stealerTags: db[draft.cards[steal.attacker].defId] ? cardTags(db[draft.cards[steal.attacker].defId]) : [],
+  })
+
   finishSteal(draft, steal)
 }
 

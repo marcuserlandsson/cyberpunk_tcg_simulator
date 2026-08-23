@@ -1018,7 +1018,7 @@
     "text": "When a friendly CORPO or GANGER Unit steals 1 or more Gigs, ready 1 Eddie.\n1 €$, {Spend} A rival Unit must attack next turn if it can.",
     "effects": [
       {
-        "trigger": "onFriendlyStealDie",
+        "trigger": "onFriendlyStealComplete",
         "condition": {
           "stealerKeywordAnyOf": [
             "corpo",
@@ -1613,9 +1613,11 @@
           "playedCardType": "unit"
         },
         "effect": {
-          "kind": "changeGig",
-          "amount": -2,
-          "target": "friendlyGigDie"
+          "kind": "scripted",
+          "name": "jackie-welles-pour-one-out-for-me",
+          "targets": [
+            "friendlyGigDie"
+          ]
         }
       },
       {
@@ -1627,40 +1629,15 @@
           "playedCardType": "gear"
         },
         "effect": {
-          "kind": "changeGig",
-          "amount": -2,
-          "target": "friendlyGigDie"
-        }
-      },
-      {
-        "trigger": "onFriendlyCardPlayed",
-        "oncePerTurn": true,
-        "onceKey": "pour-one-out-for-me",
-        "condition": {
-          "playedCardColor": "Blue",
-          "playedCardType": "unit",
-          "friendlyGigValueEquals": 1
-        },
-        "effect": {
-          "kind": "draw",
-          "count": 1
-        }
-      },
-      {
-        "trigger": "onFriendlyCardPlayed",
-        "oncePerTurn": true,
-        "onceKey": "pour-one-out-for-me",
-        "condition": {
-          "playedCardColor": "Blue",
-          "playedCardType": "gear",
-          "friendlyGigValueEquals": 1
-        },
-        "effect": {
-          "kind": "draw",
-          "count": 1
+          "kind": "scripted",
+          "name": "jackie-welles-pour-one-out-for-me",
+          "targets": [
+            "friendlyGigDie"
+          ]
         }
       }
-    ]
+    ],
+    "scripted": "jackie-welles-pour-one-out-for-me"
   },
   {
     "id": "jackie-welles-ride-or-die-choom",
@@ -2198,12 +2175,34 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "scripted",
-          "name": "maman-brigitte-spirit-of-death"
+          "kind": "chooseOne",
+          "chooser": "controller",
+          "modes": [
+            {
+              "kind": "scripted",
+              "name": "maman-brigitte-spirit-of-death:take-it",
+              "targets": [
+                "friendlyHandCard",
+                "friendlyHandCard"
+              ],
+              "filters": [
+                {
+                  "cardType": "program"
+                },
+                {
+                  "cardType": "program"
+                }
+              ]
+            },
+            {
+              "kind": "sequence",
+              "effects": []
+            }
+          ]
         }
       }
     ],
-    "scripted": "maman-brigitte-spirit-of-death"
+    "scripted": "maman-brigitte-spirit-of-death:take-it"
   },
   {
     "id": "mandibular-upgrade",

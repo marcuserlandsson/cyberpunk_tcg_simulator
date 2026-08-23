@@ -3530,19 +3530,17 @@ card's own color at all, and every earlier "watch a play" fact
   `EffectDef`s (one per `playedCardType`) sharing one `oncePerTurn` +
   `onceKey` allowance (§67) — the established way to encode "the first
   time X or Y happens each turn" as one compound event without inventing a
-  list-valued `playedCardType`. `jackie-welles-pour-one-out-for-me`'s
-  four-`EffectDef` shape (two for the decrease, two for the conditional
-  draw, all sharing `onceKey: "pour-one-out-for-me"`) is exactly
-  §67's `yorinobu-arasaka-embracing-destruction` pattern, generalized to a
-  trigger with two qualifying variants instead of one: whichever variant's
-  `EffectDef` runs first (`fireCardTrigger`'s printed order) evaluates the
-  whole group, so a Blue Unit play cannot double-fire alongside a
-  Blue Gear play later the same turn, and the "if it becomes a min Gig, draw
-  1" pair reads the board *after* the matching decrease def already ran
-  (`fireCardTrigger` resolves defs of one firing in printed order, mutating
-  the same draft — the identical "two EffectDefs on one trigger" shape the
-  schema doc's own closing paragraph describes for
-  `industrial-assembly`/`la-llorona-ghost-of-the-past`).
+  list-valued `playedCardType`. `jackie-welles-pour-one-out-for-me` uses
+  exactly this two-variant/shared-`onceKey` shape, once per variant.
+
+**Fix round 1 (docs/rulings.md §133): superseded in part.** The paragraph
+below (as originally written) went on to describe
+`jackie-welles-pour-one-out-for-me`'s "if it becomes a min Gig" clause as a
+SECOND pair of `EffectDef`s reading a board-wide condition after the
+decrease resolved. That shape is wrong — see §133 — and the card now
+resolves both the decrease and the "did it become a min Gig" check inside
+ONE scripted node per variant (still sharing the two-variant/`onceKey`
+mechanism above, which is unaffected).
 
 ## 121 — "a min Gig" is `friendlyGigValueEquals: 1` — no new vocabulary
 
@@ -3557,15 +3555,23 @@ showing* value, not "a die literally at its printed maximum face").
 every die type in the pool numbers its faces from 1. So "a min Gig" reads
 as "a friendly Gig die currently showing 1," which is *exactly* the shape
 `friendlyGigEvenAndOdd`'s neighbour `friendlyGigValueEquals` already covers
-(§68 ff., "if [a fixed number] equals the value of a friendly Gig") — no new
-condition field, just the literal value `1`. This is confirmed by
-`jackie-welles-pour-one-out-for-me`'s own printed dependency: the card
-prints a *decrease*, then checks "if it **becomes** a min Gig," i.e. the
-board-wide `friendlyGigValueEquals: 1` check on a SECOND `EffectDef`, run
-after the first def's `changeGig` already resolved (§120's ordering note) —
-the identical "two EffectDefs, second reads the board the first just wrote"
-shape as `industrial-assembly`'s "Increase a Gig by up to 4. If you control
-a Gig with 8+ value, draw 1."
+(§68 ff., "if [a fixed number] equals the value of a friendly Gig") for a
+BARE "if you control a min Gig" check (`chrome-reverie`) — no new condition
+field, just the literal value `1`. This part of the reading is unaffected
+by §133's fix.
+
+**Fix round 1 (docs/rulings.md §133): the paragraph originally here claimed
+`jackie-welles-pour-one-out-for-me`'s ANAPHORIC "if **it** becomes a min
+Gig" was confirmed by, and encoded as, the SAME board-wide
+`friendlyGigValueEquals: 1` check — reading "any friendly Gig is at 1,"
+not "the specific die THIS effect just touched is at 1." That is wrong: a
+board with Gigs `[1, 5]`, decreasing the 5 to 3, would incorrectly draw
+under a board-wide check, because the OTHER (untouched) die still sits at
+1 — "it" in the printed text refers to the die the SAME sentence just
+named, not the board in general. The threshold (`value === 1`) is still
+right; only the SUBJECT being checked was wrong for the anaphoric case.
+See §133 for the corrected encoding (a scripted node with its own
+`friendlyGigDie` target slot, so the same die is decreased and checked).
 
 ## 122 — `readyEddies`: a fungible, no-target "ready N Eddie(s)" node
 
@@ -3663,14 +3669,17 @@ string against `onFriendlyAttack`'s `attackerTags`.
   printed "or" plainly does not intend. No card in the 141-card pool
   currently carries both tags (checked), but the array shape costs nothing
   extra and closes the gap outright rather than leaving it latent;
-- "steals 1 or more Gigs" fires the watcher **once per die stolen**, the
-  same granularity every other `onFriendlyStealDie` card already uses
-  (§42) — the phrase reads as "even a single Gig counts," not "batch a
-  multi-die steal into one firing," since nothing in the pool ever
-  aggregates a steal's die count before this trigger fires. A Unit
-  power-thresholded into a 2-die steal this turn therefore readies 2
-  Eddies, one per die — the natural per-die event granularity, not an
-  approximation.
+- ~~"steals 1 or more Gigs" fires the watcher **once per die stolen**...~~
+  **Fix round 1 (docs/rulings.md §133): overturned.** The controller
+  ruling is that this fires ONCE per completed steal EPISODE (however
+  many dice it takes), not once per die — "steals 1 or more Gigs" names
+  the whole steal action/effect resolving, not each die inside it. The
+  original reasoning above (treating "1 or more" as evidence for per-die
+  firing) does not survive scrutiny: it is equally consistent with "the
+  episode counts as one event regardless of size," and a 2-die steal
+  readying 2 Eddies is a real, visible over-count a player would notice.
+  See §133 for the new `onFriendlyStealComplete` trigger this card now
+  uses instead of `onFriendlyStealDie`.
 
 ## 126 — `lowestPower`: "a Rival's lowest-power Unit... choose 1"
 
@@ -3763,9 +3772,21 @@ declared target (`friendlyTrashCard`, filtered `cardType: 'program'`).
   script for `heywood-ripperdoc`'s "its cost."
 
 ## 130 — `maman-brigitte-spirit-of-death`: fully scripted to avoid a 3-slot,
-unfillable-middle shape
+unfillable-middle shape (superseded by §133 — see below)
 
-"{Play} You may discard 2 Programs. If you do, bottom-deck a rival
+**Fix round 1 (docs/rulings.md §133): this ruling is superseded.** The
+original text (below, struck through in spirit) treated "you may discard 2
+Programs" as an auto-take per §50, on the theory that it has "no cost or
+drawback" the way a Gear/self-defeat "you may" does. The batch review
+correctly rejected that: discarding 2 of the controller's OWN hand cards
+*is* a cost, and §50's own dividing line says a costed option is a real
+decision, not an auto-take — "Where an optional clause ever becomes a real
+dilemma, it should become a `chooseOne` with a do-nothing mode." §133
+re-encodes this as exactly that, keeping the part of the reasoning below
+that remains true (the bottom-deck target still stays rng-picked, for the
+"3+ slots, unfillable middle" reason described here).
+
+~~"{Play} You may discard 2 Programs. If you do, bottom-deck a rival
 unequipped Unit." Declaring "which 2 Programs" as two real target slots
 plus "which rival Unit" as a third would put an inherently-sometimes-
 unfillable pair of slots in the MIDDLE of the def's slot list whenever fewer
@@ -3777,7 +3798,7 @@ this stays fully scripted: "which 2 Programs" and "which rival Unit" are
 both picked through the rng (`pickN`/`pick`), since the printed text
 distinguishes neither, and the discard step is auto-taken whenever ≥2
 Programs are in hand (docs/rulings.md §50) — declined only when the hand
-does not hold enough, never a real yes/no dilemma.
+does not hold enough, never a real yes/no dilemma.~~
 
 ## 131 — `misty-olszewski-mender-of-broken-spirits`: a `chooseOne` mode
 picked off the rng at a WATCHER trigger
@@ -3839,6 +3860,155 @@ never stronger, so both stay partially encoded rather than fully deferred:
   clause when it lands. `evelyn-parker-beautiful-enigma`'s first clause
   (the watcher/ready-Eddie) is independent and encoded in full.
 
+# Task 8 batch 7 fix round 1 (batch review)
+
+The batch review found 2 Critical + 1 Important issue, all fixed in place
+above (§120, §121, §125, §130 all carry pointers here) rather than
+appended as untouched-original-plus-patch, matching how §67 and §80
+documented their own fix rounds.
+
+## 133 — Summary: jackie's anaphoric "min Gig," maman-brigitte's real
+discard decision, evelyn's per-episode steal trigger
+
+**1. `jackie-welles-pour-one-out-for-me` checks the SPECIFIC decreased die,
+not the whole board (Critical).** "If **it** becomes a min Gig" is
+anaphoric: "it" is the die the SAME sentence just decreased, not "any
+friendly Gig happens to sit at 1." The original encoding (§120/§121) put
+the "min Gig" check on a SEPARATE `EffectDef` reading
+`condition.friendlyGigValueEquals: 1` against the whole board — correct
+when the decrease and the check are the ONLY die on the board (as batch
+7's original tests happened to set up), but wrong the instant a SECOND,
+untouched friendly Gig already sits at 1: decreasing a 5-die to 3 would
+still incorrectly draw, because the OTHER die satisfies the board-wide
+check regardless of what the effect actually touched.
+
+**Fix:** `jackie-welles-pour-one-out-for-me`'s two `EffectDef`s (one per
+`playedCardType` variant, still sharing `onceKey: "pour-one-out-for-me"`)
+now each resolve a single `scripted` node with its OWN declared
+`friendlyGigDie` target slot, rather than a bare `changeGig` followed by a
+separate board-read `draw`. The slot is bound exactly like any other
+trigger target reached with no player-facing action to carry it —
+rng-picked (§32), since `onFriendlyCardPlayed` is a watcher and always
+fires with an empty `targets` array — but because the SAME bound index is
+used for both the decrease and the "did it become 1" check, the script
+reads and mutates the identical die. "A min Gig" is still `value === 1`
+(§121's core reading — every die's rolled value ranges `[1, size]`, so
+there is no die-specific floor distinct from 1 — stands unchanged); only
+the SUBJECT of the check moved from "the whole board" to "the one die this
+effect is touching." `chrome-reverie`'s BARE "if you control a min Gig" is
+unaffected — that phrasing has no antecedent to be anaphoric about, so the
+board-wide `friendlyGigValueEquals: 1` reading is still correct there.
+
+**TDD evidence:** a new `tests/cards/blue.test.ts` case sets up Gigs `[1,
+5]` (an untouched die already at the floor, plus one about to be
+decreased) and asserts NO draw when the touched die lands at 3 — this is
+exactly the scenario the pre-fix board-wide check gets wrong. Verified
+failing-first: reverted the script to the old two-`EffectDef` board-check
+shape and re-ran just this case — failed with the die correctly landing at
+`[1, 3]` but a draw ALSO happening (deck length dropped by 1), confirming
+the test exercises the bug; re-applied the fix and re-ran green. A second
+new case (a single-die board, decreased to exactly 1) confirms the positive
+path still draws. Both existing jackie tests (the single-die "becomes 1"
+case and the once-per-turn dedup case) needed no changes and stayed green
+throughout, since neither ever had a second, untouched Gig die on the
+board to expose the bug.
+
+**2. `maman-brigitte-spirit-of-death`'s "you may discard 2 Programs"
+becomes a real decision (Critical).** §130's original reasoning classified
+this as a cost-free "you may" (per §50's `gilded-mato-n`-style auto-take
+precedent), which does not survive scrutiny: discarding 2 of the
+controller's OWN hand cards is a resource cost, and §50 itself draws the
+line there — "an optional clause that does cost something is a real
+decision ... it should become a `chooseOne` with a do-nothing mode."
+
+**Fix:** the card's `onPlay` effect is now a `chooseOne` (`chooser:
+'controller'`) with two modes: `maman-brigitte-spirit-of-death:take-it`
+(a scripted node with two declared `friendlyHandCard` slots, both filtered
+`cardType: 'program'`) and a bare `{ kind: 'sequence', effects: [] }`
+decline mode. "Which 2 Programs" is now a real, player-visible decision —
+the controller's own hand, matching §73/§80's "a real decision, not rng,
+when the action can carry one" — rather than an internal rng pick. The two
+declared slots are DELIBERATELY left as the only two slots on the
+"take it" mode (no third slot for "which rival Unit"): because both slots
+share the identical spec and filter, their fillability is always
+CORRELATED (either both empty or both non-empty, since they read the same
+zone the same way), so there is no "an earlier slot in this pair went
+missing while a later, independently-fillable slot in the SAME node
+remained" case — the specific shape the task brief warns against. Adding
+"which rival Unit" as a THIRD slot, after a pair that CAN be jointly
+empty, would reintroduce exactly that risk (confirmed empirically while
+prototyping this fix: a `scripted` node's own declared targets are bound
+via `bound.filter((uid): uid is number => uid !== null)`, which silently
+COLLAPSES null placeholders and destroys positional alignment for
+whatever comes after — so a later, still-fillable slot would land at the
+WRONG array index once an earlier one goes missing). "Which rival Unit"
+therefore stays rng-picked inside the script, unchanged from before.
+
+A degenerate case falls out of the correlated-slots design: with EXACTLY 1
+qualifying Program in hand, both slots still show that 1 card as their
+only candidate (a slot with ≥1 candidate is never treated as "empty" by
+`fillableSlots`), so the "take it" mode is still technically offered, with
+its only reachable tuple naming the SAME card for both slots. The script
+treats `progA === progB` as no pick at all — the same tolerance
+`matchGig` already extends to a harmless degenerate self-pick (docs/
+rulings.md §107 ff.) — so selecting this duplicate-target action is
+functionally identical to declining, never a real double-discard of one
+physical card.
+
+**TDD evidence:** `tests/cards/blue.test.ts` now has four
+`maman-brigitte-spirit-of-death` cases: taking it with 2 real, chosen
+Programs (discarded + rival bottom-decked); explicitly declining (hand and
+rival field untouched, `targets[0] === 1`); the degenerate 1-Program
+duplicate-pick (a no-op, not a real discard); and (unchanged from before)
+nothing happens with fewer than 2 Programs entirely — now via the decline
+path rather than an unconditionally-taken script. Verified failing-first
+against the pre-fix single-scripted-node encoding by temporarily reverting
+and re-running: the original code offered no "decline" action at all (a
+single `playCard` entry that always attempted the discard), confirming the
+old behaviour genuinely lacked the real decision.
+
+**3. `evelyn-parker-beautiful-enigma` fires once per steal EPISODE, not
+per die (Important).** §125's original reasoning ("even a single Gig
+counts," reusing the per-die `onFriendlyStealDie` every other card in the
+pool needs) is overturned by controller ruling: "When a friendly Unit
+steals 1 or more Gigs, ready 1 Eddie" describes ONE triggering event — the
+whole steal action or effect resolving — not each die inside a multi-die
+steal. The old encoding readied 2 Eddies for a single power-10 attack that
+steals 2 dice in one go, which is a visible, real over-count.
+
+**Fix:** `Trigger` gains `onFriendlyStealComplete` — a new watcher,
+distinct from `onFriendlyStealDie`, fired exactly once by `combat.ts`'s
+`takeStolenGig` at the point the whole steal it is resolving finishes
+(right before `finishSteal` is called — i.e. once `steal.remaining` has
+reached 0 or the victim's Gig area has run out, whichever ends the
+episode first), carrying the same `stealerUid`/`stealerIsLegend`/
+`stealerTags` facts `onFriendlyStealDie` already exposes.
+`onFriendlyStealDie` itself is completely unchanged — every existing
+per-die card (`6th-street-recruits`, `gorilla-arms`, `v-roamer-of-the-
+badlands`, `rogue-amendiares-preem-solo`, `wraith-marauders`, `take-
+control`) keeps firing once per die, exactly as before.
+`evelyn-parker-beautiful-enigma` moves from `onFriendlyStealDie` to
+`onFriendlyStealComplete`; its `condition.stealerKeywordAnyOf` field and
+the `readyEddies` effect are otherwise unchanged, since `conditionHolds`
+reads the SAME context field names regardless of which trigger populated
+them.
+
+**TDD evidence:** a new `tests/cards/blue.test.ts` case fields a power-10
+GANGER Unit (`animals-wrecker`, stealing 2 dice from a rival with exactly 2
+Gigs in one attack) and asserts exactly 1 of 2 surgically-spent Eddies
+readies, not both. Verified failing-first: temporarily reverted
+`evelyn-parker-beautiful-enigma`'s trigger back to `onFriendlyStealDie` and
+re-ran just this case — failed with BOTH Eddies readied, confirming the
+test exercises the per-die-vs-per-episode distinction; re-applied the fix
+and re-ran green. Every pre-existing `onFriendlyStealDie` card's test
+(gorilla-arms, 6th-street-recruits, etc.) stayed green throughout, since
+that trigger's own firing point and semantics are untouched.
+
+**Verification (all three fixes together):** `npx tsc --noEmit` clean,
+`npm test` 527/527 (492 pre-batch-7 + 35 in `tests/cards/blue.test.ts`,
+up from batch 7's original 31 after replacing/adding cases in the three
+affected `describe` blocks), `npm run build` clean.
+
 ## Task 8 batch 7 summary
 
 **Cards:** `alt-cunningham-soulkiller-architect`, `chrome-reverie`,
@@ -3851,27 +4021,38 @@ never stronger, so both stay partially encoded rather than fully deferred:
 `misty-olszewski-mender-of-broken-spirits`. Fifteen fully encoded; two
 partially encoded (§132) — no card fully deferred this batch.
 
-**Vocabulary extensions:** `onFriendlyCardPlayed` (`Trigger`);
-`readyEddies` (`EffectNode`); `friendlyHandOrTrashProgram` (`TargetSpec`);
-`lowestPower` (`TargetFilter`); `sourceStoleGigThisTurn`,
+**Vocabulary extensions:** `onFriendlyCardPlayed`, `onFriendlyStealComplete`
+(`Trigger`; the latter added in fix round 1, §133); `readyEddies`
+(`EffectNode`); `friendlyHandOrTrashProgram` (`TargetSpec`); `lowestPower`
+(`TargetFilter`); `sourceStoleGigThisTurn`,
 `friendlyProgramNotPlayedThisTurn`, `playedCardColor`, `playedCardType`,
 `playedCardKeyword`, `stealerKeywordAnyOf` (`EffectCondition`);
 `playedCardColor`, `playedCardType`, `playedCardTags`, `stealerTags`
 (`ConditionContext`); `stoleGigThisTurn` (`CardInstance`);
 `playedProgramThisTurn` (`PlayerState`).
 
-**Scripted cards (9):** `alt-cunningham-soulkiller-architect`,
-`chrome-reverie`, `dying-night-v-s-pistol`, `hacked-corpo` (reusing the
-`all-is-lost` shape), `judy-a-lvarez-braindance-maestro`,
+**Scripted cards (9, after fix round 1):** `alt-cunningham-soulkiller-
+architect`, `chrome-reverie`, `dying-night-v-s-pistol`, `hacked-corpo`
+(reusing the `all-is-lost` shape), `jackie-welles-pour-one-out-for-me`
+(added in fix round 1, §133 — a single scripted node shared by both
+`playedCardType` variants), `judy-a-lvarez-braindance-maestro`,
 `judy-a-lvarez-nothing-to-doubt`, `lizzy-wizzy-delicate-weapon`,
-`maman-brigitte-spirit-of-death`,
-`misty-olszewski-mender-of-broken-spirits` (three registry entries —
-`:unit`/`:gear`/`:program` — for its `chooseOne` modes). 11 registry entries
-across these 9 card ids.
+`maman-brigitte-spirit-of-death` (registry key renamed to `:take-it` in
+fix round 1, alongside a bare-`sequence` decline mode declared directly in
+`data/cards.json`), `misty-olszewski-mender-of-broken-spirits` (three
+registry entries — `:unit`/`:gear`/`:program` — for its `chooseOne`
+modes). 12 registry entries across these 10 card ids.
 
-**Partial encodings (§132):** `chrome-reverie` (first clause deferred, needs
-`floatingEffects`), `evelyn-parker-beautiful-enigma` (its `{Spend}` ability
-deferred, needs a new "forced action" capability).
+**Partial encodings (§132, unaffected by fix round 1):** `chrome-reverie`
+(first clause deferred, needs `floatingEffects`), `evelyn-parker-
+beautiful-enigma` (its `{Spend}` ability deferred, needs a new "forced
+action" capability).
 
-**Verification:** `npx tsc --noEmit` clean, `npm test` 523/523 (492
-pre-existing + 31 new), `npm run build` clean.
+**Fix round 1 (§133):** 2 Critical + 1 Important issue from the batch
+review, all fixed — see §133 for the full write-up. Re-verified: `npx tsc
+--noEmit` clean, `npm test` 527/527 (492 pre-batch-7 + 35 in
+`tests/cards/blue.test.ts`), `npm run build` clean.
+
+**Verification (original batch, superseded by fix round 1's numbers
+above):** `npx tsc --noEmit` clean, `npm test` 523/523 (492 pre-existing +
+31 new), `npm run build` clean.

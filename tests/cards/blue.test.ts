@@ -30,7 +30,7 @@ import { describe, expect, it } from 'vitest'
 import { legalActions } from '../../src/engine/legal'
 import { effectivePower, hasKeyword } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
-import type { CardDb, GameState } from '../../src/engine/types'
+import type { Action, CardDb, GameState } from '../../src/engine/types'
 import {
   activate,
   actionsOfType,
@@ -259,6 +259,33 @@ describe('evelyn-parker-beautiful-enigma', () => {
     s = attackAndSteal(db, s, roamer, 'gigArea', [0])
     expect(s.cards[s.players[0].eddies[0]].ready).toBe(false)
   })
+
+  it('readies exactly 1 Eddie for a steal EPISODE, even when it takes 2 dice (fix round 1)', () => {
+    // Controller ruling (docs/rulings.md §133): "steals 1 or more Gigs"
+    // fires ONCE per completed steal episode, not once per die. Power 10
+    // steals 2 dice in one attack (POWER_PER_EXTRA_GIG = 10); the fix
+    // fires the new `onFriendlyStealComplete` watcher exactly once when
+    // that whole steal finishes, unlike the per-die `onFriendlyStealDie`
+    // every other card in the pool still uses.
+    const { state } = fixtureWithHand(0, ['animals-wrecker']) // power 10, GANGER
+    let s = playCardByDef(db, state, 0, 'animals-wrecker')
+    s = endBothTurnsOnce(db, s)
+    const wrecker = findFielded(s, 0, 'animals-wrecker')
+    mintInto(s, 0, 'legends', 'evelyn-parker-beautiful-enigma', { faceUp: true, ready: true })
+    setGigs(s, 0, [])
+    setGigs(s, 1, [
+      { size: 6, value: 3 },
+      { size: 6, value: 4 },
+    ])
+    s.cards[s.players[0].eddies[0]].ready = false
+    s.cards[s.players[0].eddies[1]].ready = false
+
+    s = attackAndSteal(db, s, wrecker, 'gigArea', [0, 0])
+
+    expect(gigValues(s, 0)).toHaveLength(2) // both dice stolen in one episode
+    expect(s.cards[s.players[0].eddies[0]].ready).toBe(true)
+    expect(s.cards[s.players[0].eddies[1]].ready).toBe(false) // only 1 Eddie readied, not 2
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -398,6 +425,43 @@ describe('jackie-welles-pour-one-out-for-me', () => {
 
     s = playCardByDef(db, s, 0, 'evelyn-parker-scheming-siren')
     expect(gigValues(s, 0)).toEqual([4]) // unchanged: this turn's allowance is spent
+  })
+
+  it('checks the specific decreased die, not the whole board, for "min Gig" (fix round 1)', () => {
+    // "If IT becomes a min Gig" is anaphoric — the SPECIFIC die this effect
+    // just decreased, not "you control any Gig at 1" (docs/rulings.md
+    // §133). With two Gigs [1, 5], the watcher-picked die to decrease is
+    // rng-chosen (§32); the default seed deterministically picks the "5"
+    // die here, decreasing it to 3 — which must NOT draw, even though the
+    // OTHER, untouched die already sits at 1. (The pre-fix encoding checked
+    // `friendlyGigValueEquals: 1` against the whole board and drew
+    // incorrectly in exactly this scenario.)
+    const { state } = fixtureWithHand(0, ['jacked-in-voodoo-boy'])
+    mintInto(state, 0, 'legends', 'jackie-welles-pour-one-out-for-me', { faceUp: true, ready: true })
+    setGigs(state, 0, [
+      { size: 6, value: 1 },
+      { size: 6, value: 5 },
+    ])
+    const deckBefore = state.players[0].deck.length
+
+    const s = playCardByDef(db, state, 0, 'jacked-in-voodoo-boy')
+
+    expect(gigValues(s, 0)).toEqual([1, 3])
+    expect(s.players[0].deck.length).toBe(deckBefore) // no draw
+  })
+
+  it('draws when the specific decreased die itself becomes a min Gig', () => {
+    // A single-candidate board removes the rng ambiguity: the only die is
+    // both the one decreased AND the one checked.
+    const { state } = fixtureWithHand(0, ['jacked-in-voodoo-boy'])
+    mintInto(state, 0, 'legends', 'jackie-welles-pour-one-out-for-me', { faceUp: true, ready: true })
+    setGigs(state, 0, [{ size: 8, value: 3 }])
+    const deckBefore = state.players[0].deck.length
+
+    const s = playCardByDef(db, state, 0, 'jacked-in-voodoo-boy')
+
+    expect(gigValues(s, 0)).toEqual([1])
+    expect(s.players[0].deck.length).toBe(deckBefore - 1) // drew
   })
 })
 
@@ -548,28 +612,70 @@ describe('lizzy-wizzy-delicate-weapon', () => {
 // ---------------------------------------------------------------------------
 
 describe('maman-brigitte-spirit-of-death', () => {
-  it('discards 2 Programs and bottom-decks a rival unequipped Unit', () => {
+  it('may discard 2 chosen Programs and bottom-deck a rival unequipped Unit', () => {
     const { state } = fixtureWithHand(0, [
       'maman-brigitte-spirit-of-death',
       'floor-it',
       'industrial-assembly',
     ])
+    const floorIt = findInHand(state, 0, 'floor-it')
+    const industrialAssembly = findInHand(state, 0, 'industrial-assembly')
     const rival = fieldCard(state, 1, 'animals-wrecker')
 
-    const s = playCardByDef(db, state, 0, 'maman-brigitte-spirit-of-death')
+    // The "take it" mode (index 0) with both Programs as the real, chosen
+    // discard targets (fix round 1, docs/rulings.md §133 — a real decision,
+    // not an auto-take).
+    const s = playCardByDef(db, state, 0, 'maman-brigitte-spirit-of-death', {
+      targets: [0, floorIt, industrialAssembly],
+    })
 
     expect(s.players[0].hand).toEqual([])
+    expect(s.players[0].trash).toEqual(expect.arrayContaining([floorIt, industrialAssembly]))
     expect(s.players[1].field).not.toContain(rival)
     expect(s.players[1].deck).toContain(rival)
   })
 
-  it('does nothing with fewer than 2 Programs in hand', () => {
+  it('may decline, leaving hand and rival field untouched', () => {
+    const { state } = fixtureWithHand(0, [
+      'maman-brigitte-spirit-of-death',
+      'floor-it',
+      'industrial-assembly',
+    ])
+    const floorIt = findInHand(state, 0, 'floor-it')
+    const industrialAssembly = findInHand(state, 0, 'industrial-assembly')
+    const rival = fieldCard(state, 1, 'animals-wrecker')
+    const card = findInHand(state, 0, 'maman-brigitte-spirit-of-death')
+
+    // The decline mode (index 1) is offered as a real, separate choice —
+    // every mode's slots are reserved regardless of which is picked (§45),
+    // so the action still carries mode 0's (unused) sub-targets too.
+    const decline = actionsOfType(db, state, 'playCard').find(
+      (a) => a.card === card && a.targets[0] === 1
+    )
+    expect(decline).toBeDefined()
+    const s = applyAction(db, state, decline as Extract<Action, { type: 'playCard' }>)
+
+    expect(s.players[0].hand).toEqual(expect.arrayContaining([floorIt, industrialAssembly]))
+    expect(s.players[1].field).toContain(rival)
+  })
+
+  it('a degenerate duplicate pick (only 1 Program in hand) is a no-op, not a real discard', () => {
     const { state } = fixtureWithHand(0, ['maman-brigitte-spirit-of-death', 'floor-it'])
     const floorIt = findInHand(state, 0, 'floor-it')
     const rival = fieldCard(state, 1, 'animals-wrecker')
+    const card = findInHand(state, 0, 'maman-brigitte-spirit-of-death')
 
-    const s = playCardByDef(db, state, 0, 'maman-brigitte-spirit-of-death')
+    // With only 1 qualifying Program, the "take it" mode's only reachable
+    // tuple picks it for BOTH slots — a degenerate same-card duplicate the
+    // script treats as no pick at all (docs/rulings.md §133), the same
+    // tolerance `matchGig` already extends to a harmless self-pick.
+    const takeIt = actionsOfType(db, state, 'playCard').find(
+      (a) => a.card === card && a.targets[0] === 0
+    )
+    expect(takeIt).toBeDefined()
+    expect(takeIt?.targets).toEqual([0, floorIt, floorIt])
 
+    const s = applyAction(db, state, takeIt as Extract<Action, { type: 'playCard' }>)
     expect(s.players[0].hand).toContain(floorIt)
     expect(s.players[1].field).toContain(rival)
   })

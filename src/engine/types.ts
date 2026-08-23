@@ -82,6 +82,13 @@ export type Trigger =
   // condition can narrow which plays qualify (judy-a-lvarez-braindance-
   // maestro, jackie-welles-pour-one-out-for-me).
   | 'onFriendlyCardPlayed'
+  // Batch 7 fix round 1 (docs/rulings.md §133): "When a friendly Unit steals
+  // 1 or more Gigs, ..." fires ONCE per completed steal EPISODE (however
+  // many dice it actually took), unlike the per-die `onFriendlyStealDie`
+  // (§42) every other card in the pool needs — a watcher, fired once
+  // `takeStolenGig` finishes the whole steal it is resolving (evelyn-parker-
+  // beautiful-enigma).
+  | 'onFriendlyStealComplete'
   | 'activated'
   | 'static'
 

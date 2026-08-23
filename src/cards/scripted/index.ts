@@ -989,6 +989,40 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   },
 
   /**
+   * `jackie-welles-pour-one-out-for-me` — "The first time you play a Blue
+   * Unit or Blue Gear each turn, you may decrease a friendly Gig by up to
+   * 2. If IT becomes a min Gig, draw 1." **Fix round 1** (docs/rulings.md
+   * §133 — batch review, superseding the original §120/§121 encoding):
+   * "it" is anaphoric — the SPECIFIC die this effect just decreased, not
+   * "any friendly Gig happens to sit at 1." The original encoding checked
+   * `condition.friendlyGigValueEquals: 1` against the WHOLE board on a
+   * second `EffectDef`, which incorrectly drew whenever some OTHER,
+   * untouched friendly Gig already sat at 1, regardless of where the
+   * decreased die actually landed. Declaring this scripted node's own
+   * `friendlyGigDie` target slot — bound exactly the way any other
+   * watcher-fired target is (rng-picked, since `onFriendlyCardPlayed`
+   * carries none, docs/rulings.md §32) — lets the script decrease AND
+   * check the SAME die, closing the gap. "A min Gig" is still `value ===
+   * 1` (docs/rulings.md §121's reading stands: every Gig die's rolled
+   * value ranges `[1, size]`, so there is no die-specific floor distinct
+   * from 1) — only the SUBJECT of the check was wrong, not the threshold.
+   */
+  'jackie-welles-pour-one-out-for-me': (_db, state, ctx) => {
+    const index = ctx.targets[0]
+    if (index === undefined) return state
+    const p = state.players[ctx.player]
+    const die = p.gigArea[index]
+    if (die === undefined) return state
+    die.value = Math.max(1, Math.min(die.size, die.value - 2))
+    if (die.value === 1) {
+      if (!drawCards(state, ctx.player, 1)) {
+        endGame(state, opponentOf(ctx.player), 'deckout')
+      }
+    }
+    return state
+  },
+
+  /**
    * `alt-cunningham-soulkiller-architect` — "1 €$, {Spend} Play a Program
    * from your trash. Bottom-deck it after you play it. (You still pay its
    * cost.)" Unlike every earlier "play ... for free" script, this Program is
@@ -1162,21 +1196,36 @@ export const scriptedCards: Record<string, ScriptedCard> = {
 
   /**
    * `maman-brigitte-spirit-of-death` — "{Play} You may discard 2 Programs.
-   * If you do, bottom-deck a rival unequipped Unit." "If you do" ties the
-   * bottom-deck to whether the discard actually happened; with 2 discard
-   * slots feeding a 3rd conditional slot, a declared-target version risks
-   * exactly the "3+ slots, an unfillable middle one" shape this batch's
-   * brief calls out to avoid, so this stays fully scripted with both the
-   * discarded Programs and the bottom-decked Unit picked through the rng
-   * (docs/rulings.md §32/§50) — "which 2 Programs" and "which rival Unit"
-   * are not distinguished by the printed text.
+   * If you do, bottom-deck a rival unequipped Unit." **Fix round 1**
+   * (docs/rulings.md §133 — batch review, superseding the original §130):
+   * "you may discard 2 Programs" is a COSTED option (2 of the controller's
+   * own hand cards) — a real yes/no dilemma per §50's own dividing line,
+   * not an auto-take the way a Gear/self-defeat "you may" is. Encoded as a
+   * `chooseOne` (in `data/cards.json`) with a do-nothing decline mode —
+   * `{ kind: 'sequence', effects: [] }`, §50's own prescribed shape for a
+   * real dilemma — wrapping this "take it" script. "Which 2 Programs" is
+   * now this script's own two declared `friendlyHandCard` (filtered
+   * `program`) target slots: a real, player-visible decision (the
+   * controller's own hand), matching §73/§80's "a real decision, not rng,
+   * when the action can carry one." The two slots are correlated — the
+   * IDENTICAL spec+filter, so they are always either both fillable or both
+   * empty, never the "later slot stays fillable while an earlier one goes
+   * missing" shape the task brief warns against — so a degenerate
+   * same-card duplicate (only reachable when exactly 1 qualifying Program
+   * exists, since then both slots' only candidate is the same card) is
+   * simply treated as no pick at all here, the same tolerance `matchGig`
+   * already extends to a harmless degenerate self-pick. "Which rival Unit"
+   * stays picked through the rng: the printed text draws no distinction
+   * among unequipped rivals, and promoting it to a THIRD declared slot
+   * *after* a pair that can be jointly unfillable is exactly the "3+
+   * slots, unfillable middle" shape this batch's brief calls out to avoid.
    */
-  'maman-brigitte-spirit-of-death': (db, state, ctx) => {
+  'maman-brigitte-spirit-of-death:take-it': (_db, state, ctx) => {
+    const [progA, progB] = ctx.targets
+    if (progA === undefined || progB === undefined || progA === progB) return state
     const p = state.players[ctx.player]
-    const programs = p.hand.filter((uid) => db[state.cards[uid].defId]?.type === 'program')
-    if (programs.length < 2) return state
-    const discarded = pickN(state, programs, 2)
-    for (const uid of discarded) {
+    if (!p.hand.includes(progA) || !p.hand.includes(progB)) return state
+    for (const uid of [progA, progB]) {
       p.hand = p.hand.filter((u) => u !== uid)
       p.trash.push(uid)
       state.events.push({ type: 'cardTrashed', uid })
