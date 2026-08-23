@@ -216,6 +216,12 @@
           "kind": "draw",
           "count": 1
         }
+      },
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "stealInterceptByDiscard"
+        }
       }
     ]
   },
@@ -298,7 +304,20 @@
       "ganger"
     ],
     "text": "The next time a friendly Unit wins a fight by 3+ power this turn, it also steals a Gig.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "floatingEffect",
+          "floating": {
+            "kind": "winFightMarginSteal",
+            "expiry": "endOfTurn",
+            "margin": 3,
+            "count": 1
+          }
+        }
+      }
+    ]
   },
   {
     "id": "arasaka-emergency-radioport",
@@ -550,7 +569,18 @@
       "netrunner"
     ],
     "text": "{Play} Until your next turn, rival Units can't steal friendly Gigs with value higher than their power.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "floatingEffect",
+          "floating": {
+            "kind": "rivalStealCappedByPower",
+            "expiry": "ownerNextTurnStart"
+          }
+        }
+      }
+    ]
   },
   {
     "id": "chrome-reverie",
@@ -570,6 +600,17 @@
     ],
     "text": "A rival Unit can't attack until your next turn. If you control a min Gig, you may Call a Legend for free. (You can only Call a Legend once per turn.)",
     "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "floatingEffect",
+          "floating": {
+            "kind": "unitCantAttack",
+            "expiry": "ownerNextTurnStart",
+            "target": "rivalUnit"
+          }
+        }
+      },
       {
         "trigger": "onPlay",
         "condition": {
@@ -647,7 +688,36 @@
       "quickhack"
     ],
     "text": "{Quick} Give an equipped Unit +3 power this turn for each of its equipped Gears. If that Unit steals or fights, defeat it at the end of this turn.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "sameTarget",
+          "target": "anyUnit",
+          "filter": {
+            "equipped": true
+          },
+          "effects": [
+            {
+              "kind": "buffPower",
+              "amount": {
+                "perEquippedGear": 3
+              },
+              "target": "chosen",
+              "duration": "turn"
+            },
+            {
+              "kind": "floatingEffect",
+              "floating": {
+                "kind": "defeatIfActed",
+                "expiry": "endOfTurn",
+                "target": "chosen"
+              }
+            }
+          ]
+        }
+      }
+    ]
   },
   {
     "id": "deadman-transmitter",
@@ -1028,6 +1098,21 @@
         "effect": {
           "kind": "readyEddies",
           "count": 1
+        }
+      },
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true,
+          "eddies": 1
+        },
+        "effect": {
+          "kind": "floatingEffect",
+          "floating": {
+            "kind": "mustAttack",
+            "expiry": "ownerNextTurnStart",
+            "target": "rivalUnit"
+          }
         }
       }
     ]
@@ -1583,7 +1668,15 @@
       "merc"
     ],
     "text": "{Go Solo} (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\nIf a friendly Unit would be defeated, you may spend 1 €$ to defeat this Legend instead. (Remove it from the game.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "defeatInterceptSelf",
+          "eddies": 1
+        }
+      }
+    ]
   },
   {
     "id": "jackie-welles-pour-one-out-for-me",
@@ -1898,7 +1991,44 @@
       "samurai"
     ],
     "text": "When you roll in a Gig from your fixer area, you may ignore the result and reroll it once.\nWhen you roll a min or max value on a Gig, draw 1. If it's a d20, draw 3 instead.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "gigRerollOption"
+        }
+      },
+      {
+        "trigger": "onGigRoll",
+        "condition": {
+          "rolledExtremeValue": true,
+          "rolledDieSizeAnyOf": [
+            20
+          ]
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 3
+        }
+      },
+      {
+        "trigger": "onGigRoll",
+        "condition": {
+          "rolledExtremeValue": true,
+          "rolledDieSizeAnyOf": [
+            4,
+            6,
+            8,
+            10,
+            12
+          ]
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "kerry-eurodyne-the-last-rockerboy",
@@ -2508,7 +2638,19 @@
       "ganger"
     ],
     "text": "{Play} A rival Unit must attack next turn if it can.\n{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "floatingEffect",
+          "floating": {
+            "kind": "mustAttack",
+            "expiry": "ownerNextTurnStart",
+            "target": "rivalUnit"
+          }
+        }
+      }
+    ]
   },
   {
     "id": "mt0d12-flathead",
@@ -3154,7 +3296,18 @@
       "quickhack"
     ],
     "text": "{Quick} The next time a rival Unit fights this turn, it doesn't defeat the opposing friendly Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "floatingEffect",
+          "floating": {
+            "kind": "rivalFightNoDefeat",
+            "expiry": "endOfTurn"
+          }
+        }
+      }
+    ]
   },
   {
     "id": "riding-nomad",
@@ -3501,7 +3654,18 @@
       "quickhack"
     ],
     "text": "{Quick} The next time a friendly Unit loses a fight this turn, defeat the opposing rival Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "floatingEffect",
+          "floating": {
+            "kind": "loseFightDefeatFoe",
+            "expiry": "endOfTurn"
+          }
+        }
+      }
+    ]
   },
   {
     "id": "sandayu-oda-hanako-s-guardian",

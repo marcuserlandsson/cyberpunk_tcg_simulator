@@ -25,6 +25,9 @@ const triggerSchema = z.enum([
   'onFriendlyBlock',
   'onFriendlyCardPlayed',
   'onFriendlyStealComplete',
+  // Deferred slice (docs/rulings.md §143): "When you roll a min or max value
+  // on a Gig, ..." — fired wherever a Gig die's value is rolled.
+  'onGigRoll',
   'activated',
   'static',
 ])
@@ -71,6 +74,7 @@ const targetFilterSchema = z.strictObject({
   spentOnly: z.boolean().optional(),
   lowestPower: z.boolean().optional(),
   readyOnly: z.boolean().optional(),
+  equipped: z.boolean().optional(),
 })
 
 const costReductionSchema = z.discriminatedUnion('per', [
@@ -156,7 +160,55 @@ const conditionSchema = z.strictObject({
   stealerKeywordAnyOf: z.array(z.string()).optional(),
   streetCredBehindRival: z.boolean().optional(),
   friendlyGigSizeAtMin: dieSizeSchema.optional(),
+  // Deferred slice (docs/rulings.md §143), `onGigRoll` only:
+  rolledExtremeValue: z.boolean().optional(),
+  rolledDieSizeAnyOf: z.array(dieSizeSchema).optional(),
 })
+
+/**
+ * What a `floatingEffect` node writes into `GameState.floatingEffects`
+ * (`FloatingSpec` in types.ts, docs/rulings.md §141) — one strict variant per
+ * printed clause shape, so an unknown kind or a stray field is a load error
+ * like every other node.
+ */
+const floatingSpecSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('rivalStealCappedByPower'),
+    expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']),
+  }),
+  z.strictObject({
+    kind: z.literal('winFightMarginSteal'),
+    expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']),
+    margin: z.number(),
+    count: z.number(),
+  }),
+  z.strictObject({
+    kind: z.literal('loseFightDefeatFoe'),
+    expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']),
+  }),
+  z.strictObject({
+    kind: z.literal('rivalFightNoDefeat'),
+    expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']),
+  }),
+  z.strictObject({
+    kind: z.literal('defeatIfActed'),
+    expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']),
+    target: targetSpecSchema,
+    filter: targetFilterSchema.optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('unitCantAttack'),
+    expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']),
+    target: targetSpecSchema,
+    filter: targetFilterSchema.optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('mustAttack'),
+    expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']),
+    target: targetSpecSchema,
+    filter: targetFilterSchema.optional(),
+  }),
+])
 
 export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
   z.discriminatedUnion('kind', [
@@ -298,6 +350,11 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
     }),
     z.strictObject({ kind: z.literal('readyEddies'), count: z.number() }),
     z.strictObject({ kind: z.literal('cantBeBlocked') }),
+    // Deferred slice (docs/rulings.md §141 ff.):
+    z.strictObject({ kind: z.literal('floatingEffect'), floating: floatingSpecSchema }),
+    z.strictObject({ kind: z.literal('gigRerollOption') }),
+    z.strictObject({ kind: z.literal('defeatInterceptSelf'), eddies: z.number() }),
+    z.strictObject({ kind: z.literal('stealInterceptByDiscard') }),
   ])
 )
 

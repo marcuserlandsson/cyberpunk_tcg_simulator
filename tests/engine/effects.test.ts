@@ -16,7 +16,13 @@ import { gearEquipTargets, gearTargetOverrides } from '../../src/cards/targets'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { createRng } from '../../src/engine/rng'
 import { legalActions } from '../../src/engine/legal'
-import { actingPlayer, effectiveKeywords, effectivePower, streetCred } from '../../src/engine/query'
+import {
+  actingPlayer,
+  cantAttack,
+  effectiveKeywords,
+  effectivePower,
+  streetCred,
+} from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
 import type {
   Action,
@@ -96,6 +102,10 @@ function scenario(seed = 7): GameState {
     pendingAttack: null,
     pendingSteal: null,
     oncePerTurnUsed: [],
+    floatingEffects: [],
+    pendingGigRoll: null,
+    pendingIntercept: null,
+    interceptAnswers: [],
     winner: null,
     rng: createRng(seed),
     events: [],
@@ -3193,5 +3203,678 @@ describe('trigger: onFriendlyEquippedSpend (docs/rulings.md §68 ff.)', () => {
 
     const next = applyAction(db, s, { type: 'attack', attacker, target: s.players[1].field[0] })
     expect(next.players[0].hand).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The deferred slice: floating effects (§141), forced attacks (§142), the
+// gig-roll seam (§143) and would-be-mutation interceptions (§144). Synthetic
+// cards throughout — each mechanism is exercised in isolation here, and the
+// real cards that need it are covered in tests/cards/*.test.ts.
+// ---------------------------------------------------------------------------
+
+/** Ends the active player's turn (both players keep a deck so no deckout). */
+function endTurnWith(db: CardDb, state: GameState): GameState {
+  return applyAction(db, state, { type: 'endTurn' })
+}
+
+describe('floatingEffects: the zone itself (docs/rulings.md §141)', () => {
+  const db = makeDb([
+    def('until-next-turn', 'program', {
+      power: null,
+      effects: [
+        onPlay({
+          kind: 'floatingEffect',
+          floating: { kind: 'rivalStealCappedByPower', expiry: 'ownerNextTurnStart' },
+        }),
+      ],
+    }),
+    def('this-turn', 'program', {
+      power: null,
+      effects: [
+        onPlay({
+          kind: 'floatingEffect',
+          floating: { kind: 'loseFightDefeatFoe', expiry: 'endOfTurn' },
+        }),
+      ],
+    }),
+    def('grunt', 'unit', { power: 1 }),
+  ])
+
+  it('records the controller, the source def and the printed expiry', () => {
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'until-next-turn')
+
+    const next = fire(db, s, src)
+    expect(next.floatingEffects).toEqual([
+      {
+        kind: 'rivalStealCappedByPower',
+        controller: 0,
+        sourceDefId: 'until-next-turn',
+        expiry: 'ownerNextTurnStart',
+      },
+    ])
+    expect(s.floatingEffects).toEqual([]) // the input state is untouched
+  })
+
+  it('drops an endOfTurn entry when the game turn ends', () => {
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'this-turn')
+    mint(s, 0, 'deck', 'grunt')
+    mint(s, 1, 'deck', 'grunt')
+
+    let next = fire(db, s, src)
+    expect(next.floatingEffects).toHaveLength(1)
+    next = endTurnWith(db, next)
+    expect(next.floatingEffects).toEqual([])
+  })
+
+  it('keeps an ownerNextTurnStart entry through the rival turn, then drops it', () => {
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'until-next-turn')
+    mint(s, 0, 'deck', 'grunt')
+    mint(s, 0, 'deck', 'grunt')
+    mint(s, 1, 'deck', 'grunt')
+
+    let next = fire(db, s, src)
+    next = endTurnWith(db, next) // player 1's turn begins
+    expect(next.activePlayer).toBe(1)
+    expect(next.floatingEffects).toHaveLength(1) // still live during the rival's turn
+    next = endTurnWith(db, next) // player 0's next turn begins
+    expect(next.activePlayer).toBe(0)
+    expect(next.floatingEffects).toEqual([])
+  })
+})
+
+describe('floatingEffects: rivalStealCappedByPower (chrome-fang, §141)', () => {
+  const db = makeDb([
+    def('thief', 'unit', { power: 3 }),
+    def('program-thief', 'program', {
+      power: null,
+      effects: [onPlay({ kind: 'stealGig', count: 1 })],
+    }),
+  ])
+
+  function capped(): GameState {
+    const s = scenario()
+    s.floatingEffects.push({
+      kind: 'rivalStealCappedByPower',
+      controller: 1,
+      sourceDefId: 'chrome-fang',
+      expiry: 'ownerNextTurnStart',
+    })
+    return s
+  }
+
+  it('offers only the dice the stealing Unit can reach, and caps the count', () => {
+    const s = capped()
+    const attacker = mint(s, 0, 'field', 'thief')
+    s.players[1].gigArea = [
+      { size: 6, value: 2 },
+      { size: 6, value: 5 },
+      { size: 6, value: 3 },
+    ]
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(gigChoices(db, next)).toEqual([0, 2]) // the value-5 die is out of reach
+  })
+
+  it('steals nothing at all when every rival die is out of reach', () => {
+    const s = capped()
+    const attacker = mint(s, 0, 'field', 'thief')
+    s.players[1].gigArea = [{ size: 6, value: 6 }]
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.pendingSteal).toBeNull()
+    expect(next.phase).toBe('main')
+    expect(next.players[1].gigArea).toHaveLength(1)
+  })
+
+  it('does not restrict a steal whose source is not a Unit', () => {
+    const s = capped()
+    const src = mint(s, 0, 'trash', 'program-thief')
+    s.players[1].gigArea = [{ size: 6, value: 6 }]
+
+    const next = fire(db, s, src)
+    expect(next.phase).toBe('chooseGig')
+    expect(gigChoices(db, next)).toEqual([0])
+  })
+})
+
+describe('floatingEffects: fight consequences (§141)', () => {
+  const db = makeDb([
+    def('big', 'unit', { power: 6 }),
+    def('small', 'unit', { power: 2 }),
+    def('mid', 'unit', { power: 4 }),
+  ])
+
+  it('winFightMarginSteal fires on a 3+ margin win and is consumed', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'big')
+    const defender = mint(s, 1, 'field', 'small', { ready: false })
+    s.players[1].gigArea = [{ size: 6, value: 4 }]
+    s.floatingEffects.push({
+      kind: 'winFightMarginSteal',
+      controller: 0,
+      sourceDefId: 'appetite-for-destruction',
+      expiry: 'endOfTurn',
+      margin: 3,
+      count: 1,
+    })
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: defender })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.phase).toBe('chooseGig')
+    expect(next.floatingEffects).toEqual([])
+  })
+
+  it('winFightMarginSteal stays put when the margin is too small', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'big')
+    const defender = mint(s, 1, 'field', 'mid', { ready: false })
+    s.players[1].gigArea = [{ size: 6, value: 4 }]
+    s.floatingEffects.push({
+      kind: 'winFightMarginSteal',
+      controller: 0,
+      sourceDefId: 'appetite-for-destruction',
+      expiry: 'endOfTurn',
+      margin: 3,
+      count: 1,
+    })
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: defender })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.phase).toBe('main')
+    expect(next.floatingEffects).toHaveLength(1)
+  })
+
+  it('loseFightDefeatFoe defeats the winner of the fight its owner lost', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'big')
+    const defender = mint(s, 1, 'field', 'small', { ready: false })
+    s.floatingEffects.push({
+      kind: 'loseFightDefeatFoe',
+      controller: 1,
+      sourceDefId: 'safety-override',
+      expiry: 'endOfTurn',
+    })
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: defender })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.players[1].field).toEqual([]) // the loser still dies
+    expect(next.players[0].field).toEqual([]) // and takes the winner with it
+    expect(next.floatingEffects).toEqual([])
+  })
+
+  it('rivalFightNoDefeat saves its owner combatant and is consumed', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'big')
+    const defender = mint(s, 1, 'field', 'small', { ready: false })
+    s.floatingEffects.push({
+      kind: 'rivalFightNoDefeat',
+      controller: 1,
+      sourceDefId: 'reboot-optics',
+      expiry: 'endOfTurn',
+    })
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: defender })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.players[1].field).toEqual([defender])
+    expect(next.floatingEffects).toEqual([])
+  })
+})
+
+describe('floatingEffects: defeatIfActed (cyberpsychosis, §141)', () => {
+  const db = makeDb([def('grunt', 'unit', { power: 1 }), def('big', 'unit', { power: 6 })])
+
+  function rigged(state: GameState, uid: number): void {
+    state.floatingEffects.push({
+      kind: 'defeatIfActed',
+      controller: 0,
+      sourceDefId: 'cyberpsychosis',
+      expiry: 'endOfTurn',
+      unitUid: uid,
+      acted: false,
+    })
+  }
+
+  it('defeats the rigged Unit at the end of the turn once it has fought', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'big')
+    const defender = mint(s, 1, 'field', 'grunt', { ready: false })
+    mint(s, 0, 'deck', 'grunt')
+    mint(s, 1, 'deck', 'grunt')
+    rigged(s, attacker)
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: defender })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.floatingEffects[0].acted).toBe(true)
+    expect(next.players[0].field).toEqual([attacker]) // survives until end of turn
+    next = endTurnWith(db, next)
+    expect(next.players[0].field).toEqual([])
+    expect(next.floatingEffects).toEqual([])
+  })
+
+  it('marks a steal too', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'big')
+    s.players[1].gigArea = [{ size: 6, value: 2 }]
+    rigged(s, attacker)
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
+    expect(next.floatingEffects[0].acted).toBe(true)
+  })
+
+  it('leaves a Unit that did nothing alone', () => {
+    const s = scenario()
+    const idle = mint(s, 0, 'field', 'big')
+    mint(s, 0, 'deck', 'grunt')
+    mint(s, 1, 'deck', 'grunt')
+    rigged(s, idle)
+
+    const next = endTurnWith(db, s)
+    expect(next.players[0].field).toEqual([idle])
+    expect(next.floatingEffects).toEqual([])
+  })
+
+  it('never writes the acted bit back into the state it was given', () => {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'big')
+    s.players[1].gigArea = [{ size: 6, value: 2 }]
+    rigged(s, attacker)
+
+    let next = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
+    expect(s.floatingEffects[0].acted).toBe(false)
+  })
+})
+
+describe('floatingEffects: unitCantAttack (chrome-reverie, §141)', () => {
+  const db = makeDb([
+    def('grunt', 'unit', { power: 1 }),
+    def('denier', 'program', {
+      power: null,
+      effects: [
+        onPlay({
+          kind: 'floatingEffect',
+          floating: {
+            kind: 'unitCantAttack',
+            expiry: 'ownerNextTurnStart',
+            target: 'rivalUnit',
+          },
+        }),
+      ],
+    }),
+  ])
+
+  it('binds a real target slot and denies that Unit its attacks', () => {
+    const s = scenario()
+    const src = mint(s, 0, 'hand', 'denier')
+    const victim = mint(s, 1, 'field', 'grunt')
+    const other = mint(s, 1, 'field', 'grunt') // a second, untouched rival Unit
+    expect(playActions(db, s).filter((a) => a.card === src)).toHaveLength(2)
+
+    const next = applyAction(db, s, { type: 'playCard', card: src, payment: [], targets: [victim] })
+    expect(next.floatingEffects[0]).toMatchObject({ kind: 'unitCantAttack', unitUid: victim })
+    expect(cantAttack(db, next, victim)).toBe(true)
+    expect(cantAttack(db, next, other)).toBe(false)
+  })
+})
+
+describe('forced attacks: mustAttack (mox-inciters, §142)', () => {
+  const db = makeDb([def('grunt', 'unit', { power: 2 }), def('wall', 'unit', { power: 9 })])
+
+  function forced(state: GameState, uid: number, controller: PlayerId): void {
+    state.floatingEffects.push({
+      kind: 'mustAttack',
+      controller,
+      sourceDefId: 'mox-inciters',
+      expiry: 'ownerNextTurnStart',
+      unitUid: uid,
+    })
+  }
+
+  it('withholds endTurn while the forced Unit still has an attack to make', () => {
+    const s = scenario()
+    s.activePlayer = 1
+    const obliged = mint(s, 1, 'field', 'grunt')
+    mint(s, 0, 'field', 'grunt', { ready: false })
+    forced(s, obliged, 0)
+
+    const legal = legalActions(db, s)
+    expect(legal.some((a) => a.type === 'endTurn')).toBe(false)
+    expect(legal.some((a) => a.type === 'attack' && a.attacker === obliged)).toBe(true)
+  })
+
+  it('returns endTurn once the obligation is discharged by attacking', () => {
+    const s = scenario()
+    s.activePlayer = 1
+    const obliged = mint(s, 1, 'field', 'grunt')
+    const target = mint(s, 0, 'field', 'wall', { ready: false })
+    forced(s, obliged, 0)
+
+    let next = applyAction(db, s, { type: 'attack', attacker: obliged, target })
+    next = applyAction(db, next, { type: 'react', reaction: pass })
+    expect(next.floatingEffects).toEqual([])
+    expect(legalActions(db, next).some((a) => a.type === 'endTurn')).toBe(true)
+  })
+
+  it('is vacuous — endTurn stays legal — when the Unit has no legal attack', () => {
+    const s = scenario()
+    s.activePlayer = 1
+    const obliged = mint(s, 1, 'field', 'grunt')
+    forced(s, obliged, 0) // no rival Unit and no rival Gig to attack
+    expect(legalActions(db, s).some((a) => a.type === 'endTurn')).toBe(true)
+  })
+
+  it('never binds the player who created it', () => {
+    const s = scenario()
+    const obliged = mint(s, 1, 'field', 'grunt')
+    mint(s, 0, 'field', 'grunt', { ready: false })
+    forced(s, obliged, 0) // player 0 is active: it is not their turn to be forced
+    expect(legalActions(db, s).some((a) => a.type === 'endTurn')).toBe(true)
+  })
+})
+
+describe('gig-roll seam: onGigRoll + gigRerollOption (kerry-eurodyne, §143)', () => {
+  const db = makeDb([
+    def('roller', 'legend', {
+      power: null,
+      effects: [
+        { trigger: 'static', effect: { kind: 'gigRerollOption' } },
+        {
+          trigger: 'onGigRoll',
+          condition: { rolledExtremeValue: true },
+          effect: { kind: 'draw', count: 1 },
+        },
+      ],
+    }),
+    def('plain', 'legend', { power: null }),
+    def('grunt', 'unit', { power: 1 }),
+  ])
+
+  function rolling(defId: string, seed: number): GameState {
+    const s = scenario(seed)
+    s.phase = 'start'
+    s.players[0].fixer = [{ size: 4, value: 0 }]
+    mint(s, 0, 'legends', defId)
+    for (let i = 0; i < 6; i++) mint(s, 0, 'deck', 'grunt')
+    return s
+  }
+
+  it('stops in the gigReroll phase and offers both answers', () => {
+    const next = applyAction(db, rolling('roller', 3), { type: 'chooseGigDie', size: 4 })
+    expect(next.phase).toBe('gigReroll')
+    expect(next.pendingGigRoll).toEqual({ player: 0, dieIndex: 0 })
+    expect(legalActions(db, next)).toEqual([
+      { type: 'chooseGigReroll', reroll: false },
+      { type: 'chooseGigReroll', reroll: true },
+    ])
+  })
+
+  it('goes straight to main without the static', () => {
+    const next = applyAction(db, rolling('plain', 3), { type: 'chooseGigDie', size: 4 })
+    expect(next.phase).toBe('main')
+    expect(next.pendingGigRoll).toBeNull()
+  })
+
+  it('declining keeps the rolled value; rerolling rolls the same die again', () => {
+    const rolled = applyAction(db, rolling('roller', 3), { type: 'chooseGigDie', size: 4 })
+    const value = rolled.players[0].gigArea[0].value
+
+    const kept = applyAction(db, rolled, { type: 'chooseGigReroll', reroll: false })
+    expect(kept.players[0].gigArea[0].value).toBe(value)
+    expect(kept.phase).toBe('main')
+
+    const again = applyAction(db, rolled, { type: 'chooseGigReroll', reroll: true })
+    expect(again.players[0].gigArea).toHaveLength(1)
+    expect(again.events.filter((e) => e.type === 'dieRolled')).toHaveLength(2)
+    expect(again.phase).toBe('main')
+  })
+
+  it('fires the roll trigger only on a min or max face', () => {
+    // Roll a d4 under many seeds until every face has been seen once, and
+    // record how many cards the roll drew.
+    const drawsByFace = new Map<number, number>()
+    for (let seed = 1; seed <= 60 && drawsByFace.size < 4; seed++) {
+      const next = applyAction(db, rolling('roller', seed), { type: 'chooseGigDie', size: 4 })
+      const value = next.players[0].gigArea[0].value
+      if (!drawsByFace.has(value)) drawsByFace.set(value, next.players[0].hand.length)
+    }
+    expect(drawsByFace.get(1)).toBe(1) // min face -> drew 1
+    expect(drawsByFace.get(4)).toBe(1) // max face -> drew 1
+    expect(drawsByFace.get(2)).toBe(0)
+    expect(drawsByFace.get(3)).toBe(0)
+  })
+
+  it('narrows by die size with rolledDieSizeAnyOf', () => {
+    const sized = makeDb([
+      def('d20-only', 'legend', {
+        power: null,
+        effects: [
+          {
+            trigger: 'onGigRoll',
+            condition: { rolledExtremeValue: true, rolledDieSizeAnyOf: [20] },
+            effect: { kind: 'draw', count: 1 },
+          },
+        ],
+      }),
+      def('grunt', 'unit', { power: 1 }),
+    ])
+
+    function rollingSized(size: 4 | 20, seed: number): GameState {
+      const s = scenario(seed)
+      s.phase = 'start'
+      s.players[0].fixer = [{ size, value: 0 }]
+      mint(s, 0, 'legends', 'd20-only')
+      for (let i = 0; i < 6; i++) mint(s, 0, 'deck', 'grunt')
+      return s
+    }
+
+    // A d4 min/max face never fires a d20-only clause...
+    let d4Extremes = 0
+    for (let seed = 1; seed <= 20; seed++) {
+      const next = applyAction(sized, rollingSized(4, seed), { type: 'chooseGigDie', size: 4 })
+      const value = next.players[0].gigArea[0].value
+      if (value === 1 || value === 4) {
+        d4Extremes += 1
+        expect(next.players[0].hand).toEqual([])
+      }
+    }
+    expect(d4Extremes).toBeGreaterThan(0)
+
+    // ... while a d20 landing on 1 or 20 does.
+    let d20Extremes = 0
+    for (let seed = 1; seed <= 200 && d20Extremes === 0; seed++) {
+      const next = applyAction(sized, rollingSized(20, seed), { type: 'chooseGigDie', size: 20 })
+      const value = next.players[0].gigArea[0].value
+      if (value === 1 || value === 20) {
+        d20Extremes += 1
+        expect(next.players[0].hand).toHaveLength(1)
+      }
+    }
+    expect(d20Extremes).toBe(1)
+  })
+})
+
+describe('interception: defeatInterceptSelf (jackie-welles, §144)', () => {
+  const db = makeDb([
+    def('big', 'unit', { power: 6 }),
+    def('small', 'unit', { power: 1 }),
+    def('guardian', 'legend', {
+      power: null,
+      effects: [{ trigger: 'static', effect: { kind: 'defeatInterceptSelf', eddies: 1 } }],
+    }),
+    def('coin', 'unit', { power: 0 }),
+  ])
+
+  function board(opts: { eddies?: number } = {}): {
+    state: GameState
+    attacker: number
+    victim: number
+    guardian: number
+  } {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'big')
+    const victim = mint(s, 1, 'field', 'small', { ready: false })
+    const guardian = mint(s, 1, 'legends', 'guardian')
+    for (let i = 0; i < (opts.eddies ?? 1); i++) mint(s, 1, 'eddies', 'coin', { faceUp: false })
+    return { state: s, attacker, victim, guardian }
+  }
+
+  it('pauses the fight and asks the protector controller, who may decline', () => {
+    const { state, attacker, victim, guardian } = board()
+    const declared = applyAction(db, state, { type: 'attack', attacker, target: victim })
+    const paused = applyAction(db, declared, { type: 'react', reaction: pass })
+
+    expect(paused.phase).toBe('intercept')
+    expect(actingPlayer(paused)).toBe(1)
+    expect(paused.pendingIntercept).toMatchObject({
+      kind: 'defeat',
+      player: 1,
+      protector: guardian,
+      subject: victim,
+      options: [-1, guardian],
+    })
+    // Nothing has happened yet: the whole action was rolled back.
+    expect(paused.players[1].field).toEqual([victim])
+
+    const declined = applyAction(db, paused, { type: 'answerIntercept', answer: -1 })
+    expect(declined.players[1].field).toEqual([])
+    expect(declined.players[1].legends).toEqual([guardian])
+    expect(declined.phase).toBe('main')
+    expect(declined.pendingIntercept).toBeNull()
+  })
+
+  it('accepting spends the cost, removes the protector and saves the Unit', () => {
+    const { state, attacker, victim, guardian } = board()
+    const paused = applyAction(
+      db,
+      applyAction(db, state, { type: 'attack', attacker, target: victim }),
+      { type: 'react', reaction: pass }
+    )
+    const saved = applyAction(db, paused, { type: 'answerIntercept', answer: guardian })
+
+    expect(saved.players[1].field).toEqual([victim]) // not defeated
+    expect(saved.players[1].legends).toEqual([]) // the Legend left the legends zone
+    expect(saved.players[1].removed).toEqual([guardian]) // removed from the game
+    expect(saved.players[1].eddies.every((uid) => !saved.cards[uid].ready)).toBe(true)
+    expect(saved.phase).toBe('main')
+  })
+
+  it('is never offered when the controller cannot pay', () => {
+    const { state, attacker, victim } = board({ eddies: 0 })
+    const resolved = applyAction(
+      db,
+      applyAction(db, state, { type: 'attack', attacker, target: victim }),
+      { type: 'react', reaction: pass }
+    )
+    expect(resolved.phase).toBe('main')
+    expect(resolved.players[1].field).toEqual([])
+  })
+})
+
+describe('interception: stealInterceptByDiscard (alt-cunningham, §144)', () => {
+  const db = makeDb([
+    def('thief', 'unit', { power: 3 }),
+    def('warden', 'unit', {
+      power: 2,
+      effects: [{ trigger: 'static', effect: { kind: 'stealInterceptByDiscard' } }],
+    }),
+    def('cost3', 'program', { cost: 3, power: null }),
+    def('cost5', 'program', { cost: 5, power: null }),
+  ])
+
+  function board(): { state: GameState; attacker: number; match: number } {
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'thief')
+    mint(s, 1, 'field', 'warden')
+    const match = mint(s, 1, 'hand', 'cost3')
+    mint(s, 1, 'hand', 'cost5')
+    s.players[1].gigArea = [{ size: 6, value: 3 }]
+    return { state: s, attacker, match }
+  }
+
+  it('asks the victim, and a discard of the matching cost prevents the steal', () => {
+    const { state, attacker, match } = board()
+    const paused = applyAction(
+      db,
+      applyAction(db, state, { type: 'attack', attacker, target: 'gigArea' }),
+      { type: 'react', reaction: pass }
+    )
+    // The thief's own choice of die comes first; the interception follows it.
+    const asked = applyAction(db, paused, { type: 'chooseGig', dieIndex: 0 })
+    expect(asked.phase).toBe('intercept')
+    expect(asked.pendingIntercept).toMatchObject({
+      kind: 'steal',
+      player: 1,
+      options: [-1, match], // only the cost-3 card matches the die's value
+    })
+
+    const prevented = applyAction(db, asked, { type: 'answerIntercept', answer: match })
+    expect(prevented.players[1].gigArea).toEqual([{ size: 6, value: 3 }])
+    expect(prevented.players[0].gigArea).toEqual([])
+    expect(prevented.players[1].trash).toEqual([match])
+    expect(prevented.phase).toBe('main')
+  })
+
+  it('declining lets the steal through', () => {
+    const { state, attacker } = board()
+    const asked = applyAction(
+      db,
+      applyAction(
+        db,
+        applyAction(db, state, { type: 'attack', attacker, target: 'gigArea' }),
+        { type: 'react', reaction: pass }
+      ),
+      { type: 'chooseGig', dieIndex: 0 }
+    )
+    const stolen = applyAction(db, asked, { type: 'answerIntercept', answer: -1 })
+    expect(stolen.players[0].gigArea).toEqual([{ size: 6, value: 3 }])
+    expect(stolen.players[1].gigArea).toEqual([])
+    expect(stolen.players[1].hand).toHaveLength(2)
+  })
+
+  it('leaves "steals 1 or more Gigs" unfired when every die was prevented', () => {
+    // `onFriendlyStealComplete` ("When a friendly Unit steals 1 or more Gigs")
+    // must not fire for an episode that stole nothing (docs/rulings.md §144's
+    // `PendingSteal.taken`).
+    const withWatcher = makeDb([
+      def('thief', 'unit', { power: 3 }),
+      def('watcher', 'unit', {
+        power: 1,
+        effects: [{ trigger: 'onFriendlyStealComplete', effect: { kind: 'draw', count: 1 } }],
+      }),
+      def('warden', 'unit', {
+        power: 2,
+        effects: [{ trigger: 'static', effect: { kind: 'stealInterceptByDiscard' } }],
+      }),
+      def('cost3', 'program', { cost: 3, power: null }),
+    ])
+    const s = scenario()
+    const attacker = mint(s, 0, 'field', 'thief')
+    mint(s, 0, 'field', 'watcher') // watches the thief's own side
+    mint(s, 0, 'deck', 'cost3') // something to draw, if it ever fires
+    mint(s, 1, 'field', 'warden')
+    const match = mint(s, 1, 'hand', 'cost3')
+    s.players[1].gigArea = [{ size: 6, value: 3 }]
+
+    const asked = applyAction(
+      withWatcher,
+      applyAction(
+        withWatcher,
+        applyAction(withWatcher, s, { type: 'attack', attacker, target: 'gigArea' }),
+        { type: 'react', reaction: pass }
+      ),
+      { type: 'chooseGig', dieIndex: 0 }
+    )
+    const prevented = applyAction(withWatcher, asked, { type: 'answerIntercept', answer: match })
+    expect(prevented.players[0].gigArea).toEqual([]) // nothing stolen
+    expect(prevented.players[0].hand).toEqual([]) // and so nothing drawn
   })
 })

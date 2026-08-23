@@ -12,6 +12,7 @@ import type {
   CardDef,
   CardType,
   CostReduction,
+  DieSize,
   DynamicAmount,
   EffectCondition,
   EffectDef,
@@ -49,6 +50,11 @@ export function streetCred(state: GameState, player: PlayerId): number {
  * `pendingSteal.thief` undefined and stays with the active player.
  */
 export function actingPlayer(state: GameState): PlayerId {
+  // A paused would-be-mutation interception belongs to the player whose card
+  // offers it, who may be either player (docs/rulings.md §144).
+  if (state.phase === 'intercept' && state.pendingIntercept !== null) {
+    return state.pendingIntercept.player
+  }
   if (state.phase === 'chooseGig' && state.pendingSteal?.thief !== undefined) {
     return state.pendingSteal.thief
   }
@@ -116,6 +122,11 @@ export interface ConditionContext {
   playedCardTags?: string[]
   /** `onFriendlyStealDie` only: the stealing card's own faction/keyword tags. */
   stealerTags?: string[]
+  // Deferred slice (docs/rulings.md §143), `onGigRoll` only:
+  /** The size of the die that was just rolled. */
+  rolledDieSize?: number
+  /** The value it landed on. */
+  rolledDieValue?: number
 }
 
 /**
@@ -320,6 +331,20 @@ export function conditionHolds(
     !state.players[player].gigArea.some(
       (die) => die.size === condition.friendlyGigSizeAtMin && die.value === 1
     )
+  ) {
+    return false
+  }
+  // Deferred slice (docs/rulings.md §143) — both `onGigRoll`-only, and both
+  // unsatisfiable without the matching context, exactly like `stolenDieSize`.
+  if (condition.rolledExtremeValue === true) {
+    const { rolledDieSize, rolledDieValue } = context
+    if (rolledDieSize === undefined || rolledDieValue === undefined) return false
+    if (rolledDieValue !== 1 && rolledDieValue !== rolledDieSize) return false
+  }
+  if (
+    condition.rolledDieSizeAnyOf !== undefined &&
+    (context.rolledDieSize === undefined ||
+      !condition.rolledDieSizeAnyOf.includes(context.rolledDieSize as DieSize))
   ) {
     return false
   }
@@ -828,9 +853,172 @@ export function hasKeyword(db: CardDb, state: GameState, uid: number, keyword: K
 /**
  * Is `uid` under a static "this Unit can't attack" restriction (corpo-security,
  * misty-olszewski-...)? Gear can impose it too, via the same static node.
+ *
+ * A live `unitCantAttack` floating entry ("A rival Unit can't attack until
+ * your next turn" — chrome-reverie, docs/rulings.md §141) is checked here too,
+ * deliberately: this one function is what every attack path already funnels
+ * through (`combat.canAttack` and both `...DespiteLag` Lag exceptions), so a
+ * turn-spanning denial cannot leak past one of them.
  */
 export function cantAttack(db: CardDb, state: GameState, uid: number): boolean {
+  if (state.floatingEffects.some((entry) => entry.kind === 'unitCantAttack' && entry.unitUid === uid)) {
+    return true
+  }
   return activeStaticNodes(db, state, uid).some((node) => node.kind === 'cantAttack')
+}
+
+// ---------------------------------------------------------------------------
+// Floating effects (docs/rulings.md §141 ff.)
+// ---------------------------------------------------------------------------
+
+/**
+ * Is the card doing the stealing a **Unit** for the purposes of a printed
+ * clause that names one ("rival **Units** can't steal ...", "When a rival
+ * **Unit** would steal a Gig, ...")? A Unit on the field, or a {Go Solo}
+ * Legend played "as a ready Unit" (docs/rulings.md §31) — never a Program or
+ * Gear whose own effect happens to steal, and never a face-up Legend sitting
+ * in the legends zone (docs/rulings.md §141).
+ */
+export function isUnitStealer(db: CardDb, state: GameState, uid: number): boolean {
+  const card = state.cards[uid]
+  const def = card ? db[card.defId] : undefined
+  if (!card || !def) return false
+  if (def.type === 'unit') return state.players[card.owner].field.includes(uid)
+  if (def.type === 'legend') return state.players[card.owner].field.includes(uid)
+  return false
+}
+
+/**
+ * The highest Gig value a rival Unit may steal from `victim` right now, or
+ * null when nothing caps it — "Until your next turn, rival Units can't steal
+ * friendly Gigs with value higher than their power" (chrome-fang,
+ * docs/rulings.md §141). `stealerUid` is the card actually doing the stealing:
+ * the cap is *its* power, and it only applies while that card is a Unit
+ * (`isUnitStealer`), because the printed restriction names Units only.
+ */
+export function stealValueCap(
+  db: CardDb,
+  state: GameState,
+  victim: PlayerId,
+  stealerUid: number
+): number | null {
+  const capped = state.floatingEffects.some(
+    (entry) => entry.kind === 'rivalStealCappedByPower' && entry.controller === victim
+  )
+  if (!capped) return null
+  if (!isUnitStealer(db, state, stealerUid)) return null
+  return effectivePower(db, state, stealerUid)
+}
+
+/**
+ * The Units `player` is currently OBLIGED to attack with — "A rival Unit must
+ * attack next turn if it can" (mox-inciters,
+ * evelyn-parker-beautiful-enigma, docs/rulings.md §142). Only ever non-empty
+ * during `player`'s own turn: the entry is created by their RIVAL and lapses
+ * at that rival's next turn start, so the window it covers is exactly
+ * `player`'s intervening turn.
+ */
+export function forcedAttackers(state: GameState, player: PlayerId): number[] {
+  if (state.activePlayer !== player) return []
+  return state.floatingEffects
+    .filter((entry) => entry.kind === 'mustAttack' && entry.unitUid !== undefined)
+    .map((entry) => entry.unitUid as number)
+    .filter((uid) => state.cards[uid] !== undefined && state.players[player].field.includes(uid))
+}
+
+/**
+ * Does `player` have a live "When you roll in a Gig from your fixer area, you
+ * may ignore the result and reroll it once" static (kerry-eurodyne-axe-
+ * attitude-audience, docs/rulings.md §143)? Consulted by `reduce.ts`'s
+ * `chooseGigDie` to decide whether the gig-gain step ends in a real decision.
+ */
+export function friendlyGigRerollOption(db: CardDb, state: GameState, player: PlayerId): boolean {
+  const p = state.players[player]
+  const hosts = [...p.field, ...p.legends.filter((uid) => state.cards[uid].faceUp)]
+  return hosts.some((host) =>
+    activeStaticNodes(db, state, host).some((node) => node.kind === 'gigRerollOption')
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Would-be-mutation interceptions (docs/rulings.md §144)
+// ---------------------------------------------------------------------------
+
+/**
+ * The in-play card that may intercept `uid`'s defeat, and what it costs —
+ * "If a friendly Unit would be defeated, you may spend 1 €$ to defeat this
+ * Legend instead" (jackie-welles-mama-s-favorite). Null when nothing offers
+ * it, the would-be-defeated card is not a friendly Unit *on the field*, the
+ * only interceptor IS that card, or its controller cannot pay right now
+ * (an unaffordable option is never offered as a decision).
+ */
+export function defeatInterceptorFor(
+  db: CardDb,
+  state: GameState,
+  uid: number
+): { protector: number; eddies: number } | null {
+  const card = state.cards[uid]
+  if (!card) return null
+  const player = card.owner
+  if (!state.players[player].field.includes(uid)) return null
+  const hosts = [
+    ...state.players[player].field,
+    ...state.players[player].legends.filter((u) => state.cards[u].faceUp),
+  ]
+  for (const host of hosts) {
+    if (host === uid) continue
+    for (const node of activeStaticNodes(db, state, host)) {
+      if (node.kind !== 'defeatInterceptSelf') continue
+      // The interceptor is about to be destroyed, so it may never help pay
+      // its own cost — the same rule §31 gives a {Go Solo} Legend's play.
+      if (payableUids(state, player, host).length < node.eddies) continue
+      return { protector: host, eddies: node.eddies }
+    }
+  }
+  return null
+}
+
+/** Ready cards in `player`'s eddies/legends zones that could pay 1 €$ each. */
+function payableUids(state: GameState, player: PlayerId, exclude: number): number[] {
+  const p = state.players[player]
+  return [...p.eddies, ...p.legends].filter(
+    (uid) => state.cards[uid].ready && uid !== exclude
+  )
+}
+
+/**
+ * The in-play card that may intercept a steal of a die worth `dieValue` from
+ * `victim`, plus the hand cards it could discard — "When a rival Unit would
+ * steal a Gig, you may discard 1 with cost equal to that Gig's value. If you
+ * do, the Gig isn't stolen." (alt-cunningham-mother-of-daemons's second
+ * clause, docs/rulings.md §144). Null unless the stealing card is a rival
+ * **Unit** and at least one hand card's printed cost matches exactly.
+ */
+export function stealInterceptorFor(
+  db: CardDb,
+  state: GameState,
+  victim: PlayerId,
+  stealerUid: number,
+  dieValue: number
+): { protector: number; candidates: number[] } | null {
+  if (!isUnitStealer(db, state, stealerUid)) return null
+  if (state.cards[stealerUid]?.owner === victim) return null
+  const hosts = [
+    ...state.players[victim].field,
+    ...state.players[victim].legends.filter((u) => state.cards[u].faceUp),
+  ]
+  for (const host of hosts) {
+    const offers = activeStaticNodes(db, state, host).some(
+      (node) => node.kind === 'stealInterceptByDiscard'
+    )
+    if (!offers) continue
+    const candidates = state.players[victim].hand.filter(
+      (uid) => db[state.cards[uid].defId]?.cost === dieValue
+    )
+    if (candidates.length === 0) continue
+    return { protector: host, candidates }
+  }
+  return null
 }
 
 /**

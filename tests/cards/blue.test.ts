@@ -8,18 +8,13 @@
 //   judy-a-lvarez-braindance-maestro, judy-a-lvarez-nothing-to-doubt,
 //   les-e-le-mens, lizzy-wizzy-delicate-weapon, maman-brigitte-spirit-of-death,
 //   misty-olszewski-mender-of-broken-spirits.
-// No deferrals in full this batch; two cards are PARTIALLY encoded (see the
-// batch-7 report and docs/rulings.md §120 ff.):
-//   * chrome-reverie — only its "may Call a Legend for free" clause; "A rival
-//     Unit can't attack until your next turn" needs the `floatingEffects`
-//     engine gap §52 already scoped and declined to build;
-//   * evelyn-parker-beautiful-enigma — only its "ready 1 Eddie" watcher
-//     clause; the "A rival Unit must attack next turn if it can" ability
-//     needs a new "forced action" engine capability nothing in the pool has
-//     built yet.
-// Both omissions can only ever make the encoded card WEAKER than printed
-// (never stronger), the same safe partial-encoding shape §60/§72 already
-// established — never a gameplay-affecting partial per §79/§80.
+// No deferrals in this batch. Two cards were originally shipped PARTIALLY
+// encoded (batch-7 report, docs/rulings.md §132) and are now complete:
+//   * chrome-reverie — its "A rival Unit can't attack until your next turn"
+//     clause is a `unitCantAttack` floating entry (docs/rulings.md §141);
+//   * evelyn-parker-beautiful-enigma — its "{Spend} A rival Unit must attack
+//     next turn if it can" ability is a `mustAttack` floating entry, enforced
+//     by `legalActions` withholding `endTurn` (docs/rulings.md §142).
 //
 // Batch 8 cards covered (the last 16 Blue cards, and the last batch of all
 // 141), in card-id order: modded-kusanagi, modded-muramasa, mox-inciters,
@@ -27,17 +22,13 @@
 // pyramid-song, reboot-optics, rita-wheeler-no-stupid-questions,
 // sasha-yakovleva-won-t-let-you-down, tetratronic-rippler, trust-no-one,
 // unlikely-bond, v-corporate-exile, wakako-okada-peace-and-harmony.
-// Two cards are fully deferred this batch (docs/rulings.md §134 ff.),
-// `effects: []`, joining the standing deferral list rather than shipping a
-// gameplay-affecting partial encoding (§79/§80):
+// Two cards were originally deferred in this batch (docs/rulings.md §140) and
+// are now encoded in full:
 //   * mox-inciters — "{Play} A rival Unit must attack next turn if it can."
-//     needs the same "forced future action" capability §132 already
-//     reserved this exact card for (evelyn-parker-beautiful-enigma's
-//     {Spend} ability shares the gap);
+//     is a `mustAttack` floating entry (docs/rulings.md §142);
 //   * reboot-optics — "{Quick} The next time a rival Unit fights this turn,
-//     it doesn't defeat the opposing friendly Unit." needs the
-//     `floatingEffects` gap (§52/§79/§91) — a delayed, conditional, one-shot
-//     effect tied to a future board event.
+//     it doesn't defeat the opposing friendly Unit." is a one-shot
+//     `rivalFightNoDefeat` floating entry (docs/rulings.md §141).
 // psycho-squad and v-corporate-exile are vanilla (a flavour-only line and a
 // bare {Go Solo} reminder respectively); every other batch-8 card is encoded
 // in full.
@@ -59,6 +50,7 @@ import {
   blockWith,
   db,
   endBothTurnsOnce,
+  endTurnOnce,
   fieldCard,
   findFielded,
   findInHand,
@@ -68,6 +60,7 @@ import {
   mintInto,
   passReact,
   playCardByDef,
+  quickPlay,
   setGigs,
   startAttack,
 } from './fixtures'
@@ -156,6 +149,26 @@ describe('chrome-reverie', () => {
     const after = s.players[0].legends.filter((uid) => s.cards[uid].faceUp).length
     expect(after).toBe(before)
     expect(s.players[0].calledLegendThisTurn).toBe(false)
+  })
+
+  it('denies a chosen rival Unit its attacks until its own controller next turn (§141)', () => {
+    const { state } = fixtureWithHand(0, ['chrome-reverie'])
+    const denied = fieldCard(state, 1, 'animals-wrecker')
+    const free = fieldCard(state, 1, 'rockn-rockerboy')
+    setGigs(state, 0, [{ size: 6, value: 3 }])
+
+    let s = playCardByDef(db, state, 0, 'chrome-reverie', { includes: denied })
+    expect(s.floatingEffects).toMatchObject([{ kind: 'unitCantAttack', unitUid: denied }])
+
+    s = endTurnOnce(db, s) // the rival's turn: the denial is live
+    const attackers = actionsOfType(db, s, 'attack').map((action) => action.attacker)
+    expect(attackers).not.toContain(denied)
+    expect(attackers).toContain(free) // only the chosen Unit is denied
+
+    s = endTurnOnce(db, s) // back to the controller: the denial lapses
+    expect(s.floatingEffects).toEqual([])
+    s = endTurnOnce(db, s)
+    expect(actionsOfType(db, s, 'attack').map((action) => action.attacker)).toContain(denied)
   })
 })
 
@@ -307,6 +320,26 @@ describe('evelyn-parker-beautiful-enigma', () => {
     expect(gigValues(s, 0)).toHaveLength(2) // both dice stolen in one episode
     expect(s.cards[s.players[0].eddies[0]].ready).toBe(true)
     expect(s.cards[s.players[0].eddies[1]].ready).toBe(false) // only 1 Eddie readied, not 2
+  })
+
+  it('forces a rival Unit to attack next turn for 1 €$ and a {Spend} (§142)', () => {
+    const { state } = fixtureWithHand(0, [])
+    const evelyn = mintInto(state, 0, 'legends', 'evelyn-parker-beautiful-enigma', {
+      faceUp: true,
+      ready: true,
+    })
+    const obliged = fieldCard(state, 1, 'japantown-jonin')
+    setGigs(state, 0, [{ size: 6, value: 3 }])
+
+    let s = activate(db, state, evelyn, 1, { targets: [obliged] })
+    expect(s.cards[evelyn].ready).toBe(false) // {Spend}
+    expect(s.floatingEffects).toMatchObject([{ kind: 'mustAttack', unitUid: obliged }])
+
+    s = endTurnOnce(db, s)
+    expect(actionsOfType(db, s, 'endTurn')).toEqual([])
+    expect(
+      actionsOfType(db, s, 'attack').some((action) => action.attacker === obliged)
+    ).toBe(true)
   })
 })
 
@@ -794,16 +827,47 @@ describe('modded-muramasa', () => {
 
 // ---------------------------------------------------------------------------
 // mox-inciters — "{Play} A rival Unit must attack next turn if it can.
-// {Blocker}" (the {Play} clause is deferred)
+// {Blocker}" (the forced-attack clause, finished by docs/rulings.md §142)
 // ---------------------------------------------------------------------------
 
 describe('mox-inciters', () => {
-  it('carries no effects (forced-attack clause deferred); {Blocker} still works via keywords', () => {
-    expect(db['mox-inciters'].effects).toEqual([])
+  it('forces the chosen rival Unit to attack on its own next turn', () => {
     const { state } = fixtureWithHand(0, ['mox-inciters'])
-    const s = playCardByDef(db, state, 0, 'mox-inciters')
+    const obliged = fieldCard(state, 1, 'japantown-jonin') // power 0
+    setGigs(state, 0, [{ size: 6, value: 3 }])
+
+    let s = playCardByDef(db, state, 0, 'mox-inciters', { targets: [obliged] })
+    expect(s.floatingEffects).toMatchObject([{ kind: 'mustAttack', unitUid: obliged }])
+    // Not the creator's own problem: their turn continues normally.
+    expect(actionsOfType(db, s, 'endTurn')).toHaveLength(1)
+
+    s = endTurnOnce(db, s)
+    // The rival may do anything they like EXCEPT end the turn while the
+    // obliged Unit still has an attack available.
+    expect(actionsOfType(db, s, 'endTurn')).toEqual([])
+    expect(
+      actionsOfType(db, s, 'attack').some((action) => action.attacker === obliged)
+    ).toBe(true)
+
+    s = passReact(db, startAttack(db, s, obliged, 'gigArea'))
+    expect(s.floatingEffects).toEqual([]) // obligation discharged
+    expect(actionsOfType(db, s, 'endTurn')).toHaveLength(1)
+  })
+
+  it('never forces a Unit that has no legal attack, and keeps {Blocker}', () => {
+    const { state } = fixtureWithHand(0, ['mox-inciters'])
+    const obliged = fieldCard(state, 1, 'japantown-jonin')
+    setGigs(state, 0, []) // no Gig area to raid...
+
+    let s = playCardByDef(db, state, 0, 'mox-inciters', { targets: [obliged] })
     const inciters = findFielded(s, 0, 'mox-inciters')
     expect(hasKeyword(db, s, inciters, 'blocker')).toBe(true)
+
+    s = endTurnOnce(db, s)
+    // ... and mox-inciters itself is READY, so it cannot be attacked either:
+    // the obligation is vacuous and `endTurn` stays legal.
+    expect(actionsOfType(db, s, 'attack')).toEqual([])
+    expect(actionsOfType(db, s, 'endTurn')).toHaveLength(1)
   })
 })
 
@@ -970,17 +1034,44 @@ describe('pyramid-song', () => {
 
 // ---------------------------------------------------------------------------
 // reboot-optics — "{Quick} The next time a rival Unit fights this turn, it
-// doesn't defeat the opposing friendly Unit." (deferred: floatingEffects gap)
+// doesn't defeat the opposing friendly Unit." (finished by the
+// floatingEffects zone, docs/rulings.md §141)
 // ---------------------------------------------------------------------------
 
 describe('reboot-optics', () => {
-  it('carries no effects (needs the floatingEffects engine gap)', () => {
-    // A delayed, conditional, one-shot effect tied to a FUTURE fight rather
-    // than to a chosen card or a turn boundary alone — the exact
-    // `floatingEffects` gap docs/rulings.md §52/§79/§91 already scoped and
-    // declined to half-solve for chrome-fang, appetite-for-destruction,
-    // cyberpsychosis and safety-override.
-    expect(db['reboot-optics'].effects).toEqual([])
+  it('saves the friendly Unit from the next rival fight, once', () => {
+    const { state } = fixtureWithHand(1, [])
+    mintInto(state, 0, 'hand', 'reboot-optics')
+    for (let i = 0; i < 4; i++) mintInto(state, 0, 'eddies', 'animals-wrecker', { faceUp: false })
+    const attacker = fieldCard(state, 1, 'animals-wrecker') // power 10
+    const victim = fieldCard(state, 0, 'japantown-jonin', { ready: false }) // power 0
+
+    let s = startAttack(db, state, attacker, victim)
+    s = quickPlay(db, s, 0, 'reboot-optics')
+    expect(s.floatingEffects).toHaveLength(1)
+
+    s = passReact(db, s)
+    expect(s.players[0].field).toContain(victim) // the fight happened, nobody died
+    expect(s.players[1].field).toContain(attacker)
+    expect(s.floatingEffects).toEqual([]) // one-shot: consumed by that fight
+  })
+
+  it('does not protect against a second fight in the same turn', () => {
+    const { state } = fixtureWithHand(1, [])
+    mintInto(state, 0, 'hand', 'reboot-optics')
+    for (let i = 0; i < 4; i++) mintInto(state, 0, 'eddies', 'animals-wrecker', { faceUp: false })
+    const first = fieldCard(state, 1, 'animals-wrecker')
+    const second = fieldCard(state, 1, 'rockn-rockerboy') // power 8
+    const saved = fieldCard(state, 0, 'japantown-jonin', { ready: false })
+    const doomed = fieldCard(state, 0, 'secondhand-bombus', { ready: false }) // power 0
+
+    let s = startAttack(db, state, first, saved)
+    s = quickPlay(db, s, 0, 'reboot-optics')
+    s = passReact(db, s)
+    expect(s.players[0].field).toContain(saved)
+
+    s = passReact(db, startAttack(db, s, second, doomed))
+    expect(s.players[0].field).not.toContain(doomed)
   })
 })
 

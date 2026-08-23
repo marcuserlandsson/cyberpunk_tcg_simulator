@@ -215,6 +215,8 @@ export interface PlayOpts {
   targets?: number[]
   /** Pick the entry that targets the fielded copy of this card id. */
   targetDef?: string
+  /** Pick the entry whose targets contain this uid (either player's side). */
+  includes?: number
   /** Pick the nth matching entry (default: the first). */
   index?: number
 }
@@ -243,7 +245,8 @@ export function playCardByDef(
       action.card === uid &&
       (opts.targets === undefined ||
         JSON.stringify(action.targets) === JSON.stringify(opts.targets)) &&
-      (wanted === undefined || action.targets.includes(wanted))
+      (wanted === undefined || action.targets.includes(wanted)) &&
+      (opts.includes === undefined || action.targets.includes(opts.includes))
   )
   const action = candidates[opts.index ?? 0]
   if (action === undefined) {
@@ -284,6 +287,20 @@ export function activate(
 }
 
 /**
+ * Ends the active player's turn, taking the next player's start-of-turn Gig die
+ * (and declining any "you may reroll it once" offer, docs/rulings.md §143), so
+ * the RIVAL is now in their own `main` phase.
+ */
+export function endTurnOnce(db: CardDb, state: GameState): GameState {
+  let next = applyOfType(db, state, 'endTurn')
+  if (next.phase === 'start') next = applyOfType(db, next, 'chooseGigDie')
+  if (next.phase === 'gigReroll') {
+    next = applyAction(db, next, { type: 'chooseGigReroll', reroll: false })
+  }
+  return next
+}
+
+/**
  * Ends the active player's turn and the rival's, taking each start-of-turn Gig
  * die as it comes, so the original player is back in their `main` phase with
  * Lag cleared and turn buffs gone.
@@ -291,14 +308,49 @@ export function activate(
 export function endBothTurnsOnce(db: CardDb, state: GameState): GameState {
   const owner = state.activePlayer
   let next = state
-  for (let i = 0; i < 2; i++) {
-    next = applyOfType(db, next, 'endTurn')
-    if (next.phase === 'start') next = applyOfType(db, next, 'chooseGigDie')
-  }
+  for (let i = 0; i < 2; i++) next = endTurnOnce(db, next)
   if (next.activePlayer !== owner) {
     throw new Error(`endBothTurnsOnce did not return to player ${owner}.`)
   }
   return next
+}
+
+/**
+ * Plays a {Quick} card from `player`'s hand inside an open react window — the
+ * reaction form of `playCardByDef`. `includes` picks the entry whose targets
+ * contain that uid; `targets` picks an exact tuple.
+ */
+export function quickPlay(
+  db: CardDb,
+  state: GameState,
+  player: PlayerId,
+  defId: string,
+  opts: { targets?: number[]; includes?: number } = {}
+): GameState {
+  const uid = findInHand(state, player, defId)
+  const action = actionsOfType(db, state, 'react').find(
+    (candidate) =>
+      candidate.reaction.type === 'quick' &&
+      candidate.reaction.card === uid &&
+      (opts.targets === undefined ||
+        JSON.stringify(candidate.reaction.targets) === JSON.stringify(opts.targets)) &&
+      (opts.includes === undefined || candidate.reaction.targets.includes(opts.includes))
+  )
+  if (action === undefined) {
+    throw new Error(
+      `No {Quick} reaction playing "${defId}" (${JSON.stringify(opts)}) — legal reactions: ` +
+        JSON.stringify(actionsOfType(db, state, 'react'))
+    )
+  }
+  return applyAction(db, state, action)
+}
+
+/**
+ * Answers a paused would-be-defeated / would-be-stolen interception
+ * (docs/rulings.md §144): `-1` declines, anything else accepts.
+ */
+export function answerIntercept(db: CardDb, state: GameState, answer: number): GameState {
+  return applyAction(db, state, { type: 'answerIntercept', answer })
 }
 
 /** Declares an attack; the react window is left open for the defender. */

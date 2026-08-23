@@ -17,7 +17,8 @@
 //   goro-takemura-vengeful-bodyguard, hanako-arasaka-daughter-of-the-emperor,
 //   maelstrom-zealots, maxtac-av, maxtac-squadron,
 //   nadia-fighting-through-grief, overwatch-panam-s-gift, pacifica-netrunner.
-// Deferred (see the batch report): jackie-welles-mama-s-favorite.
+// The batch-5 deferral (jackie-welles-mama-s-favorite) is now fully encoded
+// via the would-be-defeated interception point (docs/rulings.md §144).
 //
 // Every test here drives a REAL card definition from `data/cards.json`
 // through the public engine API (`newGame` / `legalActions` / `applyAction`),
@@ -27,12 +28,19 @@
 import { describe, expect, it } from 'vitest'
 import { goSoloPayment } from '../../src/cards/effects'
 import { legalActions } from '../../src/engine/legal'
-import { effectiveCardCost, effectiveKeywords, effectivePower, hasKeyword } from '../../src/engine/query'
+import {
+  actingPlayer,
+  effectiveCardCost,
+  effectiveKeywords,
+  effectivePower,
+  hasKeyword,
+} from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
 import type { CardDb, GameState } from '../../src/engine/types'
 import {
   activate,
   actionsOfType,
+  answerIntercept,
   attackAndSteal,
   db,
   endBothTurnsOnce,
@@ -994,22 +1002,86 @@ describe('zetatech-berserk', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Deferred cards (see the batch-5 report)
+// jackie-welles-mama-s-favorite — "{Go Solo} ... If a friendly Unit would be
+// defeated, you may spend 1 EUR to defeat this Legend instead. (Remove it from
+// the game.)"
 // ---------------------------------------------------------------------------
 
-describe('deferred cards (see the batch-5 report)', () => {
-  it('jackie-welles-mama-s-favorite still carries no effects', () => {
-    // "{Go Solo} ... If a friendly Unit would be defeated, you may spend
-    // 1 €$ to defeat this Legend instead." This is the same shape as the
-    // deferred half of alt-cunningham-mother-of-daemons (docs/rulings.md
-    // §72): "when X would happen, you may [optional costed action] to
-    // prevent it" needs a true interception decision point before the
-    // mutation (here, a defeat) actually happens — a genuine engine
-    // feature this engine does not have yet, not a vocabulary gap. Unlike
-    // Alt Cunningham, this card has no OTHER independent clause to encode,
-    // so the whole card is deferred (docs/rulings.md §79/§80's "full or
-    // defer" policy) — only its {Go Solo} keyword (already handled by the
-    // existing keyword machinery) is live.
-    expect(db['jackie-welles-mama-s-favorite'].effects).toEqual([])
+describe('jackie-welles-mama-s-favorite', () => {
+  /** Player 0 holds a face-up Jackie, some €$, and a Unit about to die. */
+  function board(opts: { eddies?: number } = {}): {
+    state: GameState
+    jackie: number
+    victim: number
+    attacker: number
+  } {
+    const { state } = fixtureWithHand(1, [])
+    const jackie = mintInto(state, 0, 'legends', 'jackie-welles-mama-s-favorite', {
+      faceUp: true,
+    })
+    for (let i = 0; i < (opts.eddies ?? 2); i++) {
+      mintInto(state, 0, 'eddies', 'animals-wrecker', { faceUp: false })
+    }
+    const victim = fieldCard(state, 0, 'japantown-jonin', { ready: false }) // power 0
+    const attacker = fieldCard(state, 1, 'animals-wrecker') // power 10
+    return { state, jackie, victim, attacker }
+  }
+
+  it('pauses a fight defeat and asks its controller, who may decline', () => {
+    const { state, jackie, victim, attacker } = board()
+    const paused = passReact(db, startAttack(db, state, attacker, victim))
+
+    expect(paused.phase).toBe('intercept')
+    expect(actingPlayer(paused)).toBe(0)
+    expect(paused.pendingIntercept).toMatchObject({
+      kind: 'defeat',
+      player: 0,
+      protector: jackie,
+      subject: victim,
+    })
+    // Nothing has happened yet — the whole attack was rolled back to ask.
+    expect(paused.players[0].field).toContain(victim)
+
+    const declined = answerIntercept(db, paused, -1)
+    expect(declined.players[0].field).not.toContain(victim)
+    expect(declined.players[0].legends).toContain(jackie) // Jackie is untouched
+    expect(declined.phase).toBe('main')
+  })
+
+  it('saves the Unit for 1 €$, removing Jackie from the game', () => {
+    const { state, jackie, victim, attacker } = board()
+    const paused = passReact(db, startAttack(db, state, attacker, victim))
+    const readyBefore = state.players[0].eddies.filter((uid) => state.cards[uid].ready).length
+
+    const saved = answerIntercept(db, paused, jackie)
+    expect(saved.players[0].field).toContain(victim) // not defeated
+    expect(saved.players[0].legends).not.toContain(jackie)
+    expect(saved.players[0].removed).toContain(jackie) // removed, never trashed
+    expect(saved.players[0].eddies.filter((uid) => saved.cards[uid].ready)).toHaveLength(
+      readyBefore - 1
+    )
+  })
+
+  it('covers an effect-driven defeat too, not just fights', () => {
+    const { state, jackie, victim } = board()
+    mintInto(state, 1, 'hand', 'bonnie-and-clyde') // "{Play} Defeat a rival Unit with power 4 or less."
+    for (let i = 0; i < 4; i++) mintInto(state, 1, 'eddies', 'animals-wrecker', { faceUp: false })
+
+    const paused = playCardByDef(db, state, 1, 'bonnie-and-clyde', { includes: victim })
+    expect(paused.phase).toBe('intercept')
+    const saved = answerIntercept(db, paused, jackie)
+    expect(saved.players[0].field).toContain(victim)
+    expect(saved.players[0].removed).toContain(jackie)
+  })
+
+  it('is never offered when its controller cannot pay the 1 €$', () => {
+    const { state, victim, attacker } = board({ eddies: 0 })
+    // Jackie herself may never help pay (docs/rulings.md §31's rule for a
+    // Legend's own cost), and every OTHER ready payer is spent here, so the
+    // option is unaffordable and is not offered as a decision at all.
+    for (const uid of state.players[0].legends) state.cards[uid].ready = false
+    const resolved = passReact(db, startAttack(db, state, attacker, victim))
+    expect(resolved.phase).toBe('main')
+    expect(resolved.players[0].field).not.toContain(victim)
   })
 })

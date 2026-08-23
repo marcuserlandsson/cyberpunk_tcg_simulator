@@ -89,6 +89,13 @@ export type Trigger =
   // `takeStolenGig` finishes the whole steal it is resolving (evelyn-parker-
   // beautiful-enigma).
   | 'onFriendlyStealComplete'
+  // Deferred slice (docs/rulings.md §143): "When you roll a min or max value
+  // on a Gig, draw 1. If it's a d20, draw 3 instead."
+  // (kerry-eurodyne-axe-attitude-audience) — a watcher fired wherever a Gig
+  // die's value is actually rolled (the start-of-turn fixer roll, the
+  // {gigReroll} decision, and the `rerollGig` node), on the ROLLER's own
+  // in-play cards, carrying the die's size and the value it landed on.
+  | 'onGigRoll'
   | 'activated'
   | 'static'
 
@@ -186,6 +193,11 @@ export interface TargetFilter {
    * mirror image of `spentOnly`.
    */
   readyOnly?: boolean
+  /**
+   * "an equipped Unit" (cyberpsychosis, docs/rulings.md §141) — carries ≥1
+   * attached Gear, the mirror image of `unequipped`.
+   */
+  equipped?: boolean
 }
 
 /**
@@ -445,6 +457,103 @@ export type EffectNode =
   // pending attack's attacker while this static is active — the mirror
   // image of `cantAttack` on the defending side of an attack.
   | { kind: 'cantBeBlocked' }
+  // Deferred slice (docs/rulings.md §141): creates one `FloatingEffect`
+  // entry in `GameState.floatingEffects` — an effect that outlives its own
+  // resolution ("Until your next turn, ...", "The next time ... this turn,
+  // ...", "... at the end of this turn"). The `floating` spec says WHICH
+  // clause (a closed union, one variant per printed clause shape) and when
+  // it expires; a spec carrying a `target` also binds one ordinary target
+  // slot, whose uid the created entry remembers.
+  | { kind: 'floatingEffect'; floating: FloatingSpec }
+  // Deferred slice (docs/rulings.md §143): "When you roll in a Gig from your
+  // fixer area, you may ignore the result and reroll it once."
+  // (kerry-eurodyne-axe-attitude-audience) — a *static* permission read by
+  // `query.friendlyGigRerollOption`, which turns the gig-gain step into a
+  // real two-option decision (`Phase` `'gigReroll'`) instead of ending in
+  // `main` straight away.
+  | { kind: 'gigRerollOption' }
+  // Deferred slice (docs/rulings.md §144): *static*, "If a friendly Unit
+  // would be defeated, you may spend N €$ to defeat this Legend instead."
+  // (jackie-welles-mama-s-favorite) — a would-be-defeated INTERCEPTION,
+  // unlike `defeatShield` (§46) which is unconditional, costless and needs
+  // no decision. Read by `query.defeatInterceptorFor` at the single
+  // interception point in `combat.defeatUnit`.
+  | { kind: 'defeatInterceptSelf'; eddies: number }
+  // Deferred slice (docs/rulings.md §144): *static*, "When a rival Unit
+  // would steal a Gig, you may discard 1 with cost equal to that Gig's
+  // value. If you do, the Gig isn't stolen."
+  // (alt-cunningham-mother-of-daemons's second clause, deferred by §72) —
+  // the same interception family as `defeatInterceptSelf`, on the steal
+  // mutation instead of the defeat one.
+  | { kind: 'stealInterceptByDiscard' }
+
+/**
+ * What a `floatingEffect` node writes into `GameState.floatingEffects`
+ * (docs/rulings.md §141). One variant per printed clause shape; `expiry` is
+ * always printed on the card, never inferred:
+ *   * `endOfTurn` — "this turn" / "at the end of this turn": dropped when the
+ *     current GAME turn ends (the same boundary `clearTurnBuffs` uses for
+ *     `tempPower`, docs/rulings.md §20);
+ *   * `ownerNextTurnStart` — "until your next turn" / "next turn": dropped at
+ *     the start of the ENTRY CONTROLLER's next turn, so it spans exactly the
+ *     rival's intervening turn.
+ * A one-shot ("the next time ...") entry needs no flag: whoever consumes it
+ * removes it from the list, which is the same thing with less state.
+ */
+export type FloatingExpiry = 'endOfTurn' | 'ownerNextTurnStart'
+
+export type FloatingSpec =
+  // chrome-fang: "Until your next turn, rival Units can't steal friendly Gigs
+  // with value higher than their power." A lasting restriction on which dice
+  // `chooseGig` offers a rival UNIT stealing from the controller's Gig area.
+  | { kind: 'rivalStealCappedByPower'; expiry: FloatingExpiry }
+  // appetite-for-destruction: "The next time a friendly Unit wins a fight by
+  // 3+ power this turn, it also steals a Gig." A one-shot delayed trigger,
+  // consumed by the first qualifying fight (whichever Unit wins it).
+  | { kind: 'winFightMarginSteal'; expiry: FloatingExpiry; margin: number; count: number }
+  // safety-override: "The next time a friendly Unit loses a fight this turn,
+  // defeat the opposing rival Unit."
+  | { kind: 'loseFightDefeatFoe'; expiry: FloatingExpiry }
+  // reboot-optics: "The next time a rival Unit fights this turn, it doesn't
+  // defeat the opposing friendly Unit."
+  | { kind: 'rivalFightNoDefeat'; expiry: FloatingExpiry }
+  // cyberpsychosis: "If that Unit steals or fights, defeat it at the end of
+  // this turn." Tied to one specific card instance, so the spec carries a
+  // target slot.
+  | {
+      kind: 'defeatIfActed'
+      expiry: FloatingExpiry
+      target: TargetSpec
+      filter?: TargetFilter
+    }
+  // chrome-reverie: "A rival Unit can't attack until your next turn."
+  | { kind: 'unitCantAttack'; expiry: FloatingExpiry; target: TargetSpec; filter?: TargetFilter }
+  // mox-inciters / evelyn-parker-beautiful-enigma: "A rival Unit must attack
+  // next turn if it can." — a positive OBLIGATION on the rival's own legal
+  // action list (docs/rulings.md §142), not a restriction.
+  | { kind: 'mustAttack'; expiry: FloatingExpiry; target: TargetSpec; filter?: TargetFilter }
+
+/**
+ * A live entry of the floating-effect zone (docs/rulings.md §141) — the
+ * runtime twin of `FloatingSpec`, plus the facts only resolution can supply:
+ * who controls it, which card def created it (provenance for the event log),
+ * the uid its spec's target slot bound, and the mutable `acted` bit
+ * `defeatIfActed` needs.
+ */
+export interface FloatingEffect {
+  kind: FloatingSpec['kind']
+  controller: PlayerId
+  /** The `CardDef.id` of the card that created the entry. */
+  sourceDefId: string
+  expiry: FloatingExpiry
+  /** `defeatIfActed` / `unitCantAttack` / `mustAttack`: the card it names. */
+  unitUid?: number
+  /** `winFightMarginSteal`: the printed power margin and Gig count. */
+  margin?: number
+  count?: number
+  /** `defeatIfActed`: has the named Unit stolen or fought since this landed? */
+  acted?: boolean
+}
 
 /**
  * The board facts an `EffectDef`/`conditionalEffect` node can gate on. Named
@@ -526,6 +635,16 @@ export interface EffectCondition {
   streetCredBehindRival?: boolean
   /** "if a friendly d[N] is a min Gig" — a friendly Gig die of exactly this size currently showing 1 (pyramid-song). */
   friendlyGigSizeAtMin?: DieSize
+  // Deferred slice (docs/rulings.md §143), `onGigRoll` only:
+  /** "a min or max value on a Gig" — the roll landed on 1 or on the die's own top face. */
+  rolledExtremeValue?: boolean
+  /**
+   * "If it's a d20, ..." — the rolled die's size is one of these. An enumerated
+   * SET rather than a single size plus a negation primitive, so kerry-eurodyne-
+   * axe-attitude-audience's "draw 3 instead" can name `[20]` while its sibling
+   * def names the other five sizes explicitly.
+   */
+  rolledDieSizeAnyOf?: DieSize[]
 }
 
 export interface EffectDef {
@@ -667,7 +786,22 @@ export interface PlayerState {
   playedProgramThisTurn?: boolean
 }
 
-export type Phase = 'chooseOrder' | 'mulligan' | 'start' | 'main' | 'react' | 'chooseGig' | 'gameOver'
+export type Phase =
+  | 'chooseOrder'
+  | 'mulligan'
+  | 'start'
+  | 'main'
+  | 'react'
+  | 'chooseGig'
+  // Deferred slice (docs/rulings.md §143): the roller's "you may ignore the
+  // result and reroll it once" decision, offered right after the start-of-turn
+  // Gig roll while a friendly `gigRerollOption` static is live.
+  | 'gigReroll'
+  // Deferred slice (docs/rulings.md §144): a would-be-defeated / would-be-
+  // stolen INTERCEPTION decision, offered to the card that prints it while
+  // the action that caused the mutation is paused (see `PendingIntercept`).
+  | 'intercept'
+  | 'gameOver'
 
 /**
  * An unresolved Gig steal: the thief picks one die at a time (`chooseGig`).
@@ -693,6 +827,40 @@ export interface PendingSteal {
    * filtered bonus steal merges into an already-larger, unfiltered one.
    */
   distinctValueOnly?: boolean
+  /**
+   * How many dice this steal episode has actually MOVED so far
+   * (docs/rulings.md §144): a die whose steal was intercepted
+   * (alt-cunningham-mother-of-daemons) counts against `remaining` but is never
+   * taken, so an episode can now end having stolen nothing — and
+   * `onFriendlyStealComplete` ("When a friendly Unit steals 1 or more Gigs")
+   * must not fire then.
+   */
+  taken?: number
+}
+
+/**
+ * A paused would-be-mutation interception (docs/rulings.md §144). The action
+ * that caused the mutation is *rolled back* and replayed once the answer is
+ * in, so no continuation has to be captured: `action` is re-applied from the
+ * same pre-action state with `answers` (one entry per interception the replay
+ * reaches, in order) supplying every decision, which is deterministic because
+ * the rng lives in the state that is being replayed.
+ */
+export interface PendingIntercept {
+  /** Which mutation is being intercepted. */
+  kind: 'defeat' | 'steal'
+  /** Who answers — the controller of the intercepting card. */
+  player: PlayerId
+  /** The in-play card whose printed text offers the interception. */
+  protector: number
+  /** The card that would be defeated, or the Gig-die index that would be stolen. */
+  subject: number
+  /** The legal answers: `-1` declines; anything else accepts (see the card). */
+  options: number[]
+  /** The action being replayed, its answers so far, and the phase it ran in. */
+  action: Action
+  answers: number[]
+  resumePhase: Phase
 }
 
 export interface GameState {
@@ -711,6 +879,33 @@ export interface GameState {
    * (docs/rulings.md §40). Cleared with the turn buffs when the turn ends.
    */
   oncePerTurnUsed: string[]
+  /**
+   * Effects that outlive their own resolution and are attached to nothing on
+   * the board (docs/rulings.md §141): "Until your next turn, ...", "The next
+   * time ... this turn, ...", "... at the end of this turn", "... must attack
+   * next turn". Deep-copied by `draftState`, expired by `beginTurn`
+   * (`ownerNextTurnStart`) and `clearTurnBuffs` (`endOfTurn`), and consulted
+   * by the specific engine seam each entry's `kind` names.
+   */
+  floatingEffects: FloatingEffect[]
+  /**
+   * The Gig die a `gigReroll` decision is about (docs/rulings.md §143), or
+   * null outside that phase.
+   */
+  pendingGigRoll: { player: PlayerId; dieIndex: number } | null
+  /**
+   * The paused interception decision (docs/rulings.md §144), or null.
+   */
+  pendingIntercept: PendingIntercept | null
+  /**
+   * TRANSIENT (docs/rulings.md §144): the interception answers the action
+   * currently being applied may consume, in order. Always `[]` in any state a
+   * caller ever sees — `applyAction` fills it for the duration of one replay
+   * and empties it again before returning. It lives on the state (rather than
+   * in a module-level variable) so the whole engine stays free of hidden
+   * mutable globals.
+   */
+  interceptAnswers: number[]
   winner: PlayerId | null
   rng: RngState
   events: GameEvent[]
@@ -741,6 +936,16 @@ export type Action =
     }
   | { type: 'chooseGig'; dieIndex: number }
   | { type: 'react'; reaction: Reaction }
+  // "you may ignore the result and reroll it once" (kerry-eurodyne-axe-
+  // attitude-audience, docs/rulings.md §143) — the roller's own two-option
+  // decision in the `gigReroll` phase.
+  | { type: 'chooseGigReroll'; reroll: boolean }
+  // A would-be-defeated / would-be-stolen interception answer
+  // (docs/rulings.md §144): `-1` declines, any other value accepts and names
+  // whatever the intercepting card's own text asks for (the protector's uid
+  // for jackie-welles-mama-s-favorite, the discarded hand card's uid for
+  // alt-cunningham-mother-of-daemons).
+  | { type: 'answerIntercept'; answer: number }
   | { type: 'endTurn' }
 
 export type Reaction =

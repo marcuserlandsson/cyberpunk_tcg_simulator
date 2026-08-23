@@ -463,7 +463,9 @@ describe('gig-area attacks', () => {
       { size: 4, value: 1 },
       { size: 6, value: 5 },
     ])
-    expect(next.pendingSteal).toEqual({ attacker, remaining: 1 })
+    // `taken` counts the dice that actually MOVED, so an episode whose steals
+    // were all intercepted knows it stole nothing (docs/rulings.md §144).
+    expect(next.pendingSteal).toEqual({ attacker, remaining: 1, taken: 1 })
     expect(gigOptions(next)).toEqual([0, 1])
     expect(next.events.at(-1)).toEqual({ type: 'gigStolen', from: 1, die: { size: 8, value: 8 } })
 

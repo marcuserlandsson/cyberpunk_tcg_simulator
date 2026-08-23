@@ -33,9 +33,11 @@ import {
   fireWatcherTrigger,
   hasPayableOptionalTrigger,
   quickReactionActions,
+  resolveNodeOnDraft,
   spendOnDraft,
 } from '../cards/effects'
-import { legendCallPayment } from './economy'
+import { canonicalPayment, legendCallPayment } from './economy'
+import { askIntercept, DECLINE } from './intercept'
 import {
   attackableReadyKeyword,
   ATTACK_READY,
@@ -46,12 +48,15 @@ import {
   cantAttackGigArea,
   cantBeBlocked,
   cardTags,
+  defeatInterceptorFor,
   defeatShieldOf,
   effectivePower,
   fightPowerBonus,
   hasKeyword,
   opponentOf,
   rivalDeniesFreshAttacks,
+  stealInterceptorFor,
+  stealValueCap,
   winsFightRegardless,
 } from './query'
 import type { Action, CardDb, GameState, PendingSteal, PlayerId } from './types'
@@ -244,31 +249,59 @@ export function reactActions(db: CardDb, state: GameState): Action[] {
 }
 
 /**
- * One `chooseGig` per die in the victim's Gig area: the attacker picks the
- * dice to steal one at a time (guide p11 step 04, "Choose a rival Gig die and
- * move it to your friendly Gig area"), so a multi-die steal is a sequence of
- * decisions rather than one bulk transfer.
+ * Which of the victim's Gig dice this steal may actually take, as indexes into
+ * their Gig area. The single authority on that question — `chooseGigActions`
+ * enumerates it, `resolveAttack`/`stealGig` cap their counts by it, and
+ * `takeStolenGig` ends an episode early when it runs empty — so a restriction
+ * can never leave `chooseGig` with a pending steal and nothing to choose.
+ *
+ * Two narrowings, in this order:
+ *   * a live `rivalStealCappedByPower` floating entry ("Until your next turn,
+ *     rival Units can't steal friendly Gigs with value higher than their
+ *     power" — chrome-fang, docs/rulings.md §141) is a hard PROHIBITION: dice
+ *     above the stealing Unit's power are simply not stealable, even if that
+ *     leaves none;
+ *   * `distinctValueOnly` ("steal a rival Gig with a value not shared by a
+ *     friendly Gig" — gorilla-arms, docs/rulings.md §68 ff.) is a PREFERENCE:
+ *     it falls back to the whole (already prohibition-filtered) list when
+ *     nothing qualifies, mirroring §25.
  */
-export function chooseGigActions(state: GameState): Action[] {
+export function stealableDieIndexes(
+  db: CardDb,
+  state: GameState,
+  thief: PlayerId,
+  stealerUid: number,
+  distinctValueOnly = false
+): number[] {
+  const victim = opponentOf(thief)
+  const dice = state.players[victim].gigArea
+  const cap = stealValueCap(db, state, victim, stealerUid)
+  let indexes = dice.map((_die, dieIndex) => dieIndex)
+  if (cap !== null) indexes = indexes.filter((dieIndex) => dice[dieIndex].value <= cap)
+  if (distinctValueOnly) {
+    const friendlyValues = new Set(state.players[thief].gigArea.map((die) => die.value))
+    const qualifying = indexes.filter((dieIndex) => !friendlyValues.has(dice[dieIndex].value))
+    if (qualifying.length > 0) return qualifying
+  }
+  return indexes
+}
+
+/** The stealable indexes of the steal `state` currently has pending. */
+function pendingStealableIndexes(db: CardDb, state: GameState): number[] {
   const steal = state.pendingSteal
   if (steal === null) return []
   const thief = steal.thief ?? state.activePlayer
-  const victim = opponentOf(thief)
-  const dice = state.players[victim].gigArea
-  // "steal a rival Gig with a value not shared by a friendly Gig"
-  // (gorilla-arms, docs/rulings.md §68 ff.): narrow the offered dice to ones
-  // whose value the thief does not already hold, unless that would leave
-  // nothing to choose — never deadlock `chooseGig` (mirroring §25).
-  if (steal.distinctValueOnly === true) {
-    const friendlyValues = new Set(state.players[thief].gigArea.map((die) => die.value))
-    const qualifying = dice
-      .map((die, dieIndex) => ({ die, dieIndex }))
-      .filter(({ die }) => !friendlyValues.has(die.value))
-    if (qualifying.length > 0) {
-      return qualifying.map(({ dieIndex }) => ({ type: 'chooseGig', dieIndex }))
-    }
-  }
-  return dice.map((_die, dieIndex) => ({ type: 'chooseGig', dieIndex }))
+  return stealableDieIndexes(db, state, thief, steal.attacker, steal.distinctValueOnly === true)
+}
+
+/**
+ * One `chooseGig` per die in the victim's Gig area the current steal may take:
+ * the attacker picks them one at a time (guide p11 step 04, "Choose a rival Gig
+ * die and move it to your friendly Gig area"), so a multi-die steal is a
+ * sequence of decisions rather than one bulk transfer.
+ */
+export function chooseGigActions(db: CardDb, state: GameState): Action[] {
+  return pendingStealableIndexes(db, state).map((dieIndex) => ({ type: 'chooseGig', dieIndex }))
 }
 
 // ---------------------------------------------------------------------------
@@ -315,6 +348,14 @@ export function declareAttack(
   target: number | 'gigArea',
   payOptionalCosts = false
 ): void {
+  // "A rival Unit must attack next turn if it can." (mox-inciters,
+  // evelyn-parker-beautiful-enigma, docs/rulings.md §142) — the obligation is
+  // discharged by attacking, so it lapses here rather than waiting for its
+  // turn boundary: a Unit readied again mid-turn is not forced to attack twice.
+  draft.floatingEffects = draft.floatingEffects.filter(
+    (entry) => !(entry.kind === 'mustAttack' && entry.unitUid === attacker)
+  )
+
   // Spending the attacker is a spend like any other: "When this Unit is spent"
   // fires here (docs/rulings.md §47).
   spendOnDraft(db, draft, [attacker])
@@ -375,6 +416,13 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
   const card = draft.cards[uid]
   const owner = draft.players[card.owner]
   owner.field = owner.field.filter((u) => u !== uid)
+  // A face-up Legend still in the legends zone can leave play too: its own
+  // "defeat this Legend instead" interception reaches it there
+  // (jackie-welles-mama-s-favorite, docs/rulings.md §144). Filtering both
+  // zones keeps the {Go Solo} case (already off `legends` when it was played)
+  // untouched, and stops a legends-zone exit from landing in `removed` while
+  // still being listed as a Legend.
+  owner.legends = owner.legends.filter((u) => u !== uid)
 
   const gear = card.attachedGear
   card.attachedGear = []
@@ -413,10 +461,21 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
 /**
  * Defeats a Unit: `unitDefeated`, then the field exit to the trash, then its
  * on-defeat effects.
+ *
+ * `allowIntercept: false` skips the would-be-defeated interception
+ * (docs/rulings.md §144) — used for the substitute defeat an interception
+ * itself applies, so a chain of interceptors can never recurse.
  */
-export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
+export function defeatUnit(
+  draft: GameState,
+  db: CardDb,
+  uid: number,
+  opts: { allowIntercept?: boolean } = {}
+): void {
   // "If this Unit would be defeated, defeat its DEADMAN TRANSMITTER instead":
-  // the Gear soaks the hit and the Unit stays put (docs/rulings.md §46).
+  // the Gear soaks the hit and the Unit stays put (docs/rulings.md §46). An
+  // unconditional, costless substitution, so it settles the question before
+  // any *decision* is offered — nothing is "would be defeated" any more.
   const shield = defeatShieldOf(db, draft, uid)
   if (shield !== null) {
     const host = draft.cards[uid]
@@ -424,6 +483,38 @@ export function defeatUnit(draft: GameState, db: CardDb, uid: number): void {
     draft.players[draft.cards[shield].owner].trash.push(shield)
     draft.events.push({ type: 'cardTrashed', uid: shield })
     return
+  }
+
+  // [interception seam] "If a friendly Unit would be defeated, you may spend
+  // 1 €$ to defeat this Legend instead." (jackie-welles-mama-s-favorite,
+  // docs/rulings.md §144). Every defeat path in the engine funnels through
+  // here — fights, effect nodes, mass-defeat scripts — so this one seam covers
+  // all of them.
+  if (opts.allowIntercept !== false) {
+    const intercept = defeatInterceptorFor(db, draft, uid)
+    if (intercept !== null) {
+      const owner = draft.cards[intercept.protector].owner
+      const answer = askIntercept(draft, {
+        kind: 'defeat',
+        player: owner,
+        protector: intercept.protector,
+        subject: uid,
+        options: [DECLINE, intercept.protector],
+      })
+      if (answer !== DECLINE) {
+        const payment = canonicalPayment(draft, owner, intercept.eddies, intercept.protector)
+        if (payment !== null) {
+          spendOnDraft(db, draft, payment)
+          draft.events.push({
+            type: 'effectResolved',
+            sourceUid: intercept.protector,
+            description: `intercepts the defeat of ${uid}`,
+          })
+          defeatUnit(draft, db, intercept.protector, { allowIntercept: false })
+          return
+        }
+      }
+    }
   }
 
   const controller = draft.cards[uid].owner
@@ -531,7 +622,33 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // immunity granted via the ordinary `grantKeyword` machinery. The fight
   // still happens normally for the OTHER combatant — this only saves whichever
   // side(s) carry the granted keyword right now.
-  const defeated = wouldDefeat.filter((uid) => !hasKeyword(db, draft, uid, FIGHT_IMMUNE))
+  let defeated = wouldDefeat.filter((uid) => !hasKeyword(db, draft, uid, FIGHT_IMMUNE))
+
+  // "The next time a rival Unit fights this turn, it doesn't defeat the
+  // opposing friendly Unit." (reboot-optics, docs/rulings.md §141) — a
+  // one-shot floating entry consumed by the first fight its controller has a
+  // combatant in, applied at exactly the same seam as FIGHT_IMMUNE above (the
+  // fight still happens normally for the other side; a loser who is never
+  // defeated leaves nobody to have "won", per §46's `defeatShield` reading).
+  const noDefeatIndex = draft.floatingEffects.findIndex(
+    (entry) =>
+      entry.kind === 'rivalFightNoDefeat' &&
+      (entry.controller === draft.cards[attacker].owner ||
+        entry.controller === draft.cards[defender].owner)
+  )
+  if (noDefeatIndex !== -1) {
+    const protectedPlayer = draft.floatingEffects[noDefeatIndex].controller
+    draft.floatingEffects.splice(noDefeatIndex, 1)
+    defeated = defeated.filter((uid) => draft.cards[uid].owner !== protectedPlayer)
+  }
+
+  // "If that Unit steals or fights, defeat it at the end of this turn."
+  // (cyberpsychosis, docs/rulings.md §141) — *fighting* is one of the two
+  // qualifying acts, and it counts for BOTH combatants, win or lose.
+  for (const entry of draft.floatingEffects) {
+    if (entry.kind !== 'defeatIfActed') continue
+    if (entry.unitUid === attacker || entry.unitUid === defender) entry.acted = true
+  }
 
   // [trigger seam] "When this Unit loses a fight, ..." (maelstrom-zealots,
   // docs/rulings.md §92 ff.) — fired for each loser BEFORE either combatant
@@ -559,6 +676,44 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   const winner = loser === null ? null : loser === defender ? attacker : defender
   if (winner !== null && loser !== null && !onField(draft, loser) && onField(draft, winner)) {
     fireTriggerOnDraft(db, draft, 'onWinFight', winner, [])
+  }
+
+  // Delayed, one-shot floating consequences of this fight (docs/rulings.md
+  // §141), both resolved AFTER the fight itself is completely settled — the
+  // printed texts speak of a fight that has already been won or lost:
+  //   * "The next time a friendly Unit wins a fight by 3+ power this turn, it
+  //     also steals a Gig." (appetite-for-destruction);
+  //   * "The next time a friendly Unit loses a fight this turn, defeat the
+  //     opposing rival Unit." (safety-override).
+  if (winner !== null && loser !== null && onField(draft, winner)) {
+    const margin =
+      winner === attacker ? attackPower - defendPower : defendPower - attackPower
+    const index = draft.floatingEffects.findIndex(
+      (entry) =>
+        entry.kind === 'winFightMarginSteal' &&
+        entry.controller === draft.cards[winner].owner &&
+        margin >= (entry.margin ?? 0)
+    )
+    if (index !== -1) {
+      const [entry] = draft.floatingEffects.splice(index, 1)
+      resolveNodeOnDraft(
+        db,
+        draft,
+        { kind: 'stealGig', count: entry.count ?? 1 },
+        winner,
+        entry.controller
+      )
+    }
+  }
+
+  for (const uid of defeated) {
+    const foe = uid === attacker ? defender : attacker
+    const index = draft.floatingEffects.findIndex(
+      (entry) => entry.kind === 'loseFightDefeatFoe' && entry.controller === draft.cards[uid].owner
+    )
+    if (index === -1) continue
+    draft.floatingEffects.splice(index, 1)
+    if (onField(draft, foe)) defeatUnit(draft, db, foe)
   }
 }
 
@@ -619,7 +774,6 @@ export function resolveAttack(draft: GameState, db: CardDb): void {
     return
   }
 
-  const victim = opponentOf(draft.activePlayer)
   // "... have +N power while attacking" applies to a Gig-area steal exactly
   // like a fight (docs/rulings.md §107 ff.); "steals 1 fewer Gig this turn"
   // (take-control, docs/rulings.md §107 ff.) then reduces the resulting
@@ -627,7 +781,13 @@ export function resolveAttack(draft: GameState, db: CardDb): void {
   const power = effectivePower(db, draft, attacker) + attackPowerBonus(db, draft, attacker)
   const reduction = draft.cards[attacker].stealReduction ?? 0
   const rawCount = Math.max(0, stealCount(power) - reduction)
-  const count = Math.min(rawCount, draft.players[victim].gigArea.length)
+  // Capped by what this attacker may actually take, not merely by how many
+  // dice exist: a `rivalStealCappedByPower` restriction (chrome-fang,
+  // docs/rulings.md §141) can put some — or all — of them out of reach.
+  const count = Math.min(
+    rawCount,
+    stealableDieIndexes(db, draft, draft.activePlayer, attacker).length
+  )
   if (count === 0) {
     endAttack(draft)
     return
@@ -651,42 +811,92 @@ export function takeStolenGig(draft: GameState, db: CardDb, dieIndex: number): v
   // which names its own controller (docs/rulings.md §32).
   const thief = steal.thief ?? draft.activePlayer
   const victim = opponentOf(thief)
-  const [die] = draft.players[victim].gigArea.splice(dieIndex, 1)
-  draft.players[thief].gigArea.push(die)
-  draft.events.push({ type: 'gigStolen', from: victim, die: { ...die } })
+  const chosen = draft.players[victim].gigArea[dieIndex]
+  // Unreachable: `legalActions` only offers indexes the victim's area holds.
+  if (chosen === undefined) return
 
-  // "if this Unit stole a Gig this turn" (delamain-cab, docs/rulings.md §120
-  // ff.) — set on the card that actually did the stealing, attack- or
-  // effect-driven alike; cleared alongside `tempPower` in `clearTurnBuffs`.
-  if (draft.cards[steal.attacker]) draft.cards[steal.attacker].stoleGigThisTurn = true
+  // [interception seam] "When a rival Unit would steal a Gig, you may discard 1
+  // with cost equal to that Gig's value. If you do, the Gig isn't stolen."
+  // (alt-cunningham-mother-of-daemons, docs/rulings.md §72/§144) — asked
+  // BEFORE the die moves, and the die then stays where it is.
+  let prevented = false
+  const intercept = stealInterceptorFor(db, draft, victim, steal.attacker, chosen.value)
+  if (intercept !== null) {
+    const answer = askIntercept(draft, {
+      kind: 'steal',
+      player: victim,
+      protector: intercept.protector,
+      subject: dieIndex,
+      options: [DECLINE, ...intercept.candidates],
+    })
+    if (answer !== DECLINE && intercept.candidates.includes(answer)) {
+      const p = draft.players[victim]
+      p.hand = p.hand.filter((uid) => uid !== answer)
+      p.trash.push(answer)
+      draft.events.push({ type: 'cardTrashed', uid: answer })
+      draft.events.push({
+        type: 'effectResolved',
+        sourceUid: intercept.protector,
+        description: `prevents the steal of d${chosen.size}:${chosen.value}`,
+      })
+      prevented = true
+    }
+  }
 
-  // [trigger seam] "When a friendly Unit steals a d6, ..." — a watcher trigger,
-  // fired on every in-play card of the thief (docs/rulings.md §42), ONCE PER
-  // DIE. `stealerUid` answers "When THIS Unit steals a Gig" (docs/rulings.md
-  // §55 ff.). `stolenDieValue`/`stealerIsLegend` answer "if its value is
-  // even/odd" and "a friendly LEGEND steals" (rogue-amendiares-preem-solo,
-  // docs/rulings.md §81 ff.).
-  fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
-    stolenDieSize: die.size,
-    stolenDieValue: die.value,
-    stealerUid: steal.attacker,
-    stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
-  })
+  if (!prevented) {
+    const [die] = draft.players[victim].gigArea.splice(dieIndex, 1)
+    draft.players[thief].gigArea.push(die)
+    draft.events.push({ type: 'gigStolen', from: victim, die: { ...die } })
+    steal.taken = (steal.taken ?? 0) + 1
+
+    // "if this Unit stole a Gig this turn" (delamain-cab, docs/rulings.md §120
+    // ff.) — set on the card that actually did the stealing, attack- or
+    // effect-driven alike; cleared alongside `tempPower` in `clearTurnBuffs`.
+    if (draft.cards[steal.attacker]) draft.cards[steal.attacker].stoleGigThisTurn = true
+
+    // "If that Unit steals or fights, defeat it at the end of this turn."
+    // (cyberpsychosis, docs/rulings.md §141) — *stealing* is the other
+    // qualifying act (the fight one is marked inside `fight`).
+    for (const entry of draft.floatingEffects) {
+      if (entry.kind === 'defeatIfActed' && entry.unitUid === steal.attacker) entry.acted = true
+    }
+
+    // [trigger seam] "When a friendly Unit steals a d6, ..." — a watcher trigger,
+    // fired on every in-play card of the thief (docs/rulings.md §42), ONCE PER
+    // DIE. `stealerUid` answers "When THIS Unit steals a Gig" (docs/rulings.md
+    // §55 ff.). `stolenDieValue`/`stealerIsLegend` answer "if its value is
+    // even/odd" and "a friendly LEGEND steals" (rogue-amendiares-preem-solo,
+    // docs/rulings.md §81 ff.).
+    fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
+      stolenDieSize: die.size,
+      stolenDieValue: die.value,
+      stealerUid: steal.attacker,
+      stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
+    })
+  }
 
   steal.remaining -= 1
-  if (steal.remaining > 0 && draft.players[victim].gigArea.length > 0) return
+  // The episode continues only while there is still something this steal may
+  // legally take — the victim's area running dry, or a `rivalStealCappedByPower`
+  // restriction putting every remaining die out of reach (docs/rulings.md
+  // §141), both end it here rather than leaving `chooseGig` with no choice.
+  if (steal.remaining > 0 && pendingStealableIndexes(db, draft).length > 0) return
 
   // [trigger seam] "When a friendly Unit steals 1 or more Gigs, ..." — a
   // watcher trigger fired ONCE, when the whole steal EPISODE this
   // `takeStolenGig` call is resolving finishes (however many dice it took),
   // unlike `onFriendlyStealDie` above (docs/rulings.md §133 — batch 7 fix
   // round 1, evelyn-parker-beautiful-enigma). `stealerTags` answers "a
-  // CORPO or GANGER Unit steals."
-  fireWatcherTrigger(db, draft, 'onFriendlyStealComplete', thief, {
-    stealerUid: steal.attacker,
-    stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
-    stealerTags: db[draft.cards[steal.attacker].defId] ? cardTags(db[draft.cards[steal.attacker].defId]) : [],
-  })
+  // CORPO or GANGER Unit steals." An episode whose every die was intercepted
+  // (docs/rulings.md §144) stole nothing, so "1 or more Gigs" is false and it
+  // does not fire at all.
+  if ((steal.taken ?? 0) > 0) {
+    fireWatcherTrigger(db, draft, 'onFriendlyStealComplete', thief, {
+      stealerUid: steal.attacker,
+      stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
+      stealerTags: db[draft.cards[steal.attacker].defId] ? cardTags(db[draft.cards[steal.attacker].defId]) : [],
+    })
+  }
 
   finishSteal(draft, steal)
 }

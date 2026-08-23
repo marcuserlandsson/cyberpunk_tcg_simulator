@@ -13,19 +13,25 @@
 //   gilded-mato-n, gorilla-arms, hanako-arasaka-in-a-gilded-cage,
 //   heywood-ripperdoc, jackie-welles-ride-or-die-choom, kiroshi-optics,
 //   live-with-the-aftermath, maelstrom-goons.
-// Deferred (see the batch report): cyberpsychosis, kerry-eurodyne-axe-attitude-audience.
+// The batch-3 deferrals (cyberpsychosis, kerry-eurodyne-axe-attitude-audience)
+// are now fully encoded via the floatingEffects zone and the gig-roll trigger
+// seam (docs/rulings.md §141/§143).
 
 import { describe, expect, it } from 'vitest'
-import { effectiveCardCost } from '../../src/engine/query'
+import { effectiveCardCost, effectivePower } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
-import type { GameState } from '../../src/engine/types'
+import { createRng } from '../../src/engine/rng'
+import { draftState } from '../../src/engine/game'
+import type { DieSize, GameState } from '../../src/engine/types'
 import {
   actionsOfType,
   activate,
+  answerIntercept,
   attackAndSteal,
   blockWith,
   db,
   endBothTurnsOnce,
+  endTurnOnce,
   fieldCard,
   findFielded,
   findInHand,
@@ -34,6 +40,7 @@ import {
   mintInto,
   passReact,
   playCardByDef,
+  quickPlay,
   setGigs,
   startAttack,
 } from './fixtures'
@@ -146,6 +153,55 @@ describe('alt-cunningham-mother-of-daemons', () => {
     const handBefore = state.players[0].hand.length
     const attacked = startAttack(db, state, alt, victim)
     expect(attacked.players[0].hand).toHaveLength(handBefore)
+  })
+
+  // Clause 2, deferred by docs/rulings.md §72 and finished by the
+  // would-be-stolen interception point (docs/rulings.md §144): "When a rival
+  // Unit would steal a Gig, you may discard 1 with cost equal to that Gig's
+  // value. If you do, the Gig isn't stolen."
+  /**
+   * Alt on player 0's field with `hand` in player 0's hand, a power-3 rival
+   * thief on player 1's field, and one value-3 friendly Gig — mid-way through
+   * player 1's turn, with the die already chosen for the steal, so the state
+   * returned is exactly the interception decision (or `main`, if none was
+   * offered).
+   */
+  function stealAgainstAlt(hand: string[]): GameState {
+    const { state } = fixtureWithHand(0, hand)
+    fieldCard(state, 0, 'alt-cunningham-mother-of-daemons')
+    const thief = fieldCard(state, 1, 'valentino-street-racer') // power 3: steals 1
+    let s = endTurnOnce(db, state) // player 1's turn
+    setGigs(s, 0, [{ size: 6, value: 3 }])
+    setGigs(s, 1, [])
+    s = passReact(db, startAttack(db, s, thief, 'gigArea'))
+    return applyAction(db, s, { type: 'chooseGig', dieIndex: 0 })
+  }
+
+  it('may discard a cost-matching card to stop a rival Unit stealing a Gig', () => {
+    // cost 3 (the die's value) and cost 6 (never offered).
+    const asked = stealAgainstAlt(['valentino-street-racer', 'animals-wrecker'])
+    const match = findInHand(asked, 0, 'valentino-street-racer')
+    expect(asked.phase).toBe('intercept')
+    expect(asked.pendingIntercept?.options).toEqual([-1, match])
+
+    const prevented = answerIntercept(db, asked, match)
+    expect(gigValues(prevented, 0)).toEqual([3]) // the die never moved
+    expect(gigValues(prevented, 1)).toEqual([])
+    expect(prevented.players[0].trash).toContain(match)
+  })
+
+  it('lets the steal through when the offer is declined', () => {
+    const asked = stealAgainstAlt(['valentino-street-racer'])
+    const stolen = answerIntercept(db, asked, -1)
+    expect(gigValues(stolen, 0)).toEqual([])
+    expect(gigValues(stolen, 1)).toEqual([3])
+    expect(stolen.players[0].hand).toHaveLength(1) // nothing discarded
+  })
+
+  it('is never offered when no hand card matches the die value', () => {
+    const resolved = stealAgainstAlt(['animals-wrecker']) // cost 6, die shows 3
+    expect(resolved.phase).toBe('main')
+    expect(gigValues(resolved, 1)).toEqual([3])
   })
 })
 
@@ -592,31 +648,135 @@ describe('maelstrom-goons', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Batch bookkeeping: the cards this batch could not encode.
+// The two batch-3 deferrals, finished by the floating-effects zone
+// (docs/rulings.md §141) and the gig-roll seam (§143).
+//
+// cyberpsychosis — "{Quick} Give an equipped Unit +3 power this turn for each
+// of its equipped Gears. If that Unit steals or fights, defeat it at the end
+// of this turn."
 // ---------------------------------------------------------------------------
 
-describe('deferred cards (see the batch-3 report)', () => {
-  it('cyberpsychosis still carries no effects', () => {
-    // "{Quick} Give an equipped Unit +3 power this turn for each of its
-    // equipped Gears. If that Unit steals or fights, defeat it at the end of
-    // this turn." A gameplay-affecting partial encoding (the buff alone,
-    // without the delayed self-destruct) would make the card strictly
-    // better than printed with no visible marking — forbidden by standing
-    // policy (docs/rulings.md §79). The delayed, conditional, one-shot
-    // defeat needs the same `floatingEffects` engine feature §52 already
-    // scoped and declined to half-build for chrome-fang/
-    // appetite-for-destruction, so the whole card is deferred, not just its
-    // second clause.
-    expect(db['cyberpsychosis'].effects).toEqual([])
+describe('cyberpsychosis', () => {
+  it('buffs an equipped Unit by +3 per Gear and kills it at end of turn if it steals', () => {
+    const { state } = fixtureWithHand(0, ['cyberpsychosis'])
+    const host = fieldCard(state, 0, 'valentino-street-racer') // power 3
+    attachGear(state, host, 'mandibular-upgrade') // power 0 Gear
+    attachGear(state, host, 'mantis-blades') // power 2 Gear
+    setGigs(state, 1, [{ size: 6, value: 4 }])
+
+    let next = playCardByDef(db, state, 0, 'cyberpsychosis', { includes: host })
+    // 3 printed + 2 (mantis-blades' own power box) + 6 (two Gears x +3).
+    expect(effectivePower(db, next, host)).toBe(11)
+    expect(next.floatingEffects).toHaveLength(1)
+
+    next = attackAndSteal(db, next, host, 'gigArea')
+    expect(next.players[0].field).toContain(host) // still alive this turn
+    next = endTurnOnce(db, next)
+    expect(next.players[0].field).not.toContain(host) // defeated at end of turn
+    expect(next.players[0].trash).toContain(host)
   })
 
-  it('kerry-eurodyne-axe-attitude-audience still carries no effects', () => {
-    // Both clauses hook into the gig-die *roll* itself (the fixer's
-    // start-of-turn roll and any future reroll), which no existing trigger
-    // seam exposes — a genuine engine gap, not a vocabulary one. Recorded
-    // here so the completeness test at the end of Task 8 has a single place
-    // to look.
-    expect(db['kerry-eurodyne-axe-attitude-audience'].effects).toEqual([])
+  it('spares a Unit that neither steals nor fights', () => {
+    const { state } = fixtureWithHand(0, ['cyberpsychosis'])
+    const host = fieldCard(state, 0, 'valentino-street-racer')
+    attachGear(state, host, 'mantis-blades')
+
+    let next = playCardByDef(db, state, 0, 'cyberpsychosis', { includes: host })
+    next = endTurnOnce(db, next)
+    expect(next.players[0].field).toContain(host)
+    expect(next.floatingEffects).toEqual([]) // and the entry expires with the turn
+  })
+
+  it('only ever targets an equipped Unit', () => {
+    const { state } = fixtureWithHand(0, ['cyberpsychosis'])
+    fieldCard(state, 0, 'valentino-street-racer') // unequipped
+    const equipped = fieldCard(state, 0, 'riding-nomad')
+    attachGear(state, equipped, 'mantis-blades')
+    const uid = findInHand(state, 0, 'cyberpsychosis')
+
+    const plays = actionsOfType(db, state, 'playCard').filter((a) => a.card === uid)
+    expect(plays).toHaveLength(1)
+    expect(plays[0].targets).toEqual([equipped])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// kerry-eurodyne-axe-attitude-audience — "When you roll in a Gig from your
+// fixer area, you may ignore the result and reroll it once. When you roll a
+// min or max value on a Gig, draw 1. If it's a d20, draw 3 instead."
+// ---------------------------------------------------------------------------
+
+describe('kerry-eurodyne-axe-attitude-audience', () => {
+  /**
+   * [surgery] The gig roll is the one decision whose outcome a test cannot
+   * steer through the public API, so this reseeds the rng and re-enters the
+   * `start` phase with a single die of `size` in the fixer — the same
+   * "there is no legal action that puts a chosen value on a die" carve-out
+   * the other Gig fixtures use.
+   */
+  function aboutToRoll(size: DieSize, seed: number, withKerry = true): GameState {
+    const { state } = fixtureWithHand(0, [])
+    const next = draftState(state)
+    if (withKerry) {
+      mintInto(next, 0, 'legends', 'kerry-eurodyne-axe-attitude-audience', { faceUp: true })
+    }
+    next.players[0].fixer = [{ size, value: 0 }]
+    next.players[0].gigArea = []
+    next.phase = 'start'
+    next.rng = createRng(seed)
+    return next
+  }
+
+  it('offers the reroll decision after the roll, and rerolls the same die', () => {
+    const rolled = applyAction(db, aboutToRoll(6, 5), { type: 'chooseGigDie', size: 6 })
+    expect(rolled.phase).toBe('gigReroll')
+    expect(actionsOfType(db, rolled, 'chooseGigReroll')).toHaveLength(2)
+
+    const kept = applyAction(db, rolled, { type: 'chooseGigReroll', reroll: false })
+    expect(gigValues(kept, 0)).toEqual(gigValues(rolled, 0))
+    expect(kept.phase).toBe('main')
+
+    const rolls = rolled.events.filter((e) => e.type === 'dieRolled').length
+    const rerolled = applyAction(db, rolled, { type: 'chooseGigReroll', reroll: true })
+    expect(rerolled.players[0].gigArea).toHaveLength(1) // the same die, re-rolled
+    expect(rerolled.events.filter((e) => e.type === 'dieRolled')).toHaveLength(rolls + 1)
+    expect(rerolled.phase).toBe('main')
+  })
+
+  it('never offers the reroll without Kerry in play', () => {
+    const rolled = applyAction(db, aboutToRoll(6, 5, false), { type: 'chooseGigDie', size: 6 })
+    expect(rolled.phase).toBe('main')
+  })
+
+  it('draws 1 on a min or max face, and nothing in between', () => {
+    const drawsByFace = new Map<number, number>()
+    for (let seed = 1; seed <= 80 && drawsByFace.size < 4; seed++) {
+      const before = aboutToRoll(4, seed)
+      const handBefore = before.players[0].hand.length
+      const after = applyAction(db, before, { type: 'chooseGigDie', size: 4 })
+      const value = after.players[0].gigArea[0].value
+      if (!drawsByFace.has(value)) {
+        drawsByFace.set(value, after.players[0].hand.length - handBefore)
+      }
+    }
+    expect(drawsByFace.get(1)).toBe(1)
+    expect(drawsByFace.get(4)).toBe(1)
+    expect(drawsByFace.get(2)).toBe(0)
+    expect(drawsByFace.get(3)).toBe(0)
+  })
+
+  it('draws 3 instead when the extreme face is on a d20', () => {
+    let checked = 0
+    for (let seed = 1; seed <= 400 && checked === 0; seed++) {
+      const before = aboutToRoll(20, seed)
+      const handBefore = before.players[0].hand.length
+      const after = applyAction(db, before, { type: 'chooseGigDie', size: 20 })
+      const value = after.players[0].gigArea[0].value
+      if (value !== 1 && value !== 20) continue
+      checked += 1
+      expect(after.players[0].hand.length - handBefore).toBe(3)
+    }
+    expect(checked).toBe(1)
   })
 })
 
@@ -631,7 +791,8 @@ describe('deferred cards (see the batch-3 report)', () => {
 //   the-relic-experimental-biochip, trauma-team-operatives,
 //   viktor-vektor-drop-your-illusions, viktor-vektor-sit-down-and-relax,
 //   viktor-vektor-you-might-feel-a-little-pinch, zetatech-faceplate.
-// Deferred (see the batch-4 report): safety-override.
+// The batch-4 deferral (safety-override) is now fully encoded via the
+// floatingEffects zone (docs/rulings.md §141).
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -1183,17 +1344,41 @@ describe('zetatech-faceplate', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Batch bookkeeping: the card this batch could not encode.
+// safety-override — "{Quick} The next time a friendly Unit loses a fight this
+// turn, defeat the opposing rival Unit." (the batch-4 deferral, finished by
+// the floating-effects zone — docs/rulings.md §141).
 // ---------------------------------------------------------------------------
 
-describe('deferred cards (see the batch-4 report)', () => {
-  it('safety-override still carries no effects', () => {
-    // "{Quick} The next time a friendly Unit loses a fight this turn, defeat
-    // the opposing rival Unit." A delayed, conditional, one-shot effect tied
-    // to a future board event rather than to a chosen card — exactly the
-    // `floatingEffects` gap docs/rulings.md §52 already scoped and declined
-    // to half-solve for chrome-fang/appetite-for-destruction (and, per §79,
-    // full-or-defer is the standing policy for any such gap).
-    expect(db['safety-override'].effects).toEqual([])
+describe('safety-override', () => {
+  it('takes the winner down with the friendly Unit it defeated', () => {
+    const { state } = fixtureWithHand(1, [])
+    mintInto(state, 0, 'hand', 'safety-override')
+    for (let i = 0; i < 4; i++) mintInto(state, 0, 'eddies', 'animals-wrecker', { faceUp: false })
+    const attacker = fieldCard(state, 1, 'animals-wrecker') // power 10
+    const victim = fieldCard(state, 0, 'japantown-jonin', { ready: false }) // power 0
+
+    let next = startAttack(db, state, attacker, victim)
+    next = quickPlay(db, next, 0, 'safety-override')
+    expect(next.floatingEffects).toHaveLength(1)
+
+    next = passReact(db, next)
+    expect(next.players[0].field).not.toContain(victim) // the fight is still lost
+    expect(next.players[1].field).not.toContain(attacker) // but the winner dies too
+    expect(next.floatingEffects).toEqual([]) // one-shot: consumed
+  })
+
+  it('does nothing while no friendly Unit loses a fight', () => {
+    const { state } = fixtureWithHand(1, [])
+    mintInto(state, 0, 'hand', 'safety-override')
+    for (let i = 0; i < 4; i++) mintInto(state, 0, 'eddies', 'animals-wrecker', { faceUp: false })
+    const attacker = fieldCard(state, 1, 'japantown-jonin') // power 0
+    const survivor = fieldCard(state, 0, 'animals-wrecker', { ready: false }) // power 10
+
+    let next = startAttack(db, state, attacker, survivor)
+    next = quickPlay(db, next, 0, 'safety-override')
+    next = passReact(db, next)
+    expect(next.players[0].field).toContain(survivor)
+    expect(next.players[1].field).not.toContain(attacker) // it lost, not us
+    expect(next.floatingEffects).toHaveLength(1) // still waiting, unconsumed
   })
 })

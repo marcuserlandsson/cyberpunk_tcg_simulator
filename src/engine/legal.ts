@@ -15,7 +15,7 @@
 import { activatedAbilityActions, goSoloPayment, playCardTargetChoices } from '../cards/effects'
 import { attackActions, chooseGigActions, reactActions } from './combat'
 import { canonicalPayment, legendCallPayment } from './economy'
-import { effectiveCardCost } from './query'
+import { effectiveCardCost, forcedAttackers } from './query'
 import type { Action, CardDb, DieSize, GameState } from './types'
 
 const D20: DieSize = 20
@@ -84,9 +84,21 @@ function mainPhaseActions(db: CardDb, state: GameState): Action[] {
 
   actions.push(...activatedAbilityActions(db, state, player))
 
-  actions.push(...attackActions(db, state))
+  const attacks = attackActions(db, state)
+  actions.push(...attacks)
 
-  actions.push({ type: 'endTurn' })
+  // "A rival Unit must attack next turn if it can." (mox-inciters,
+  // evelyn-parker-beautiful-enigma, docs/rulings.md §142) — a positive
+  // OBLIGATION, so `endTurn` is withheld while a forced Unit still has an
+  // attack it could make. Derived from the very list of attacks just
+  // enumerated, which is what guarantees a legal action always remains: the
+  // moment the forced Unit has no attack left (spent, defeated, no legal
+  // target, `cantAttack`), the obligation is vacuous and `endTurn` returns.
+  const forced = forcedAttackers(state, player)
+  const owes = forced.some((uid) =>
+    attacks.some((action) => action.type === 'attack' && action.attacker === uid)
+  )
+  if (!owes) actions.push({ type: 'endTurn' })
   return actions
 }
 
@@ -120,6 +132,25 @@ export function legalActions(db: CardDb, state: GameState): Action[] {
 
     case 'chooseGig':
       // The attacker picking the dice a successful steal takes.
-      return chooseGigActions(state)
+      return chooseGigActions(db, state)
+
+    case 'gigReroll':
+      // "you may ignore the result and reroll it once" (kerry-eurodyne-axe-
+      // attitude-audience, docs/rulings.md §143) — the roller's own two-option
+      // decision, offered only while a friendly `gigRerollOption` static is
+      // live (which is what put the turn in this phase at all).
+      return [
+        { type: 'chooseGigReroll', reroll: false },
+        { type: 'chooseGigReroll', reroll: true },
+      ]
+
+    case 'intercept': {
+      // A paused would-be-defeated / would-be-stolen interception
+      // (docs/rulings.md §144): one entry per legal answer, `-1` first so the
+      // decline is always the head of the list.
+      const pending = state.pendingIntercept
+      if (pending === null) return []
+      return pending.options.map((answer) => ({ type: 'answerIntercept', answer }))
+    }
   }
 }

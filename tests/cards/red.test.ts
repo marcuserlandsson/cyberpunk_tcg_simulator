@@ -15,7 +15,8 @@
 //   gunpoint-diplomacy, industrial-assembly, japantown-jonin,
 //   johnny-silverhand-never-stop-fighting, johnny-silverhand-rocking-renegade,
 //   kerry-eurodyne-the-last-rockerboy, la-llorona-ghost-of-the-past.
-// Deferred (see the batch report): appetite-for-destruction, chrome-fang.
+// The two batch-1 deferrals (appetite-for-destruction, chrome-fang) are now
+// fully encoded via the floatingEffects zone (docs/rulings.md §141).
 
 import { describe, expect, it } from 'vitest'
 import { effectivePower, streetCred } from '../../src/engine/query'
@@ -25,8 +26,10 @@ import {
   activate,
   attackAndSteal,
   blockWith,
+  chooseGig,
   db,
   endBothTurnsOnce,
+  endTurnOnce,
   fieldCard,
   findFielded,
   findInHand,
@@ -1272,15 +1275,83 @@ describe('yorinobu-arasaka-steel-dragon', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Batch bookkeeping: the two cards this batch could not encode.
+// The two batch-1 deferrals, finished by the floating-effects zone
+// (docs/rulings.md §141).
+//
+// chrome-fang — "{Play} Until your next turn, rival Units can't steal friendly
+// Gigs with value higher than their power."
 // ---------------------------------------------------------------------------
 
-describe('deferred cards (see the batch-1 report)', () => {
-  it('appetite-for-destruction and chrome-fang still carry no effects', () => {
-    // Both need a floating "until <later>" effect zone on GameState, which is a
-    // bigger engine change than a vocabulary extension. Recorded here so the
-    // completeness test at the end of Task 8 has a single place to look.
-    expect(db['appetite-for-destruction'].effects).toEqual([])
-    expect(db['chrome-fang'].effects).toEqual([])
+describe('chrome-fang', () => {
+  it("caps which friendly Gigs a rival Unit may steal at the thief's own power", () => {
+    const { state } = fixtureWithHand(0, ['chrome-fang'])
+    // A rival power-3 Unit, ready and waiting for its own turn.
+    const thief = fieldCard(state, 1, 'valentino-street-racer') // power 3
+    let next = playCardByDef(db, state, 0, 'chrome-fang')
+    setGigs(next, 0, [
+      { size: 6, value: 2 },
+      { size: 6, value: 5 },
+      { size: 6, value: 3 },
+    ])
+    next = endTurnOnce(db, next) // the rival's turn: the restriction is live
+
+    next = passReact(db, startAttack(db, next, thief, 'gigArea'))
+    // Only the value-2 and value-3 dice are within reach of power 3.
+    expect(actionsOfType(db, next, 'chooseGig').map((a) => a.dieIndex)).toEqual([0, 2])
+  })
+
+  it('lapses at the start of its own controller next turn', () => {
+    const { state } = fixtureWithHand(0, ['chrome-fang'])
+    const thief = fieldCard(state, 1, 'valentino-street-racer')
+    let next = playCardByDef(db, state, 0, 'chrome-fang')
+    expect(next.floatingEffects).toHaveLength(1)
+    setGigs(next, 0, [{ size: 6, value: 5 }])
+
+    next = endBothTurnsOnce(db, next) // rival turn, then player 0's next turn
+    expect(next.floatingEffects).toEqual([])
+    next = endTurnOnce(db, next) // the rival's turn again, unrestricted now
+    next = passReact(db, startAttack(db, next, thief, 'gigArea'))
+    // Every friendly die is on the table again, whatever its value — including
+    // the value-5 one the lapsed restriction had put out of a power-3 reach.
+    expect(actionsOfType(db, next, 'chooseGig')).toHaveLength(
+      next.players[0].gigArea.length
+    )
+    expect(gigValues(next, 0)).toContain(5)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// appetite-for-destruction — "The next time a friendly Unit wins a fight by 3+
+// power this turn, it also steals a Gig."
+// ---------------------------------------------------------------------------
+
+describe('appetite-for-destruction', () => {
+  it('gives the winner of a 3+ margin fight a bonus Gig steal, once', () => {
+    const { state } = fixtureWithHand(0, ['appetite-for-destruction'])
+    const attacker = fieldCard(state, 0, 'animals-wrecker') // power 10
+    const victim = fieldCard(state, 1, 'japantown-jonin', { ready: false }) // power 0
+    setGigs(state, 1, [{ size: 6, value: 4 }])
+
+    let next = playCardByDef(db, state, 0, 'appetite-for-destruction')
+    expect(next.floatingEffects).toHaveLength(1)
+
+    next = passReact(db, startAttack(db, next, attacker, victim))
+    // The fight is won by 10, so the delayed steal fires and asks for a die.
+    expect(next.phase).toBe('chooseGig')
+    expect(next.floatingEffects).toEqual([]) // one-shot: consumed
+    next = chooseGig(db, next, 0)
+    expect(gigValues(next, 0)).toContain(4)
+  })
+
+  it('does not fire on a narrower win', () => {
+    const { state } = fixtureWithHand(0, ['appetite-for-destruction'])
+    const attacker = fieldCard(state, 0, 'valentino-street-racer') // power 3
+    const victim = fieldCard(state, 1, 'corpo-security', { ready: false }) // power 2
+    setGigs(state, 1, [{ size: 6, value: 4 }])
+
+    let next = playCardByDef(db, state, 0, 'appetite-for-destruction')
+    next = passReact(db, startAttack(db, next, attacker, victim))
+    expect(next.phase).toBe('main') // margin 1: no steal
+    expect(next.floatingEffects).toHaveLength(1) // still waiting for a real win
   })
 })

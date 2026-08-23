@@ -168,6 +168,10 @@ export function newGame(db: CardDb, config: NewGameConfig): GameState {
     pendingAttack: null,
     pendingSteal: null,
     oncePerTurnUsed: [],
+    floatingEffects: [],
+    pendingGigRoll: null,
+    pendingIntercept: null,
+    interceptAnswers: [],
     winner: null,
     rng,
     events,
@@ -227,6 +231,20 @@ export function draftState(state: GameState): GameState {
     pendingAttack: state.pendingAttack ? { ...state.pendingAttack } : null,
     pendingSteal: clonePendingSteal(state.pendingSteal),
     oncePerTurnUsed: state.oncePerTurnUsed.slice(),
+    // Floating entries are mutable (`defeatIfActed.acted`) and are removed
+    // one at a time by whoever consumes them, so each entry is copied, not
+    // shared (docs/rulings.md §141).
+    floatingEffects: state.floatingEffects.map((entry) => ({ ...entry })),
+    pendingGigRoll: state.pendingGigRoll ? { ...state.pendingGigRoll } : null,
+    pendingIntercept:
+      state.pendingIntercept === null
+        ? null
+        : {
+            ...state.pendingIntercept,
+            options: state.pendingIntercept.options.slice(),
+            answers: state.pendingIntercept.answers.slice(),
+          },
+    interceptAnswers: state.interceptAnswers.slice(),
     events: state.events.slice(),
   }
 }
@@ -311,6 +329,11 @@ export function clearTurnBuffs(draft: GameState): void {
     draft.cards[Number(key)].stoleGigThisTurn = false
   }
   draft.oncePerTurnUsed = []
+  // "... this turn" floating entries have exactly the same lifetime as a turn
+  // power buff (docs/rulings.md §141). Their *consequences* have already run:
+  // `reduce.ts`'s `endTurn` resolves the end-of-turn ones (cyberpsychosis)
+  // before calling this, in the same way it fires `onEndTurn` first.
+  draft.floatingEffects = draft.floatingEffects.filter((entry) => entry.expiry !== 'endOfTurn')
 }
 
 /**
@@ -377,6 +400,14 @@ export function beginTurn(draft: GameState, player: PlayerId, turnNumber: number
     endGame(draft, player, 'sevenGigs')
     return
   }
+
+  // "Until your next turn, ..." / "... next turn if it can" (docs/rulings.md
+  // §141/§142): an entry created on this player's own turn spans exactly the
+  // rival's intervening turn and lapses here, the moment its controller's next
+  // turn begins — before `readySpentCards`, so nothing can read a stale one.
+  draft.floatingEffects = draft.floatingEffects.filter(
+    (entry) => !(entry.expiry === 'ownerNextTurnStart' && entry.controller === player)
+  )
 
   readySpentCards(draft, player, turnNumber)
   resetTurnState(draft, player)

@@ -27,7 +27,7 @@
 // mutate a draft the caller already owns and are what the engine's reducers
 // use, exactly like game.ts's `drawCards`.
 
-import { defeatUnit, leaveField } from '../engine/combat'
+import { defeatUnit, leaveField, stealableDieIndexes } from '../engine/combat'
 import { canonicalPayment, pay } from '../engine/economy'
 import { draftState, drawCards, endGame } from '../engine/game'
 import {
@@ -60,6 +60,8 @@ import type {
   EffectCondition,
   EffectDef,
   EffectNode,
+  FloatingEffect,
+  FloatingSpec,
   GameState,
   PlayerId,
   PlayerState,
@@ -210,6 +212,17 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
           : [{ kind: 'target' as const, spec: node.target, filter: node.filter }]),
         ...node.effects.flatMap(slotSpecs),
       ]
+    // A floating entry tied to a specific card instance ("Give an equipped
+    // Unit ... If THAT Unit steals or fights ...") needs a target slot; a
+    // board-wide one ("Until your next turn, rival Units can't ...") needs
+    // none (docs/rulings.md §141).
+    case 'floatingEffect': {
+      const spec = floatingTarget(node.floating)
+      if (spec === null) return []
+      return spec.target === 'self' || spec.target === 'chosen' || spec.target === 'fightFoe'
+        ? []
+        : [{ kind: 'target', spec: spec.target, filter: spec.filter }]
+    }
     case 'scripted':
       // `filters[i]` narrows `targets[i]` exactly like any other node's
       // `filter` (docs/rulings.md §81 ff.) — absent (a shorter/omitted array)
@@ -239,6 +252,23 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
 /** How many slots a node subtree reserves (used to skip past unchosen modes). */
 function slotWidth(node: EffectNode): number {
   return slotSpecs(node).length
+}
+
+/**
+ * The card a `FloatingSpec` names, if any (docs/rulings.md §141): the three
+ * instance-scoped variants (`defeatIfActed`, `unitCantAttack`, `mustAttack`)
+ * carry a `target`; the board-wide ones carry none. One helper so the slot
+ * reservation and the resolution below can never disagree about which is which.
+ */
+function floatingTarget(spec: FloatingSpec): { target: TargetSpec; filter?: TargetFilter } | null {
+  if (
+    spec.kind === 'defeatIfActed' ||
+    spec.kind === 'unitCantAttack' ||
+    spec.kind === 'mustAttack'
+  ) {
+    return { target: spec.target, filter: spec.filter }
+  }
+  return null
 }
 
 /**
@@ -795,8 +825,16 @@ function applyNode(
       // win condition — so an effect steal routes through the same
       // pendingSteal/chooseGig machinery as an attack steal, with this effect's
       // controller as the thief (docs/rulings.md §32).
-      const victim = opponentOf(ctx.player)
-      const available = draft.players[victim].gigArea.length
+      // How many dice this steal could actually take — not merely how many
+      // exist: a `rivalStealCappedByPower` restriction (chrome-fang,
+      // docs/rulings.md §141) can put some of them out of reach.
+      const available = stealableDieIndexes(
+        db,
+        draft,
+        ctx.player,
+        ctx.sourceUid,
+        node.distinctValueOnly === true
+      ).length
       const count = Math.min(node.count, available)
       if (count <= 0) return
       const head = draft.pendingSteal
@@ -864,6 +902,10 @@ function applyNode(
       die.value = value
       draft.events.push({ type: 'dieRolled', player, size: die.size, value })
       note(draft, ctx.sourceUid, `reroll a ${node.whose} gig`)
+      // [trigger seam] "When you roll a min or max value on a Gig, ..." — the
+      // ROLLER is this effect's controller, whichever player's die was
+      // rerolled ("when YOU roll", docs/rulings.md §143).
+      fireGigRollTrigger(db, draft, ctx.player, die.size, value)
       return
     }
 
@@ -898,6 +940,39 @@ function applyNode(
     case 'readyEddies': {
       readyFriendlyEddies(draft, ctx.player, node.count)
       note(draft, ctx.sourceUid, `ready ${node.count} eddie(s)`)
+      return
+    }
+
+    case 'floatingEffect': {
+      const spec = node.floating
+      const wants = floatingTarget(spec)
+      let unitUid: number | undefined
+      if (wants !== null) {
+        // Uses the same `takeTarget` path as every other targeted node, so
+        // `'chosen'` inside a `sameTarget` (cyberpsychosis) resolves to the
+        // shared uid and consumes no slot (docs/rulings.md §53/§141).
+        const bound = takeTarget({ target: wants.target }, ctx, slots)
+        if (bound === null || !draft.cards[bound]) return
+        unitUid = bound
+      }
+      const entry: FloatingEffect = {
+        kind: spec.kind,
+        controller: ctx.player,
+        sourceDefId: draft.cards[ctx.sourceUid]?.defId ?? '',
+        expiry: spec.expiry,
+      }
+      if (unitUid !== undefined) entry.unitUid = unitUid
+      if (spec.kind === 'winFightMarginSteal') {
+        entry.margin = spec.margin
+        entry.count = spec.count
+      }
+      if (spec.kind === 'defeatIfActed') entry.acted = false
+      draft.floatingEffects.push(entry)
+      note(
+        draft,
+        ctx.sourceUid,
+        `floating ${spec.kind} (${spec.expiry})${unitUid === undefined ? '' : ` on ${unitUid}`}`
+      )
       return
     }
 
@@ -943,6 +1018,12 @@ function applyNode(
     case 'goSoloTax':
     case 'attackPowerBonus':
     case 'attackUnitDespiteLag':
+    // Deferred slice (docs/rulings.md §143/§144): three more static layers —
+    // the Gig-reroll permission and the two would-be-mutation interceptions,
+    // all read by query.ts at their own engine seam.
+    case 'gigRerollOption':
+    case 'defeatInterceptSelf':
+    case 'stealInterceptByDiscard':
       // Static layers, read by query.ts — nothing to do at resolution time.
       return
   }
@@ -1231,6 +1312,28 @@ export function fireWatcherTrigger(
   }
 }
 
+/**
+ * "When you roll a min or max value on a Gig, draw 1. If it's a d20, draw 3
+ * instead." (kerry-eurodyne-axe-attitude-audience, docs/rulings.md §143) — a
+ * watcher on the ROLLER's own in-play cards, carrying the die's size and the
+ * value it landed on. Fired from every place a Gig die's value is actually
+ * rolled: `reduce.ts`'s fixer roll and its `gigReroll` decision, and the
+ * `rerollGig` node below. Lives here (not in reduce.ts) so the node can use it
+ * without adding a `cards -> engine/reduce` import direction.
+ */
+export function fireGigRollTrigger(
+  db: CardDb,
+  draft: GameState,
+  roller: PlayerId,
+  size: number,
+  value: number
+): void {
+  fireWatcherTrigger(db, draft, 'onGigRoll', roller, {
+    rolledDieSize: size,
+    rolledDieValue: value,
+  })
+}
+
 /** Pure form of `fireTriggerOnDraft`: returns a new state, never mutates. */
 export function fireTrigger(
   db: CardDb,
@@ -1242,6 +1345,26 @@ export function fireTrigger(
   const draft = draftState(state)
   fireTriggerOnDraft(db, draft, trigger, sourceUid, targets)
   return draft
+}
+
+/**
+ * Resolves one node against a draft the caller already owns, for `player`, with
+ * no supplied targets (so any slot it wants falls to the rng like a trigger's,
+ * docs/rulings.md §32). The `...OnDraft` twin of `resolveEffect`, added so a
+ * floating entry's *consequence* ("it also steals a Gig") can reuse the
+ * ordinary node vocabulary instead of re-implementing it inside combat.ts
+ * (docs/rulings.md §141).
+ */
+export function resolveNodeOnDraft(
+  db: CardDb,
+  draft: GameState,
+  node: EffectNode,
+  sourceUid: number,
+  player: PlayerId
+): void {
+  const def: EffectDef = { trigger: 'activated', effect: node }
+  const slots = bindSlots(db, draft, def, sourceUid, [], player)
+  applyNode(db, draft, node, { player, sourceUid, targets: [] }, slots)
 }
 
 /** Resolves a single node against an explicit context; returns a new state. */

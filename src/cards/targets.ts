@@ -276,6 +276,9 @@ export function filterTargets(
     // Batch 8 addition (docs/rulings.md §134 ff.): "a ready Unit" — the
     // mirror image of `spentOnly`.
     if (filter.readyOnly === true && !state.cards[uid].ready) return false
+    // Deferred slice (docs/rulings.md §141): "an equipped Unit"
+    // (cyberpsychosis) — the mirror image of `unequipped`.
+    if (filter.equipped === true && state.cards[uid].attachedGear.length === 0) return false
     return true
   })
 }

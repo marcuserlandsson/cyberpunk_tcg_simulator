@@ -15,12 +15,13 @@
 
 import {
   activateAbilityOnDraft,
+  fireGigRollTrigger,
   fireTriggerOnDraft,
   fireWatcherTrigger,
   playCardOnDraft,
   spendOnDraft,
 } from '../cards/effects'
-import { blockAttack, declareAttack, resolveAttack, takeStolenGig } from './combat'
+import { blockAttack, declareAttack, defeatUnit, resolveAttack, takeStolenGig } from './combat'
 import { canPayWith, legendCallCost } from './economy'
 import {
   beginTurn,
@@ -31,10 +32,17 @@ import {
   endGame,
   OPENING_HAND_SIZE,
 } from './game'
+import { InterceptRequired } from './intercept'
 import { legalActions } from './legal'
-import { actingPlayer, effectiveCardCost, opponentOf, rivalGoSoloTax } from './query'
+import {
+  actingPlayer,
+  effectiveCardCost,
+  friendlyGigRerollOption,
+  opponentOf,
+  rivalGoSoloTax,
+} from './query'
 import { nextInt, rollDie, shuffle } from './rng'
-import type { Action, CardDb, GameState, PlayerId, Reaction } from './types'
+import type { Action, CardDb, DieSize, GameState, PlayerId, Reaction } from './types'
 
 export class IllegalActionError extends Error {
   constructor(message: string) {
@@ -212,8 +220,16 @@ function startTurn(draft: GameState, db: CardDb, player: PlayerId, turnNumber: n
   fireWatcherTrigger(db, draft, 'onStartTurn', player, {})
 }
 
-/** Gain a gig: take the chosen die from the fixer, roll it, keep the result. */
-function chooseGigDie(draft: GameState, size: number): void {
+/**
+ * Gain a gig: take the chosen die from the fixer, roll it, keep the result.
+ *
+ * [trigger seam] "When you roll a min or max value on a Gig, ..." fires here
+ * (docs/rulings.md §143). If the roller also has a live "you may ignore the
+ * result and reroll it once" static (kerry-eurodyne-axe-attitude-audience) the
+ * turn stops in the new `gigReroll` phase for that decision instead of going
+ * straight to `main`.
+ */
+function chooseGigDie(draft: GameState, db: CardDb, size: number): void {
   const player = draft.activePlayer
   const p = draft.players[player]
   const index = p.fixer.findIndex((die) => die.size === size)
@@ -225,8 +241,59 @@ function chooseGigDie(draft: GameState, size: number): void {
   const [value, rng] = rollDie(draft.rng, die.size)
   draft.rng = rng
   p.gigArea.push({ size: die.size, value })
+  const dieIndex = p.gigArea.length - 1
   draft.events.push({ type: 'dieRolled', player, size: die.size, value })
+
+  fireGigRollTrigger(db, draft, player, die.size, value)
+  // A roll trigger can end the game (a forced draw off an empty deck).
+  if (draft.winner !== null) return
+
+  if (friendlyGigRerollOption(db, draft, player)) {
+    draft.pendingGigRoll = { player, dieIndex }
+    draft.phase = 'gigReroll'
+    return
+  }
   draft.phase = 'main'
+}
+
+/**
+ * "you may ignore the result and reroll it once" (docs/rulings.md §143):
+ * declining is a no-op; rerolling re-rolls the same die in place and fires the
+ * roll trigger again. Either answer ends the decision — "once" means once.
+ */
+function chooseGigReroll(draft: GameState, db: CardDb, reroll: boolean): void {
+  const pending = draft.pendingGigRoll
+  draft.pendingGigRoll = null
+  if (reroll && pending !== null) {
+    const die = draft.players[pending.player].gigArea[pending.dieIndex]
+    if (die !== undefined) {
+      const [value, rng] = rollDie(draft.rng, die.size)
+      draft.rng = rng
+      die.value = value
+      draft.events.push({ type: 'dieRolled', player: pending.player, size: die.size, value })
+      fireGigRollTrigger(db, draft, pending.player, die.size, value)
+    }
+  }
+  if (draft.winner !== null) return
+  draft.phase = 'main'
+}
+
+/**
+ * The floating entries whose printed text acts AT the end of the turn
+ * (docs/rulings.md §141): `cyberpsychosis`'s "If that Unit steals or fights,
+ * defeat it at the end of this turn." Runs after the `onEndTurn` watcher (both
+ * are "end of turn" events, and the printed trigger words put the card's own
+ * end-of-turn abilities first) and before `clearTurnBuffs` drops the entries.
+ */
+function resolveEndOfTurnFloating(draft: GameState, db: CardDb): void {
+  for (const entry of [...draft.floatingEffects]) {
+    if (entry.kind !== 'defeatIfActed' || entry.acted !== true) continue
+    const uid = entry.unitUid
+    if (uid === undefined || draft.cards[uid] === undefined) continue
+    if (!draft.players[draft.cards[uid].owner].field.includes(uid)) continue
+    defeatUnit(draft, db, uid)
+    if (draft.winner !== null) return
+  }
 }
 
 /**
@@ -355,6 +422,10 @@ function endTurn(draft: GameState, db: CardDb): void {
   // wipe (docs/rulings.md §55 ff.).
   fireWatcherTrigger(db, draft, 'onEndTurn', player, {})
   if (draft.winner !== null) return
+  // "... defeat it at the end of this turn" (docs/rulings.md §141) — resolved
+  // before the buffs (and the floating entries themselves) are wiped.
+  resolveEndOfTurnFloating(draft, db)
+  if (draft.winner !== null) return
   clearTurnBuffs(draft)
   const next = opponentOf(player)
   // turnNumber counts each player's own turns and advances when the first
@@ -376,8 +447,69 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
     )
   }
 
-  const draft = draftState(state)
+  // An interception answer is not an action of its own: it resumes the action
+  // that was paused, by replaying it with one more answer (docs/rulings.md
+  // §144).
+  if (action.type === 'answerIntercept') {
+    const pending = state.pendingIntercept
+    // Unreachable: `legalActions` only offers this with a pending interception.
+    if (pending === null) return state
+    const resumed = draftState(state)
+    resumed.phase = pending.resumePhase
+    resumed.pendingIntercept = null
+    resumed.interceptAnswers = []
+    return runAction(db, resumed, pending.action, [...pending.answers, action.answer])
+  }
 
+  return runAction(db, state, action, [])
+}
+
+/**
+ * Applies one action to a fresh draft of `state`, with `answers` pre-supplying
+ * every would-be-mutation interception the run reaches (docs/rulings.md §144).
+ *
+ * When the run reaches an interception it has no answer for, `askIntercept`
+ * throws: the half-finished draft is discarded wholesale and the ORIGINAL state
+ * is returned with the question attached (`phase: 'intercept'`), so nothing the
+ * aborted run touched — the rng included — can leak out. Answering replays this
+ * same action from that same original state with the answer appended, which is
+ * deterministic precisely because the rng is part of the state being replayed.
+ */
+function runAction(
+  db: CardDb,
+  state: GameState,
+  action: Action,
+  answers: number[]
+): GameState {
+  const draft = draftState(state)
+  draft.interceptAnswers = [...answers]
+  draft.pendingIntercept = null
+
+  try {
+    dispatch(db, draft, action)
+  } catch (error) {
+    if (error instanceof InterceptRequired) {
+      const paused = draftState(state)
+      paused.pendingIntercept = {
+        ...error.ask,
+        action,
+        answers: [...answers],
+        resumePhase: state.phase,
+      }
+      paused.phase = 'intercept'
+      paused.interceptAnswers = []
+      return paused
+    }
+    throw error
+  }
+
+  draft.interceptAnswers = []
+  checkOvertimeWin(draft)
+  return draft
+}
+
+/** The action dispatch itself: one handler per action type, on a live draft. */
+function dispatch(db: CardDb, draft: GameState, action: Action): void {
   switch (action.type) {
     case 'choosePlayOrder':
       choosePlayOrder(draft, action.goFirst)
@@ -389,7 +521,10 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
       keepHand(draft, db)
       break
     case 'chooseGigDie':
-      chooseGigDie(draft, action.size)
+      chooseGigDie(draft, db, action.size)
+      break
+    case 'chooseGigReroll':
+      chooseGigReroll(draft, db, action.reroll)
       break
     case 'sellCard':
       sellCard(draft, action.card)
@@ -422,8 +557,9 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
     case 'endTurn':
       endTurn(draft, db)
       break
+    case 'answerIntercept':
+      // Handled by `applyAction` before the dispatch (it replays the paused
+      // action rather than mutating anything itself).
+      break
   }
-
-  checkOvertimeWin(draft)
-  return draft
 }
