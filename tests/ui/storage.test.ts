@@ -9,6 +9,7 @@ import {
   getLastSimResult,
   getSettings,
   importDeckText,
+  isReadOnlyDeck,
   listDecks,
   listGameRecords,
   saveDeck,
@@ -73,6 +74,21 @@ describe('saveDeck / listDecks / deleteDeck round trip', () => {
     deleteDeck(STARTER_DECK.name)
     // ...and deleting it reveals the original bundled deck again, unchanged.
     expect(listDecks().find((deck) => deck.name === STARTER_DECK.name)).toEqual(STARTER_DECK)
+  })
+})
+
+describe('isReadOnlyDeck', () => {
+  it('is true for a bundled starter deck with no localStorage override', () => {
+    expect(isReadOnlyDeck(STARTER_DECK.name)).toBe(true)
+  })
+
+  it('is false once a localStorage save shadows it by name', () => {
+    saveDeck({ ...STARTER_DECK, cards: { 'mantis-blades': 1 } })
+    expect(isReadOnlyDeck(STARTER_DECK.name)).toBe(false)
+  })
+
+  it('is false for a name that is not a bundled starter at all', () => {
+    expect(isReadOnlyDeck('Some Made Up Deck')).toBe(false)
   })
 })
 

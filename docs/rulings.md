@@ -5486,3 +5486,68 @@ the state *before* the action. `undoToLastDecisionOf` derives that by
 replaying rather than storing it, so a record produced by any writer (UI, sim,
 fuzz harness) is undoable, and the attribution can never disagree with the
 actions themselves.
+
+## 152 — Deck Builder: invalid decks are shown, never refused; editing a bundled deck forks a local copy (Task 14)
+
+**Adding a card never refuses.** `DeckBuilderView`/`CardBrowser`/`DeckPanel`
+let the deck under construction go invalid in every way `validateDeck`
+checks — a 4th copy of a card, a card costing more RAM than the chosen
+legends currently provide, an unfilled legend slot, a short or long deck —
+and every resulting error string is listed live, in red
+(`data-testid="deck-errors"`), rather than disabling the click that would
+cause it. **Saving an invalid deck is also allowed**: `storage.saveDeck`
+takes whatever `DeckList` it is given, and the Deck Builder does not gate
+Save on `validateDeck(db, deck).length === 0`. This was a deliberate choice
+between two options the brief left open ("BLOCKED" vs "ALLOWED-but-flagged"):
+blocking would mean a player mid-build (e.g. adding a card before picking
+the legend that would license its RAM cost, or building past 3 copies while
+deciding which two to keep) hits a wall for a violation that is often about
+to be fixed by the very next click. The engine-level guarantee is untouched —
+nothing about `validateDeck` changed — and the errors are the same list a
+saved deck would show if reloaded.
+
+The corollary, **left for the controller of a later task**: `listDecks()`
+still returns every saved deck, valid or not, exactly as before. The Deck
+Builder is the only place that computes and displays `validateDeck` per
+deck; the Play view's and Simulate view's deck pickers do not yet filter to
+valid decks. Task 15 (or whichever task wires those pickers) should call
+`validateDeck(db, deck).length === 0` itself before offering a deck as a
+seat, the same way `DeckPanel` already computes it for display.
+
+**Editing a bundled starter deck and hitting Save forks a local copy, using
+storage.ts's existing shadow-by-name behavior — no new persistence
+mechanism.** `storage.ts` gains one function. `isReadOnlyDeck(name)` is true
+exactly when `name` is a bundled starter with no localStorage override yet —
+the same check `deleteDeck` already made internally, now exposed so the UI
+can show a badge (`data-testid="readonly-badge"`) before the player edits
+away. Loading a bundled deck and clicking Save calls the ordinary
+`saveDeck({ ...deck, name })`: if `name` is the same as the bundled deck's,
+this writes a localStorage entry that *shadows* the bundled deck by name
+(the exact mechanism `tests/ui/storage.test.ts`'s "reverts to the bundled
+deck after deleting a localStorage save that shadowed it by name" already
+covers) — the bundled JSON under `data/decks/` is never touched, and deleting
+the shadow later reveals the original bundled deck again, unchanged.
+`isReadOnlyDeck(name)` becomes false the instant that shadow exists, so the
+badge disappears immediately after Save. Typing a different name before
+Save is the ordinary "Save As": it creates an independent deck and leaves
+the bundled deck (and any of its own shadow) alone.
+
+**The demo flag and the read-only flag are independent facts, shown as two
+separate badges.** `deck.demo` relaxes `validateDeck`'s 40–50 card-count
+check (`src/engine/deck.ts`, unchanged by this task) and is shown via
+`data-testid="demo-badge"` whenever the deck being edited carries it —
+including after it has been forked into a local copy, since forking copies
+the whole `DeckList` verbatim. `isReadOnlyDeck` is about *where the deck
+lives* (bundled vs. local), not about its size rules, so a deck can be demo
+without being read-only (any saved demo deck) or read-only without being
+demo (neither bundled starter deck actually needs this today, but the
+mechanism doesn't assume otherwise).
+
+**The art-only promo (`rebecca-having-a-moment`) is disabled generically, not
+by id.** `CardBrowser.isArtOnlyPromo(def)` is exactly `validateDeck`'s own
+promo test (`type === 'legend' && ramLimit === null && text === ''`) — the
+browser cell gets a `disabled` class, a `title` tooltip explaining why, and
+both the card's own click and its `+` button are no-ops, so the one card in
+the current 141-card pool meeting that description can never be added as a
+legend. Nothing hardcodes the id; a future promo with the same printed shape
+would be caught the same way.

@@ -74,6 +74,18 @@ export function listDecks(): DeckList[] {
 }
 
 /**
+ * True when `name` names a bundled starter deck that has no localStorage
+ * override yet — i.e. editing it in the Deck Builder and hitting Save would
+ * *fork* a local copy under the same name (which then shadows the bundled
+ * deck in `listDecks`), rather than overwrite anything checked into the
+ * repo. Mirrors `deleteDeck`'s own "is there a local override" check, so the
+ * two stay consistent by construction (docs/rulings.md §152).
+ */
+export function isReadOnlyDeck(name: string): boolean {
+  return STARTER_DECK_NAMES.has(name) && !(name in readLocalDecks())
+}
+
+/**
  * Deletes a localStorage deck by name. Bundled starter decks are read-only:
  * deleting one that has no localStorage override throws (a documented
  * choice, rather than silently no-oping on a name the caller clearly meant).

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { PlayView } from './ui/PlayView'
+import { DeckBuilderView } from './ui/DeckBuilderView'
 import { loadCardDb } from './engine/cardDb'
-import type { DeckList } from './engine/deck'
-import { deleteDeck, getSettings, listDecks, saveSettings } from './ui/storage'
+import { getSettings, saveSettings } from './ui/storage'
 
 type View = 'play' | 'deckBuilder' | 'simulate'
 
@@ -31,9 +31,6 @@ export default function App() {
   const [useOfficialImages, setUseOfficialImages] = useState(
     () => getSettings().useOfficialImages
   )
-  const [decks, setDecks] = useState<DeckList[]>(() => listDecks())
-  const [deckError, setDeckError] = useState<string | null>(null)
-
   const db = useMemo(() => loadCardDb(), [])
   const aiDelayMs = useMemo(() => aiDelayFromUrl(), [])
 
@@ -41,16 +38,6 @@ export default function App() {
     const next = !useOfficialImages
     setUseOfficialImages(next)
     saveSettings({ useOfficialImages: next })
-  }
-
-  function handleDeleteDeck(name: string) {
-    try {
-      deleteDeck(name)
-      setDecks(listDecks())
-      setDeckError(null)
-    } catch (err) {
-      setDeckError(err instanceof Error ? err.message : String(err))
-    }
   }
 
   return (
@@ -85,22 +72,12 @@ export default function App() {
         <div hidden={view !== 'play'}>
           <PlayView db={db} useOfficialImages={useOfficialImages} aiDelayMs={aiDelayMs} />
         </div>
-        {view === 'deckBuilder' && (
-          <section aria-label="Deck Builder">
-            <h2>Decks</h2>
-            {deckError && <p className="deck-error">{deckError}</p>}
-            <ul className="deck-list">
-              {decks.map((deck) => (
-                <li key={deck.name}>
-                  <span>{deck.name}</span>
-                  <button type="button" onClick={() => handleDeleteDeck(deck.name)}>
-                    Delete
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        {/* Kept mounted, only hidden: matches the Play tab's pattern (Task
+            13) so a deck under construction survives a glance at another
+            tab instead of being discarded. */}
+        <div hidden={view !== 'deckBuilder'}>
+          <DeckBuilderView db={db} useOfficialImages={useOfficialImages} />
+        </div>
         {view === 'simulate' && (
           <section aria-label="Simulate">
             <p>Simulate placeholder</p>
