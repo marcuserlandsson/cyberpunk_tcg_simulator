@@ -59,7 +59,7 @@ export function replay(db: CardDb, record: GameRecord): GameState {
  * any producer (UI, sim, test) is undoable without carrying redundant
  * bookkeeping that could disagree with the actions themselves.
  */
-function attributions(db: CardDb, record: GameRecord): PlayerId[] {
+export function actionOwners(db: CardDb, record: GameRecord): PlayerId[] {
   let state = newGame(db, record.config)
   const owners: PlayerId[] = []
   for (const action of record.actions) {
@@ -87,7 +87,7 @@ export function undoToLastDecisionOf(
   record: GameRecord,
   player: PlayerId
 ): GameRecord {
-  const owners = attributions(db, record)
+  const owners = actionOwners(db, record)
   const lastOwn = owners.lastIndexOf(player)
   if (lastOwn === -1) return record
   return { config: record.config, actions: record.actions.slice(0, lastOwn) }
@@ -95,5 +95,23 @@ export function undoToLastDecisionOf(
 
 /** True when `player` has an action in `record` that `undoToLastDecisionOf` would strip. */
 export function canUndo(db: CardDb, record: GameRecord, player: PlayerId): boolean {
-  return attributions(db, record).includes(player)
+  return actionOwners(db, record).includes(player)
+}
+
+/**
+ * The rng seed the opponent agent uses for the decision that will become
+ * `record.actions[actionIndex]`.
+ *
+ * Derived from the game seed and the action index rather than stored, so the
+ * AI's behavior is a pure function of the record: loading a saved record and
+ * continuing gives the same opponent as playing it straight through, and
+ * undoing back into a turn and repeating an action gets the same answer again.
+ * A single long-lived agent instance could not offer either guarantee — its rng
+ * position would depend on how many decisions it happened to have made,
+ * including ones that were later undone. Lives here (not in the UI) because it
+ * is part of what makes a `GameRecord` a complete description of a game.
+ */
+export function agentSeedFor(gameSeed: number, actionIndex: number): number {
+  const mixed = Math.imul(gameSeed >>> 0, 2654435761) ^ Math.imul(actionIndex + 1, 40503)
+  return mixed >>> 0
 }
