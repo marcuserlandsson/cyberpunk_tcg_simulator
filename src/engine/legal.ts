@@ -79,7 +79,7 @@ function mainPhaseActions(db: CardDb, state: GameState): Action[] {
     }
   }
 
-  const legendPayment = legendCallPayment(state, player)
+  const legendPayment = legendCallPayment(db, state, player)
   if (legendPayment !== null) actions.push({ type: 'callLegend', payment: legendPayment })
 
   actions.push(...activatedAbilityActions(db, state, player))

@@ -38,6 +38,7 @@ import {
   opponentOf,
   reducedCost,
   resolvePowerAmount,
+  rivalGoSoloTax,
   streetCred,
   type ConditionContext,
 } from '../engine/query'
@@ -101,6 +102,14 @@ export interface TriggerContext extends ConditionContext {
    * just fought, read by the `'fightFoe'` `TargetSpec` (maelstrom-zealots).
    */
   fightFoeUid?: number
+  /**
+   * A Gear's own trigger, fired via `fireWatcherTrigger` (docs/rulings.md
+   * §107 ff.): the uid of the Unit/Legend wearing it, since `'self'` on the
+   * Gear's own EffectDef reads the GEAR's own uid, not its host — a
+   * `scripted` node reads this directly (`sandevistan`), the same shape as
+   * `defeatedHostUid`.
+   */
+  equipHostUid?: number
 }
 
 /** Keyword: "usable during the rival's attack" (guide p11 / glossary QUICK). */
@@ -172,6 +181,18 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
         { kind: 'target', spec: 'friendlyGigDie' },
         { kind: 'target', spec: 'rivalGigDie' },
       ]
+    // "Set a Gig's value to the value of another Gig" — two `anyGigDie`
+    // slots: the die being set, then the die being read from (docs/rulings.md
+    // §107 ff.).
+    case 'matchGig':
+      return [
+        { kind: 'target', spec: 'anyGigDie' },
+        { kind: 'target', spec: 'anyGigDie' },
+      ]
+    case 'buffFightPower':
+      return node.target === 'self' || node.target === 'chosen' || node.target === 'fightFoe'
+        ? []
+        : [{ kind: 'target', spec: node.target, filter: node.filter }]
     // Gates its single child's slots on a board condition, without gating the
     // whole enclosing EffectDef (docs/rulings.md §92 ff.) — the child's slots
     // are still reserved either way, matching `sameTarget`'s "step over the
@@ -570,6 +591,32 @@ function applyNode(
       return
     }
 
+    case 'matchGig': {
+      const targetIndex = takeSlot(slots)
+      const sourceIndex = takeSlot(slots)
+      if (targetIndex === null || sourceIndex === null) return
+      const targetDie = gigDieAt(draft, 'anyGigDie', targetIndex, ctx.player)
+      const sourceDie = gigDieAt(draft, 'anyGigDie', sourceIndex, ctx.player)
+      if (targetDie === null || sourceDie === null) return
+      const before = targetDie.value
+      targetDie.value = Math.max(1, Math.min(targetDie.size, sourceDie.value))
+      note(draft, ctx.sourceUid, `gig ${before} -> ${targetDie.value} (matched)`)
+      const dieOwner = gigDieOwner(draft, 'anyGigDie', targetIndex, ctx.player)
+      if (dieOwner !== ctx.player) {
+        fireWatcherTrigger(db, draft, 'onRivalAdjustFriendlyGig', dieOwner, {})
+      }
+      return
+    }
+
+    case 'buffFightPower': {
+      const target = takeTarget(node, ctx, slots)
+      if (target === null || !draft.cards[target]) return
+      const amount = resolvePowerAmount(draft, node.amount, target, ctx.player)
+      draft.cards[target].fightPowerBonusThisTurn = (draft.cards[target].fightPowerBonusThisTurn ?? 0) + amount
+      note(draft, ctx.sourceUid, `+${amount} fight power (this turn) on ${target}`)
+      return
+    }
+
     case 'skipNextReady': {
       const target = takeTarget(node, ctx, slots)
       if (target === null || !draft.cards[target]) return
@@ -855,6 +902,10 @@ function applyNode(
     case 'attackReadyWithKeyword':
     case 'cantAttackGigArea':
     case 'attackGigAreaDespiteLag':
+    case 'freeLegendCall':
+    case 'goSoloTax':
+    case 'attackPowerBonus':
+    case 'attackUnitDespiteLag':
       // Static layers, read by query.ts — nothing to do at resolution time.
       return
   }
@@ -1134,7 +1185,11 @@ export function fireWatcherTrigger(
   for (const uid of watchers) {
     const hosts = [uid, ...draft.cards[uid].attachedGear]
     for (const host of hosts) {
-      fireCardTrigger(db, draft, trigger, host, [], player, context)
+      // A Gear's own EffectDef reads `equipHostUid` for "this Unit" (its
+      // host), since `'self'` on that def resolves to the Gear's own uid
+      // (docs/rulings.md §107 ff., sandevistan).
+      const hostContext = host === uid ? context : { ...context, equipHostUid: uid }
+      fireCardTrigger(db, draft, trigger, host, [], player, hostContext)
     }
   }
 }
@@ -1337,8 +1392,11 @@ export function goSoloPayment(
   // Printed keywords only, deliberately: Gear may grant {blocker}/{adrenaline}
   // to its host, but never {go-solo} (docs/rulings.md §30).
   if (def.type !== 'legend' || !def.keywords.includes('go-solo')) return null
-  // The same reduced cost `reduce.ts` validates the payment against (§44).
-  return canonicalPayment(state, player, effectiveCardCost(db, state, player, uid), uid)
+  // The same reduced cost `reduce.ts` validates the payment against (§44),
+  // plus a RIVAL's "Rivals must pay +N €$ to use {Go Solo}" tax if active
+  // (riot-shield, docs/rulings.md §107 ff.).
+  const cost = effectiveCardCost(db, state, player, uid) + rivalGoSoloTax(db, state, player)
+  return canonicalPayment(state, player, cost, uid)
 }
 
 /**

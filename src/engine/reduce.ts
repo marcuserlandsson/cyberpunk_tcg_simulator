@@ -21,7 +21,7 @@ import {
   spendOnDraft,
 } from '../cards/effects'
 import { blockAttack, declareAttack, resolveAttack, takeStolenGig } from './combat'
-import { CALL_A_LEGEND_COST, canPayWith } from './economy'
+import { canPayWith, legendCallCost } from './economy'
 import {
   beginTurn,
   checkOvertimeWin,
@@ -32,7 +32,7 @@ import {
   OPENING_HAND_SIZE,
 } from './game'
 import { legalActions } from './legal'
-import { actingPlayer, effectiveCardCost, opponentOf } from './query'
+import { actingPlayer, effectiveCardCost, opponentOf, rivalGoSoloTax } from './query'
 import { nextInt, rollDie, shuffle } from './rng'
 import type { Action, CardDb, GameState, PlayerId, Reaction } from './types'
 
@@ -103,7 +103,8 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     if (!shapeMatches) return false
     // The payer is the defender, not the active player (guide p11: Call a
     // Legend is one of the attacked Rival's reactions).
-    return canPayWith(state, actingPlayer(state), action.reaction.payment, CALL_A_LEGEND_COST)
+    const payer = actingPlayer(state)
+    return canPayWith(state, payer, action.reaction.payment, legendCallCost(db, state, payer))
   }
 
   if (action.type === 'playCard') {
@@ -117,14 +118,22 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     const def = db[state.cards[action.card].defId]
     // A {go-solo} Legend can never help pay its own cost (docs/rulings.md §31).
     const exclude = def.type === 'legend' ? action.card : undefined
-    const cost = effectiveCardCost(db, state, state.activePlayer, action.card)
+    // A {go-solo} Legend play also owes a RIVAL's "Rivals must pay +N €$ to
+    // use {Go Solo}" tax if active (riot-shield, docs/rulings.md §107 ff.).
+    const tax = def.type === 'legend' ? rivalGoSoloTax(db, state, state.activePlayer) : 0
+    const cost = effectiveCardCost(db, state, state.activePlayer, action.card) + tax
     return canPayWith(state, state.activePlayer, action.payment, cost, exclude)
   }
 
   if (action.type === 'callLegend') {
     const shapeMatches = legal.some((candidate) => candidate.type === 'callLegend')
     if (!shapeMatches) return false
-    return canPayWith(state, state.activePlayer, action.payment, CALL_A_LEGEND_COST)
+    return canPayWith(
+      state,
+      state.activePlayer,
+      action.payment,
+      legendCallCost(db, state, state.activePlayer)
+    )
   }
 
   return legal.some((candidate) => deepEqual(candidate, action))

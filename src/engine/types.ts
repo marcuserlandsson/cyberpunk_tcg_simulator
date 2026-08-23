@@ -119,6 +119,10 @@ export type TargetSpec =
   //     includes the field) — maxtac-squadron.
   | 'fightFoe'
   | 'friendlyFaceUpLegend'
+  // Batch 6 (docs/rulings.md §107 ff.): "a Gear from THIS Legend" — the Gear
+  // attached to the source card itself (panam-palmer-nomad-cavalry), unlike
+  // `friendlyGear` which gathers every friendly Unit/Legend's Gear.
+  | 'selfGear'
 
 /** The three Gig-die scopes a card's text can name (docs/rulings.md §39). */
 export type GigDieSpec = 'friendlyGigDie' | 'rivalGigDie' | 'anyGigDie'
@@ -147,6 +151,10 @@ export interface TargetFilter {
   maxPowerIfAheadOnStreetCred?: number
   /** "power equal to or less than the value of a friendly d20" (over-the-edge). */
   maxPowerVsFriendlyD20?: boolean
+  /** "an UNEQUIPPED friendly Unit" — carries no attached Gear (panam-palmer-nomad-cavalry, docs/rulings.md §107 ff.). */
+  unequipped?: boolean
+  /** bare "a spent Unit" — either side, not ready (wild-in-the-streets, docs/rulings.md §107 ff.). */
+  spentOnly?: boolean
 }
 
 /**
@@ -160,6 +168,10 @@ export interface TargetFilter {
 export type CostReduction =
   | { per: 'friendlyGigValueAtLeast'; value: number; amount: number; minimum: number }
   | { per: 'unitInTrash'; amount: number; minimum: number }
+  // "-1 €$ for each friendly face-up Legend, to a minimum of 1 €$"
+  // (zetatech-berserk, docs/rulings.md §107 ff.) — a third flat-count variant,
+  // alongside `unitInTrash`.
+  | { per: 'friendlyFaceUpLegend'; amount: number; minimum: number }
 
 /**
  * A power amount read off the board instead of printed on the card.
@@ -180,6 +192,10 @@ export type DynamicAmount =
   // controller's own Gig area (two dice sharing a value; a third die of the
   // same value adds no further pair, matching the printed "each" reading).
   | 'friendlyGigValuePairCount'
+  // "+1 power for each friendly face-up Legend" (synapse-burnout,
+  // panam-palmer-strength-through-family, docs/rulings.md §107 ff.) — the
+  // count of the amount's own player's face-up Legends.
+  | 'friendlyFaceUpLegendCount'
 
 export type EffectNode =
   // "Draw 1 for each friendly Gig with an odd value" needs a board-read count
@@ -338,6 +354,43 @@ export type EffectNode =
   // pair* half of it needed this to land). Consumes its child's slots whether
   // or not the condition holds, so later siblings still read the right ones.
   | { kind: 'conditionalEffect'; condition: EffectCondition; effect: EffectNode }
+  // Batch 6 additions (docs/rulings.md §107 ff.):
+  // "Set a Gig's value to the value of another Gig" (peace-offering,
+  // padre-man-of-the-cross) — two `anyGigDie` slots (the die being set, then
+  // the die being read from), copying the second die's value onto the first,
+  // clamped to [1, size] exactly like `changeGig` (docs/rulings.md §39).
+  // Fires `onRivalAdjustFriendlyGig` on the SET die's owner, mirroring
+  // `changeGig`/`swapGig`.
+  | { kind: 'matchGig' }
+  // Static: "During your turn, you may Call a Legend for free"
+  // (panam-palmer-strength-through-family) — zeroes the 1 €$ Call-a-Legend
+  // cost for the controller while this def's own `condition` holds.
+  | { kind: 'freeLegendCall' }
+  // Static: "Rivals must pay +N €$ to use {Go Solo}" (riot-shield) — the
+  // mirror image of `rivalCantAttackWhenPlayed`: a tax on the OPPOSING side's
+  // {Go Solo} plays, not the printing card's own side.
+  | { kind: 'goSoloTax'; amount: number }
+  // Static: "Friendly ARASAKA Units have +1 power while attacking" /
+  // "Other friendly Units have +2 power while attacking"
+  // (saburo-arasaka-stubborn-patriarch, saul-bright-stormrider) — a power
+  // bonus that exists only for the duration of the MATCHING Unit's own
+  // attack (fight power and Gig-steal power alike), never folded into
+  // `effectivePower` generally, the mirror image of `powerVsCardType`
+  // (which is about the FOE's type, not "is this an attack"). `keyword`
+  // matches `cardTags` (role tag or the single faction tag), not
+  // `TargetFilter.keyword` (`hasKeyword`-only, docs/rulings.md §66).
+  | { kind: 'attackPowerBonus'; amount: number; keyword?: string; excludeSelf?: boolean }
+  // Static: "This Unit can attack rival Units the turn it's played"
+  // (sandayu-oda-hanako-s-guardian) — the mirror image of
+  // `attackGigAreaDespiteLag`: unlocks ONLY a rival Unit target despite Lag,
+  // never the Gig area.
+  | { kind: 'attackUnitDespiteLag' }
+  // "{Quick} A friendly Unit has +N power for each friendly face-up Legend
+  // while fighting rival Units this turn" (synapse-burnout) — an
+  // until-end-of-turn, FIGHT-ONLY power bonus on the chosen target (stored on
+  // `CardInstance.fightPowerBonusThisTurn`, read only by `fightPowerBonus`,
+  // never by `effectivePower`).
+  | { kind: 'buffFightPower'; amount: number | DynamicAmount; target: TargetSpec; filter?: TargetFilter }
 
 /**
  * The board facts an `EffectDef`/`conditionalEffect` node can gate on. Named
@@ -398,6 +451,9 @@ export interface EffectCondition {
   sourceSpent?: boolean
   /** "if you control a value-pair of Gigs" — two dice sharing a value (goro-takemura-vengeful-bodyguard). */
   friendlyGigValuePair?: boolean
+  // Batch 6 addition (docs/rulings.md §107 ff.):
+  /** "if 5 or more friendly Units and/or Legends are equipped" (panam-palmer-nomad-cavalry). */
+  friendlyEquippedCountAtLeast?: number
 }
 
 export interface EffectDef {
@@ -493,6 +549,16 @@ export interface CardInstance {
   // same reason `skipNextReady` is — instance state, never part of the
   // card-data zod schema.
   playedThisTurn?: boolean
+  // Batch 6 additions (docs/rulings.md §107 ff.), both cleared to 0 alongside
+  // `tempPower` in `clearTurnBuffs`:
+  /**
+   * "+N power ... while fighting rival Units this turn" (synapse-burnout) — a
+   * temporary bonus consulted ONLY by `query.fightPowerBonus` (never
+   * `effectivePower`), unlike `tempPower` which is a general power delta.
+   */
+  fightPowerBonusThisTurn?: number
+  /** "steals 1 fewer Gig this turn" (take-control) — read by `combat.ts`'s attack-driven steal count. */
+  stealReduction?: number
 }
 
 // ---------------------------------------------------------------------------

@@ -2497,7 +2497,33 @@
       "ganger"
     ],
     "text": "{Call} Choose one effect.\nSpend a rival Unit. // Draw 1.\n{Spend} Set a player's Gig to the same value as another player's Gig.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onCall",
+        "effect": {
+          "kind": "chooseOne",
+          "modes": [
+            {
+              "kind": "spendCard",
+              "target": "rivalUnit"
+            },
+            {
+              "kind": "draw",
+              "count": 1
+            }
+          ]
+        }
+      },
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true
+        },
+        "effect": {
+          "kind": "matchGig"
+        }
+      }
+    ]
   },
   {
     "id": "panam-palmer-nomad-cavalry",
@@ -2519,7 +2545,40 @@
       "nomad"
     ],
     "text": "2 €$, {Spend} Move a Gear from this Legend to an unequipped friendly Unit. If you do, ready that Unit.\nAt the end of your turn, if 5 or more friendly Units and/or Legends are equipped, ready them.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true,
+          "eddies": 2
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "panam-palmer-nomad-cavalry:move-gear",
+          "targets": [
+            "selfGear",
+            "friendlyUnit"
+          ],
+          "filters": [
+            {},
+            {
+              "unequipped": true
+            }
+          ]
+        }
+      },
+      {
+        "trigger": "onEndTurn",
+        "condition": {
+          "friendlyEquippedCountAtLeast": 5
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "panam-palmer-nomad-cavalry:ready-equipped"
+        }
+      }
+    ],
+    "scripted": "panam-palmer-nomad-cavalry"
   },
   {
     "id": "panam-palmer-strength-through-family",
@@ -2541,7 +2600,28 @@
       "nomad"
     ],
     "text": "During your turn, you may Call a Legend for free.\n{Attack} Discard 1. If you do, draw 1 for each friendly face-up Legend.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "condition": {
+          "duringOwnTurn": true
+        },
+        "effect": {
+          "kind": "freeLegendCall"
+        }
+      },
+      {
+        "trigger": "onAttack",
+        "effect": {
+          "kind": "scripted",
+          "name": "panam-palmer-strength-through-family",
+          "targets": [
+            "friendlyHandCard"
+          ]
+        }
+      }
+    ],
+    "scripted": "panam-palmer-strength-through-family"
   },
   {
     "id": "peace-offering",
@@ -2560,7 +2640,24 @@
       "braindance"
     ],
     "text": "You may set a Gig's value to the value of another Gig. Then, if you control a value-pair, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "matchGig"
+        }
+      },
+      {
+        "trigger": "onPlay",
+        "condition": {
+          "friendlyGigValuePair": true
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "pepe-najarro-working-doubles",
@@ -2579,7 +2676,19 @@
     "sellTag": false,
     "keywords": [],
     "text": "{Attack} If you control a value-pair of Gigs, ready up to 2 MERC Legends in your Legends area.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "condition": {
+          "friendlyGigValuePair": true
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "pepe-najarro-working-doubles"
+        }
+      }
+    ],
+    "scripted": "pepe-najarro-working-doubles"
   },
   {
     "id": "placide-voodoo-sentinel",
@@ -2714,7 +2823,15 @@
       "weapon"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\n{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nRivals must pay +2 €$ to use {Go Solo}.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "goSoloTax",
+          "amount": 2
+        }
+      }
+    ]
   },
   {
     "id": "rita-wheeler-no-stupid-questions",
@@ -2971,7 +3088,16 @@
       "corpo"
     ],
     "text": "Friendly ARASAKA Units have +1 power while attacking.\n(Units steal an extra Gig for every 10 power.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "attackPowerBonus",
+          "amount": 1,
+          "keyword": "arasaka"
+        }
+      }
+    ]
   },
   {
     "id": "safety-override",
@@ -3012,7 +3138,22 @@
       "corpo"
     ],
     "text": "{Play} Spend a rival Unit for each friendly value-pair of Gigs.\nThis Unit can attack rival Units the turn it's played.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "sandayu-oda-hanako-s-guardian"
+        }
+      },
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "attackUnitDespiteLag"
+        }
+      }
+    ],
+    "scripted": "sandayu-oda-hanako-s-guardian"
   },
   {
     "id": "sandevistan",
@@ -3031,7 +3172,16 @@
       "cyberware"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nAt the end of your turn, ready this Unit or Legend.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onEndTurn",
+        "effect": {
+          "kind": "scripted",
+          "name": "sandevistan"
+        }
+      }
+    ],
+    "scripted": "sandevistan"
   },
   {
     "id": "sasha-yakovleva-won-t-let-you-down",
@@ -3104,7 +3254,24 @@
       "nomad"
     ],
     "text": "Other friendly Units have +2 power while attacking.\nAt the end of your turn, ready up to 3 friendly Units.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "attackPowerBonus",
+          "amount": 2,
+          "excludeSelf": true
+        }
+      },
+      {
+        "trigger": "onEndTurn",
+        "effect": {
+          "kind": "scripted",
+          "name": "saul-bright-stormrider"
+        }
+      }
+    ],
+    "scripted": "saul-bright-stormrider"
   },
   {
     "id": "screw-lovelorn-fool",
@@ -3266,7 +3433,16 @@
       "quickhack"
     ],
     "text": "{Quick} A friendly Unit has +1 power for each friendly face-up Legend while fighting rival Units this turn.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "buffFightPower",
+          "amount": "friendlyFaceUpLegendCount",
+          "target": "friendlyUnit"
+        }
+      }
+    ]
   },
   {
     "id": "t-bug-amateur-philosopher",
@@ -3316,7 +3492,19 @@
       "quickhack"
     ],
     "text": "{Quick} A rival Unit steals 1 fewer Gig this turn. If that Unit is an AI, DRONE, or VEHICLE, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "take-control",
+          "targets": [
+            "rivalUnit"
+          ]
+        }
+      }
+    ],
+    "scripted": "take-control"
   },
   {
     "id": "tetratronic-rippler",
@@ -3626,7 +3814,21 @@
       "vehicle"
     ],
     "text": "{Play} Give another friendly Unit with cost 5 or less {Adrenaline} this turn. (A Unit with Adrenaline can attack the turn it's played.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "grantKeyword",
+          "keyword": "adrenaline",
+          "target": "friendlyUnit",
+          "filter": {
+            "excludeSelf": true,
+            "maxCost": 5
+          },
+          "duration": "turn"
+        }
+      }
+    ]
   },
   {
     "id": "viktor-vektor-drop-your-illusions",
@@ -3769,7 +3971,18 @@
       "ganger"
     ],
     "text": "Defeat a spent Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "defeat",
+          "target": "anyUnit",
+          "filter": {
+            "spentOnly": true
+          }
+        }
+      }
+    ]
   },
   {
     "id": "wraith-marauders",
@@ -3790,7 +4003,19 @@
       "raffen-shiv"
     ],
     "text": "When this Unit steals a Gig, ready another friendly Unit with power equal to the Gig's value.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyStealDie",
+        "condition": {
+          "selfIsStealer": true
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "wraith-marauders"
+        }
+      }
+    ],
+    "scripted": "wraith-marauders"
   },
   {
     "id": "yorinobu-arasaka-embracing-destruction",
@@ -3913,7 +4138,19 @@
       "cyberware"
     ],
     "text": "Play this Gear for -1 €$ for each friendly face-up Legend, to a minimum of 1 €$.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "costReduction",
+          "reduction": {
+            "per": "friendlyFaceUpLegend",
+            "amount": 1,
+            "minimum": 1
+          }
+        }
+      }
+    ]
   },
   {
     "id": "zetatech-faceplate",

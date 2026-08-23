@@ -7,13 +7,25 @@
 // COST, EDDIES). Legends pay whether face-up or face-down (guide p7/p11) and
 // stay in the legends zone, merely spent, when used this way.
 
-import type { GameState, PlayerId } from './types'
+import { friendlyLegendCallFree } from './query'
+import type { CardDb, GameState, PlayerId } from './types'
 
 /**
  * Call a Legend costs 1 €$ (guide p10/p11/glossary CALL A LEGEND) — the same
  * price in the main phase and as a reaction to an attack.
  */
 export const CALL_A_LEGEND_COST = 1
+
+/**
+ * What Call a Legend actually costs `player` right now: the printed 1 €$,
+ * or 0 while a friendly "During your turn, you may Call a Legend for free"
+ * static is active (panam-palmer-strength-through-family, docs/rulings.md
+ * §107 ff.). Consulted by both `legendCallPayment` below and `reduce.ts`'s
+ * `isLegal`, so the two can never drift apart.
+ */
+export function legendCallCost(db: CardDb, state: GameState, player: PlayerId): number {
+  return friendlyLegendCallFree(db, state, player) ? 0 : CALL_A_LEGEND_COST
+}
 
 /** The payer's own ready eddies + legends — every uid worth 1 €$ right now. */
 function readyPaymentUids(state: GameState, player: PlayerId): number[] {
@@ -76,11 +88,11 @@ export function canonicalPayment(
  * `legalActions` slices (main phase and react window) so the two can never
  * drift apart.
  */
-export function legendCallPayment(state: GameState, player: PlayerId): number[] | null {
+export function legendCallPayment(db: CardDb, state: GameState, player: PlayerId): number[] | null {
   const p = state.players[player]
   if (p.calledLegendThisTurn) return null
   if (!p.legends.some((uid) => !state.cards[uid].faceUp)) return null
-  return canonicalPayment(state, player, CALL_A_LEGEND_COST)
+  return canonicalPayment(state, player, legendCallCost(db, state, player))
 }
 
 /**

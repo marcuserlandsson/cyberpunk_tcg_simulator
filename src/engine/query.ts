@@ -261,6 +261,15 @@ export function conditionHolds(
   if (condition.friendlyGigValuePair === true && valuePairCount(state, player) < 1) {
     return false
   }
+  // Batch 6 addition (docs/rulings.md §107 ff.): "if 5 or more friendly Units
+  // and/or Legends are equipped" (panam-palmer-nomad-cavalry).
+  if (condition.friendlyEquippedCountAtLeast !== undefined) {
+    const equipped = [
+      ...state.players[player].field,
+      ...state.players[player].legends.filter((uid) => state.cards[uid].faceUp),
+    ].filter((uid) => state.cards[uid].attachedGear.length > 0).length
+    if (equipped < condition.friendlyEquippedCountAtLeast) return false
+  }
   return true
 }
 
@@ -283,11 +292,18 @@ export function reducedCost(
   reduction: CostReduction | undefined
 ): number {
   if (reduction === undefined) return base
-  const matching =
-    reduction.per === 'friendlyGigValueAtLeast'
-      ? state.players[player].gigArea.filter((die) => die.value >= reduction.value).length
-      : state.players[player].trash.filter((uid) => db[state.cards[uid].defId]?.type === 'unit')
-          .length
+  let matching: number
+  if (reduction.per === 'friendlyGigValueAtLeast') {
+    matching = state.players[player].gigArea.filter((die) => die.value >= reduction.value).length
+  } else if (reduction.per === 'unitInTrash') {
+    matching = state.players[player].trash.filter(
+      (uid) => db[state.cards[uid].defId]?.type === 'unit'
+    ).length
+  } else {
+    // "-1 €$ for each friendly face-up Legend" (zetatech-berserk,
+    // docs/rulings.md §107 ff.).
+    matching = state.players[player].legends.filter((uid) => state.cards[uid].faceUp).length
+  }
   return Math.max(reduction.minimum, base - matching * reduction.amount)
 }
 
@@ -480,6 +496,11 @@ export function resolvePowerAmount(
   // "Draw 1 for each friendly value-pair of Gigs" (hanako-arasaka-daughter-of-
   // the-emperor, docs/rulings.md §92 ff.).
   if (amount === 'friendlyGigValuePairCount') return valuePairCount(state, player)
+  // "+1 power for each friendly face-up Legend" (synapse-burnout,
+  // panam-palmer-strength-through-family, docs/rulings.md §107 ff.).
+  if (amount === 'friendlyFaceUpLegendCount') {
+    return state.players[player].legends.filter((uid) => state.cards[uid].faceUp).length
+  }
   if ('perEquippedGear' in amount) {
     return state.cards[subjectUid].attachedGear.length * amount.perEquippedGear
   }
@@ -498,7 +519,7 @@ export function resolvePowerAmount(
  * pair (docs/rulings.md §92 ff.). Used both by the `friendlyGigValuePair`
  * boolean condition (≥1) and the `friendlyGigValuePairCount` dynamic amount.
  */
-function valuePairCount(state: GameState, player: PlayerId): number {
+export function valuePairCount(state: GameState, player: PlayerId): number {
   const counts = new Map<number, number>()
   for (const die of state.players[player].gigArea) {
     counts.set(die.value, (counts.get(die.value) ?? 0) + 1)
@@ -534,9 +555,43 @@ export function fightPowerBonus(db: CardDb, state: GameState, uid: number, foe: 
   const foeCard = state.cards[foe]
   const foeDef = foeCard ? db[foeCard.defId] : undefined
   if (!foeDef) return 0
-  let bonus = 0
+  // "+N power for each friendly face-up Legend while fighting rival Units
+  // this turn" (synapse-burnout, docs/rulings.md §107 ff.) — a temporary,
+  // per-instance fight-only bonus, unlike the static-node-based one below.
+  // Every fight is against a rival Unit relative to `uid`'s own controller
+  // (the two combatants are always on opposing sides), so this needs no
+  // further "is `foe` a rival Unit" check.
+  let bonus = state.cards[uid]?.fightPowerBonusThisTurn ?? 0
   for (const node of activeStaticNodes(db, state, uid)) {
     if (node.kind === 'powerVsCardType' && node.cardType === foeDef.type) bonus += node.amount
+  }
+  return bonus
+}
+
+/**
+ * "Friendly ARASAKA Units have +1 power while attacking" / "Other friendly
+ * Units have +2 power while attacking" (saburo-arasaka-stubborn-patriarch,
+ * saul-bright-stormrider, docs/rulings.md §107 ff.) — a power bonus that
+ * exists only for the duration of `uid`'s own attack, the mirror image of
+ * `fightPowerBonus` (about the FOE's type, not "is this an attack"). Read by
+ * `combat.ts`'s `fight()` (attacker's side only) and `resolveAttack()`'s
+ * steal-count calculation, never `effectivePower` generally — there is no
+ * "currently attacking" fact outside an attack in progress.
+ */
+export function attackPowerBonus(db: CardDb, state: GameState, uid: number): number {
+  const card = state.cards[uid]
+  const def = card ? db[card.defId] : undefined
+  if (!card || !def) return 0
+  const p = state.players[card.owner]
+  const hosts = [...p.field, ...p.legends.filter((u) => state.cards[u].faceUp)]
+  let bonus = 0
+  for (const host of hosts) {
+    for (const node of activeStaticNodes(db, state, host)) {
+      if (node.kind !== 'attackPowerBonus') continue
+      if (node.excludeSelf === true && uid === host) continue
+      if (node.keyword !== undefined && !cardTags(def).includes(node.keyword)) continue
+      bonus += node.amount
+    }
   }
   return bonus
 }
@@ -592,6 +647,23 @@ export function canAttackGigAreaDespiteLag(db: CardDb, state: GameState, uid: nu
 }
 
 /**
+ * "This Unit can attack rival Units the turn it's played"
+ * (sandayu-oda-hanako-s-guardian, docs/rulings.md §107 ff.) — the mirror
+ * image of `canAttackGigAreaDespiteLag`: unlocks ONLY a rival Unit target
+ * despite Lag, never the Gig area. Same rival-denial respect as its mirror
+ * (docs/rulings.md §81 ff./§106).
+ */
+export function canAttackUnitDespiteLag(db: CardDb, state: GameState, uid: number): boolean {
+  const card = state.cards[uid]
+  if (!card || !card.ready || !card.lag) return false
+  if (cantAttack(db, state, uid)) return false
+  if (!activeStaticNodes(db, state, uid).some((node) => node.kind === 'attackUnitDespiteLag')) {
+    return false
+  }
+  return !rivalDeniesFreshAttacks(db, state, uid)
+}
+
+/**
  * "Rival Units can't attack the turn they're played" (maxtac-suppression-team,
  * docs/rulings.md §81 ff.) — does `uid`'s owner's OPPONENT have any in-play
  * card carrying a `rivalCantAttackWhenPlayed` static? Consulted by
@@ -607,6 +679,37 @@ export function rivalDeniesFreshAttacks(db: CardDb, state: GameState, uid: numbe
   const hosts = [...rival.field, ...rival.legends.filter((u) => state.cards[u].faceUp)]
   return hosts.some((host) =>
     activeStaticNodes(db, state, host).some((node) => node.kind === 'rivalCantAttackWhenPlayed')
+  )
+}
+
+/**
+ * Extra €$ `player` must pay to use {Go Solo} because of a RIVAL's static
+ * "Rivals must pay +N €$ to use {Go Solo}" (riot-shield, docs/rulings.md §107
+ * ff.) — the mirror image of `rivalDeniesFreshAttacks`: read from the
+ * OPPOSING side of `player`, not their own.
+ */
+export function rivalGoSoloTax(db: CardDb, state: GameState, player: PlayerId): number {
+  const rival = state.players[opponentOf(player)]
+  const hosts = [...rival.field, ...rival.legends.filter((u) => state.cards[u].faceUp)]
+  let tax = 0
+  for (const host of hosts) {
+    for (const node of activeStaticNodes(db, state, host)) {
+      if (node.kind === 'goSoloTax') tax += node.amount
+    }
+  }
+  return tax
+}
+
+/**
+ * Does `player` currently have a friendly "During your turn, you may Call a
+ * Legend for free" static active (panam-palmer-strength-through-family,
+ * docs/rulings.md §107 ff.)? Consulted by `economy.ts`'s Call-a-Legend cost.
+ */
+export function friendlyLegendCallFree(db: CardDb, state: GameState, player: PlayerId): boolean {
+  const p = state.players[player]
+  const hosts = [...p.field, ...p.legends.filter((u) => state.cards[u].faceUp)]
+  return hosts.some((host) =>
+    activeStaticNodes(db, state, host).some((node) => node.kind === 'freeLegendCall')
   )
 }
 

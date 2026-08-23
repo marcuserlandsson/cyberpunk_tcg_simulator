@@ -300,6 +300,10 @@ export function clearTurnBuffs(draft: GameState): void {
     // (docs/rulings.md §43), and "the first time ... each turn" allowances
     // refresh with them (docs/rulings.md §40).
     draft.cards[Number(key)].tempKeywords = []
+    // Batch 6 additions (docs/rulings.md §107 ff.): the same until-end-of-
+    // game-turn lifetime as `tempPower`.
+    draft.cards[Number(key)].fightPowerBonusThisTurn = 0
+    draft.cards[Number(key)].stealReduction = 0
   }
   draft.oncePerTurnUsed = []
 }

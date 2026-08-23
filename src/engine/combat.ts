@@ -39,7 +39,9 @@ import { legendCallPayment } from './economy'
 import {
   attackableReadyKeyword,
   ATTACK_READY,
+  attackPowerBonus,
   canAttackGigAreaDespiteLag,
+  canAttackUnitDespiteLag,
   cantAttack,
   cantAttackGigArea,
   cardTags,
@@ -133,7 +135,8 @@ function attackTargets(
   state: GameState,
   attacker: PlayerId,
   attackerUid: number,
-  gigAreaOnly = false
+  gigAreaOnly = false,
+  unitOnly = false
 ): (number | 'gigArea')[] {
   const rival = state.players[opponentOf(attacker)]
   // "this Unit can attack their Gig area the turn it's played" (nadia-
@@ -157,6 +160,10 @@ function attackTargets(
       !state.cards[uid].ready ||
       (readyKeyword !== null && hasKeyword(db, state, uid, readyKeyword))
   )
+  // "This Unit can attack rival Units the turn it's played" (sandayu-oda-
+  // hanako-s-guardian, docs/rulings.md §107 ff.) — the mirror image of
+  // `gigAreaOnly`: never unlocks the Gig area, only a rival Unit.
+  if (unitOnly) return targets
   // "This Unit can only attack rival Units" (docs/rulings.md §55 ff.), on top
   // of §24's engine-wide "no dice, no attack" rule.
   if (rival.gigArea.length > 0 && !cantAttackGigArea(db, state, attackerUid)) {
@@ -180,9 +187,12 @@ export function attackActions(db: CardDb, state: GameState): Action[] {
     // Lag exception consulted only once the general one has already failed
     // (docs/rulings.md §92 ff.).
     const gigAreaOnly = !full && canAttackGigAreaDespiteLag(db, state, attacker)
-    if (!full && !gigAreaOnly) continue
+    // The mirror image: "This Unit can attack rival Units the turn it's
+    // played" (docs/rulings.md §107 ff.).
+    const unitOnly = !full && !gigAreaOnly && canAttackUnitDespiteLag(db, state, attacker)
+    if (!full && !gigAreaOnly && !unitOnly) continue
     const optional = hasPayableOptionalTrigger(db, state, attacker, 'onAttack')
-    for (const target of attackTargets(db, state, player, attacker, gigAreaOnly)) {
+    for (const target of attackTargets(db, state, player, attacker, gigAreaOnly, unitOnly)) {
       actions.push({ type: 'attack', attacker, target })
       if (optional) actions.push({ type: 'attack', attacker, target, payOptionalCosts: true })
     }
@@ -215,7 +225,7 @@ export function reactActions(db: CardDb, state: GameState): Action[] {
     actions.push({ type: 'react', reaction: { type: 'block', blocker: uid } })
   }
 
-  const payment = legendCallPayment(state, defender)
+  const payment = legendCallPayment(db, state, defender)
   if (payment !== null) actions.push({ type: 'react', reaction: { type: 'callLegend', payment } })
 
   // [trigger seam] {quick} programs from hand and {quick} activated abilities.
@@ -487,7 +497,13 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // "+2 power while fighting a Legend" — a bonus that only exists for the
   // duration of this specific fight, never folded into `effectivePower`
   // (docs/rulings.md §55 ff.).
-  const attackPower = effectivePower(db, draft, attacker) + fightPowerBonus(db, draft, attacker, defender)
+  // "... have +N power while attacking" (saburo-arasaka-stubborn-patriarch,
+  // saul-bright-stormrider, docs/rulings.md §107 ff.) only ever applies to
+  // the ATTACKER's own side of this fight, never the defender's.
+  const attackPower =
+    effectivePower(db, draft, attacker) +
+    fightPowerBonus(db, draft, attacker, defender) +
+    attackPowerBonus(db, draft, attacker)
   const defendPower = effectivePower(db, draft, defender) + fightPowerBonus(db, draft, defender, attacker)
   // "This Unit wins all fights against CORPO Units" overrides the power
   // comparison in that Unit's favour (docs/rulings.md §41).
@@ -594,8 +610,14 @@ export function resolveAttack(draft: GameState, db: CardDb): void {
   }
 
   const victim = opponentOf(draft.activePlayer)
-  const power = effectivePower(db, draft, attacker)
-  const count = Math.min(stealCount(power), draft.players[victim].gigArea.length)
+  // "... have +N power while attacking" applies to a Gig-area steal exactly
+  // like a fight (docs/rulings.md §107 ff.); "steals 1 fewer Gig this turn"
+  // (take-control, docs/rulings.md §107 ff.) then reduces the resulting
+  // count, floored at 0.
+  const power = effectivePower(db, draft, attacker) + attackPowerBonus(db, draft, attacker)
+  const reduction = draft.cards[attacker].stealReduction ?? 0
+  const rawCount = Math.max(0, stealCount(power) - reduction)
+  const count = Math.min(rawCount, draft.players[victim].gigArea.length)
   if (count === 0) {
     endAttack(draft)
     return

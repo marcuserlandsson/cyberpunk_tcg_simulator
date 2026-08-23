@@ -3099,3 +3099,394 @@ with zero snapshot changes.
 **Verification:** `npx tsc --noEmit` clean, `npm test` 466/466 (the
 existing suite plus the round-1 and round-2 additions), `npm run build`
 clean, purity grep (`Math.random`/`Date.now`) clean on every touched file.
+
+## Task 8 batch 6 (Green, 2/2) — docs/rulings.md §107 ff.
+
+## 107 — `matchGig`: "set a Gig's value to the value of another Gig"
+
+`padre-man-of-the-cross` ("{Spend} Set a player's Gig to the same value as
+another player's Gig") and `peace-offering` ("You may set a Gig's value to
+the value of another Gig...") both print a mechanic no earlier card needed:
+copying one Gig die's rolled *value* onto another, rather than adjusting one
+die by a signed amount (`changeGig`, §39) or exchanging two dice wholesale
+(`swapGig`, §92). Both cards phrase it as bare "a Gig"/"another Gig" (no
+"friendly"/"rival" qualifier), matching §39's bare-scope convention.
+
+**Ruling:** a new node, `{ kind: 'matchGig' }`, with two fixed-order
+`anyGigDie` slots — the die being overwritten, then the die being read from
+— copying the second's `value` onto the first, clamped to `[1, size]`
+exactly like `changeGig`'s "by up to N" (a die that cannot hold the copied
+value takes the closest it can). Fires `onRivalAdjustFriendlyGig` on the
+overwritten die's actual owner when that differs from the effect's
+controller, mirroring `changeGig`/`swapGig`.
+
+Both slots draw from the *same* `anyGigDie` index space, so nothing stops a
+player from picking the same die for both ("another" not being mechanically
+enforced) — a documented simplification: doing so is simply a no-op pick
+among the enumerated options, never a way to see or force an otherwise
+unreachable outcome, and no card in the pool ever needed a "distinct from
+slot 1" constraint before. `peace-offering` chains a second `onPlay`
+`EffectDef` gated on `condition.friendlyGigValuePair` (already existing,
+§92 ff.) for its "then, if you control a value-pair, draw 1"; `padre`'s
+`{Spend}` ability is the node on its own, with no chained condition.
+
+## 108 — `panam-palmer-nomad-cavalry`: `selfGear`, `unequipped`, and a
+mass-ready static
+
+"2 €$, {Spend} Move a Gear from this Legend to an unequipped friendly Unit.
+If you do, ready that Unit. At the end of your turn, if 5 or more friendly
+Units and/or Legends are equipped, ready them."
+
+Three new pieces:
+
+- **`selfGear`** (`TargetSpec`): "a Gear from THIS Legend" — the Gear
+  attached to the source card itself, never any other friendly Unit or
+  Legend's Gear (unlike `friendlyGear`, §73, which gathers every friendly
+  Gear regardless of host). `targetsFor`'s case is a one-liner:
+  `state.cards[sourceUid]?.attachedGear`.
+- **`TargetFilter.unequipped`**: "an UNEQUIPPED friendly Unit" — the mirror
+  image of `sourceEquipped`/`defeatedWasEquipped` (both existing
+  conditions), but as a target filter: `attachedGear.length === 0`.
+- **`EffectCondition.friendlyEquippedCountAtLeast`**: "if 5 or more friendly
+  Units and/or Legends are equipped" — counts the controller's own field
+  Units plus face-up Legends with `attachedGear.length > 0`.
+
+Both "which Gear" (`selfGear`) and "which Unit" (`friendlyUnit`, filtered
+`unequipped`) are real, declared target slots on a `scripted` node
+(docs/rulings.md §48) — this activated ability's action already carries a
+committed `targets` array, so neither decision is left to the rng. "If you
+do, ready that Unit" needs no separate gate: both slots are real decisions,
+so the ability is either fully legal (both fillable, and the move — plus
+the ready — happens) or not offered at all; there is no partial-move case
+to condition on.
+
+The second clause — "ready THEM" (every currently-equipped friendly Unit and
+Legend, not a chosen one) — has no per-target decision at all once the
+printed count gate is met, so it is a second, unconditional-once-gated
+`scripted` node, the same "mass effect, no target slot" shape as
+`adam-smasher-metal-over-meat`'s "Defeat all other Units" (§68 ff.), applied
+to readying instead of defeating and to a filtered subset (equipped only)
+instead of everything.
+
+## 109 — `freeLegendCall`: a static that zeroes the Call-a-Legend cost
+
+`panam-palmer-strength-through-family`: "During your turn, you may Call a
+Legend for free." Unlike every earlier "free Call" card in the pool
+(`t-bug-amateur-philosopher`, `arasaka-emergency-radioport`,
+`dum-dum-maelstrom-triggerman`), which grant a ONE-SHOT free Call tied to a
+specific trigger firing (§77-ish precedent, scripted), this is a STANDING
+modifier to the ordinary Call-a-Legend action itself, live for the whole of
+the controller's own turn, with no triggering event at all.
+
+**Ruling:** a new static node, `{ kind: 'freeLegendCall' }`, gated by the
+already-existing `duringOwnTurn` condition (§55 ff.) rather than any new
+condition field. `query.ts` gains `friendlyLegendCallFree(db, state,
+player)`, consulting the player's own active static nodes exactly like
+`rivalDeniesFreshAttacks`'s sibling functions.
+
+This required a genuine plumbing change, not just a new node: Call-a-Legend's
+cost was a bare constant (`economy.ts`'s `CALL_A_LEGEND_COST = 1`) consulted
+in four places (`legendCallPayment`, and three `canPayWith` call sites in
+`reduce.ts`'s `isLegal` / `combat.ts`'s react window). A new
+`legendCallCost(db, state, player)` in `economy.ts` (zero while
+`friendlyLegendCallFree` holds, else the printed 1 €$) replaces the constant
+everywhere it mattered for *validating* a payment; `legendCallPayment` itself
+now takes `db` too, so both `legalActions`' enumeration and `isLegal`'s
+independent re-derivation agree. `economy.ts` importing from `query.ts` is a
+new one-directional edge (`query.ts` never imports `economy.ts`), so no
+cycle.
+
+The card's second clause — "{Attack} Discard 1. If you do, draw 1 for each
+friendly face-up Legend" — is scripted for the same "if you do" dependency
+§102/§103 already forced into a script: the bonus draw's size only makes
+sense once the discard (a real, declared `friendlyHandCard` target) is known
+to have actually happened.
+
+## 110 — `goSoloTax`: a static that costs the OPPOSING side's {Go Solo}
+
+`riot-shield`: "Rivals must pay +2 €$ to use {Go Solo}." The mirror image of
+`rivalCantAttackWhenPlayed` (§82) — a restriction that lives on one card but
+reads from the OPPOSING side of whoever controls it, rather than the
+printing card's own side.
+
+**Ruling:** `{ kind: 'goSoloTax'; amount: number }`, consulted by a new
+`query.rivalGoSoloTax(db, state, player)` exactly like
+`rivalDeniesFreshAttacks`'s shape (walk `player`'s rival's in-play cards,
+sum any `goSoloTax` static's `amount`). Two call sites needed the tax added
+on top of the ordinary printed/reduced cost:
+
+- `effects.goSoloPayment` (the {Go Solo} play's own canonical-payment
+  builder, consulted by `legalActions`);
+- `reduce.ts`'s `isLegal` for `playCard`, which independently re-derives the
+  cost of *any* supplied payment rather than trusting the canonical one —
+  this is the one this batch's audit actually caught: without this fix, a
+  Legend played Go Solo against an active `riot-shield` could be validated
+  at the UN-taxed cost, letting a payment 2 €$ short of the real price
+  through `isLegal`, even though `legalActions` itself would never have
+  *offered* that underpaid tuple. Exactly the class of drift §106's audit
+  was watching for, just on the cost side instead of the attack-legality
+  side.
+
+## 111 — `attackPowerBonus`: "... have +N power while attacking"
+
+`saburo-arasaka-stubborn-patriarch` ("Friendly ARASAKA Units have +1 power
+while attacking") and `saul-bright-stormrider` ("Other friendly Units have
++2 power while attacking") both print a power bonus that only exists for the
+duration of the boosted Unit's OWN attack — never a permanent or even a
+until-end-of-turn `effectivePower` change, and never keyed to the FOE's type
+(unlike `powerVsCardType`/`fightPowerBonus`, §56, which is "+N while
+fighting a [card type]"). Whether the boosted Unit is fighting or stealing
+from an unblocked Gig-area attack, the bonus applies either way — "while
+attacking" is broader than "while fighting."
+
+**Ruling:** `{ kind: 'attackPowerBonus'; amount: number; keyword?: string;
+excludeSelf?: boolean }`, a static read by a new `query.attackPowerBonus(db,
+state, uid)` — walks `uid`'s OWN controller's in-play cards for active
+`attackPowerBonus` statics, matching `keyword` against `cardTags` (not
+`hasKeyword`/`TargetFilter.keyword`, which is role-tags-only against
+`def.keywords` — §66 already flagged this gap: a card whose only ARASAKA tag
+lives in `faction`, like `saburo` and every ARASAKA Unit with no second
+faction tag, would silently never match a `hasKeyword`-based check) and
+`excludeSelf` against the printing card's own uid (`saul-bright-stormrider`
+excludes itself: "OTHER friendly Units").
+
+Consulted only by `combat.ts`'s `fight()` (added to the ATTACKER's side only,
+never the defender's — the bonus is never about defending) and
+`resolveAttack()`'s Gig-steal power calculation, exactly the same
+"fight-only, never general `effectivePower`" placement as `fightPowerBonus`
+(§56) — there is no "currently attacking" fact outside an attack actually in
+progress, so folding this into `effectivePower` would be observable (and
+wrong) outside combat.
+
+## 112 — `attackUnitDespiteLag`: the mirror image of `attackGigAreaDespiteLag`
+
+`sandayu-oda-hanako-s-guardian`: "This Unit can attack rival Units the turn
+it's played." §100 already built `attackGigAreaDespiteLag` for "can attack
+their Gig area the turn it's played" (nadia-fighting-through-grief) — a Lag
+exception narrower than {adrenaline} that unlocks ONLY the Gig area. This
+card needs the exact opposite narrowing: unlocks ONLY a rival Unit target,
+never the Gig area.
+
+**Ruling:** `{ kind: 'attackUnitDespiteLag' }`, read by a new
+`query.canAttackUnitDespiteLag`, byte-for-byte `canAttackGigAreaDespiteLag`'s
+structure (ready + Lag + the static active + not vetoed by
+`rivalDeniesFreshAttacks`) but gating on the new node kind.
+`combat.ts`'s `attackTargets` gains a second boolean parameter (`unitOnly`,
+alongside the existing `gigAreaOnly`) that short-circuits BEFORE the Gig-area
+push rather than replacing the whole target list, so both "only Gig area"
+and "only rival Units" share the same ready-Unit-filtering logic
+`attackTargets` already had. `attackActions` tries `full`, then
+`gigAreaOnly`, then `unitOnly`, in that order — at most one narrowing is ever
+live for the same attacker on the same turn (a fresh Unit either has Lag or
+it doesn't).
+
+## 113 — `equipHostUid`: threading a Gear's own host through `fireWatcherTrigger`
+
+`sandevistan`: "At the end of your turn, ready this Unit or Legend." Printed
+on Gear, and — unlike every EARLIER Gear trigger in the pool — "this Unit"
+means the HOST, not the Gear card itself. Every prior Gear ability either
+needed no target at all (`satori-sword-of-saburo`'s "draw 1",
+`gorilla-arms`'s self-referential steal condition) or read a fact rather
+than acting on a card uid. `'self'` on a Gear's OWN `EffectDef` resolves to
+the Gear's own uid (`ctx.sourceUid` is whatever `fireCardTrigger`/
+`fireWatcherTrigger` was called with for THAT def) — readying the Gear card
+itself would be a silent no-op, since nothing anywhere reads a Gear
+instance's own `ready` flag.
+
+**Ruling:** `TriggerContext.equipHostUid` (mirroring `defeatedHostUid`, §87)
+— the uid of the Unit/Legend wearing the Gear, threaded through whenever
+`fireWatcherTrigger` fires a trigger for an attached Gear rather than the
+watching card itself:
+
+```ts
+const hostContext = host === uid ? context : { ...context, equipHostUid: uid }
+fireCardTrigger(db, draft, trigger, host, [], player, hostContext)
+```
+
+`sandevistan` is a fully `scripted` node (no declared targets) reading
+`ctx.context?.equipHostUid` directly, the same "read a context fact rather
+than declare a target slot" shape as `wraith-marauders` (§117 below) and
+`the-relic-experimental-biochip` (§87) — not a generic `TargetSpec`, because
+the fact is specific to ONE trigger-firing seam
+(`fireWatcherTrigger`), not a board zone any card could enumerate.
+`fireTriggerOnDraft`'s OTHER propagation path (`GEAR_PROPAGATED_TRIGGERS` —
+{Attack}/{Defeated}/{Block}/{onWinFight}/{onSpend}/{onLoseFight}) is left
+untouched: no card in the pool needs "this Unit" on one of THOSE Gear
+triggers to mean the host rather than a target the propagated trigger
+already carries or auto-picks.
+
+## 114 — `buffFightPower`: a temporary, fight-only power buff on a chosen target
+
+`synapse-burnout`: "{Quick} A friendly Unit has +1 power for each friendly
+face-up Legend while fighting rival Units this turn." Combines three things
+no earlier card needed together: a chosen target (not the printing card
+itself), a temporary ("this turn") duration, and a FIGHT-ONLY scope (never
+folded into `effectivePower`, like `attackPowerBonus`/`fightPowerBonus`
+above/§56) — "while fighting rival Units" is, for combat purposes, simply
+"while fighting" (every fight is against a card on the opposing side of
+whoever is fighting, so no extra "is the foe a rival" check is needed).
+
+**Ruling:** a new `CardInstance` field, `fightPowerBonusThisTurn?: number`
+— the fight-only sibling of `tempPower` (a general, always-counted delta)
+— cleared to 0 alongside `tempPower`/`tempKeywords` in `clearTurnBuffs`
+(same until-end-of-game-turn lifetime, §20). A new `EffectNode`,
+`{ kind: 'buffFightPower'; amount: number | DynamicAmount; target:
+TargetSpec; filter?: TargetFilter }`, resolves like `buffPower` but adds to
+`fightPowerBonusThisTurn` instead of `tempPower`. `query.fightPowerBonus`
+(§56) now reads `state.cards[uid].fightPowerBonusThisTurn` as its starting
+value before adding any `powerVsCardType` static bonus, so `combat.ts`'s
+`fight()` (the bonus's only consumer) picks up both sources uniformly.
+
+A new `DynamicAmount`, `'friendlyFaceUpLegendCount'`, answers "+1 power for
+each friendly face-up Legend" (also reused by
+`panam-palmer-strength-through-family`'s "draw 1 for each friendly face-up
+Legend" inside its script, §109) — a plain count of the amount's own
+player's face-up Legends, resolved the same way `friendlyGigValuePairCount`
+(§92 ff.) is.
+
+## 115 — `stealReduction`: "steals 1 fewer Gig this turn"
+
+`take-control`: "{Quick} A rival Unit steals 1 fewer Gig this turn. If that
+Unit is an AI, DRONE, or VEHICLE, draw 1." No earlier card reduces a Unit's
+OWN future steal count — every existing Gig-count effect either changes a
+die's value (`changeGig`/`matchGig`/`swapGig`) or the number of dice an
+ALREADY-RESOLVING steal takes (`stealGig.count`, an effect's own steal, not
+a debuff on a future one).
+
+**Ruling:** a new `CardInstance` field, `stealReduction?: number`, cleared
+to 0 alongside `tempPower` in `clearTurnBuffs` (same turn lifetime). Read
+only by `combat.ts`'s `resolveAttack()`, the attack-driven Gig-area steal:
+`count = min(max(0, stealCount(power) - reduction), gigArea.length)`.
+**Scope decision:** this reduction is NOT also applied to an
+effect-driven `stealGig` node's count — "a rival Unit steals" most
+naturally reads as the combat steal (the overwhelmingly common, and only
+printed, way any card "steals a Gig" through an attack), and no card in the
+pool combines a targeted `stealReduction` debuff with an effect-driven
+`stealGig` from the SAME debuffed card in a way that would expose the gap;
+documented here as a deliberate, narrower-than-literal reading rather than a
+silent omission.
+
+Both halves of the printed sentence act on the SAME chosen Unit — "if THAT
+Unit is..." reads a property (its own `cardTags`) of whichever card the
+first half's real, declared `rivalUnit` target turned out to be — the same
+"read a property of what a prior step touched" shape §73 already forced
+into a script for `heywood-ripperdoc`'s "its cost", so the whole card is one
+`scripted` node with one declared target.
+
+## 116 — `TargetFilter.spentOnly`: bare "a spent Unit"
+
+`wild-in-the-streets`: "Defeat a spent Unit." Bare (no "friendly"/"rival"
+qualifier, either side), and — unlike `don-t-fear-the-reaper`'s "defeat a
+spent Unit" (§102), which only becomes meaningful mid-resolution after a
+mass-spend the SAME card just performed — this card's candidates (whichever
+Units are ALREADY spent, on either side) are fully known before the card
+even resolves. A real, enumerable decision belongs on the ordinary
+target-slot machinery, not the rng.
+
+**Ruling:** `TargetFilter.spentOnly?: boolean` — narrows a candidate list to
+`!ready`, applied to the existing bare `anyUnit` `TargetSpec`:
+`{ kind: 'defeat', target: 'anyUnit', filter: { spentOnly: true } }`.
+
+## 117 — `wraith-marauders`: reading `stolenDieValue` without a new `TargetFilter`
+
+"When this Unit steals a Gig, ready another friendly Unit with power equal
+to the Gig's value." `onFriendlyStealDie` already carries
+`context.stolenDieValue` (§81 ff.) for its CONDITION vocabulary, but
+`TargetFilter` has no way to compare a card's power against a *runtime*
+context value — every existing `TargetFilter` field compares against either
+a printed constant or a plain board read (`weakerThanAFriendlyUnit`,
+`maxPowerVsFriendlyD20`), never something carried by the firing
+`TriggerContext`. Threading `context` all the way through
+`candidatesFor`/`fillableSlots`/`bindSlots` for the sake of one filter that
+only one card needs — and which can NEVER be a real, action-carried decision
+anyway, since `onFriendlyStealDie` (like every non-`onPlay` trigger) offers
+no player-facing target slot at all (§32) — would be a disproportionate
+plumbing change for zero behavioural gain over the alternative.
+
+**Ruling:** fully `scripted`, no declared targets. The script reads
+`ctx.context?.stolenDieValue` directly (already on `EffectCtx.context` for
+every scripted node, no new threading needed) and searches
+`state.players[ctx.player].field` for a power-matching candidate itself,
+falling back to the rng exactly like every other trigger-context-only
+target (`v-roamer-of-the-badlands`, §48). `excludeSelf`-equivalent filtering
+("ANOTHER friendly Unit") is a plain `uid !== ctx.sourceUid` check inside the
+script, mirroring the generic filter's own semantics without needing the
+generic machinery.
+
+## 118 — "Ready/spend up to N" with no printed tie-breaker: `pickN`'s rng convention
+
+Three cards in this batch print "affect up to N of a zone" where N can be
+smaller than the zone's size, and nothing on the card names *which* ones
+when more than N qualify: `pepe-najarro-working-doubles` ("ready up to 2
+MERC Legends"), `saul-bright-stormrider` ("ready up to 3 friendly Units"),
+and `sandayu-oda-hanako-s-guardian` ("Spend a rival Unit for each friendly
+value-pair of Gigs" — a *dynamic* count, but the same "which N of the
+eligible pool" gap once the rival controls more Units than the count owes).
+No earlier card in the pool combined "N might be less than the eligible
+pool" with "no filter distinguishes them" for a *board* zone (as opposed to
+a *mid-resolution reveal*, where `viktor-vektor-sit-down-and-relax`'s
+"reveal up to 2 Gears... picked via rng" — §81 ff. — already set the "act on
+all if ≤N, else N at random" precedent).
+
+Building genuine "choose exactly N distinct, without replacement" target
+slots would need the target-slot machinery to know, when enumerating slot
+*i*'s candidates, which uids slots `1..i-1` of the SAME node already
+consumed — a real feature, but one no card before this batch needed, and
+adding it for three "no printed tie-breaker" cards would be scope
+disproportionate to the actual decision it protects (none: every "up to N"
+effect in this batch is purely beneficial to the caster or purely
+detrimental to a rival's undifferentiated Units — readying/spending A vs. B
+when both are otherwise interchangeable is not a choice any of these
+printed texts asks the player to make).
+
+**Ruling:** `scripted/index.ts` gains `pickN(state, items, n)`: returns
+every item if the pool holds `n` or fewer, otherwise `n` of them chosen
+uniformly at random (splice-based, exactly `viktor-vektor-sit-down-and-
+relax`'s existing loop, extracted into a shared helper). All three cards'
+scripts call it and ready/spend the returned set — deterministic (and
+correct per the printed text) whenever the pool is small enough to make the
+"up to N" cap vacuous, rng-resolved only in the genuinely oversubscribed
+case, which the printed text itself never distinguishes.
+
+## 119 — `CostReduction.per: 'friendlyFaceUpLegend'`: a third flat-count variant
+
+`zetatech-berserk`: "Play this Gear for -1 €$ for each friendly face-up
+Legend, to a minimum of 1 €$." §89 already added a second `CostReduction`
+variant (`unitInTrash`) alongside the original `friendlyGigValueAtLeast`
+because it had no `value` threshold, just a flat count. This card's count
+(face-up Legends) is a different board fact from either existing variant,
+so it is a third sibling: `{ per: 'friendlyFaceUpLegend'; amount: number;
+minimum: number }`, handled by `reducedCost`'s existing `if/else if/else`
+chain (now three-way) the same way the other two are.
+
+## Task 8 batch 6 summary
+
+**Cards:** `padre-man-of-the-cross`, `panam-palmer-nomad-cavalry`,
+`panam-palmer-strength-through-family`, `peace-offering`,
+`pepe-najarro-working-doubles`, `riding-nomad`, `riot-shield`,
+`saburo-arasaka-stubborn-patriarch`, `sandayu-oda-hanako-s-guardian`,
+`sandevistan`, `saul-bright-stormrider`, `synapse-burnout`, `take-control`,
+`valentino-street-racer`, `wild-in-the-streets`, `wraith-marauders`,
+`zetatech-berserk`. All 17 fully encoded — no deferrals.
+
+**Vocabulary extensions:** `matchGig`, `freeLegendCall`, `goSoloTax`,
+`attackPowerBonus`, `attackUnitDespiteLag`, `buffFightPower` (`EffectNode`);
+`selfGear` (`TargetSpec`); `unequipped`, `spentOnly` (`TargetFilter`);
+`friendlyEquippedCountAtLeast` (`EffectCondition`);
+`friendlyFaceUpLegendCount` (`DynamicAmount`); `friendlyFaceUpLegend`
+(`CostReduction.per`); `fightPowerBonusThisTurn`, `stealReduction`
+(`CardInstance`); `equipHostUid` (`TriggerContext`).
+
+**Engine-side fixes surfaced by this batch's audit (both riot-shield's
+`goSoloTax` and panam-palmer-strength-through-family's `freeLegendCall`
+needed cost-validation call sites updated, not just the enumeration side):**
+`reduce.ts`'s `isLegal` for `playCard` (a {Go Solo} Legend play) now adds
+`rivalGoSoloTax`; its two `callLegend`/`react callLegend` cost checks now
+call `economy.legendCallCost` instead of the bare `CALL_A_LEGEND_COST`
+constant. Same "the enumeration path and the independent validation path
+must read the same effective cost" class of gap §106's audit flagged for
+the attack-legality side.
+
+**Verification:** `npx tsc --noEmit` clean, `npm test` 492/492 (466
+pre-existing + 26 new), `npm run build` clean, purity grep
+(`Math.random`/`Date.now`) clean on every touched file.

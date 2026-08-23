@@ -26,7 +26,7 @@
 
 import { defeatGear, defeatUnit } from '../../engine/combat'
 import { endGame, drawCards } from '../../engine/game'
-import { hasKeyword, opponentOf } from '../../engine/query'
+import { cardTags, effectivePower, hasKeyword, opponentOf, valuePairCount } from '../../engine/query'
 import { nextInt, shuffle } from '../../engine/rng'
 import type { CardDb, GameState, PlayerId } from '../../engine/types'
 import { fireTriggerOnDraft, spendOnDraft, type EffectCtx } from '../effects'
@@ -39,6 +39,27 @@ function pick<T>(state: GameState, items: T[]): T | undefined {
   const [index, rng] = nextInt(state.rng, items.length)
   state.rng = rng
   return items[index]
+}
+
+/**
+ * Picks up to `n` distinct items through the seeded rng — every item if the
+ * pool holds `n` or fewer (docs/rulings.md §107 ff.'s "up to N, no printed
+ * tie-breaker" convention: when the pool exceeds `n`, nothing on the card
+ * distinguishes *which* ones, so those are chosen uniformly at random, the
+ * same "no enumerable decision left" reasoning as `viktor-vektor-sit-down-
+ * and-relax`'s "reveal up to 2 Gears" — extended here from a mid-resolution
+ * reveal to an already-visible board zone).
+ */
+function pickN<T>(state: GameState, items: T[], n: number): T[] {
+  if (items.length <= n) return [...items]
+  const pool = [...items]
+  const taken: T[] = []
+  while (taken.length < n && pool.length > 0) {
+    const [index, rng] = nextInt(state.rng, pool.length)
+    state.rng = rng
+    taken.push(...pool.splice(index, 1))
+  }
+  return taken
 }
 
 /** Every Gear card attached anywhere on `player`'s side (field + legends). */
@@ -743,6 +764,176 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (!drawCards(state, ctx.player, 1)) {
       endGame(state, opponentOf(ctx.player), 'deckout')
     }
+    return state
+  },
+
+  // -------------------------------------------------------------------------
+  // Task 8 batch 6 (Green) — docs/rulings.md §107 ff.
+  // -------------------------------------------------------------------------
+
+  /**
+   * `sandevistan` — "At the end of your turn, ready this Unit or Legend."
+   * Printed on Gear, fired via the `onEndTurn` watcher; `'self'` on a Gear's
+   * own EffectDef resolves to the GEAR's own uid (readying it is a no-op —
+   * nothing ever reads a Gear card's own `ready` flag), so this reads the
+   * host uid `fireWatcherTrigger` now threads through
+   * `ctx.context.equipHostUid` instead (docs/rulings.md §107 ff.).
+   */
+  sandevistan: (_db, state, ctx) => {
+    const hostUid = ctx.context?.equipHostUid
+    if (hostUid === undefined || !state.cards[hostUid]) return state
+    state.cards[hostUid].ready = true
+    return state
+  },
+
+  /**
+   * `panam-palmer-nomad-cavalry` — "2 €$, {Spend} Move a Gear from this
+   * Legend to an unequipped friendly Unit. If you do, ready that Unit."
+   * Both "which Gear" (`selfGear` — Gear attached to Panam herself only, not
+   * any friendly Gear) and "which Unit" (`friendlyUnit`, filtered
+   * `unequipped`) are real, declared target slots (docs/rulings.md §48) —
+   * this activated ability's action already carries a committed `targets`
+   * array. "If you do" is automatic here: both slots are real decisions, so
+   * either they are both filled (the move — and the ready — happens) or the
+   * whole activation was never legal/offered in the first place (no
+   * partial-move case to gate on).
+   */
+  'panam-palmer-nomad-cavalry:move-gear': (_db, state, ctx) => {
+    const [gear, host] = ctx.targets
+    if (gear === undefined || host === undefined) return state
+    const source = state.cards[ctx.sourceUid]
+    if (!source.attachedGear.includes(gear)) return state
+    source.attachedGear = source.attachedGear.filter((uid) => uid !== gear)
+    state.cards[host].attachedGear.push(gear)
+    state.cards[host].ready = true
+    return state
+  },
+
+  /**
+   * `panam-palmer-nomad-cavalry` — "At the end of your turn, if 5 or more
+   * friendly Units and/or Legends are equipped, ready them." A mass,
+   * unconditional (once the printed count gate is met) ready with no
+   * per-target decision — the same shape as `adam-smasher-metal-over-meat`'s
+   * mass defeat (docs/rulings.md §68 ff.), but readying every EQUIPPED
+   * friendly Unit/Legend rather than every Unit.
+   */
+  'panam-palmer-nomad-cavalry:ready-equipped': (_db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const equipped = [...p.field, ...p.legends.filter((uid) => state.cards[uid].faceUp)].filter(
+      (uid) => state.cards[uid].attachedGear.length > 0
+    )
+    for (const uid of equipped) state.cards[uid].ready = true
+    return state
+  },
+
+  /**
+   * `panam-palmer-strength-through-family` — "{Attack} Discard 1. If you do,
+   * draw 1 for each friendly face-up Legend." "Which card to discard" is a
+   * real, declared target (`friendlyHandCard`, docs/rulings.md §73/§80's
+   * convention); the dynamic draw amount depends on whether the discard
+   * actually happened (an empty hand declines by having nothing to give
+   * up), the same "if you do" target-dependency shape §102/§103 already
+   * forced into a script.
+   */
+  'panam-palmer-strength-through-family': (_db, state, ctx) => {
+    const discarded = ctx.targets[0]
+    if (discarded === undefined) return state
+    const p = state.players[ctx.player]
+    if (!p.hand.includes(discarded)) return state
+    p.hand = p.hand.filter((uid) => uid !== discarded)
+    p.trash.push(discarded)
+    state.events.push({ type: 'cardTrashed', uid: discarded })
+    const count = p.legends.filter((uid) => state.cards[uid].faceUp).length
+    if (count > 0 && !drawCards(state, ctx.player, count)) {
+      endGame(state, opponentOf(ctx.player), 'deckout')
+    }
+    return state
+  },
+
+  /**
+   * `pepe-najarro-working-doubles` — "{Attack} If you control a value-pair
+   * of Gigs, ready up to 2 MERC Legends in your Legends area." No printed
+   * criterion distinguishes *which* 2 when more than 2 face-up MERC Legends
+   * are in play, so this is `pickN`'s "act on all if ≤N, else N at random"
+   * convention (docs/rulings.md §107 ff.).
+   */
+  'pepe-najarro-working-doubles': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const eligible = p.legends.filter(
+      (uid) => state.cards[uid].faceUp && hasKeyword(db, state, uid, 'merc')
+    )
+    for (const uid of pickN(state, eligible, 2)) state.cards[uid].ready = true
+    return state
+  },
+
+  /**
+   * `saul-bright-stormrider` — "At the end of your turn, ready up to 3
+   * friendly Units." Same "act on all if ≤N, else N at random" convention as
+   * `pepe-najarro-working-doubles` above (docs/rulings.md §107 ff.).
+   */
+  'saul-bright-stormrider': (_db, state, ctx) => {
+    const p = state.players[ctx.player]
+    for (const uid of pickN(state, p.field, 3)) state.cards[uid].ready = true
+    return state
+  },
+
+  /**
+   * `sandayu-oda-hanako-s-guardian` — "{Play} Spend a rival Unit for each
+   * friendly value-pair of Gigs." A dynamic, mass spend with no per-target
+   * decision beyond "which N of the rival's field" when the rival controls
+   * more Units than the value-pair count owes — the same "act on all if
+   * ≤N, else N at random" convention (docs/rulings.md §107 ff.).
+   */
+  'sandayu-oda-hanako-s-guardian': (db, state, ctx) => {
+    const pairs = valuePairCount(state, ctx.player)
+    if (pairs <= 0) return state
+    const rival = opponentOf(ctx.player)
+    const targets = pickN(state, state.players[rival].field, pairs)
+    if (targets.length > 0) spendOnDraft(db, state, targets)
+    return state
+  },
+
+  /**
+   * `take-control` — "{Quick} A rival Unit steals 1 fewer Gig this turn. If
+   * that Unit is an AI, DRONE, or VEHICLE, draw 1." "Which rival Unit" is a
+   * real, declared target (`rivalUnit`); the bonus draw reads a property
+   * (its own tags) of that SAME chosen Unit, the same "read a property of
+   * what a prior step touched" shape §73 already forced into a script for
+   * `heywood-ripperdoc`'s "its cost".
+   */
+  'take-control': (db, state, ctx) => {
+    const target = ctx.targets[0]
+    if (target === undefined) return state
+    const card = state.cards[target]
+    card.stealReduction = (card.stealReduction ?? 0) + 1
+    const tags = cardTags(db[card.defId])
+    if (['ai', 'drone', 'vehicle'].some((keyword) => tags.includes(keyword))) {
+      if (!drawCards(state, ctx.player, 1)) {
+        endGame(state, opponentOf(ctx.player), 'deckout')
+      }
+    }
+    return state
+  },
+
+  /**
+   * `wraith-marauders` — "When this Unit steals a Gig, ready another
+   * friendly Unit with power equal to the Gig's value." Fired from
+   * `onFriendlyStealDie` (gated `condition.selfIsStealer`), which — like
+   * every non-`onPlay` trigger — carries no action-level target
+   * (docs/rulings.md §32); "power equal to the Gig's value" also names a
+   * fact only the firing context knows (`ctx.context.stolenDieValue`), which
+   * the ordinary `TargetFilter` vocabulary has no way to read, so both the
+   * candidate search and the pick (when more than one qualifies) stay here
+   * rather than becoming a declared target slot.
+   */
+  'wraith-marauders': (db, state, ctx) => {
+    const stolenValue = ctx.context?.stolenDieValue
+    if (stolenValue === undefined) return state
+    const candidates = state.players[ctx.player].field.filter(
+      (uid) => uid !== ctx.sourceUid && effectivePower(db, state, uid) === stolenValue
+    )
+    const target = pick(state, candidates)
+    if (target !== undefined) state.cards[target].ready = true
     return state
   },
 }

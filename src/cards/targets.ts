@@ -128,6 +128,11 @@ export function targetsFor(
     // unlike `friendlyUnitOrLegend` (which also includes the field).
     case 'friendlyFaceUpLegend':
       return faceUpLegendsOf(state, me)
+    // Batch 6 (docs/rulings.md §107 ff.): "a Gear from THIS Legend" — the
+    // Gear attached to the source card itself, never any other friendly
+    // Unit/Legend's Gear (panam-palmer-nomad-cavalry).
+    case 'selfGear':
+      return state.cards[sourceUid]?.attachedGear.slice() ?? []
   }
 }
 
@@ -247,6 +252,9 @@ export function filterTargets(
       if (friendlyBest === null) return false
       if (effectivePower(db, state, uid) >= friendlyBest) return false
     }
+    // Batch 6 additions (docs/rulings.md §107 ff.):
+    if (filter.unequipped === true && state.cards[uid].attachedGear.length > 0) return false
+    if (filter.spentOnly === true && state.cards[uid].ready) return false
     return true
   })
 }

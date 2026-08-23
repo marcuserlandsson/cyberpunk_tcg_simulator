@@ -47,6 +47,7 @@ const targetSpecSchema = z.enum([
   'anyGear',
   'fightFoe',
   'friendlyFaceUpLegend',
+  'selfGear',
 ])
 
 const gigDieSpecSchema = z.enum(['friendlyGigDie', 'rivalGigDie', 'anyGigDie'])
@@ -63,6 +64,8 @@ const targetFilterSchema = z.strictObject({
   maxCost: z.number().optional(),
   maxPowerIfAheadOnStreetCred: z.number().optional(),
   maxPowerVsFriendlyD20: z.boolean().optional(),
+  unequipped: z.boolean().optional(),
+  spentOnly: z.boolean().optional(),
 })
 
 const costReductionSchema = z.discriminatedUnion('per', [
@@ -77,11 +80,17 @@ const costReductionSchema = z.discriminatedUnion('per', [
     amount: z.number(),
     minimum: z.number(),
   }),
+  z.strictObject({
+    per: z.literal('friendlyFaceUpLegend'),
+    amount: z.number(),
+    minimum: z.number(),
+  }),
 ])
 
 const dynamicAmountSchema = z.union([
   z.literal('friendlyMaxGig'),
   z.literal('friendlyGigValuePairCount'),
+  z.literal('friendlyFaceUpLegendCount'),
   z.strictObject({ perEquippedGear: z.number() }),
   z.strictObject({
     perFriendlyGigParity: z.strictObject({
@@ -133,6 +142,7 @@ const conditionSchema = z.strictObject({
   allFriendlyLegendsFaceUp: z.boolean().optional(),
   sourceSpent: z.boolean().optional(),
   friendlyGigValuePair: z.boolean().optional(),
+  friendlyEquippedCountAtLeast: z.number().optional(),
 })
 
 export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
@@ -255,6 +265,22 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       kind: z.literal('conditionalEffect'),
       condition: conditionSchema,
       effect: effectNodeSchema,
+    }),
+    z.strictObject({ kind: z.literal('matchGig') }),
+    z.strictObject({ kind: z.literal('freeLegendCall') }),
+    z.strictObject({ kind: z.literal('goSoloTax'), amount: z.number() }),
+    z.strictObject({
+      kind: z.literal('attackPowerBonus'),
+      amount: z.number(),
+      keyword: z.string().optional(),
+      excludeSelf: z.boolean().optional(),
+    }),
+    z.strictObject({ kind: z.literal('attackUnitDespiteLag') }),
+    z.strictObject({
+      kind: z.literal('buffFightPower'),
+      amount: powerAmountSchema,
+      target: targetSpecSchema,
+      filter: targetFilterSchema.optional(),
     }),
   ])
 )
