@@ -351,6 +351,42 @@ describe('callLegend', () => {
   })
 })
 
+// Regression (found by the Task 9 fuzz harness, tests/fuzz/invariants.test.ts,
+// FUZZ_SEEDS=6000 seed 3398): a Program's SECOND onPlay effect can end the
+// game outright (a conditional draw off an empty deck — the same deckout
+// rule as the start-of-turn draw). `playCardOnDraft` used to fire every
+// onPlay effect BEFORE moving a Program to the trash, so a deckout raised
+// mid-resolution left the just-played card in no zone at all, and the
+// "move it to trash" bookkeeping that ran anyway afterward appended a
+// `cardTrashed` event AFTER the terminal `gameEnded` one.
+describe('playCard: a Program whose own onPlay effect ends the game', () => {
+  it('leaves gameEnded as the final event and the Program correctly in the trash', () => {
+    const state = setHand(mainPhaseP0(127), 0, ['industrial-assembly'])
+    const [programUid] = state.players[0].hand
+
+    // industrial-assembly: "Increase a Gig by up to 4. If it now has 8+
+    // value, draw 1." The sole friendly Gig die (taken by `mainPhaseP0`'s
+    // own opening `chooseGigDie size: 4`) is a d4, which a +4 increase
+    // clamps right back to 4 (its own max face) — so it's swapped for a
+    // bigger die showing exactly 4, which +4 pushes to 8 and arms the
+    // conditional draw. Then the deck is emptied so that draw is a forced
+    // deckout.
+    state.players[0].gigArea[0] = { size: 10, value: 4 }
+    state.players[0].trash = [...state.players[0].trash, ...state.players[0].deck]
+    state.players[0].deck = []
+
+    const play = findPlayCard(state, programUid)
+    expect(play).toBeDefined()
+    const next = applyAction(db, state, play!)
+
+    expect(next.phase).toBe('gameOver')
+    expect(next.winner).toBe(1)
+    expect(next.events.at(-1)).toMatchObject({ type: 'gameEnded', reason: 'deckout' })
+    expect(next.players[0].trash).toContain(programUid)
+    expect(next.players[0].hand).not.toContain(programUid)
+  })
+})
+
 describe('economy primitives', () => {
   it('canPayWith requires ready, owned, non-duplicated uids totalling exactly cost', () => {
     const state = giveEddies(mainPhaseP0(127), 0, 2)

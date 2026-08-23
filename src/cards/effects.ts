@@ -1001,6 +1001,13 @@ function applyNode(
       const result = script(db, draft, scriptCtx)
       // Scripts may mutate the draft or return a fresh state; fold either in.
       if (result !== draft) Object.assign(draft, result)
+      // Several scripts end the game themselves (a forced draw off an empty
+      // deck — deckout — e.g. `jackie-welles-pour-one-out-for-me`,
+      // `t-bug-amateur-philosopher`'s siblings in scripted/index.ts). They
+      // already stop their own work the moment that happens, but this
+      // wrapper must not still log a trailing `effectResolved` note AFTER the
+      // terminal `gameEnded` event (found by the Task 9 fuzz harness).
+      if (draft.winner !== null) return
       note(draft, ctx.sourceUid, `scripted:${node.name}`)
       return
     }
@@ -1176,6 +1183,16 @@ export function fireCardTrigger(
     }
     if (!met) continue
     applyEffectDefOnDraft(db, draft, effect, sourceUid, slice, player, context)
+    // An effect can end the game outright (a forced draw off an empty deck,
+    // docs/rulings.md's deckout rule) — once that happens nothing else in
+    // this card's text (or anything downstream: `fireWatcherTrigger`'s other
+    // watchers, `fireTriggerOnDraft`'s Gear propagation, a caller's own
+    // post-trigger phase bookkeeping) may still run. Found by the Task 9
+    // fuzz harness: a card's LATER effect entry running after an EARLIER one
+    // ended the game could set fresh pending state (e.g. `stealGig`'s own
+    // `draft.phase = 'chooseGig'`) that clobbers the terminal `gameOver`
+    // phase `endGame` already committed.
+    if (draft.winner !== null) return
   }
 }
 
@@ -1218,10 +1235,12 @@ export function fireTriggerOnDraft(
   if (!card) return
   const controller = effectController(draft, sourceUid)
   fireCardTrigger(db, draft, trigger, sourceUid, targets, controller, context)
+  if (draft.winner !== null) return
 
   if (!GEAR_PROPAGATED_TRIGGERS.includes(trigger)) return
   for (const gearUid of [...card.attachedGear]) {
     fireCardTrigger(db, draft, trigger, gearUid, [], controller, context)
+    if (draft.winner !== null) return
   }
 }
 
@@ -1308,6 +1327,11 @@ export function fireWatcherTrigger(
       // (docs/rulings.md §107 ff., sandevistan).
       const hostContext = host === uid ? context : { ...context, equipHostUid: uid }
       fireCardTrigger(db, draft, trigger, host, [], player, hostContext)
+      // A watcher on an EARLIER card can end the game outright (a forced
+      // draw off an empty deck) — once that happens, no LATER watcher in
+      // this broadcast may still run (see the matching guard inside
+      // `fireCardTrigger`, docs/rulings.md's deckout rule).
+      if (draft.winner !== null) return
     }
   }
 }
@@ -1640,8 +1664,8 @@ function stateAfterEntry(db: CardDb, state: GameState, uid: number): GameState {
  *   * Unit   — enters the field ready with Lag (guide p7);
  *   * Legend — {go-solo}: enters the field ready with NO Lag, "it can attack
  *              this turn" (docs/rulings.md §31);
- *   * Program— resolves, then goes to the trash (so a `self` reference still
- *              works while it resolves);
+ *   * Program— goes to the trash immediately (before `onPlay` fires, exactly
+ *              like a Unit/Legend's field push), then resolves;
  *   * Gear   — equips to `targets[0]`.
  * Shared by reduce.ts's main-phase `playCard` and the `quick` reaction, so the
  * two can never drift apart.
@@ -1691,6 +1715,18 @@ export function playCardOnDraft(
       // docs/rulings.md §120 ff.) — cleared for this player only at their own
       // next turn start (`resetTurnState`), matching `soldThisTurn`'s scope.
       p.playedProgramThisTurn = true
+      // Moved to the trash HERE — before `onPlay` fires — for the same
+      // reason a Unit/Legend's field push happens before its own `onPlay`:
+      // a card leaving `onPlay` mid-resolution (e.g. a forced draw off an
+      // empty deck ending the game outright) must never leave this card
+      // parked in no zone at all while its own trigger chain is still
+      // unwinding (docs/rulings.md §144's "every card is in exactly one
+      // zone" invariant, hardened by the Task 9 fuzz harness). No printed
+      // Program effect targets a trash-zone card of its own, so moving this
+      // ahead of `onPlay` cannot let a Program's own text see (or select)
+      // itself as already-trashed.
+      p.trash.push(cardUid)
+      draft.events.push({ type: 'cardTrashed', uid: cardUid })
       break
   }
 
@@ -1722,11 +1758,6 @@ export function playCardOnDraft(
     playedCardType: def.type,
     playedCardTags: cardTags(def),
   })
-
-  if (def.type === 'program') {
-    p.trash.push(cardUid)
-    draft.events.push({ type: 'cardTrashed', uid: cardUid })
-  }
 }
 
 /**

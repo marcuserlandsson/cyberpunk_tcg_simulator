@@ -518,6 +518,26 @@ describe('jackie-welles-pour-one-out-for-me', () => {
     expect(gigValues(s, 0)).toEqual([1])
     expect(s.players[0].deck.length).toBe(deckBefore - 1) // drew
   })
+
+  // Regression (found by the Task 9 fuzz harness, tests/fuzz/invariants.test.ts,
+  // FUZZ_SEEDS=20000 seed 4511): the "draw 1" this card's own scripted
+  // function makes can end the game outright (a forced draw off an empty
+  // deck — deckout). The script itself already stops right there, but the
+  // generic `'scripted'` EffectNode wrapper in `effects.ts` used to log its
+  // own trailing `effectResolved` note unconditionally afterward — an event
+  // appended AFTER the terminal `gameEnded` one.
+  it('does not log a trailing effectResolved note after its own draw decks the player out', () => {
+    const { state } = fixtureWithHand(0, ['jacked-in-voodoo-boy'])
+    mintInto(state, 0, 'legends', 'jackie-welles-pour-one-out-for-me', { faceUp: true, ready: true })
+    setGigs(state, 0, [{ size: 8, value: 3 }]) // decreases to 1: a min Gig, arming the draw
+    state.players[0].deck = [] // nothing left for that draw
+
+    const s = playCardByDef(db, state, 0, 'jacked-in-voodoo-boy')
+
+    expect(s.phase).toBe('gameOver')
+    expect(s.winner).toBe(1)
+    expect(s.events.at(-1)).toMatchObject({ type: 'gameEnded', reason: 'deckout' })
+  })
 })
 
 // ---------------------------------------------------------------------------
