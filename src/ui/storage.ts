@@ -266,16 +266,14 @@ export function saveSettings(settings: Settings): void {
 // ---------------------------------------------------------------------------
 // Game records
 //
-// TODO(Task 13): `GameRecord` is a placeholder shape ruled in during Task 12's
-// pre-flight — Task 13 defines the real turn-by-turn record in the engine
-// (likely alongside `GameEvent`); once it does, this file should re-import
-// that type instead of defining its own.
+// The real record type lives in the engine (`src/engine/replay.ts`): a
+// `NewGameConfig` plus the ordered action list, which is JSON-safe by
+// construction and replays back into the exact game state. This module only
+// persists it; re-exported here so UI callers need one import, not two.
 // ---------------------------------------------------------------------------
 
-export interface GameRecord {
-  config: unknown
-  actions: unknown[]
-}
+export type { GameRecord } from '../engine/replay'
+import type { GameRecord } from '../engine/replay'
 
 function readGameRecords(): Record<string, GameRecord> {
   return readJson<Record<string, GameRecord>>(GAME_RECORDS_KEY, {})

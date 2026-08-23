@@ -178,7 +178,15 @@ describe('settings', () => {
 
 describe('game records', () => {
   it('round-trips saved game records', () => {
-    const record: GameRecord = { config: { seed: 1 }, actions: [{ type: 'endTurn' }] }
+    // `GameRecord` is now the engine's real shape (src/engine/replay.ts), so
+    // the fixture carries a real `NewGameConfig` — a starter deck on both
+    // seats plus a seed. This module only persists the blob; it never replays
+    // it, so the action list can stay a single token action.
+    const deck = listDecks()[0]
+    const record: GameRecord = {
+      config: { decks: [deck, deck], seed: 1 },
+      actions: [{ type: 'endTurn' }],
+    }
     saveGameRecord('game-1', record)
     expect(listGameRecords()).toEqual([{ name: 'game-1', record }])
   })
