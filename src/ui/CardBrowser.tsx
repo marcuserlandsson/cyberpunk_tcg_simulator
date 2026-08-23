@@ -101,7 +101,7 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
               key={color}
               data-testid={`filter-color-${color}`}
               aria-pressed={colors.has(color)}
-              className={colors.has(color) ? 'chip chip--active' : 'chip'}
+              className={colors.has(color) ? 'filter-chip filter-chip--active' : 'filter-chip'}
               onClick={() => toggle(colors, color, setColors)}
             >
               {color}
@@ -115,7 +115,7 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
               key={type}
               data-testid={`filter-type-${type}`}
               aria-pressed={types.has(type)}
-              className={types.has(type) ? 'chip chip--active' : 'chip'}
+              className={types.has(type) ? 'filter-chip filter-chip--active' : 'filter-chip'}
               onClick={() => toggle(types, type, setTypes)}
             >
               {type}
@@ -129,7 +129,7 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
               key={keyword}
               data-testid={`filter-keyword-${keyword}`}
               aria-pressed={keywords.has(keyword)}
-              className={keywords.has(keyword) ? 'chip chip--active' : 'chip'}
+              className={keywords.has(keyword) ? 'filter-chip filter-chip--active' : 'filter-chip'}
               onClick={() => toggle(keywords, keyword, setKeywords)}
             >
               {keyword}

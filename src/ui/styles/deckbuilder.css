@@ -31,7 +31,7 @@
   gap: 0.3em;
 }
 
-.chip {
+.filter-chip {
   font-size: 0.75em;
   padding: 0.2em 0.6em;
   border: 1px solid var(--neon-cyan);
@@ -40,7 +40,7 @@
   color: var(--neon-cyan);
 }
 
-.chip--active {
+.filter-chip--active {
   background: var(--neon-cyan);
   color: var(--bg-color, #05060a);
 }
