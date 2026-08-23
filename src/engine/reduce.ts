@@ -380,7 +380,19 @@ function callLegend(draft: GameState, db: CardDb, player: PlayerId, payment: num
   const p = draft.players[player]
   spendOnDraft(db, draft, payment)
 
+  // A card spent to pay for THIS call can itself be wearing
+  // `arasaka-emergency-radioport` ("When this Unit or Legend is spent, you
+  // may ... Call it for free"): spending it above already fired that nested
+  // free Call, which can beat this call to the punch — flipping the very
+  // last face-down Legend and/or using up the once-per-turn allowance before
+  // this call's own resolution runs. When that happens this call has been
+  // outrun (docs/rulings.md's fizzle convention, e.g. §27's vanished attack
+  // target): the €$/spent-Legend cost already paid stands, but the call
+  // itself does nothing further, exactly like an attack whose target
+  // vanished mid-react.
+  if (p.calledLegendThisTurn) return
   const faceDown = p.legends.filter((uid) => !draft.cards[uid].faceUp)
+  if (faceDown.length === 0) return
   const [index, rng] = nextInt(draft.rng, faceDown.length)
   draft.rng = rng
   const target = faceDown[index]

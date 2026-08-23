@@ -221,6 +221,49 @@ describe('arasaka-emergency-radioport', () => {
     next = startAttack(db, next, host, 'gigArea')
     expect(next.cards[legend].faceUp).toBe(false)
   })
+
+  // Regression (found by the Task 9 fuzz harness, tests/fuzz/invariants.test.ts):
+  // `reduce.ts`'s `callLegend` spends its payment BEFORE picking which
+  // face-down Legend to flip. If the spent payment card is itself wearing
+  // this Gear, spending it fires the Gear's OWN nested free Call first — and
+  // when only one face-down Legend exists, that nested call already flips
+  // it (and marks `calledLegendThisTurn`), leaving the explicit call's own
+  // "pick a face-down Legend" step with none to pick, which crashed with
+  // `Cannot set properties of undefined (setting 'faceUp')` instead of
+  // fizzling like every other "the thing this was about to affect is
+  // already gone" case in the engine (docs/rulings.md's fizzle convention,
+  // e.g. §27's vanished attack target).
+  it('fizzles the explicit Call instead of crashing when its own payment card wears this Gear', () => {
+    const fixture = fixtureWithHand(0, ['arasaka-emergency-radioport'])
+    const state = fixture.state
+    state.players[0].legends = []
+    const target = mintInto(state, 0, 'legends', 'saburo-arasaka-stubborn-patriarch', {
+      faceUp: false,
+    })
+    const host = mintInto(state, 0, 'legends', 'yorinobu-arasaka-embracing-destruction', {
+      faceUp: true,
+      ready: true,
+    })
+
+    let next = playCardByDef(db, state, 0, 'arasaka-emergency-radioport', { includes: host })
+    expect(next.cards[host].attachedGear).toHaveLength(1)
+    expect(next.cards[target].faceUp).toBe(false)
+    expect(next.players[0].calledLegendThisTurn).toBe(false)
+
+    // An explicit Call a Legend, paid for with `host` — legal right now
+    // because `target` is still face-down and nothing has called yet.
+    // Spending `host` fires its Gear's {Spend} trigger before this call's
+    // own flip runs.
+    next = applyAction(db, next, { type: 'callLegend', payment: [host] })
+
+    // The nested free Call got there first: it flipped `target` and used up
+    // the once-per-turn allowance.
+    expect(next.cards[target].faceUp).toBe(true)
+    expect(next.players[0].calledLegendThisTurn).toBe(true)
+    // Exactly one `legendCalled` event — the explicit call fizzled instead
+    // of reaching for a second Legend that no longer exists.
+    expect(next.events.filter((e) => e.type === 'legendCalled')).toHaveLength(1)
+  })
 })
 
 // ---------------------------------------------------------------------------
