@@ -119,6 +119,33 @@ describe('alt-cunningham-soulkiller-architect', () => {
     })
     expect(actionsOfType(db, state, 'activateAbility').some((a) => a.card === alt)).toBe(false)
   })
+
+  // Regression (found by task review of the Task 9 fuzz harness's fix round
+  // 2; docs/rulings.md §148, fix round 3): the revived Program's own onPlay
+  // (floor-it's unconditional "draw 1") can end the game outright against
+  // an empty deck. The script used to bottom-deck the Program only AFTER
+  // firing onPlay, so a deckout mid-script left a trailing
+  // `cardBottomDecked` event past the terminal `gameEnded` one.
+  it("doesn't log a trailing cardBottomDecked after the revived Program's own onPlay decks the player out", () => {
+    const { state } = fixtureWithHand(0, [])
+    const alt = mintInto(state, 0, 'legends', 'alt-cunningham-soulkiller-architect', {
+      faceUp: true,
+      ready: true,
+    })
+    const program = mintInto(state, 0, 'trash', 'floor-it')
+    fieldCard(state, 1, 'animals-wrecker') // floor-it's own buffPower target
+    state.players[0].deck = [] // floor-it's own "draw 1" has nothing left to draw
+
+    const s = activate(db, state, alt, 0, { targets: [program] })
+
+    expect(s.phase).toBe('gameOver')
+    expect(s.winner).toBe(1)
+    expect(s.events.at(-1)).toMatchObject({ type: 'gameEnded', reason: 'deckout' })
+    // The zone move (bottom-deck) still completed — only the flavor events
+    // for it, and onPlay itself, were skipped once the game had ended.
+    expect(s.players[0].deck).toContain(program)
+    expect(s.players[0].trash).not.toContain(program)
+  })
 })
 
 // ---------------------------------------------------------------------------

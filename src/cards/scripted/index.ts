@@ -26,7 +26,7 @@
 
 import { defeatGear, defeatUnit } from '../../engine/combat'
 import { canonicalPayment } from '../../engine/economy'
-import { endGame, drawCards } from '../../engine/game'
+import { endGame, drawCards, stillLive } from '../../engine/game'
 import {
   cardTags,
   effectiveCardCost,
@@ -559,6 +559,12 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       p.field.push(chosen)
       state.events.push({ type: 'cardPlayed', player: ctx.player, uid: chosen })
       fireTriggerOnDraft(db, state, 'onPlay', chosen, [])
+      // The revived Unit's own onPlay can end the game outright (a forced
+      // draw off an empty deck). The host is already safely sitting in
+      // `p.trash` (it landed there when it was defeated, before this
+      // script ever ran), so it simply stays put rather than also being
+      // bottom-decked on a finished game (docs/rulings.md §148).
+      if (!stillLive(state)) return state
     }
     if (p.trash.includes(hostUid)) {
       p.trash = p.trash.filter((uid) => uid !== hostUid)
@@ -1048,14 +1054,26 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const payment = canonicalPayment(state, ctx.player, cost)
     if (payment === null) return state
     spendOnDraft(db, state, payment)
+    // The payment's own {Spend} trigger can end the game outright — bail
+    // before touching the Program at all, so it simply stays where it
+    // already validly sat (`p.trash`) rather than being removed with
+    // nowhere yet to go (docs/rulings.md §147/§148).
+    if (!stillLive(state)) return state
     p.trash = p.trash.filter((uid) => uid !== program)
     // A Program never enters a zone before its own onPlay resolves (matching
     // `playCardOnDraft`) — no `ready`/`lag` to set.
     state.events.push({ type: 'cardPlayed', player: ctx.player, uid: program })
     fireTriggerOnDraft(db, state, 'onPlay', program, [])
-    // "Bottom-deck it after you play it" — instead of a Program's ordinary
-    // post-play trash fate.
+    // "Bottom-deck it after you play it" — deliberately AFTER `onPlay`, not
+    // before: bottom-decking earlier would let the Program's own draw
+    // effect (e.g. `floor-it`) immediately re-draw the very card this line
+    // is about to bottom-deck, which is not what "after you play it" means.
+    // The zone move itself always completes regardless of what `onPlay`
+    // just did — this Program must land somewhere — only the flavor event
+    // for it is skipped once the game has ended, so `gameEnded` stays the
+    // terminal event (docs/rulings.md §148).
     p.deck.push(program)
+    if (!stillLive(state)) return state
     state.events.push({ type: 'cardBottomDecked', uid: program })
     return state
   },
@@ -1154,15 +1172,18 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       card.lag = true
       card.playedThisTurn = true
       p.field.push(uid)
-    }
-    // A Program is not placed in any zone before it resolves (matching
-    // `playCardOnDraft`), so its own `self` reference still works.
-    state.events.push({ type: 'cardPlayed', player: ctx.player, uid })
-    fireTriggerOnDraft(db, state, 'onPlay', uid, [])
-    if (def.type === 'program') {
+    } else {
+      // Program: the zone assignment happens before its own `onPlay` fires
+      // (matching `playCardOnDraft`'s own Program handling, docs/rulings.md
+      // §144/§147/§148), so it's always in exactly one zone regardless of
+      // what `onPlay` does — no printed Program effect targets a trash-zone
+      // card of its own, so this cannot let it see (or select) itself as
+      // already-trashed.
       p.trash.push(uid)
-      state.events.push({ type: 'cardTrashed', uid })
     }
+    state.events.push({ type: 'cardPlayed', player: ctx.player, uid })
+    if (def.type === 'program') state.events.push({ type: 'cardTrashed', uid })
+    fireTriggerOnDraft(db, state, 'onPlay', uid, [])
     return state
   },
 
@@ -1187,9 +1208,16 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (inTrash) p.trash = p.trash.filter((uid) => uid !== target)
     state.events.push({ type: 'cardPlayed', player: ctx.player, uid: target })
     fireTriggerOnDraft(db, state, 'onPlay', target, [])
-    // "Bottom-deck it after you play it" — instead of a Program's ordinary
-    // post-play trash fate.
+    // "Bottom-deck it after you play it" — deliberately AFTER `onPlay`, not
+    // before: bottom-decking earlier would let the Program's own draw
+    // effect (e.g. `floor-it`) immediately re-draw the very card this line
+    // is about to bottom-deck. The zone move itself always completes
+    // regardless of what `onPlay` just did — this Program must land
+    // somewhere — only the flavor event for it is skipped once the game
+    // has ended, so `gameEnded` stays the terminal event (docs/rulings.md
+    // §148).
     p.deck.push(target)
+    if (!stillLive(state)) return state
     state.events.push({ type: 'cardBottomDecked', uid: target })
     return state
   },

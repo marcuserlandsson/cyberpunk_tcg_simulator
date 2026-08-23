@@ -254,6 +254,27 @@ export function draftState(state: GameState): GameState {
 // ---------------------------------------------------------------------------
 
 /**
+ * True while the game hasn't ended yet. A named alias for `state.winner ===
+ * null`, for the one place that most needs a readable, greppable name for
+ * it: `src/cards/scripted/index.ts`'s escape-hatch scripts, which fire a
+ * nested trigger mid-script (via `fireTriggerOnDraft`) and then keep
+ * mutating `state` in the SAME function afterward — unlike the engine's own
+ * resolution choke points (`resolveAttack`, `fight`, `defeatUnit`, the
+ * trigger wrappers themselves), a scripted card's own body cannot be
+ * guarded "by construction" from the outside, since only the script itself
+ * knows what still needs to run after its own nested fire. Every
+ * `fireTriggerOnDraft` call site in `scripted/index.ts` is swept for this in
+ * docs/rulings.md §148 (Task 9 fuzz harness, fix round 3) — most are already
+ * safe because the mutation that matters (a revived card's own zone
+ * assignment) happens BEFORE the nested fire, mirroring `playCardOnDraft`'s
+ * own Program handling (§147); the ones that still run something AFTER
+ * check `stillLive` first.
+ */
+export function stillLive(state: GameState): boolean {
+  return state.winner === null
+}
+
+/**
  * Idempotent by construction: a second call (e.g. a scripted card's own
  * post-`defeatGear`/`defeatUnit` deckout check re-running after that call's
  * OWN chained trigger already ended the game) is a silent no-op rather than

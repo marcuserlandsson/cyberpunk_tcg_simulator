@@ -5161,3 +5161,166 @@ enforced leaves both a real margin and a real ceiling.
 `npm run build` green; a ≥20,000-seed fuzz confirmation run clean at the
 final committed state (see task-9-report.md for the exact count and
 timing).
+
+# Task 9 — fuzz harness, fix round 3 (review)
+
+A re-review of fix round 2 confirmed its Critical and one Important finding
+addressed, but returned the second Important as still open: §147's sweep of
+`fireCardTrigger`/`fireTriggerOnDraft`/`fireWatcherTrigger` call sites
+covered `src/engine/combat.ts`, `src/cards/effects.ts` and `src/engine/
+reduce.ts` — every FILE with a call site EXCEPT `src/cards/scripted/
+index.ts`, which has 11 of its own `fireTriggerOnDraft` calls and was never
+looked at. Four of those 11 have the identical bug shape. This round closes
+that gap and analyzes (rather than silently accepting) one Minor behavioral
+side effect §147's `playCardOnDraft` reorder introduced.
+
+## 148 — The scripted-card escape hatch needed its own sweep; a script's own
+body can't be guarded from the outside
+
+**Why `scripted/index.ts` needed a DIFFERENT fix shape than §147's.** Every
+choke point §147 guarded (`resolveAttack`, `fight`, `defeatUnit`, the three
+trigger wrappers) is a shared function many callers reach through, so one
+entry guard protects all of them "by construction." A scripted card's body
+is the opposite: each one is a bespoke, one-off sequence no other code
+calls into, so nothing outside the script can know what — if anything —
+still needs to run after its own nested `fireTriggerOnDraft` call. The fix
+here is a NAMED helper (`stillLive(state)`, `game.ts`) scripts check
+explicitly, plus a permanent static sweep (`tests/engine/
+scriptedGameEndGuards.test.ts`) that re-derives the same "is anything
+unguarded after this fire" answer from the source text on every run, so a
+future script that adds an unsafe `fireTriggerOnDraft` call fails CI instead
+of waiting for a fuzz seed to find it.
+
+**The four bugs**, all "fires a revived/revealed card's own `onPlay`, then
+unconditionally logs a trailing zone-change event afterward":
+
+1. **`the-relic-experimental-biochip`** — revives a Unit from trash, fires
+   its `onPlay`, then unconditionally bottom-decks the Gear's defeated host.
+2. **`alt-cunningham-soulkiller-architect`** — plays a Program from trash
+   (paying its cost separately), fires its `onPlay`, then unconditionally
+   bottom-decks it.
+3. **`judy-a-lvarez-nothing-to-doubt`** — reveals the top card; for a
+   Program, fires its `onPlay`, then unconditionally trashes it.
+4. **`lizzy-wizzy-delicate-weapon`** — plays a Program for free, fires its
+   `onPlay`, then unconditionally bottom-decks it.
+
+**Ruling, and why the fix is NOT uniform across all four:** the naive fix —
+"just add `if (!stillLive(state)) return state` right after the fire" —
+is wrong for three of the four, because it would leave the played/revived
+card in NO zone at all if the game ends right there (the same zone-
+consistency bug §147.2 already fixed for `playCardOnDraft`'s Programs).
+Which fix actually applies split three ways:
+
+- **#1 (`the-relic-experimental-biochip`) needed only the guard, no
+  reorder.** The revived Unit is already placed on the field BEFORE its
+  `onPlay` fires (unaffected by this bug). The thing bottom-decked
+  afterward is a DIFFERENT card — the Gear's already-defeated host, which
+  was already sitting validly in `p.trash` before this script ran. Skipping
+  that bottom-deck on a finished game just leaves it exactly where it
+  already validly was — no zone violation, so a bare `stillLive` guard
+  after the fire is sufficient and correct.
+- **#3 (`judy-a-lvarez-nothing-to-doubt`) needed a reorder, not a guard.**
+  For its Program branch, the revealed card sat in NO zone until the
+  trailing `p.trash.push`, exactly `playCardOnDraft`'s original bug shape.
+  Fixed the same way §147.2 fixed it: the Program now enters `p.trash`
+  BEFORE `onPlay` fires, so it's always zoned; `onPlay` is now this
+  script's last act and needs no guard at all (no printed Program effect
+  targets a trash-zone card of its own, so this can't let it see itself as
+  already-trashed, the same reasoning §147.2 already verified).
+- **#2 and #4 (`alt-cunningham-soulkiller-architect`,
+  `lizzy-wizzy-delicate-weapon`) needed a guard AFTER a reorder that stops
+  short of the naive one.** Both bottom-deck the Program into `p.deck` —
+  and unlike moving a Program into `p.trash` early (safe: nothing reads
+  trash mid-`onPlay`), moving it into the DECK before `onPlay` fires is
+  actively wrong: `onPlay` can itself be a draw effect (`floor-it`'s
+  unconditional "draw 1"), which would then immediately re-draw the very
+  card that was just bottom-decked, contradicting "bottom-deck it AFTER you
+  play it." So the bottom-deck stays exactly where it was — after
+  `onPlay` — and the fix is a `stillLive` guard placed AFTER that
+  bottom-deck (which always completes: the Program must land somewhere
+  regardless of what `onPlay` just did) but BEFORE the trailing
+  `cardBottomDecked` event. `alt-cunningham-soulkiller-architect` also
+  separately pays a cost inside its own script (`spendOnDraft`, the
+  Program's own play cost, on top of the activated ability's own already-
+  paid cost); that payment's own `{Spend}` trigger gets the same guard
+  BEFORE the Program is even removed from `p.trash`, so it simply stays put
+  if paying for it already ended the game — never reaching a state with
+  nowhere to be either.
+
+**TDD evidence:** a lint-style test
+(`tests/engine/scriptedGameEndGuards.test.ts`) statically re-derives the
+whole sweep from the source text — for every `fireTriggerOnDraft(` call
+site, it scans forward and requires a `stillLive(state)` check, a bare
+`return state`, or a chained `fireTriggerOnDraft(` before any
+`state.events.push(`; a zone-only mutation (a `p.deck.push`/`p.trash.push`
+finishing a bottom-deck/trash placed deliberately AFTER the fire, per the
+reasoning above) does not by itself fail the scan, since it isn't the
+mechanically-observable symptom (an event surviving past `gameEnded`) this
+sweep exists to catch. It also pins the exact list of the 11 sites in file
+order, so a new one changes a length assertion on purpose, not silently.
+Verified failing-first by reverting `scripted/index.ts` and `game.ts`
+together: the lint test reports exactly the four buggy sites by name, and a
+staged regression (`tests/cards/blue.test.ts`, `alt-cunningham-soulkiller-
+architect` reviving `floor-it` from trash against an empty deck) reproduces
+the real symptom — first a trailing `cardBottomDecked` event past
+`gameEnded` (against the very first, over-eager reorder attempt this round
+made and then corrected once the `floor-it` self-redraw problem above was
+found), then, against the true pre-fix code, the same trailing event again.
+Both fixed states pass; both reverted states fail.
+
+**The full sweep, `scripted/index.ts` call sites appended to §147's table:**
+
+| Site | Verdict |
+|---|---|
+| `arasaka-emergency-radioport` (`onCall`) | Safe — last statement before `return state` |
+| `yorinobu-arasaka-steel-dragon` (`onPlay`) | Safe — the played Unit already entered `p.field` before the fire; last statement before `return state` |
+| `t-bug-amateur-philosopher` (`onCall`) | Safe — last statement before `return state` |
+| `the-heist` (`onPlay`) | Safe — the Gear already attached before the fire; `return state` immediately follows |
+| `the-relic-experimental-biochip` (`onPlay`) | **Fixed — guard.** See #1 above |
+| `river-ward-detective-on-the-hunt:free-gear` (`onPlay`) | Safe — the Gear already attached before the fire; last statement before `return state` |
+| `viktor-vektor-you-might-feel-a-little-pinch` (`onPlay`) | Safe — the Gear already attached before the fire; last statement before `return state` |
+| `alt-cunningham-soulkiller-architect` (`onPlay`) | **Fixed — reorder (bottom-deck stays after) + guard.** See #2 above |
+| `chrome-reverie` (`onCall`) | Safe — last statement before `return state` |
+| `judy-a-lvarez-nothing-to-doubt` (`onPlay`) | **Fixed — reorder (Program zoned into trash before the fire); now terminal, no guard needed.** See #3 above |
+| `lizzy-wizzy-delicate-weapon` (`onPlay`) | **Fixed — reorder (bottom-deck stays after) + guard.** See #4 above |
+
+Net for this round: 4 of 11 scripted sites fixed, none of them by the same
+mechanical patch — each needed its own zone-safety analysis, which is
+exactly why a shared choke-point guard (§147's approach) doesn't reach this
+file and a per-site, tool-checked sweep does.
+
+## 149 — Analyzed, not silent: a face-up Legend that is both a new Gear's
+host and part of its own payment now reads as "equipped" the moment it's
+spent
+
+§147's `playCardOnDraft` reorder (moving a Gear's own equip onto its host
+BEFORE `spendOnDraft(payment)` runs, to fix the zone-consistency bug that
+review round found) has a side effect nobody had traced through: if the
+SAME face-up Legend is both the newly-played Gear's host and one of the
+cards spent to pay for it, `spendOnDraft` now sees `attachedGear.length > 0`
+on her at the moment it spends her — because the equip already happened —
+so `alt-cunningham-mother-of-daemons`'s "When a friendly equipped Unit or
+Legend is spent, draw 1" now fires for a combination it did not fire for
+before this task's round 2. No card in the 141-card pool breaks from this
+today.
+
+**Ruling (intended, not a bug):** the pre-round-2 ordering asked "is this
+card equipped" before the very equip its own play was causing had actually
+happened — an accident of implementation sequencing, not a reasoned rule
+distinction, since nothing about "Legends pay whether face-up or face-down"
+(economy.ts) or the printed Gear text ("Equip to a friendly Unit or face-up
+Legend") forbids a Legend paying for the Gear that's about to sit on her.
+By the time she is actually spent, she genuinely does carry that Gear on
+the board — the new reading is the more accurate one, not merely the
+incidental one, and it is kept rather than special-cased away (e.g. by
+excluding a Gear's own host from `canonicalPayment`, which would add a
+restriction the printed rules never state).
+
+**TDD evidence (pinning, not failing-first — this is a kept behavior, not a
+bug fix):** `tests/cards/yellow.test.ts`'s `alt-cunningham-mother-of-
+daemons` suite gains a case fielding her as the watcher, with a separate
+face-up Legend serving as both `mantis-blades`' equip host and its sole
+payment card (a `{ eddies: 0 }` fixture forces the canonical payment to
+reach for the Legend, since no eddie exists to prefer instead) — asserting
+the Legend ends up both equipped and spent, and that Alt's own draw
+actually fired (`cardDrawn` in the event log).
