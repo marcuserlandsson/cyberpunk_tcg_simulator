@@ -323,6 +323,13 @@ function onField(state: GameState, uid: number): boolean {
  * resumes into `main` once the dice are taken.
  */
 function endAttack(draft: GameState): void {
+  // A fight (or the watcher triggers it fires) can end the game outright — a
+  // forced draw off an empty deck, docs/rulings.md's deckout rule. Once
+  // `endGame` has committed `phase: 'gameOver'`, this bookkeeping step must
+  // not un-set it by reaching for `main`/`chooseGig` (found by the Task 9
+  // fuzz harness: `resolveAttack` -> `fight` -> a chained on-defeat draw
+  // ending the game -> this ran anyway and clobbered the terminal phase).
+  if (draft.winner !== null) return
   draft.pendingAttack = null
   const steal = draft.pendingSteal
   if (steal !== null && steal.thief !== undefined) {
@@ -910,6 +917,12 @@ export function takeStolenGig(draft: GameState, db: CardDb, dieIndex: number): v
  * a react window whose attack is still pending).
  */
 function finishSteal(draft: GameState, head: PendingSteal): void {
+  // The `onFriendlyStealDie`/`onFriendlyStealComplete` watchers just fired by
+  // `takeStolenGig` can end the game outright (a forced draw off an empty
+  // deck) — once `endGame` has committed `phase: 'gameOver'`, this must not
+  // un-set it by resuming into `chooseGig`/`main` (the same class of bug as
+  // `endAttack`'s guard above, found by the Task 9 fuzz harness).
+  if (draft.winner !== null) return
   const queue = head.queue ?? []
   const next = queue.shift()
   if (next !== undefined) {

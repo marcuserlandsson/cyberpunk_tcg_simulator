@@ -366,6 +366,26 @@ describe('fights', () => {
     expect(next.players[0].trash).toContain(attacker)
     expect(next.players[1].trash).toContain(target)
   })
+
+  // Regression (found by the Task 9 fuzz harness, tests/fuzz/invariants.test.ts,
+  // FUZZ_SEEDS=20000 seed 6198): the fight's own `{onWinFight}` trigger can end
+  // the game outright (a forced draw off an empty deck — deckout). `endAttack`
+  // used to run anyway afterward and unconditionally reset `draft.phase` to
+  // `'main'`, clobbering the `'gameOver'` `endGame` had just committed — the
+  // game was over (`winner` set) but `phase` lied about it and
+  // `pendingAttack` never cleared.
+  it("doesn't clobber gameOver back to main when the winner's own {onWinFight} draws off an empty deck", () => {
+    const s = base()
+    const attacker = putUnit(s, 0, 'psycho-squad') // power 6
+    attachGear(s, 0, 'satori-sword-of-saburo', attacker) // {onWinFight} draw 1
+    const target = putUnit(s, 1, 'japantown-jonin', { ready: false }) // power 0
+    s.players[0].deck = [] // the win's own draw has nothing left to draw
+
+    const next = react(declare(s, attacker, target), passReaction)
+    expect(next.phase).toBe('gameOver')
+    expect(next.winner).toBe(1)
+    expect(next.events.at(-1)).toMatchObject({ type: 'gameEnded', reason: 'deckout' })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -506,6 +526,30 @@ describe('gig-area attacks', () => {
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
     expect(next.players[0].gigArea).toHaveLength(2)
     expect(next.players[1].gigArea).toEqual([])
+  })
+
+  // Regression (found by the Task 9 fuzz harness at larger FUZZ_SEEDS scale):
+  // the sibling of the `{onWinFight}`/`endAttack` bug in the `fights`
+  // describe block above, but on the steal path. `takeStolenGig`'s own
+  // `onFriendlyStealDie` watcher can end the game outright (a forced draw
+  // off an empty deck), and `finishSteal` used to run anyway afterward and
+  // reset `draft.phase` to `'chooseGig'`/`'main'`, clobbering the terminal
+  // `'gameOver'` `endGame` had just committed.
+  it("doesn't clobber gameOver back to main when a steal's own onFriendlyStealDie draws off an empty deck", () => {
+    const s = base()
+    // {go-solo} legend, power 7 -> steals 1: "When a friendly Legend steals
+    // a Gig, if its value is even, draw 1."
+    const attacker = putUnit(s, 0, 'rogue-amendiares-preem-solo')
+    s.players[1].gigArea = [{ size: 6, value: 4 }] // even value arms the draw
+    s.players[0].deck = [] // nothing left for that draw
+
+    let next = react(declare(s, attacker, 'gigArea'), passReaction)
+    expect(next.phase).toBe('chooseGig')
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
+
+    expect(next.phase).toBe('gameOver')
+    expect(next.winner).toBe(1)
+    expect(next.events.at(-1)).toMatchObject({ type: 'gameEnded', reason: 'deckout' })
   })
 
   it('conserves all 12 gig dice across a multi-die steal', () => {
