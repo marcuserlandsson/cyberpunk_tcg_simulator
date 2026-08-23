@@ -1,0 +1,690 @@
+<title>Afterlife UI</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Single-theme by design: this is a proposal for a neon-dark game UI, and it
+     commits to that world on both host grounds. */
+  :root {
+    --void: #07070d;
+    --panel: #10101a;
+    --panel-2: #161624;
+    --line: #262638;
+    --line-bright: #3a3a52;
+    --text: #e8ecf2;
+    --muted: #8b94a8;
+    --cyan: #00e5ff;
+    --cyan-dim: #0a3a44;
+    --red: #ff3d5a;
+    --yellow: #fcee0a;
+    --ram-red: #ff4655;
+    --ram-yellow: #fcee0a;
+    --ram-green: #2dff87;
+    --ram-blue: #38a8ff;
+    --display: 'Rajdhani', 'Arial Narrow', sans-serif;
+    --body: 'Chakra Petch', 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 28px 90px; }
+
+  /* ---- shared chrome ---- */
+  .clip { clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px); }
+  .panel { background: var(--panel); border: 1px solid var(--line); position: relative; }
+  .brackets::before, .brackets::after {
+    content: ''; position: absolute; width: 14px; height: 14px; pointer-events: none;
+  }
+  .brackets::before { top: -1px; left: -1px; border-top: 2px solid var(--cyan); border-left: 2px solid var(--cyan); }
+  .brackets::after { bottom: -1px; right: -1px; border-bottom: 2px solid var(--cyan); border-right: 2px solid var(--cyan); }
+
+  .eyebrow {
+    font-family: var(--display); font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.32em; font-size: 12px; color: var(--cyan);
+  }
+  h1 {
+    font-family: var(--display); font-weight: 700; text-transform: uppercase;
+    font-size: clamp(52px, 9vw, 96px); line-height: 0.95; margin: 10px 0 6px;
+    letter-spacing: 0.01em; text-wrap: balance;
+    color: var(--text);
+    text-shadow: 3px 0 0 rgba(255, 61, 90, 0.55), -3px 0 0 rgba(0, 229, 255, 0.5);
+  }
+  h2 {
+    font-family: var(--display); font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; font-size: 26px; margin: 0 0 4px; text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--display); font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; font-size: 16px; color: var(--cyan); margin: 0 0 10px;
+  }
+  p { max-width: 68ch; }
+  p.lead { color: var(--muted); font-size: 16px; }
+  section { margin-top: 72px; }
+  .sec-tag {
+    display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em;
+    color: var(--void); background: var(--yellow); padding: 3px 10px; margin-bottom: 14px;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+  .note { color: var(--muted); font-size: 13px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* ---- diagnosis ---- */
+  .before-shot { width: 100%; display: block; border: 1px solid var(--line-bright); }
+  .issues { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 10px; }
+  .issues li { display: flex; gap: 12px; align-items: baseline; }
+  .issues .x { color: var(--red); font-family: var(--mono); font-weight: 500; flex: none; }
+
+  /* ---- palette ---- */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
+  .swatch { border: 1px solid var(--line); padding: 10px; }
+  .swatch .chip { height: 44px; margin-bottom: 8px; }
+  .swatch .nm { font-family: var(--display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 13px; }
+  .swatch .hx { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .type-spec { border: 1px solid var(--line); padding: 22px; display: grid; gap: 14px; }
+  .type-spec .t1 { font-family: var(--display); font-weight: 700; font-size: 34px; text-transform: uppercase; line-height: 1; }
+  .type-spec .t2 { font-family: var(--display); font-weight: 600; font-size: 15px; text-transform: uppercase; letter-spacing: 0.24em; color: var(--cyan); }
+  .type-spec .t3 { font-size: 14px; color: var(--text); }
+  .type-spec .t4 { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  .type-spec .who { font-family: var(--mono); font-size: 10.5px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+
+  /* ================= CARD MOCKUPS ================= */
+  .card-lab { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; margin-top: 18px; }
+  .lab-item { display: grid; gap: 10px; justify-items: center; }
+  .lab-cap { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-align: center; max-width: 190px; }
+
+  /* image-first board card */
+  .bc { position: relative; width: 150px; border-radius: 6px; }
+  .bc img { width: 100%; display: block; border-radius: 6px; }
+  .bc.ready { box-shadow: 0 0 0 2px rgba(0,229,255,0.9), 0 0 18px rgba(0,229,255,0.45); }
+  .bc.playable { box-shadow: 0 0 0 2px rgba(252,238,10,0.95), 0 0 22px rgba(252,238,10,0.5); animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 2px rgba(252,238,10,0.55), 0 0 10px rgba(252,238,10,0.25); } }
+  @media (prefers-reduced-motion: reduce) { .bc.playable { animation: none; } }
+  .bc.spent img { filter: grayscale(0.85) brightness(0.55); }
+  .bc.spent::after {
+    content: 'SPENT'; position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%) rotate(-12deg);
+    font-family: var(--display); font-weight: 700; letter-spacing: 0.3em; font-size: 15px;
+    color: rgba(255,255,255,0.75); border: 2px solid rgba(255,255,255,0.55); padding: 2px 8px 2px 12px;
+  }
+  .pow-chip {
+    position: absolute; right: -8px; bottom: -8px; min-width: 34px; height: 34px;
+    display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 19px;
+    background: #0c0c14; border: 2px solid var(--line-bright); color: var(--text);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    padding: 0 4px;
+  }
+  .pow-chip.buffed { color: var(--ram-green); border-color: var(--ram-green); }
+  .kw-strip { position: absolute; left: -7px; top: 8px; display: grid; gap: 4px; }
+  .kw-pip {
+    width: 22px; height: 22px; display: grid; place-items: center; font-size: 12px; font-weight: 700;
+    font-family: var(--display); background: #0c0c14; border: 1.5px solid var(--yellow); color: var(--yellow);
+    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  }
+  .lag-band {
+    position: absolute; left: 0; right: 0; bottom: 26%; padding: 2px 0; text-align: center;
+    font-family: var(--display); font-weight: 600; letter-spacing: 0.35em; font-size: 11px;
+    color: var(--void); background: rgba(252,238,10,0.92);
+  }
+
+  /* HTML-frame cards */
+  .fc {
+    width: 190px; background: #0d0d15; border: 2px solid var(--ram-green); border-radius: 7px;
+    padding: 7px; position: relative; font-family: var(--display); color: var(--text);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 4px 18px rgba(0,0,0,0.6);
+  }
+  .fc.full { width: 250px; }
+  .fc .toprow { display: flex; justify-content: space-between; align-items: flex-start; }
+  .hexcost {
+    width: 38px; height: 42px; display: grid; place-items: center; font-weight: 700; font-size: 21px;
+    background: #0c0c14; border: 2px solid var(--ram-green); color: var(--text);
+    clip-path: polygon(50% 0, 100% 26%, 100% 74%, 50% 100%, 0 74%, 0 26%);
+    border-radius: 4px;
+  }
+  .typecap {
+    font-weight: 700; font-size: 11px; letter-spacing: 0.18em; padding: 3px 10px;
+    background: var(--ram-green); color: #05130a;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  }
+  .ramrow { display: flex; justify-content: flex-end; margin-top: 4px; gap: 3px; }
+  .rampip { width: 9px; height: 9px; background: var(--ram-green); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  .fc .art {
+    height: 88px; margin: 6px 0; border: 1px solid var(--line);
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px),
+      linear-gradient(145deg, #14202a, #0a1410 55%, #101a24);
+    position: relative;
+  }
+  .fc.full .art { height: 128px; }
+  .fc .art::after {
+    content: ''; position: absolute; inset: 6px; border: 1px solid rgba(45,255,135,0.25);
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  }
+  .fc .nm { font-weight: 700; font-size: 17px; text-transform: uppercase; line-height: 1.02; letter-spacing: 0.01em; }
+  .fc .sub { font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--ram-green); margin-top: 1px; }
+  .tags { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
+  .tag {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em; padding: 2px 8px;
+    border: 1px solid var(--line-bright); color: var(--muted);
+    clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  }
+  .rules { font-family: var(--body); font-size: 11.5px; line-height: 1.45; margin-top: 7px; color: var(--text); }
+  .kwcap {
+    display: inline-block; font-family: var(--display); font-weight: 700; font-size: 10px;
+    letter-spacing: 0.12em; padding: 1px 7px; transform: translateY(-1px);
+    clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  }
+  .kw-y { background: var(--yellow); color: #131200; }
+  .kw-m { background: var(--red); color: #1a0208; }
+  .fc .botrow { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 9px; }
+  .barcode {
+    width: 58px; height: 14px; opacity: 0.5;
+    background: repeating-linear-gradient(90deg, var(--muted) 0 2px, transparent 2px 4px, var(--muted) 4px 5px, transparent 5px 8px);
+  }
+  .powbox {
+    min-width: 42px; height: 40px; display: grid; place-items: center; font-weight: 700; font-size: 24px;
+    border: 2px solid var(--ram-green); color: var(--text); background: #0c0c14; padding: 0 6px;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  }
+  .fc.mini { width: 132px; padding: 5px; }
+  .fc.mini .nm { font-size: 12.5px; }
+  .fc.mini .art { height: 56px; margin: 4px 0; }
+  .fc.mini .hexcost { width: 26px; height: 30px; font-size: 15px; }
+  .fc.mini .powbox { min-width: 30px; height: 28px; font-size: 17px; }
+  .fc.mini .typecap { font-size: 9px; padding: 2px 7px; }
+
+  /* ================= PLAYMAT MOCK ================= */
+  .mat {
+    border: 1px solid var(--line-bright); background: #0a0a12; margin-top: 18px;
+    display: grid; grid-template-columns: 1fr 235px; overflow: hidden;
+  }
+  @media (max-width: 900px) { .mat { grid-template-columns: 1fr; } }
+  .mat-board {
+    padding: 12px 14px; position: relative;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.016) 0 1px, transparent 1px 4px),
+      radial-gradient(ellipse 90% 60% at 50% 108%, rgba(0,229,255,0.07), transparent 60%),
+      radial-gradient(ellipse 90% 55% at 50% -8%, rgba(255,61,90,0.06), transparent 60%),
+      #0a0a12;
+  }
+  .zone-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 0.28em; color: var(--muted); text-transform: uppercase; margin-bottom: 5px; }
+  .mrow { display: flex; gap: 8px; align-items: center; }
+  .mcard {
+    width: 64px; height: 90px; border-radius: 4px; flex: none; position: relative;
+    background: linear-gradient(150deg, #1a2430, #101720); border: 1.5px solid var(--line-bright);
+    font-family: var(--display);
+  }
+  .mcard .mn {
+    position: absolute; left: 4px; right: 4px; bottom: 16px; font-size: 8px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.1; color: var(--text);
+  }
+  .mcard .mp {
+    position: absolute; right: -4px; bottom: -4px; width: 19px; height: 19px; display: grid; place-items: center;
+    font-size: 11px; font-weight: 700; background: #0c0c14; border: 1.5px solid var(--line-bright);
+    clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
+  }
+  .mcard .mc {
+    position: absolute; left: -4px; top: -4px; width: 17px; height: 19px; display: grid; place-items: center;
+    font-size: 10px; font-weight: 700; background: #0c0c14; border: 1.5px solid var(--line-bright);
+    clip-path: polygon(50% 0, 100% 28%, 100% 72%, 50% 100%, 0 72%, 0 28%);
+  }
+  .mcard.rdy { border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,229,255,0.35); }
+  .mcard.rdy .mp { border-color: var(--cyan); color: var(--cyan); }
+  .mcard.spnt { filter: brightness(0.55) grayscale(0.6); }
+  .mcard.enemy { background: linear-gradient(150deg, #2a1420, #170d14); }
+  .mcard.glow { border-color: var(--yellow); box-shadow: 0 0 12px rgba(252,238,10,0.45); }
+  .mcard.back {
+    background:
+      repeating-linear-gradient(45deg, rgba(0,229,255,0.14) 0 2px, transparent 2px 7px),
+      linear-gradient(150deg, #101826, #0b1018);
+  }
+  .mcard.back.eb {
+    background:
+      repeating-linear-gradient(45deg, rgba(255,61,90,0.14) 0 2px, transparent 2px 7px),
+      linear-gradient(150deg, #241018, #150b10);
+  }
+  .mcard.legend { border-color: #6b5d20; }
+  .mcard.legend.faceup { border-color: var(--yellow); }
+
+  .street {
+    margin: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 8px 10px; display: flex; align-items: center; gap: 16px; justify-content: space-between;
+    background: rgba(255,255,255,0.015);
+  }
+  .gigside { display: grid; gap: 5px; }
+  .gigside .mrow { gap: 6px; }
+  .die {
+    width: 30px; height: 30px; display: grid; place-items: center; font-family: var(--display);
+    font-weight: 700; font-size: 13px; color: var(--void); background: var(--cyan); position: relative;
+  }
+  .die.enemy { background: var(--red); color: #fff; }
+  .die.fixer { background: transparent; border: 1.5px solid var(--line-bright); color: var(--muted); }
+  .d4 { clip-path: polygon(50% 0, 100% 92%, 0 92%); }
+  .d6 { border-radius: 3px; }
+  .d8 { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  .d10 { clip-path: polygon(50% 0, 92% 42%, 50% 100%, 8% 42%); }
+  .d12 { clip-path: polygon(50% 0, 100% 38%, 81% 100%, 19% 100%, 0 38%); }
+  .d20 { clip-path: polygon(27% 5%, 73% 5%, 100% 50%, 73% 95%, 27% 95%, 0 50%); }
+  .vsblock { text-align: center; font-family: var(--display); }
+  .vsblock .turn { font-weight: 700; font-size: 17px; letter-spacing: 0.1em; color: var(--yellow); }
+  .vsblock .cred { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  .handfan { display: flex; justify-content: center; margin-top: 16px; height: 104px; }
+  .handfan .mcard { margin: 0 -9px; transform-origin: 50% 130%; box-shadow: -6px 0 14px rgba(0,0,0,0.5); }
+  .handfan .mcard:nth-child(1) { transform: rotate(-9deg) translateY(9px); }
+  .handfan .mcard:nth-child(2) { transform: rotate(-5.5deg) translateY(3px); }
+  .handfan .mcard:nth-child(3) { transform: rotate(-2deg); }
+  .handfan .mcard:nth-child(4) { transform: rotate(2deg); }
+  .handfan .mcard:nth-child(5) { transform: rotate(5.5deg) translateY(3px); }
+  .handfan .mcard:nth-child(6) { transform: rotate(9deg) translateY(9px); }
+  .handfan .mcard:hover { transform: translateY(-14px) scale(1.12); z-index: 2; }
+
+  .mat-log { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
+  @media (max-width: 900px) { .mat-log { border-left: none; border-top: 1px solid var(--line); } }
+  .mat-log .hd {
+    font-family: var(--display); font-weight: 600; letter-spacing: 0.22em; font-size: 11px;
+    padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--cyan); text-transform: uppercase;
+    display: flex; justify-content: space-between;
+  }
+  .loglines { font-family: var(--mono); font-size: 10.5px; padding: 8px 12px; display: grid; gap: 5px; color: var(--muted); }
+  .loglines .you { color: var(--cyan); }
+  .loglines .foe { color: var(--red); }
+  .loglines .sys { color: var(--yellow); }
+  .loglines .tn { opacity: 0.5; margin-right: 6px; }
+  .actionbar {
+    margin-top: auto; padding: 10px 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em;
+    font-size: 12px; padding: 8px 18px; cursor: pointer; border: none;
+    clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+  }
+  .btn-pri { background: var(--yellow); color: #131200; }
+  .btn-pri:hover { background: #fff65e; }
+  .btn-ghost { background: transparent; color: var(--cyan); box-shadow: inset 0 0 0 1.5px var(--cyan); }
+  .btn-ghost:hover { background: rgba(0,229,255,0.12); }
+  .btn-danger { background: transparent; color: var(--red); box-shadow: inset 0 0 0 1.5px var(--red); }
+  .btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+  .reaction {
+    margin-top: 14px; border: 1px solid var(--cyan); background: rgba(0,229,255,0.06); padding: 10px 14px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .reaction .who { font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--cyan); font-size: 13px; }
+  .reaction .what { font-size: 12.5px; color: var(--text); }
+
+  .callouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-top: 14px; }
+  .callout { border: 1px solid var(--line); padding: 10px 12px; font-size: 12.5px; color: var(--muted); }
+  .callout b { color: var(--text); font-family: var(--display); text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; }
+
+  /* components section */
+  .comp-row { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start; margin-top: 16px; }
+  .comp { border: 1px solid var(--line); padding: 16px; display: grid; gap: 12px; background: var(--panel); }
+  .dice-demo { display: flex; gap: 10px; align-items: center; }
+  .dice-demo .die { width: 38px; height: 38px; font-size: 16px; }
+  .dsz { font-family: var(--mono); font-size: 9px; color: var(--muted); text-align: center; margin-top: 3px; }
+
+  .decision { border: 1px solid var(--line); border-left: 3px solid var(--yellow); padding: 14px 18px; margin-top: 12px; }
+  .decision h4 { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.08em; font-size: 15px; margin: 0 0 6px; }
+  .decision p { margin: 0; font-size: 13.5px; color: var(--muted); max-width: none; }
+  .decision .rec { color: var(--cyan); }
+
+  .refs { font-size: 13px; color: var(--muted); }
+  .refs a { color: var(--cyan); text-decoration: none; }
+  .refs a:hover { text-decoration: underline; }
+</style>
+
+<div class="wrap">
+  <header class="panel brackets clip" style="padding: 38px 36px 34px;">
+    <div class="eyebrow">Visual overhaul proposal // Cyberpunk TCG Simulator</div>
+    <h1>Afterlife</h1>
+    <p class="lead" style="margin: 8px 0 0;">
+      A redesign that makes the simulator read as a game table in Night City, not a debug view.
+      Built on three anchors: the <strong style="color:var(--text)">official card frames</strong> we already have images of,
+      the <strong style="color:var(--text)">Cyberpunk 2077 interface language</strong> (soft red + cyan on black, angular
+      clipped geometry, corner brackets, scanlines), and layout lessons from
+      <strong style="color:var(--text)">Gwent, Runeterra and MTG Arena</strong>.
+      Everything below is live HTML/CSS — what you see is buildable as-is.
+    </p>
+  </header>
+
+  <!-- ============================ DIAGNOSIS ============================ -->
+  <section>
+    <div class="sec-tag">DIAGNOSIS</div>
+    <h2>What the table looks like today</h2>
+    <p class="lead">Mid-game, turn 5, captured from the current build:</p>
+    <img class="before-shot" src="{{IMG_BEFORE}}" alt="Current play view at turn 5: rival cards rotated sideways and clipped off-screen, all cards rendered as text boxes">
+    <ul class="issues">
+      <li><span class="x">[01]</span><span><strong>The rival's cards are rotated 90–180° and clipped off the viewport</strong> — their board is literally unreadable, you can't see what you're fighting.</span></li>
+      <li><span class="x">[02]</span><span><strong>Cards are paragraphs in boxes.</strong> Full rules text is rendered at every size, so nothing has hierarchy — name, cost and power don't pop, and names visually collide with their subtitles.</span></li>
+      <li><span class="x">[03]</span><span><strong>No board.</strong> Zones are labels floating in black space; the gig areas — the win condition — are a tiny text line, and legends sprawl huge and overlapping in mid-board.</span></li>
+      <li><span class="x">[04]</span><span><strong>Everything is the same monospace cyan</strong> — buttons, log, card text, headings. The eye has nowhere to land.</span></li>
+      <li><span class="x">[05]</span><span><strong>Dice are placeholder polygons with "?"</strong> and stats (deck, trash, eddies) are plain text chips scattered around.</span></li>
+      <li><span class="x">[06]</span><span><strong>Setup, Deck Builder and Simulate are raw HTML forms</strong> — default selects and checkboxes on a black page.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ DIRECTION ============================ -->
+  <section>
+    <div class="sec-tag">DIRECTION</div>
+    <h2>One visual language, from the official cards outward</h2>
+    <p class="lead">
+      The printed cards already define the aesthetic: hex cost badges, angular clipped corners,
+      RAM-colored frames, keyword capsules, barcode strips, big power boxes. The app should feel
+      like the surface those cards were designed to sit on.
+    </p>
+    <div class="grid2" style="margin-top: 18px;">
+      <div>
+        <h3>Palette</h3>
+        <div class="swatches">
+          <div class="swatch"><div class="chip" style="background:#07070d; border:1px solid var(--line);"></div><div class="nm">Void</div><div class="hx">#07070D · page ground</div></div>
+          <div class="swatch"><div class="chip" style="background:#10101a;"></div><div class="nm">Panel</div><div class="hx">#10101A · surfaces</div></div>
+          <div class="swatch"><div class="chip" style="background:#00e5ff;"></div><div class="nm">Cyan</div><div class="hx">#00E5FF · you / interactive</div></div>
+          <div class="swatch"><div class="chip" style="background:#ff3d5a;"></div><div class="nm">Signal red</div><div class="hx">#FF3D5A · rival / danger</div></div>
+          <div class="swatch"><div class="chip" style="background:#fcee0a;"></div><div class="nm">CP yellow</div><div class="hx">#FCEE0A · actions / emphasis</div></div>
+          <div class="swatch"><div class="chip" style="background:linear-gradient(90deg,#ff4655 0 25%,#fcee0a 0 50%,#2dff87 0 75%,#38a8ff 0);"></div><div class="nm">RAM colors</div><div class="hx">card identity only</div></div>
+        </div>
+        <p class="note" style="margin-top:12px;">
+          Rule: <strong style="color:var(--text)">cyan = yours, red = rival's, yellow = something you can do right now.</strong>
+          RAM colors stay on cards and deck-building budgets, never on chrome. That one rule fixes
+          most of today's "everything is cyan" noise.
+        </p>
+      </div>
+      <div>
+        <h3>Typography</h3>
+        <div class="type-spec">
+          <div>
+            <div class="t1">Rajdhani 700</div>
+            <div class="who">Display — card names, zone headers, buttons, numbers</div>
+          </div>
+          <div>
+            <div class="t2">Rajdhani 600 · tracked wide</div>
+            <div class="who">Labels, tags, eyebrows</div>
+          </div>
+          <div>
+            <div class="t3">Chakra Petch — rules text and UI body. Squared terminals keep the techno feel while staying readable at 11px on a card.</div>
+          </div>
+          <div>
+            <div class="t4">IBM Plex Mono — the game log, seeds, sim numbers. Mono is demoted from "everything" to "data".</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ CARDS ============================ -->
+  <section>
+    <div class="sec-tag">CARDS</div>
+    <h2>Three renditions, one card</h2>
+    <p class="lead">
+      The core fix for overlap and unreadability: <strong style="color:var(--text)">cards on the board never show rules text.</strong>
+      They show art, name, cost, power and status — the full card appears in a large zoom panel on hover/click
+      (and that's where rules text lives). Rival cards render upright, same as yours, in red-keyed frames.
+    </p>
+
+    <div class="card-lab">
+      <div class="lab-item">
+        <div class="bc ready">
+          <img src="{{IMG_CORPO}}" alt="Corpo Security, official card">
+          <div class="kw-strip"><div class="kw-pip" title="Blocker">B</div></div>
+          <div class="pow-chip">2</div>
+        </div>
+        <div class="lab-cap"><b style="color:var(--cyan)">Board card, images on</b> — official art, cyan ready-ring, keyword pips, live power chip</div>
+      </div>
+      <div class="lab-item">
+        <div class="bc playable">
+          <img src="{{IMG_SMASHER}}" alt="Adam Smasher, official card">
+          <div class="pow-chip buffed">17</div>
+        </div>
+        <div class="lab-cap"><b style="color:var(--yellow)">Playable / can attack</b> — yellow pulse says "you can act with this"; green chip = buffed above printed power</div>
+      </div>
+      <div class="lab-item">
+        <div class="bc spent">
+          <img src="{{IMG_CORPO}}" alt="Corpo Security, spent">
+          <div class="pow-chip">2</div>
+        </div>
+        <div class="lab-cap"><b>Spent</b> — desaturated with a stamp; no rotation, so rows stay tidy and nothing overlaps</div>
+      </div>
+      <div class="lab-item">
+        <div class="fc mini">
+          <div class="toprow">
+            <div class="hexcost">2</div>
+            <div><div class="typecap">UNIT</div><div class="ramrow"><span class="rampip"></span></div></div>
+          </div>
+          <div class="art"><div class="lag-band" style="bottom:8%;">LAG</div></div>
+          <div class="nm">Corpo Security</div>
+          <div class="botrow"><div class="barcode"></div><div class="powbox" style="min-width:30px;height:28px;font-size:17px;">2</div></div>
+        </div>
+        <div class="lab-cap"><b>Board card, images off</b> — same layout language as the print card, no rules text, LAG banner when it just landed</div>
+      </div>
+      <div class="lab-item">
+        <div class="fc full">
+          <div class="toprow">
+            <div class="hexcost">2</div>
+            <div><div class="typecap">UNIT</div><div class="ramrow"><span class="rampip"></span></div></div>
+          </div>
+          <div class="art"></div>
+          <div class="nm">Corpo Security</div>
+          <div class="sub">Sworn to the Tower</div>
+          <div class="tags"><span class="tag">CORPO</span></div>
+          <div class="rules">
+            This Unit can't attack.<br>
+            <span class="kwcap kw-m">BLOCKER</span> <em>(You may spend this Unit to redirect a rival Unit's attack to it instead.)</em>
+          </div>
+          <div class="botrow"><div class="barcode"></div><div class="powbox">2</div></div>
+        </div>
+        <div class="lab-cap"><b>Zoom / hand / browser card</b> — the full HTML frame, mirroring the printed layout: hex cost, type capsule, RAM pips, keyword capsules, power box</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ TABLE ============================ -->
+  <section>
+    <div class="sec-tag">THE TABLE</div>
+    <h2>Play view layout</h2>
+    <p class="lead">
+      Runeterra's trick, adopted: the player's side gets ~60% of the height, the rival's is compact but fully
+      readable, and the contested resource — the <strong style="color:var(--text)">gig dice</strong> — sits on a "street"
+      strip across the middle where both totals face each other. Hand becomes a fan at the bottom
+      (hover a card in the mock). Log and actions live in a right rail.
+    </p>
+
+    <div class="mat clip">
+      <div class="mat-board">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="zone-lbl" style="color:var(--red);">Rival — deck 14 · trash 3 · €$ 2 · hand 5</div>
+          <div class="mrow">
+            <div class="mcard back eb" style="width:34px;height:48px;"></div>
+            <div class="mcard legend faceup" style="width:34px;height:48px;"><div class="mn" style="font-size:6px;bottom:3px;">Johnny</div></div>
+            <div class="mcard legend" style="width:34px;height:48px;"></div>
+          </div>
+        </div>
+        <div class="mrow" style="margin-top:4px;">
+          <div class="mcard enemy spnt"><div class="mn">Animals Wrecker</div><div class="mc">3</div><div class="mp">6</div></div>
+          <div class="mcard enemy"><div class="mn">Ruthless Lowlife</div><div class="mc">2</div><div class="mp">4</div></div>
+          <div class="mcard enemy" style="border-color:var(--red); box-shadow:0 0 10px rgba(255,61,90,0.4);"><div class="mn">Maelstrom Ganger</div><div class="mc">4</div><div class="mp">8</div></div>
+        </div>
+
+        <div class="street">
+          <div class="gigside">
+            <div class="zone-lbl" style="margin:0; color:var(--red);">Rival gigs · 3 ★ 17</div>
+            <div class="mrow">
+              <div class="die enemy d6">4</div>
+              <div class="die enemy d10">8</div>
+              <div class="die enemy d12">5</div>
+              <div class="die fixer d20">?</div>
+            </div>
+          </div>
+          <div class="vsblock">
+            <div class="turn">TURN 5 — YOU</div>
+            <div class="cred">first to 7 gigs wins</div>
+          </div>
+          <div class="gigside">
+            <div class="zone-lbl" style="margin:0;">Your gigs · 4 ★ 21</div>
+            <div class="mrow">
+              <div class="die d4">3</div>
+              <div class="die d8">7</div>
+              <div class="die d6">6</div>
+              <div class="die d10">5</div>
+              <div class="die fixer d12">?</div>
+              <div class="die fixer d20">?</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="zone-lbl">Your field — deck 15 · trash 2 · €$ 3</div>
+          <div class="mrow">
+            <div class="mcard legend faceup" style="width:34px;height:48px;"><div class="mn" style="font-size:6px;bottom:3px;">Yorinobu</div></div>
+            <div class="mcard back" style="width:34px;height:48px;"></div>
+            <div class="mcard back" style="width:34px;height:48px;"></div>
+          </div>
+        </div>
+        <div class="mrow" style="margin-top:4px;">
+          <div class="mcard rdy glow"><div class="mn">Emergency Atlus</div><div class="mc">3</div><div class="mp">4</div></div>
+          <div class="mcard rdy"><div class="mn">Field Operator</div><div class="mc">2</div><div class="mp">2</div></div>
+          <div class="mcard spnt"><div class="mn">Japantown Jonin</div><div class="mc">2</div><div class="mp">0</div></div>
+        </div>
+
+        <div class="handfan">
+          <div class="mcard glow"><div class="mn">Satori</div><div class="mc">2</div></div>
+          <div class="mcard glow"><div class="mn">Corpo Security</div><div class="mc">2</div></div>
+          <div class="mcard"><div class="mn">Over the Edge</div><div class="mc">3</div></div>
+          <div class="mcard glow"><div class="mn">Surveillance</div><div class="mc">1</div></div>
+          <div class="mcard"><div class="mn">All is Lost</div><div class="mc">1</div></div>
+          <div class="mcard"><div class="mn">Industrial Assembly</div><div class="mc">1</div></div>
+        </div>
+      </div>
+
+      <div class="mat-log">
+        <div class="hd"><span>Feed</span><span style="color:var(--muted); font-family:var(--mono); letter-spacing:0;">seed 20260822</span></div>
+        <div class="loglines">
+          <div><span class="tn">T4</span><span class="foe">Rival played Floor It.</span></div>
+          <div><span class="tn">T4</span><span class="foe">Floor It: −1 power on 12.</span></div>
+          <div><span class="tn">T4</span><span class="foe">Rival ended their turn.</span></div>
+          <div><span class="tn">T5</span><span class="sys">Turn 5 — your turn.</span></div>
+          <div><span class="tn">T5</span><span class="you">You drew Industrial Assembly.</span></div>
+          <div><span class="tn">T5</span><span class="you">You rolled d10 → 5.</span></div>
+        </div>
+        <div class="actionbar">
+          <button class="btn btn-pri">End turn</button>
+          <button class="btn btn-ghost">Call legend</button>
+          <button class="btn btn-ghost">Undo</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="reaction">
+      <span class="who">React window</span>
+      <span class="what">Maelstrom Ganger (8) attacks your Field Operator (2)</span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost">Block with Corpo Security</button>
+      <button class="btn btn-danger">Take the hit</button>
+    </div>
+    <p class="note" style="margin-top:8px;">
+      Reaction windows become a spotlight bar pinned above the hand: the attack is restated in words, the
+      legal responses are buttons, and the rest of the board dims. No more hunting for what the game is asking.
+    </p>
+
+    <div class="callouts">
+      <div class="callout"><b>Rival board upright</b><br>Same card rendition as yours, red-keyed. Rotation and clipping gone.</div>
+      <div class="callout"><b>Gigs face each other</b><br>The win condition is the visual center of the table, with street cred totals beside each pool. Fixer dice show as dim outlines until rolled.</div>
+      <div class="callout"><b>Hand as a fan</b><br>Playable cards glow yellow; hover lifts and enlarges. Click&nbsp;→ full zoom card with rules text.</div>
+      <div class="callout"><b>Log becomes a feed</b><br>Color-coded by actor, turn-stamped, auto-scrolling; action buttons anchored beneath it.</div>
+    </div>
+  </section>
+
+  <!-- ============================ COMPONENTS ============================ -->
+  <section>
+    <div class="sec-tag">COMPONENTS</div>
+    <h2>The supporting cast</h2>
+    <div class="comp-row">
+      <div class="comp">
+        <h3 style="margin:0;">Polyhedral dice</h3>
+        <div class="dice-demo">
+          <div><div class="die d4">4</div><div class="dsz">D4</div></div>
+          <div><div class="die d6">6</div><div class="dsz">D6</div></div>
+          <div><div class="die d8">7</div><div class="dsz">D8</div></div>
+          <div><div class="die d10">9</div><div class="dsz">D10</div></div>
+          <div><div class="die d12">11</div><div class="dsz">D12</div></div>
+          <div><div class="die d20">18</div><div class="dsz">D20</div></div>
+        </div>
+        <div class="note">Real silhouettes per die size, filled with the owner's color. A short roll flicker plays when one lands in a gig area.</div>
+      </div>
+      <div class="comp">
+        <h3 style="margin:0;">Buttons &amp; chips</h3>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-pri">Start game</button>
+          <button class="btn btn-ghost">Export</button>
+          <button class="btn btn-danger">Concede</button>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <span class="tag" style="font-size:11px; padding:3px 10px;">ARASAKA</span>
+          <span class="kwcap kw-y" style="font-size:11px;">ADRENALINE</span>
+          <span class="kwcap kw-m" style="font-size:11px;">BLOCKER</span>
+        </div>
+        <div class="note">Yellow = the one primary action on screen. Cyan ghosts for everything else. Keyword capsules match the printed cards.</div>
+      </div>
+      <div class="comp" style="max-width:330px;">
+        <h3 style="margin:0;">Deck builder &amp; simulate</h3>
+        <div style="display:grid; gap:6px;">
+          <div style="display:flex; justify-content:space-between; font-family:var(--display); font-size:12px; letter-spacing:0.1em;"><span style="color:var(--ram-green)">GREEN RAM</span><span>3 / 4</span></div>
+          <div style="height:8px; background:var(--panel-2); border:1px solid var(--line);"><div style="width:75%; height:100%; background:var(--ram-green);"></div></div>
+          <div style="display:flex; justify-content:space-between; font-family:var(--display); font-size:12px; letter-spacing:0.1em;"><span style="color:var(--ram-red)">RED RAM</span><span>2 / 2</span></div>
+          <div style="height:8px; background:var(--panel-2); border:1px solid var(--line);"><div style="width:100%; height:100%; background:var(--ram-red);"></div></div>
+        </div>
+        <div class="note">
+          Deck legality becomes visual: per-color RAM budget bars, a 40–50 size meter, legend slots drawn as card
+          silhouettes. The browser uses the zoom-card rendition in a proper grid with hover states; Simulate gets the
+          same panel chrome with results as stat blocks instead of raw text.
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:14px;">
+      Motion stays purposeful and cheap: playable pulse, hover lift, a slide when cards enter a zone, dice roll
+      flicker, and a brief red/cyan glitch flash on game-over. All CSS, all disabled under
+      <span style="font-family:var(--mono)">prefers-reduced-motion</span>.
+    </p>
+  </section>
+
+  <!-- ============================ DECISIONS ============================ -->
+  <section>
+    <div class="sec-tag">SETTLE THESE</div>
+    <h2>Four decisions before I write the spec</h2>
+    <div class="decision">
+      <h4>1 · Default card rendition on the board</h4>
+      <p>Official images with overlays (shown above) as the default, HTML frames as the images-off fallback — or HTML frames as the default everywhere? <span class="rec">I recommend images-on by default</span>: the art carries most of the premium feel and we have all 141.</p>
+    </div>
+    <div class="decision">
+      <h4>2 · Hand: fan or straight strip?</h4>
+      <p>The fan (in the mock) feels the most game-like; a straight strip shows more of each card at rest. <span class="rec">I recommend the fan</span> with hover-lift.</p>
+    </div>
+    <div class="decision">
+      <h4>3 · Spent cards: stamp or rotate?</h4>
+      <p>Physical TCGs rotate ("tap") spent cards; the mock uses desaturate + SPENT stamp to keep rows compact. Rotation is more traditional but costs horizontal space.</p>
+    </div>
+    <div class="decision">
+      <h4>4 · Scope of motion</h4>
+      <p>Baseline (glow, hover, fades) — or add showpieces: attack lunge animation, dice tumble, animated gig steal flying across the street strip? <span class="rec">Baseline first, showpieces as a follow-up</span> is my recommendation.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-tag">SOURCES</div>
+    <p class="refs">
+      Reference material used:
+      <a href="https://interfaceingame.com/articles/cyberpunk-2077-ux-ui-critique/">Cyberpunk 2077 UX/UI critique</a> ·
+      <a href="https://www.behance.net/gallery/118663901/Cyberpunk-2077User-Interface-(Part-1)">CP2077 UI breakdown (Behance)</a> ·
+      <a href="https://www.gameuidatabase.com/gameData.php?id=1046">Gwent — Game UI Database</a> ·
+      <a href="https://gdkeys.com/the-card-games-ui-design-of-fairtravel-battle/">Card game UI design keys (board/hand zoning, Runeterra's 60/40 split)</a> ·
+      the official card scans in <span style="font-family:var(--mono)">data/images/</span> and
+      <a href="https://cyberpunktcg.com">cyberpunktcg.com</a>'s corner-bracket / barcode motifs.
+    </p>
+  </section>
+</div>
