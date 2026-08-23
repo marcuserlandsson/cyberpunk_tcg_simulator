@@ -76,9 +76,13 @@ export function BoardCard(props: {
       data-attacker={attacker ? 'true' : undefined}
       data-target={target ? 'true' : undefined}
     >
-      <button
-        type="button"
+      {/* A `div role="button"` rather than a real <button>: CardFrame's root is
+          a <div> (flow content), which a <button> may not legally contain. */}
+      <div
         className="board-card__hit"
+        role="button"
+        tabIndex={clickable ? 0 : -1}
+        aria-disabled={!clickable}
         data-testid={
           playable
             ? 'playable-card'
@@ -89,8 +93,16 @@ export function BoardCard(props: {
                 : 'board-card-hit'
         }
         aria-label={faceDown ? 'Face-down card' : def.name}
-        disabled={!clickable}
-        onClick={() => handlers.onCard(uid)}
+        onClick={clickable ? () => handlers.onCard(uid) : undefined}
+        onKeyDown={
+          clickable
+            ? (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                handlers.onCard(uid)
+              }
+            : undefined
+        }
       >
         <CardFrame
           def={def}
@@ -101,7 +113,7 @@ export function BoardCard(props: {
           tempPower={delta}
           useOfficialImages={useOfficialImages}
         />
-      </button>
+      </div>
       {instance.attachedGear.length > 0 && (
         <span className="board-card__gear" data-testid="gear-count">
           +{instance.attachedGear.length} gear

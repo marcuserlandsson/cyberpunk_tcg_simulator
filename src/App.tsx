@@ -80,9 +80,11 @@ export default function App() {
         </label>
       </header>
       <main>
-        {view === 'play' && (
+        {/* Kept mounted, only hidden: unmounting PlayView would throw away an
+            in-progress game every time the player glanced at another tab. */}
+        <div hidden={view !== 'play'}>
           <PlayView db={db} useOfficialImages={useOfficialImages} aiDelayMs={aiDelayMs} />
-        )}
+        </div>
         {view === 'deckBuilder' && (
           <section aria-label="Deck Builder">
             <h2>Decks</h2>
