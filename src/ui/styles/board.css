@@ -156,13 +156,23 @@
   min-height: 0;
 }
 
+/* `overflow-y: auto` (not `hidden`) is the one thing standing between a
+   pathological board (8+ units a side, several called Legends, a packed
+   eddie row) and the *binding* "no clipping/overlap at any state" rule: a
+   fixed-height board must never hide a reachable, clickable card. Every row
+   below is sized to its own natural content (no `min-height: 0` squeeze
+   anywhere in this column any more — see `.player-zone`), so in the common
+   case content still fits inside the fixed height with room to spare and
+   this never engages; in the rare state where it doesn't, the board grows
+   internally and scrolls rather than clipping. This is deliberately scoped
+   to `.playmat__board` alone (not `.playmat`/`.playmat__body`) so the right
+   rail — Undo/End Turn/Save, all reachable regardless — never moves. */
 .playmat__board {
-  overflow: hidden;
+  overflow-y: auto;
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   gap: 6px;
   min-width: 0;
-  min-height: 0;
   padding: 10px 12px;
   position: relative;
   background:
@@ -179,41 +189,20 @@
   gap: 4px;
 }
 
-/* Only the player's zone (the `1fr` track) opts out of the grid's default
-   content-based minimum — it is the one row meant to flex, absorbing
-   whatever the fixed-height board has left over once the `auto` rows above
-   and below it (rival strip, street, hand) claim their own content-sized
-   share. Giving `.rival-strip` the same `min-height: 0` was tried and
-   reverted (verified in a real browser): it let the *rival* strip's own
-   "auto" track get squeezed arbitrarily small too, at which point nothing
-   about the split was predictable — the player's own field could still end
-   up starved even though it's the side that matters most on screen. */
-.player-zone {
-  min-height: 0;
-  /* Safety net: even after the compact-card sizing below, a long game can
-     still grow the human's own Field/ZonePanels content past this row's
-     allotted share (many units, several legends). Rather than let that
-     overflow spill downward and visually sit on top of — and steal clicks
-     from — the Hand row that follows in the grid (verified in a real
-     browser: this is exactly what broke `attacker-card` clicks before this
-     rule existed), it clips inside its own box. The player's own content is
-     still capped/tuned below to make this rare, not the primary defense. */
-  overflow: hidden;
-}
-
-/* The rival strip is sized to its content (a normal "auto" track) up to this
-   cap — comfortable for the common case (a handful of field units, legends
-   still face-down) — but a heavier board (a called Legend goes back to full
-   card size; several units) is capped and clips internally rather than
-   shrinking the player's own zone or pushing the hand row off-board. Neither
-   outcome is perfect, but between "rival's own strip loses its least
-   important content" and "the player's own field disappears", this is the
-   one that keeps the side that matters more on screen (verified in a real
-   browser across an extended, AI-driven game). */
-.rival-strip {
-  max-height: 210px;
-  overflow: hidden;
-}
+/* Neither `.rival-strip` nor `.player-zone` overrides the grid's default
+   content-based automatic minimum any more (a `min-height: 0` on
+   `.player-zone` here, plus a hard `max-height` + `overflow: hidden` cap on
+   `.rival-strip` below, previously squeezed/clipped whichever side lost the
+   fight for the fixed-height board's leftover space — including, in a real
+   game, clipping away the player's own still-interactive Legends/Eddies row
+   entirely, and separately letting rival units disappear behind a hard cap.
+   Both were reviewed and rejected: a card a player can still legally click
+   — a playable/sellable Legend has no choice-bar fallback, it *needs* the
+   direct click — must never be hidden by CSS alone. Every row here now keeps
+   its natural, un-squeezed minimum size; `.playmat__board`'s `overflow-y:
+   auto` above is what absorbs the rare case where that no longer fits a
+   fixed 1366×768 board, rather than any one row silently eating the
+   difference by hiding content. */
 
 .rival-strip .zone__label {
   color: var(--rival);
@@ -309,6 +298,12 @@
 .playmat__board .zone--hand .card-frame {
   gap: 2px;
   padding: 4px;
+  /* Fills whatever width the shrink-then-wrap grid track below settles on
+     (56–92px) instead of the global `.card-frame--small`'s fixed 92px —
+     that fixed width is exactly what made a crowded row wrap instead of
+     shrinking, which is the one thing the binding "no clipping/overlap"
+     rule rules out. */
+  width: 100%;
 }
 
 .playmat__board .zone--field .card-frame__art,
@@ -330,9 +325,39 @@
   font-size: 14px;
 }
 
+/* The binding rule's own mechanism ("cards shrink evenly to keep one row,
+   down to a 56px-width floor, then the row wraps") — both sides, field and
+   hand. `flex-wrap` cannot do this: a wrapping flex row decides how many
+   items fit a line from each item's *unshrunk* basis size, so it wraps to a
+   second (taller) line well before shrinking ever kicks in — the opposite
+   of "shrink first". `repeat(auto-fill, minmax(56px, 92px))` is the layout
+   primitive that actually does it: it fits as many 56–92px columns as the
+   row's width allows, letting every column grow toward 92px while there's
+   room to spare, and only starts a second row once even 56px columns don't
+   fit. `align-items: end` keeps the base-of-card alignment `.zone__cards`
+   used under flex; `grid-auto-rows: max-content` (rather than the implicit
+   default, which would stretch every row to match the tallest) lets a
+   wrapped second row size to its own content instead of inheriting the
+   first row's height. */
 .playmat__board .zone--field .zone__cards,
 .playmat__board .zone--hand .zone__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 92px));
+  grid-auto-rows: max-content;
+  align-items: end;
+  gap: 0.3em;
   min-height: 0;
+}
+
+/* Grid items default to `justify-self: stretch` (filling their column), but
+   `.board-card`'s own flex-column layout still carries an automatic
+   min-width based on its content's min-content size (the "Sell"/"Ability"
+   button text beneath a card) unless told otherwise — this is what actually
+   lets it shrink down to the 56px floor instead of refusing to go below
+   whatever "Ability" renders at. */
+.playmat__board .zone--field .board-card,
+.playmat__board .zone--hand .board-card {
+  min-width: 0;
 }
 
 .playmat__meta {
