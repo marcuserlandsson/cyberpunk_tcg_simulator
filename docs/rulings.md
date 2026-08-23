@@ -4525,6 +4525,11 @@ the board and outlives the resolution that created it:
   `resolveAttack`/`stealGig` cap their counts by it while `takeStolenGig` ends
   an episode early when it runs empty — so `chooseGig` is never reached with a
   pending steal and no legal choice;
+  **"their power" is the power the Unit is ATTACKING with** (fix round 1,
+  §145): `stealValueCap` reads `effectivePower` **plus** `attackPowerBonus`,
+  the same sum `resolveAttack` derives the steal COUNT from and `fight()` uses
+  for the attacker's side. A Unit's power during its own attack is ONE number,
+  whichever rule reads it;
 - **"wins a fight by 3+ power" is the raw power margin**, `winnerPower -
   loserPower`, computed from the same two numbers `fight()` already compares
   (buffs, Gear and attack bonuses included). A win that came from
@@ -4768,3 +4773,82 @@ equip/keyword reminder, or empty). There are **no deferral allowances**. The
 same file checks that every `scripted` node name resolves in `scriptedCards`,
 that no script is dead, and that every card's informational `scripted` field
 matches a node it actually uses.
+
+# Task 8 deferred slice — fix round 1 (review)
+
+The slice review returned two Important findings, both fixed in place above
+(§141 carries a pointer to the first) rather than appended as
+untouched-original-plus-patch, matching how §67, §80 and §133 documented their
+own fix rounds.
+
+## 145 — Attack power is one number, and a trigger seam may not clobber the
+phase it opened
+
+**1. The steal cap and the steal count read the same power (Important).**
+`stealValueCap` (§141, chrome-fang) capped at bare `effectivePower` while
+`resolveAttack` derives the steal COUNT from `effectivePower +
+attackPowerBonus` (§111). A Unit attacking under
+`saburo-arasaka-stubborn-patriarch` ("Friendly ARASAKA Units have +1 power
+while attacking") or `saul-bright-stormrider` ("Other friendly Units have +2
+power while attacking") therefore stole as if power+N but was capped as if
+power+0 — reachable with real cards, and visibly wrong: the same attack was
+being priced with two different powers.
+
+**Ruling (controller):** an attacking Unit's power is a single number, and
+every rule that reads "its power" during that attack reads the same one. This
+is the general form of the reading §141 already applied to
+`appetite-for-destruction`'s fight margin ("the same two numbers `fight()`
+already compares", attack bonuses included) and of §111's own scope note
+(`attackPowerBonus` covers "fight power and Gig-steal power alike").
+`stealValueCap` now returns `effectivePower + attackPowerBonus`.
+
+**TDD evidence:** a new synthetic case fields a power-3 thief alongside a
+friendly `attackPowerBonus: 2` static against a capped victim holding dice of
+value 2, 5 and 6, and asserts the value-5 die is now in reach while the
+value-6 one is not. Verified failing-first by reverting `stealValueCap` to bare
+`effectivePower` and re-running: that one case fails (the value-5 die is not
+offered), and it is the only failure, so nothing else in the suite depended on
+the old reading.
+
+**2. `chooseGigDie`/`chooseGigReroll` clobbered the phase after firing
+`onGigRoll` (Important).** Both handlers fired the roll trigger and then
+assigned `draft.phase` unconditionally. An `onGigRoll` effect that opens a
+decision of its own — a `stealGig` node setting `phase: 'chooseGig'` plus a
+`pendingSteal` — had that decision silently overwritten, stranding the pending
+steal. No card in the pool reaches it today (kerry's clauses only draw), but
+the seam is public API that the fuzz harness, the AI and the UI all drive.
+
+**Ruling:** the gig-gain step hands control back through one helper,
+`settleAfterGigRoll(draft, resume)`, which follows the shape `declareAttack`
+already established for the identical situation on the attack seam (§32's
+"an on-attack effect can owe the attacker a Gig-die choice; they take it
+first"): if the trigger left a pending steal, the steal keeps the phase and
+`resume` becomes its `resumePhase`; otherwise `resume` is assigned directly.
+`resume` is `'gigReroll'` when the roller has a live `gigRerollOption` static
+(§143) and `'main'` otherwise, so the reroll decision is now *deferred* behind
+the steal rather than lost to it. `pendingIntercept` deliberately needs no
+equivalent guard: an interception never sets a phase from inside a mutation —
+it throws, and `runAction` discards the whole draft and asks from the
+pre-action state (§144).
+
+**TDD evidence:** a new synthetic case gives a Legend an unconditional
+`onGigRoll` → `stealGig`, and drives both landing phases: without the reroll
+static the steal owns `chooseGig` and hands back to `main`; with it, the steal
+is taken first and hands back to `gigReroll`, and the *reroll's* own trigger
+firing then does the same again, ending in `main` with all three dice
+(one rolled, two stolen) in the roller's Gig area. Verified failing-first by
+deleting the guard and re-running: that one case fails, nothing else.
+
+**Deferred minors, ledgered here, not fixed (they touch lines this round does
+not):** `defeatUnit` accepts any answer other than `-1` as an acceptance
+without checking it equals the offered protector uid, where the steal seam does
+validate against its candidate list (asymmetric, but every value reaching it
+came from `legalActions`' own option list); a declined interception writes no
+`effectResolved` event, so the log shows only the accepted ones; an
+`appetite-for-destruction` steal interleaved with a `safety-override` defeat
+can leave `pendingSteal.attacker` pointing at a trashed card, which silently
+turns chrome-fang's cap off for the remainder of that episode
+(`isUnitStealer` fails the field check); `rivalFightNoDefeat`'s controller
+predicate is vacuous in a two-player game and its comment does not say so; and
+`forcedAttackers` (query.ts) carries a second `as number` cast the slice report
+did not disclose — the slice report claimed one cast, there are two.

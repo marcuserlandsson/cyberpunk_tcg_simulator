@@ -42,7 +42,7 @@ import {
   rivalGoSoloTax,
 } from './query'
 import { nextInt, rollDie, shuffle } from './rng'
-import type { Action, CardDb, DieSize, GameState, PlayerId, Reaction } from './types'
+import type { Action, CardDb, GameState, Phase, PlayerId, Reaction } from './types'
 
 export class IllegalActionError extends Error {
   constructor(message: string) {
@@ -248,12 +248,31 @@ function chooseGigDie(draft: GameState, db: CardDb, size: number): void {
   // A roll trigger can end the game (a forced draw off an empty deck).
   if (draft.winner !== null) return
 
-  if (friendlyGigRerollOption(db, draft, player)) {
-    draft.pendingGigRoll = { player, dieIndex }
-    draft.phase = 'gigReroll'
+  // Where the gig-gain step lands once nothing else is owed: the reroll
+  // decision if the roller has that static live, the main phase otherwise.
+  const resume: Phase = friendlyGigRerollOption(db, draft, player) ? 'gigReroll' : 'main'
+  if (resume === 'gigReroll') draft.pendingGigRoll = { player, dieIndex }
+  settleAfterGigRoll(draft, resume)
+}
+
+/**
+ * Hands control back after a Gig roll, without clobbering a decision the roll
+ * trigger itself opened (docs/rulings.md §145 — fix round 1). An `onGigRoll`
+ * effect can owe its controller a Gig-die choice, exactly as an `onAttack` one
+ * can (docs/rulings.md §32), so this follows `declareAttack`'s established
+ * shape: the pending steal keeps the decision, and `resume` becomes the phase
+ * it hands back to when the last die is taken.
+ *
+ * `pendingIntercept` needs no equivalent guard: an interception never *sets* a
+ * phase from inside a mutation — it throws, and `runAction` discards this whole
+ * draft and asks from the pre-action state instead (docs/rulings.md §144).
+ */
+function settleAfterGigRoll(draft: GameState, resume: Phase): void {
+  if (draft.phase === 'chooseGig' && draft.pendingSteal !== null) {
+    draft.pendingSteal.resumePhase = resume
     return
   }
-  draft.phase = 'main'
+  draft.phase = resume
 }
 
 /**
@@ -275,7 +294,9 @@ function chooseGigReroll(draft: GameState, db: CardDb, reroll: boolean): void {
     }
   }
   if (draft.winner !== null) return
-  draft.phase = 'main'
+  // The reroll's own trigger firing can owe a Gig-die choice too, so this
+  // hands back through the same guard (docs/rulings.md §145).
+  settleAfterGigRoll(draft, 'main')
 }
 
 /**

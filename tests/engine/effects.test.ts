@@ -3341,6 +3341,34 @@ describe('floatingEffects: rivalStealCappedByPower (chrome-fang, §141)', () => 
     expect(next.phase).toBe('chooseGig')
     expect(gigChoices(db, next)).toEqual([0])
   })
+
+  it('caps at the power the Unit is ATTACKING with, bonuses included (§145)', () => {
+    // "+N power while attacking" (saburo-arasaka-stubborn-patriarch,
+    // saul-bright-stormrider) counts towards the steal COUNT and towards a
+    // fight, so it counts towards "their power" here too — one number
+    // (docs/rulings.md §145, fix round 1).
+    const boosted = makeDb([
+      def('thief', 'unit', { power: 3 }),
+      def('banner', 'unit', {
+        power: 1,
+        effects: [{ trigger: 'static', effect: { kind: 'attackPowerBonus', amount: 2 } }],
+      }),
+    ])
+    const s = capped()
+    const attacker = mint(s, 0, 'field', 'thief')
+    mint(s, 0, 'field', 'banner')
+    s.players[1].gigArea = [
+      { size: 6, value: 2 },
+      { size: 6, value: 5 },
+      { size: 6, value: 6 },
+    ]
+
+    let next = applyAction(boosted, s, { type: 'attack', attacker, target: 'gigArea' })
+    next = applyAction(boosted, next, { type: 'react', reaction: pass })
+    // Power 3 + 2 while attacking: the value-5 die is now within reach, the
+    // value-6 one still is not.
+    expect(gigChoices(boosted, next)).toEqual([0, 1])
+  })
 })
 
 describe('floatingEffects: fight consequences (§141)', () => {
@@ -3650,6 +3678,71 @@ describe('gig-roll seam: onGigRoll + gigRerollOption (kerry-eurodyne, §143)', (
     expect(drawsByFace.get(4)).toBe(1) // max face -> drew 1
     expect(drawsByFace.get(2)).toBe(0)
     expect(drawsByFace.get(3)).toBe(0)
+  })
+
+  it('lets an onGigRoll effect own the phase it opened (§145)', () => {
+    // A roll trigger can owe its controller a Gig-die choice, exactly as an
+    // `onAttack` one can (docs/rulings.md §32) — the gig-gain step must hand
+    // over to it rather than clobbering the phase, and must be handed back to
+    // afterwards. Checked with AND without the reroll static, since those are
+    // the two phases the step can land in.
+    const stealer = makeDb([
+      def('roll-thief', 'legend', {
+        power: null,
+        effects: [{ trigger: 'onGigRoll', effect: { kind: 'stealGig', count: 1 } }],
+      }),
+      def('roll-thief-rerolls', 'legend', {
+        power: null,
+        effects: [
+          { trigger: 'static', effect: { kind: 'gigRerollOption' } },
+          { trigger: 'onGigRoll', effect: { kind: 'stealGig', count: 1 } },
+        ],
+      }),
+      def('grunt', 'unit', { power: 1 }),
+    ])
+
+    function rollingThief(defId: string): GameState {
+      const s = scenario(3)
+      s.phase = 'start'
+      s.players[0].fixer = [{ size: 4, value: 0 }]
+      mint(s, 0, 'legends', defId)
+      for (let i = 0; i < 6; i++) mint(s, 0, 'deck', 'grunt')
+      s.players[1].gigArea = [
+        { size: 6, value: 2 },
+        { size: 6, value: 3 },
+      ]
+      return s
+    }
+
+    // No reroll static: the steal owns the phase, then hands back to `main`.
+    let plain = applyAction(stealer, rollingThief('roll-thief'), {
+      type: 'chooseGigDie',
+      size: 4,
+    })
+    expect(plain.phase).toBe('chooseGig')
+    expect(plain.pendingSteal).toMatchObject({ remaining: 1, thief: 0, resumePhase: 'main' })
+    plain = applyAction(stealer, plain, { type: 'chooseGig', dieIndex: 0 })
+    expect(plain.phase).toBe('main')
+    expect(plain.pendingSteal).toBeNull()
+
+    // With the reroll static: the steal is taken first, THEN the reroll
+    // decision it would otherwise have overwritten.
+    let both = applyAction(stealer, rollingThief('roll-thief-rerolls'), {
+      type: 'chooseGigDie',
+      size: 4,
+    })
+    expect(both.phase).toBe('chooseGig')
+    expect(both.pendingSteal).toMatchObject({ resumePhase: 'gigReroll' })
+    both = applyAction(stealer, both, { type: 'chooseGig', dieIndex: 0 })
+    expect(both.phase).toBe('gigReroll')
+
+    // And the reroll's own trigger firing gets the same treatment.
+    both = applyAction(stealer, both, { type: 'chooseGigReroll', reroll: true })
+    expect(both.phase).toBe('chooseGig')
+    expect(both.pendingSteal).toMatchObject({ resumePhase: 'main' })
+    both = applyAction(stealer, both, { type: 'chooseGig', dieIndex: 0 })
+    expect(both.phase).toBe('main')
+    expect(both.players[0].gigArea).toHaveLength(3) // the rolled die + 2 stolen
   })
 
   it('narrows by die size with rolledDieSizeAnyOf', () => {

@@ -895,6 +895,13 @@ export function isUnitStealer(db: CardDb, state: GameState, uid: number): boolea
  * docs/rulings.md §141). `stealerUid` is the card actually doing the stealing:
  * the cap is *its* power, and it only applies while that card is a Unit
  * (`isUnitStealer`), because the printed restriction names Units only.
+ *
+ * **Fix round 1 (docs/rulings.md §145):** "their power" is the power the Unit
+ * is attacking WITH, so `attackPowerBonus` counts here exactly as it counts in
+ * the steal-count calculation and in a fight — a Unit's power during its own
+ * attack is one number, whichever rule reads it. Reading bare
+ * `effectivePower` here made a Unit under `saburo-arasaka-stubborn-patriarch`
+ * or `saul-bright-stormrider` steal as if power+N but be capped as if power+0.
  */
 export function stealValueCap(
   db: CardDb,
@@ -907,7 +914,7 @@ export function stealValueCap(
   )
   if (!capped) return null
   if (!isUnitStealer(db, state, stealerUid)) return null
-  return effectivePower(db, state, stealerUid)
+  return effectivePower(db, state, stealerUid) + attackPowerBonus(db, state, stealerUid)
 }
 
 /**
