@@ -67,14 +67,30 @@ function ramPool(db: CardDb, legendIds: string[]): Record<string, number> {
  * every legend contributes a RAM limit of 2), but the retry keeps the
  * generator honest against a future, sparser card pool instead of silently
  * handing back an under-sized deck for `validateDeck` to reject.
+ *
+ * `require` names non-legend card ids the deck MUST contain (Task 10's
+ * hidden-information suite needs decks that actually carry a
+ * `discardRandomRival` card, since neither bundled starter deck does). A legend
+ * trio whose RAM pool cannot admit every required id is rejected and the pick
+ * retried, so the requirement is satisfied by construction rather than by
+ * hoping a random draw includes it.
  */
 export function generateDeck(
   db: CardDb,
   seed: number,
   name: string,
+  require: readonly string[] = [],
   maxAttempts = 25
 ): DeckList {
   let rng: RngState = createRng(seed)
+
+  for (const id of require) {
+    const def = db[id]
+    if (def === undefined) throw new Error(`generateDeck: required card "${id}" is not in the pool`)
+    if (def.type === 'legend' || def.ram === null) {
+      throw new Error(`generateDeck: required card "${id}" is not a RAM-costed non-legend card`)
+    }
+  }
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const [legendIds, afterLegends] = pickLegends(db, rng)
@@ -86,14 +102,23 @@ export function generateDeck(
     )
     const capacity = eligible.length * MAX_COPIES
     if (capacity < MIN_CARDS) continue // this trio can't reach a legal deck; reshuffle and retry
+    // This trio's RAM pool can't pay for something the caller insists on.
+    if (require.some((id) => !eligible.some((def) => def.id === id))) continue
 
     const [shuffledEligible, afterCards] = shuffle(rng, eligible)
     rng = afterCards
 
     const cards: Record<string, number> = {}
     let total = 0
+    // The required cards go in first, so the fill below can only ever be
+    // squeezed by them and never the other way round.
+    for (const id of require) {
+      cards[id] = 1
+      total += 1
+    }
     for (const def of shuffledEligible) {
       if (total >= MAX_CARDS) break
+      if (cards[def.id] !== undefined) continue
       const [roll, afterRoll] = nextInt(rng, MAX_COPIES)
       rng = afterRoll
       const copies = Math.min(roll + 1, MAX_CARDS - total)

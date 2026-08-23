@@ -16,14 +16,28 @@
 //   * the terminal `winner`.
 //
 // What is deliberately NOT read anywhere in this file: the rival's hand
-// *contents*, either player's deck *contents or order*, and any face-down
-// Legend's `defId`. `effectivePower` is safe on both sides because
+// *contents*, either player's deck *contents or order*, any face-down Legend's
+// `defId`, and — the one that is easy to miss — either player's TRASH, in
+// contents or in size. `effectivePower` is safe on both sides because
 // `query.inPlay` only lets a Legend contribute statics once it is face-up, so
 // no face-down identity can leak into a power number. The AI's own hand is
 // legitimately visible to it, but this function ignores its contents too, and
-// scores only its size — which is what lets tests/ai/heuristic.test.ts shuffle
-// *both* decks in a clone and still demand an identical score (a strictly
-// stronger property than the brief's rival-only invariance).
+// scores only its size.
+//
+// Those last two omissions are what make the whole thing hold under
+// simulation, and they are pinned rather than asserted. A candidate action the
+// AI is only *scoring* can move hidden cards around for real — a
+// `discardRandomRival` picks an index into the rival's shuffled hand
+// (`effects.ts`), a draw pulls off a shuffled deck — so two clones that differ
+// only in hidden information genuinely produce DIFFERENT positions after the
+// same candidate. They must still produce the same *number*, and they do,
+// because hand/deck are scored by size and the trash is not scored at all.
+// tests/ai/heuristic.test.ts asserts exactly that, in two ways: a targeted
+// `augmented-negotiators` fixture where blocking discards a provably different
+// rival card in each clone, and a harvest over synthetic decks built to
+// contain `discardRandomRival` cards, which requires that at least one
+// candidate's outcome materially diverged and that no such divergence changed
+// a score or the chosen action. See docs/rulings.md §150.
 //
 // Sign convention: positive is good for `perspective`. Every term is an
 // integer, so two equal positions score exactly equal and the caller's

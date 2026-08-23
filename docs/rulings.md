@@ -5383,9 +5383,42 @@ it: because a would-be-stolen interception (§144) is played forward with a
 "decline" default, whether the rival *had* an intercept available (a read of
 their hand as a set) does not change the score the AI computes.
 
+**Fix round 1 — the seam, measured rather than assumed.** The review asked
+the obvious follow-up question: `discardRandomRival` picks the discarded card
+by rng INDEX into the rival's hand (`effects.ts`), so does permuting that hand
+change what the AI decides? **Empirically, no** — and the reason is a property
+of `evaluate` worth stating outright rather than leaving implicit: *the trash
+is never scored, in contents or in size, and hand/deck are scored by size
+only.* So a candidate the AI is merely scoring can genuinely move a different
+hidden card in each clone (the position after the action really does differ)
+and still score identically, which is precisely the invariance the AI needs.
+The same argument covers a differently-ordered deck yielding a different drawn
+card. The claim in `evaluate.ts`'s header is now written to say exactly this,
+no more.
+
+The one place this reasoning would break is a future `evaluate` term that read
+the trash (a plausible one: `costReduction { per: 'unitInTrash' }` makes a
+rival's trash composition genuinely relevant to what they can afford). Adding
+such a term would silently re-open the seam, which is why the tests below
+assert the divergence *happens* — a future term that broke invariance would
+fail on a case the suite has already proven is live, rather than on nothing.
+
 **TDD evidence:** `tests/ai/heuristic.test.ts`'s hidden-information suite
 harvests mid-game states out of real seeded games and, for each, clones it
 with the rival's hand order, the rival's deck order, the rival's face-down
-Legend `defId`s and the AI's own deck order all permuted — asserting first
-that `legalActions` is unchanged (so the two clones pose the same question)
-and then that both `evaluate` and `chooseAction` answer identically.
+Legend `defId`s and the AI's own deck order all permuted — asserting that
+`legalActions` is unchanged (so the two clones pose the same question), that
+`evaluate` agrees on the two clones, that applying *every* candidate to both
+clones scores identically, and that `chooseAction` answers identically. It
+runs twice: once on the starter decks (87 states; 127 candidate outcomes
+materially diverged across 58 states) and once on synthetic decks
+(`generateDeck`'s new `require` parameter) forced to carry
+`augmented-negotiators`, `caliber-totentanz-s-top-dog` and `maelstrom-goons`
+(102 states; 124 divergent candidate outcomes) — with a hard
+`divergentCandidates > 0` assertion so the test cannot pass vacuously. A third
+case pins the mechanism deterministically instead of sampling it:
+`augmented-negotiators` prints "When this Unit uses {Blocker}, a Rival discards
+1", so the AI's own `block` candidate fires the discard; with the rival's
+four-card hand reversed (a 4-cycle reversal has no fixed point) the two clones
+provably discard *different* cards, and the assertions are that they do, and
+that the score and the chosen action are nonetheless identical.

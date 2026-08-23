@@ -77,7 +77,19 @@ export const END_TURN_TEMPO_PENALTY = 5
  * than a guess — it exists only so a future card that reopens a window cannot
  * spin here forever.
  */
-const QUIESCENCE_STEP_LIMIT = 32
+export const QUIESCENCE_STEP_LIMIT = 32
+
+export interface HeuristicOptions {
+  /** Evaluation weights. Defaults to `evaluate.DEFAULT_WEIGHTS`. */
+  weights?: EvalWeights
+  /**
+   * Quiescence depth (LAYER 2). Defaults to `QUIESCENCE_STEP_LIMIT`; **0
+   * disables the layer entirely**, which is only useful for the ablation
+   * regression test that pins how much the layer is worth
+   * (tests/ai/heuristic.test.ts). Not a knob for real play.
+   */
+  quiescenceSteps?: number
+}
 
 /** Mulligan unless the opening hand holds at least this many cheap cards. */
 const MULLIGAN_MIN_CHEAP_CARDS = 2
@@ -88,10 +100,13 @@ const MULLIGAN_CHEAP_COST = 2
  * Whether to take the first turn when the d20 roll makes it this AI's call.
  * Going first wins the race to a 7-Gig turn start (the win check runs at the
  * start of each turn, so the first player checks first every round), but it
- * costs two Legends spent and un-readied through turn 1 (guide p9) — and
- * measured over 200 mirror games (heuristic vs heuristic, first player forced
- * and alternated) the second player wins 57%, so the tempo is not worth the
- * two Legends. See the task-10 report for the measurement.
+ * costs two Legends spent and un-readied through turn 1 (guide p9) — and in
+ * mirror games (heuristic vs heuristic, first player forced and alternated) the
+ * second player wins **54.5% over 400 games**, and between 51.7% and 56.7%
+ * across six different 120-game seed ranges: a small but consistently
+ * one-directional edge, so the tempo is not worth the two Legends. The
+ * measurement is pinned by a regression test (tests/ai/heuristic.test.ts's
+ * tuning suite), which also asserts this constant agrees with it.
  */
 const PREFER_GOING_FIRST = false
 
@@ -158,9 +173,9 @@ function continuationAction(db: CardDb, state: GameState, actions: Action[]): Ac
  * or an interception) actually reaches rather than the mid-air one it starts.
  * Stops the moment the game is over or the position is quiet.
  */
-function resolveWindows(db: CardDb, state: GameState): GameState {
+function resolveWindows(db: CardDb, state: GameState, stepLimit: number): GameState {
   let current = state
-  for (let step = 0; step < QUIESCENCE_STEP_LIMIT; step++) {
+  for (let step = 0; step < stepLimit; step++) {
     if (current.winner !== null || !isWindowPhase(current)) break
     const actions = legalActions(db, current)
     if (actions.length === 0) break
@@ -180,10 +195,11 @@ function scoreAction(
   state: GameState,
   action: Action,
   perspective: PlayerId,
-  weights: EvalWeights
+  weights: EvalWeights,
+  quiescenceSteps: number
 ): number {
   const applied = applyAction(db, state, action)
-  const quiet = resolveWindows(db, applied)
+  const quiet = resolveWindows(db, applied, quiescenceSteps)
   const score = evaluate(db, quiet, perspective, weights)
   return action.type === 'endTurn' ? score - END_TURN_TEMPO_PENALTY : score
 }
@@ -260,11 +276,17 @@ function policyAction(
  * tie-break among equally-scored actions, on the agent's own mulberry32 stream
  * (never `state.rng`) — so the same seed replayed against the same sequence of
  * questions always answers identically, exactly like `createRandomAgent`.
+ *
+ * `options` exists so the two tuning decisions behind the defaults stay
+ * *measurable* rather than folded away: the weight set and the quiescence
+ * depth are both parameters, which is what lets
+ * tests/ai/heuristic.test.ts pit the shipped configuration against the
+ * alternatives it was chosen over as ordinary regression tests. Real callers
+ * pass nothing.
  */
-export function createHeuristicAgent(
-  seed: number,
-  weights: EvalWeights = DEFAULT_WEIGHTS
-): Agent {
+export function createHeuristicAgent(seed: number, options: HeuristicOptions = {}): Agent {
+  const weights = options.weights ?? DEFAULT_WEIGHTS
+  const quiescenceSteps = options.quiescenceSteps ?? QUIESCENCE_STEP_LIMIT
   let rng: RngState = createRng(seed)
   return {
     chooseAction(db: CardDb, state: GameState, actions: Action[]): Action {
@@ -280,7 +302,7 @@ export function createHeuristicAgent(
       let bestScore = -Infinity
       let tied: Action[] = []
       for (const action of actions) {
-        const score = scoreAction(db, state, action, perspective, weights)
+        const score = scoreAction(db, state, action, perspective, weights, quiescenceSteps)
         if (score > bestScore) {
           bestScore = score
           tied = [action]
