@@ -361,7 +361,11 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
 
   if (state === null || setupOpen) {
     return (
-      <section className="play-setup" aria-label="New game" data-testid="play-setup">
+      <section
+        className="play-setup panel clip-corners corner-brackets"
+        aria-label="New game"
+        data-testid="play-setup"
+      >
         <h2>New game</h2>
         <label className="play-setup__field">
           Your deck
@@ -401,11 +405,16 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             onChange={(event) => setSeedText(event.target.value)}
           />
         </label>
-        <button type="button" data-testid="start-game" onClick={startGame}>
+        <button type="button" className="btn--primary" data-testid="start-game" onClick={startGame}>
           Start game
         </button>
         {state !== null && (
-          <button type="button" data-testid="cancel-setup" onClick={() => setSetupOpen(false)}>
+          <button
+            type="button"
+            className="btn--ghost"
+            data-testid="cancel-setup"
+            onClick={() => setSetupOpen(false)}
+          >
             Back to game
           </button>
         )}
@@ -413,9 +422,10 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
         {records.length === 0 && <p data-testid="no-saves">No saved games.</p>}
         <ul className="play-setup__saves">
           {records.map((entry) => (
-            <li key={entry.name}>
+            <li key={entry.name} className="play-setup__save-row">
               <button
                 type="button"
+                className="btn--ghost"
                 data-testid="resume-game"
                 data-name={entry.name}
                 onClick={() => {
@@ -430,11 +440,16 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
           ))}
         </ul>
         {game.loadError !== null && (
-          <div className="play-setup__load-error" role="alert" data-testid="resume-error">
+          <div
+            className="play-setup__load-error panel"
+            role="alert"
+            data-testid="resume-error"
+          >
             <p>{game.loadError}</p>
             {resumeAttempt !== null && (
               <button
                 type="button"
+                className="btn--danger"
                 data-testid="delete-broken-save"
                 data-name={resumeAttempt}
                 onClick={() => {
@@ -474,86 +489,28 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
       data-turn={state.turnNumber}
       data-phase={state.phase}
     >
-      <div className="playmat__bar" data-testid="control-bar">
-        <span className="playmat__chip" data-testid="turn-indicator">
-          Turn {state.turnNumber}
-        </span>
-        <span className="playmat__chip" data-testid="phase-indicator">
-          {PHASE_LABELS[state.phase] ?? state.phase}
-        </span>
-        <span className="playmat__chip" data-testid="active-indicator">
-          {yourTurn ? 'Your turn' : "Rival's turn"}
-        </span>
-        {game.aiThinking && (
-          <span className="playmat__chip playmat__chip--thinking" data-testid="ai-thinking">
-            Rival is thinking…
-          </span>
-        )}
-        <span className="playmat__chip playmat__chip--seed" data-testid="seed-chip">
-          seed {record?.config.seed}
-        </span>
-        <div className="playmat__actions">
-          <button
-            type="button"
-            data-testid="call-legend"
-            disabled={callLegend === undefined}
-            onClick={() => callLegend !== undefined && game.act(callLegend)}
-          >
-            Call Legend
-          </button>
-          <button
-            type="button"
-            data-testid="end-turn"
-            disabled={endTurn === undefined}
-            title={
-              endTurn === undefined
-                ? 'You cannot end your turn right now (a Unit may be forced to attack).'
-                : undefined
-            }
-            onClick={() => endTurn !== undefined && game.act(endTurn)}
-          >
-            End Turn
-          </button>
-          <button
-            type="button"
-            data-testid="undo"
-            disabled={!game.canUndo}
-            onClick={() => game.undo()}
-          >
-            Undo
-          </button>
-          <input
-            data-testid="save-name"
-            placeholder="save name"
-            value={saveName}
-            onChange={(event) => setSaveName(event.target.value)}
-          />
-          <button type="button" data-testid="save-game" onClick={doSave}>
-            Save
-          </button>
-          <button type="button" data-testid="new-game" onClick={() => setSetupOpen(true)}>
-            New game
-          </button>
-        </div>
-        {savedNote !== null && (
-          <span className="playmat__chip" data-testid="saved-note">
-            {savedNote}
-          </span>
-        )}
-      </div>
-
       <div className="playmat__body">
         <div className="playmat__board">
-          <div className="playmat__side playmat__side--rival" data-testid="rival-side">
-            <HandStrip
-              db={db}
-              state={state}
-              player={AI}
-              hidden
-              affordances={affordances}
-              handlers={handlers}
-              useOfficialImages={useOfficialImages}
-            />
+          <div className="rival-strip" data-testid="rival-side">
+            {/* Turn/phase/whose-turn already read prominently off `StreetStrip`'s
+                vs-block below; these stay tiny and muted so nothing is said
+                twice loudly — their testids are the point, not their looks. */}
+            <div className="playmat__meta">
+              <span className="chip" data-testid="turn-indicator">
+                Turn {state.turnNumber}
+              </span>
+              <span className="chip" data-testid="phase-indicator">
+                {PHASE_LABELS[state.phase] ?? state.phase}
+              </span>
+              <span className="chip" data-testid="active-indicator">
+                {yourTurn ? 'Your turn' : "Rival's turn"}
+              </span>
+              {game.aiThinking && (
+                <span className="chip chip--thinking" data-testid="ai-thinking">
+                  Rival is thinking…
+                </span>
+              )}
+            </div>
             <ZonePanels
               db={db}
               state={state}
@@ -566,6 +523,15 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               db={db}
               state={state}
               player={AI}
+              affordances={affordances}
+              handlers={handlers}
+              useOfficialImages={useOfficialImages}
+            />
+            <HandStrip
+              db={db}
+              state={state}
+              player={AI}
+              hidden
               affordances={affordances}
               handlers={handlers}
               useOfficialImages={useOfficialImages}
@@ -582,7 +548,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             rivalGigAreaTargetable={affordances.gigAreaTarget}
           />
 
-          <div className="playmat__side playmat__side--human" data-testid="human-side">
+          <div className="player-zone" data-testid="human-side">
             <Field
               db={db}
               state={state}
@@ -599,19 +565,85 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               handlers={handlers}
               useOfficialImages={useOfficialImages}
             />
-            <HandStrip
-              db={db}
-              state={state}
-              player={HUMAN}
-              hidden={false}
-              affordances={affordances}
-              handlers={handlers}
-              useOfficialImages={useOfficialImages}
-            />
           </div>
+
+          <HandStrip
+            db={db}
+            state={state}
+            player={HUMAN}
+            hidden={false}
+            affordances={affordances}
+            handlers={handlers}
+            useOfficialImages={useOfficialImages}
+          />
         </div>
 
-        <LogPanel lines={game.eventsForLog} />
+        <div className="playmat__rail" data-testid="control-bar">
+          <LogPanel
+            lines={game.eventsForLog}
+            headerExtra={
+              <span className="chip chip--seed" data-testid="seed-chip">
+                seed {record?.config.seed}
+              </span>
+            }
+          />
+          <div className="action-rail">
+            <button
+              type="button"
+              className="btn--ghost"
+              data-testid="call-legend"
+              disabled={callLegend === undefined}
+              onClick={() => callLegend !== undefined && game.act(callLegend)}
+            >
+              Call Legend
+            </button>
+            <button
+              type="button"
+              className="btn--primary"
+              data-testid="end-turn"
+              disabled={endTurn === undefined}
+              title={
+                endTurn === undefined
+                  ? 'You cannot end your turn right now (a Unit may be forced to attack).'
+                  : undefined
+              }
+              onClick={() => endTurn !== undefined && game.act(endTurn)}
+            >
+              End Turn
+            </button>
+            <button
+              type="button"
+              className="btn--ghost"
+              data-testid="undo"
+              disabled={!game.canUndo}
+              onClick={() => game.undo()}
+            >
+              Undo
+            </button>
+            <input
+              data-testid="save-name"
+              placeholder="save name"
+              value={saveName}
+              onChange={(event) => setSaveName(event.target.value)}
+            />
+            <button type="button" className="btn--ghost" data-testid="save-game" onClick={doSave}>
+              Save
+            </button>
+            <button
+              type="button"
+              className="btn--ghost"
+              data-testid="new-game"
+              onClick={() => setSetupOpen(true)}
+            >
+              New game
+            </button>
+            {savedNote !== null && (
+              <span className="chip" data-testid="saved-note">
+                {savedNote}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="playmat__prompts">

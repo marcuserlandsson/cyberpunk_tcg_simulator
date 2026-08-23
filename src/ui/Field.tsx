@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
-import { CardFrame } from './CardFrame'
+import { CardFrame, type CardFrameOwner } from './CardFrame'
 import { effectivePower } from '../engine/query'
+import { AI } from './useGame'
 import type { BoardAffordances, BoardHandlers } from './playAffordances'
 import type { CardDb, GameState, PlayerId } from '../engine/types'
 
@@ -64,6 +65,10 @@ export function BoardCard(props: {
   // engine currently computes, which is the number that actually matters.
   const power = faceDown || def.power === null ? null : effectivePower(db, state, uid)
   const delta = power === null || def.power === null ? 0 : power - def.power
+  // Red-keys the rival's own cards (frame, ready ring, face-down back) so a
+  // glance at the field tells whose card is whose — the same `owner` prop
+  // ZonePanels already threads through for eddies/deck/trash piles.
+  const owner: CardFrameOwner = instance.owner === AI ? 'rival' : 'you'
 
   return (
     <div
@@ -111,6 +116,7 @@ export function BoardCard(props: {
           ready={instance.ready}
           lag={instance.lag}
           tempPower={delta}
+          owner={owner}
           useOfficialImages={useOfficialImages}
         />
       </div>

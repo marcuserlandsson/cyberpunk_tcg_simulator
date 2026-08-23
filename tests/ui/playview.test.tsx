@@ -109,3 +109,15 @@ describe('PlayView resume error handling', () => {
     expect(container.querySelector('[data-testid="playmat"]')).not.toBeNull()
   })
 })
+
+describe('PlayView feed', () => {
+  it('feed lines are actor-classed', () => {
+    saveGameRecord('good-slot', GOOD_RECORD)
+    render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+
+    fireEvent.click(screen.getByTestId('resume-game'))
+
+    const lines = screen.getAllByTestId('log-line')
+    expect(lines.some((l) => l.className.includes('log-line--sys'))).toBe(true)
+  })
+})

@@ -52,12 +52,44 @@
 /* choice — and each is applied only from an entry in `legalActions`.      */
 /* ---------------------------------------------------------------------- */
 
+/* Corner brackets: two opposing L-marks on a panel's corners (chrome.css's
+   `.clip-corners` handles the clipped edges; this is the separate decorative
+   accent from the same design language). Two pseudo-elements can only mark
+   two corners — top-left and bottom-right read as "bracketed" without a third
+   DOM node per corner. */
+.corner-brackets {
+  position: relative;
+}
+
+.corner-brackets::before,
+.corner-brackets::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.corner-brackets::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--you);
+  border-left: 2px solid var(--you);
+}
+
+.corner-brackets::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--you);
+  border-right: 2px solid var(--you);
+}
+
 .play-setup {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.6em;
-  padding: 1em;
+  padding: 1.2em;
 }
 
 .play-setup__field {
@@ -67,102 +99,299 @@
   font-size: 0.9em;
 }
 
-.play-setup__field select,
-.play-setup__field input,
-.playmat__actions input {
-  background: var(--panel-bg);
-  color: var(--neon-cyan);
-  border: 1px solid var(--neon-cyan);
-  font-family: var(--font-display);
-  padding: 0.3em 0.5em;
-}
-
 .play-setup__saves {
   list-style: none;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4em;
-}
-
-.playmat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5em;
-  padding: 0.5em;
-}
-
-.playmat__bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5em;
-  border: 1px solid var(--neon-cyan);
-  border-radius: 4px;
-  padding: 0.4em 0.6em;
-  background: var(--panel-bg);
-}
-
-.playmat__chip {
-  font-size: 0.8em;
-  border: 1px solid rgba(0, 240, 255, 0.4);
-  border-radius: 999px;
-  padding: 0.15em 0.7em;
-  white-space: nowrap;
-}
-
-.playmat__chip--thinking {
-  color: var(--neon-magenta);
-  border-color: var(--neon-magenta);
-}
-
-.playmat__chip--seed {
-  opacity: 0.6;
-}
-
-.playmat__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4em;
-  margin-left: auto;
-}
-
-.playmat__actions button {
-  padding: 0.3em 0.7em;
-  font-size: 0.85em;
-}
-
-.playmat__actions button:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  border-color: rgba(0, 240, 255, 0.3);
-}
-
-.playmat__body {
-  display: flex;
-  gap: 0.6em;
-  align-items: stretch;
-}
-
-.playmat__board {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4em;
-  min-width: 0;
-}
-
-.playmat__side {
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 0.3em;
-  border: 1px solid rgba(0, 240, 255, 0.25);
-  border-radius: 4px;
-  padding: 0.35em;
+  width: 100%;
+  max-width: 22em;
 }
 
-.playmat__side--rival {
-  border-color: rgba(255, 42, 109, 0.35);
+.play-setup__save-row button {
+  width: 100%;
+  text-align: left;
+}
+
+.play-setup__load-error {
+  border-color: var(--rival);
+  padding: 0.6em 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+}
+
+.play-setup__load-error p {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Playmat — main grid: board column + fixed right rail                   */
+/* (docs/superpowers/specs/2026-08-23-visual-overhaul-design.md, "Play     */
+/* view"). The header above (App.tsx) measures ~74px tall at 1366×768 in a  */
+/* real browser (Playwright, `header.boundingBox()`) — the design spec's    */
+/* assumed 52px did not match. `.playmat`'s calc reserves 78px (a few px of */
+/* slack over the measurement) and clips to it, so nothing here ever grows  */
+/* the page past the viewport — not even the prompt bars, which is why they */
+/* overlay the board (`.playmat__prompts`, below) rather than sit in flow:  */
+/* the design spec calls them "pinned above the hand", and a bar that only */
+/* appears while a decision is pending must not shove the whole page around */
+/* every time one opens and closes.                                         */
+/* ---------------------------------------------------------------------- */
+
+.playmat {
+  position: relative;
+  height: calc(100vh - 78px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.playmat__body {
+  display: grid;
+  grid-template-columns: 1fr 290px;
+  height: 100%;
+  min-height: 0;
+}
+
+.playmat__board {
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 12px;
+  position: relative;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.016) 0 1px, transparent 1px 4px),
+    radial-gradient(ellipse 90% 60% at 50% 108%, rgba(0, 229, 255, 0.07), transparent 60%),
+    radial-gradient(ellipse 90% 55% at 50% -8%, rgba(255, 61, 90, 0.06), transparent 60%),
+    var(--void);
+}
+
+.rival-strip,
+.player-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Only the player's zone (the `1fr` track) opts out of the grid's default
+   content-based minimum — it is the one row meant to flex, absorbing
+   whatever the fixed-height board has left over once the `auto` rows above
+   and below it (rival strip, street, hand) claim their own content-sized
+   share. Giving `.rival-strip` the same `min-height: 0` was tried and
+   reverted (verified in a real browser): it let the *rival* strip's own
+   "auto" track get squeezed arbitrarily small too, at which point nothing
+   about the split was predictable — the player's own field could still end
+   up starved even though it's the side that matters most on screen. */
+.player-zone {
+  min-height: 0;
+  /* Safety net: even after the compact-card sizing below, a long game can
+     still grow the human's own Field/ZonePanels content past this row's
+     allotted share (many units, several legends). Rather than let that
+     overflow spill downward and visually sit on top of — and steal clicks
+     from — the Hand row that follows in the grid (verified in a real
+     browser: this is exactly what broke `attacker-card` clicks before this
+     rule existed), it clips inside its own box. The player's own content is
+     still capped/tuned below to make this rare, not the primary defense. */
+  overflow: hidden;
+}
+
+/* The rival strip is sized to its content (a normal "auto" track) up to this
+   cap — comfortable for the common case (a handful of field units, legends
+   still face-down) — but a heavier board (a called Legend goes back to full
+   card size; several units) is capped and clips internally rather than
+   shrinking the player's own zone or pushing the hand row off-board. Neither
+   outcome is perfect, but between "rival's own strip loses its least
+   important content" and "the player's own field disappears", this is the
+   one that keeps the side that matters more on screen (verified in a real
+   browser across an extended, AI-driven game). */
+.rival-strip {
+  max-height: 210px;
+  overflow: hidden;
+}
+
+.rival-strip .zone__label {
+  color: var(--rival);
+}
+
+/* The rival's hidden hand renders as a compact fan of backs: same overlap
+   technique the eddies row uses (a fixed overlap here, rather than eddies'
+   count-gated one, since hand size swings less and this row never needs to
+   hold as many cards as a spent-eddie pile eventually can). Shrunk to the
+   same 46px width the deck/trash piles already use (cards.css's `.pile`) —
+   a face-down back has no internal proportional content to break, so this is
+   a plain resize (height follows from `.card-frame__back`'s aspect-ratio),
+   and it is what actually keeps the rival strip within its ~40%-of-board
+   share: at full card size, four stacked rival rows (meta/zones/field/hand)
+   outweigh the fixed board height on their own and starve the player's own
+   zone down to nothing (verified in a real browser before this rule). */
+.rival-strip .zone--hand-hidden .zone__cards {
+  flex-wrap: nowrap;
+}
+
+.rival-strip .zone--hand-hidden .card-frame {
+  width: 46px;
+}
+
+.rival-strip .zone--hand-hidden .board-card--hand-back:not(:last-child) {
+  margin-right: -27px;
+}
+
+/* Legends read as a small badge rather than a full card on the table itself
+   (both sides — matching the mockup's tiny legend backs), which is also load-
+   bearing for the height budget: an uncalled Legend is face-down with the
+   same simple, size-agnostic markup as an eddie or a deck back, so shrinking
+   it costs nothing structurally. A *called* (face-up) Legend keeps the full
+   card face — its cost badge/name/text are laid out at fixed pixel sizes for
+   the small/medium frame, so it is left at normal size rather than risking
+   that content overflowing a badge-sized box. */
+.zone--legends .card-frame--face-down {
+  width: 46px;
+}
+
+/* `.zone.zone--legends` (rather than the bare `.zone--legends` the base rule
+   below uses) beats it on specificity regardless of source order — the base
+   96px reservation stays intact for anything that isn't this override. */
+.zone.zone--legends {
+  min-height: 70px;
+}
+
+/* Eddies row, both sides (superseding Task 4's 92px-card overlap math for
+   the human specifically — this was originally scoped to `.rival-strip`
+   alone, deliberately leaving the human's own eddies at full size; a real
+   browser playthrough of the whole board (this task's own height-budget
+   verification) showed that at full size the human's own eddies push the
+   Field+ZonePanels bundle well past its share of the fixed 1366×768 budget,
+   the same problem the rival-only shrink was written to solve. Same 46px
+   resize, with the dense-overlap margins recomputed at the new width
+   (half-width overlap, and the same proportionally-scaled tapped-card
+   sliver) — now scoped to the whole board rather than just the rival strip. */
+.playmat__board .zone--eddies .card-frame {
+  width: 46px;
+}
+
+.playmat__board .zone--eddies {
+  min-height: 70px;
+}
+
+.playmat__board .zone--eddies--dense .eddie-card {
+  margin-right: -23px;
+}
+
+.playmat__board .zone--eddies--dense .eddie-card[data-ready='false'],
+.playmat__board .zone--eddies--dense .eddie-card:has(+ .eddie-card[data-ready='false']) {
+  margin-right: -4px;
+}
+
+/* Field + Hand cards (both sides — this is the one place *face-up* cards get
+   a board-specific compact treatment, unlike the face-down eddies/legends/
+   pile shrinks above, which only resize because a card back has no fixed-px
+   content to break). In the default (non-image) rendition, a compact card's
+   height is dominated by fixed-pixel rows — the 38px art placeholder, the
+   30px cost badge, the 28px power box, `.card-frame`'s own gap/padding —
+   none of which shrink from a narrower `width` the way an aspect-ratio'd
+   card back does. With four such rows stacked in the board column (rival
+   field, rival hand-fan, player field, player hand) at the base sizing, the
+   total comfortably exceeds a 1366×768 viewport's available height even with
+   a handful of cards a side (verified in a real browser mid-game, where it
+   overflowed enough to sit `attacker-card` clicks underneath the Hand row
+   instead of the Field card meant to receive them). Trimming the fixed rows
+   directly — while leaving typography/readability alone — is what actually
+   buys the vertical room the calc() budget below assumes; official-image
+   mode isn't touched (its `.card-frame__image-wrap` already scales off
+   `width` via `aspect-ratio`, so it never had this problem). */
+.playmat__board .zone--field .card-frame,
+.playmat__board .zone--hand .card-frame {
+  gap: 2px;
+  padding: 4px;
+}
+
+.playmat__board .zone--field .card-frame__art,
+.playmat__board .zone--hand .card-frame__art {
+  height: 20px;
+  margin: 2px 0;
+}
+
+.playmat__board .zone--field .card-frame__cost-badge,
+.playmat__board .zone--hand .card-frame__cost-badge {
+  width: 22px;
+  height: 24px;
+}
+
+.playmat__board .zone--field .card-frame__power,
+.playmat__board .zone--hand .card-frame__power {
+  min-width: 24px;
+  height: 22px;
+  font-size: 14px;
+}
+
+.playmat__board .zone--field .zone__cards,
+.playmat__board .zone--hand .zone__cards {
+  min-height: 0;
+}
+
+.playmat__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip--thinking {
+  color: var(--rival);
+  border-color: var(--rival);
+}
+
+.chip--seed {
+  opacity: 0.7;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Right rail: the feed (LogPanel) over the action rail                    */
+/* ---------------------------------------------------------------------- */
+
+.playmat__rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.playmat__rail .log-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.action-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.action-rail input {
+  width: 100%;
+}
+
+/* Pins the prompt bars (choice/reaction/intercept/etc.) over the board column
+   instead of in normal flow — "pinned above the hand" per the design spec.
+   Only positioning lives here: prompts.css (Task 7's file) still owns the
+   bars' own look, and these properties don't collide with anything it sets.
+   Overlaying rather than stacking in flow keeps a bar that only exists while
+   a decision is pending from growing the page past the viewport every time
+   one opens. */
+.playmat__prompts {
+  position: absolute;
+  left: 12px;
+  right: calc(290px + 12px);
+  bottom: 10px;
+  z-index: 5;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -270,10 +499,11 @@
 }
 
 .zone__label {
-  font-size: 0.7em;
-  letter-spacing: 0.1em;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  opacity: 0.65;
+  color: var(--muted);
 }
 
 .zone__cards,
@@ -467,34 +697,40 @@
 /* --- log panel --------------------------------------------------------- */
 
 .log-panel {
-  flex: 0 0 20em;
-  max-width: 20em;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  border-radius: 4px;
-  background: var(--panel-bg);
-  padding: 0.4em;
+  min-height: 0;
 }
 
 .log-panel__title {
-  margin: 0 0 0.3em;
-  font-size: 0.8em;
-  letter-spacing: 0.15em;
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6em;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  opacity: 0.7;
+  color: var(--you);
 }
 
 .log-panel__lines {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 8px 12px;
   overflow-y: auto;
-  max-height: 32em;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.15em;
-  font-size: 0.75em;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .log-panel__line {
@@ -504,5 +740,21 @@
 
 .log-panel__turn {
   flex: 0 0 2.2em;
-  opacity: 0.45;
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+/* Actor coloring — the feed's presentation-only heuristic (LogPanel.tsx's
+   `actorClass`), never fed back into game logic. Only the message text is
+   tinted; the turn stamp stays muted at its own fixed opacity above. */
+.log-line--you .log-panel__text {
+  color: var(--you);
+}
+
+.log-line--rival .log-panel__text {
+  color: var(--rival);
+}
+
+.log-line--sys .log-panel__text {
+  color: var(--act);
 }
