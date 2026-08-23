@@ -479,6 +479,20 @@ export interface CardInstance {
   // per-instance instead of hardcoded to two uids. Optional so every existing
   // `CardInstance` literal (tests included) stays valid without a field.
   skipNextReady?: boolean
+  // Set on ANY field entry (a Unit play, or a {Go Solo} Legend play —
+  // docs/rulings.md §106 fix round 2) and cleared at the same turn boundary
+  // Lag clears (the owner's own next turn start) or on any field exit,
+  // whichever comes first. `lag` alone cannot answer "was this card played
+  // THIS turn" for a {Go Solo} Legend, which deliberately enters with
+  // `lag: false` ("it can attack this turn", §31) — so a card that only
+  // checks `!card.lag` to decide whether a fresh-attack denial
+  // (`maxtac-suppression-team`'s "Rival Units can't attack the turn they're
+  // played") applies wrongly lets a freshly-Go-Solo'd Legend through. This
+  // flag is the single source of truth for "entered the field this turn,"
+  // independent of whether Lag itself was ever applied. Optional for the
+  // same reason `skipNextReady` is — instance state, never part of the
+  // card-data zod schema.
+  playedThisTurn?: boolean
 }
 
 // ---------------------------------------------------------------------------

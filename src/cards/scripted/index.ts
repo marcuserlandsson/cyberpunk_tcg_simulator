@@ -172,6 +172,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const card = state.cards[target]
     card.ready = true
     card.lag = true
+    card.playedThisTurn = true // docs/rulings.md §106 fix round 2
     p.field.push(target)
     state.events.push({ type: 'cardPlayed', player: ctx.player, uid: target })
     fireTriggerOnDraft(db, state, 'onPlay', target, [])
@@ -503,6 +504,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       const card = state.cards[chosen]
       card.ready = true
       card.lag = true
+      card.playedThisTurn = true // docs/rulings.md §106 fix round 2
       p.field.push(chosen)
       state.events.push({ type: 'cardPlayed', player: ctx.player, uid: chosen })
       fireTriggerOnDraft(db, state, 'onPlay', chosen, [])

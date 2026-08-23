@@ -2994,23 +2994,108 @@ check `combat.ts`'s `canAttack`/`attackTargets` consult:
 3. **{go-solo} Legends entering the field with `lag: false`** from the start
    (`effects.ts`'s `playCardOnDraft`, the Legend case) — "it can attack this
    turn" is the printed rule (§31), and this Unit never has Lag to except in
-   the first place, so it skips `canAttack`'s Lag branch entirely (`if
+   the first place, so it skipped `canAttack`'s Lag branch entirely (`if
    (!card.lag) return true`) without ever reaching the {adrenaline}/denial
-   check. **This is NOT a new gap** — §82 already found and explicitly
-   accepted it ("A {go-solo} Legend enters the field with `lag: false` from
-   the start ... so `maxtac-suppression-team` does not, and cannot without
-   tracking a separate 'entered the field this turn' flag on every card
-   instance, stop a rival's freshly-played Go Solo Legend from attacking ...
-   the safe direction under §79/§80's policy"). Re-confirmed here rather than
-   silently re-fixed: closing it would need a new per-instance "entered the
-   field this turn" flag distinct from Lag (Go Solo's whole point is
-   *skipping* Lag, so Lag itself cannot double as that flag), which is a
-   genuine new engine feature, not a one-line mirror of `canAttack`'s
-   existing branch the way today's fix was. No card in the pool through
-   batch 5 needs it enough to justify building it now, so the gap stays
-   open, under-delivering (safe direction) exactly as §82 already ruled.
+   check. Originally left open here, citing §82's acceptance of exactly this
+   gap — **overturned in fix round 2 below**, on controller instruction: the
+   gap is not acceptable, because `maxtac-suppression-team`'s own printed
+   text is precisely the card that justifies closing it, and {go-solo}
+   Legends are common, high-power "attack the turn played" threats
+   (`adam-smasher-metal-over-meat`, `goro-takemura-hands-unclean`,
+   `royce-*`, `v-streetkid`, `rogue-*`, `jackie-welles-mama-s-favorite`
+   once its deferred clause lands) — not an edge case §79/§80's
+   "under-delivering is safe" policy should shelter.
 
 No other fresh-attack permission path exists in the codebase as of batch 5 —
 `ATTACK_READY`/`attackableReadyKeyword` (§43/§58) widen the *target list* for
 an already-attack-eligible Unit and are orthogonal to the Lag question
 entirely, so they were not in scope for this audit.
+
+## Fix round 2 (controller-directed) — {go-solo} must respect the fresh-attack denial too
+
+The batch-5 §106 audit above found the {go-solo} gap and, following §82's
+prior acceptance, left it open. **Overturned:** the controller ruled this
+unacceptable — `maxtac-suppression-team` ("Rival Units can't attack the turn
+they're played") denies ANY Unit played this turn, and a Legend played via
+{go-solo} is, from that moment, a Unit on the field that was played this
+turn; nothing in the printed text carves out Units that skip Lag to get
+there. §82's "no card justifies building this" reasoning does not survive
+contact with `maxtac-suppression-team` itself being exactly that card, and
+{go-solo} Legends are a mainstream "fresh attacker" shape across the pool
+(§105's list), not a rare interaction.
+
+**Ruling:** `CardInstance` gains `playedThisTurn?: boolean` — the "entered
+the field this turn" flag §82/§106 already identified as the missing
+primitive, kept deliberately separate from `lag` because {go-solo}'s whole
+point is skipping Lag ("it can attack this turn," §31), so Lag cannot double
+as this signal. It is:
+
+- **set** on every field entry that represents a card being played: the two
+  branches of `effects.ts`'s `playCardOnDraft` (a Unit; a {go-solo} Legend)
+  and the two scripts that place a card directly onto the field
+  (`yorinobu-arasaka-steel-dragon`, `the-relic-experimental-biochip`) —
+  matching exactly the four `p.field.push(...)` call sites in the codebase;
+- **cleared** at precisely the same turn boundary Lag clears
+  (`game.ts`'s `resetTurnState`, for the owner's own next turn), and on any
+  field exit (`combat.ts`'s `leaveField`, alongside the other per-tenure
+  resets) so a card that leaves and is later replayed gets a fresh flag;
+- **never part of the card-data zod schema** — it is instance/runtime state
+  (like `lag`, `ready`, `skipNextReady`), not something `data/cards.json`
+  ever carries, so `cardDb.ts`'s schemas are untouched.
+
+`combat.ts`'s `canAttack` is restructured so the fresh-attack denial is
+consulted on BOTH paths that let an attack through despite normally-required
+Lag, rather than special-casing "no Lag" as an unconditional pass:
+
+```ts
+if (card.lag) {
+  if (!hasKeyword(db, state, uid, ADRENALINE)) return false
+  return !rivalDeniesFreshAttacks(db, state, uid)
+}
+if (card.playedThisTurn === true) {
+  return !rivalDeniesFreshAttacks(db, state, uid)
+}
+return true
+```
+
+A Unit with Lag and no exception is still blocked before either denial
+check runs (unchanged); a Unit with no Lag that also was NOT played this
+turn (the ordinary "already on the field, fully readied" case) hits the
+final `return true` and is completely unaffected — the denial only ever
+reaches a genuinely fresh attacker. `nadia-fighting-through-grief`'s own
+`canAttackGigAreaDespiteLag` (§100/§106) is unchanged by this round: her
+card is never {go-solo}, so `lag` and `playedThisTurn` are always in
+lockstep for her, and the round-1 fix already covers her case correctly.
+
+**TDD evidence:** extended `tests/cards/green.test.ts`'s
+`goro-takemura-hands-unclean` block (already a {go-solo} card in this
+batch) with a new case — flip the Legend face-up, field an opposing
+`maxtac-suppression-team`, Go Solo it: asserts `playedThisTurn` is `true`
+and NO `attack` action is offered this turn, then runs a full turn cycle
+(`endBothTurnsOnce`) and asserts `playedThisTurn` is back to `false` and an
+`attack` action IS now offered. The existing "vanilla Go Solo" test was
+extended (not replaced) to also assert an `attack` action is offered the
+turn it's played when no denial is in play, so both sides of §82's original
+`without maxtac it attacks the turn played` intent stay covered. Verified
+failing-first: reverse-applied this round's patch (`git apply -R`) and
+re-ran just the new case — failed with `expected undefined to be true` on
+the `playedThisTurn` assertion (the field did not exist yet), confirming
+the test actually exercises the new code; re-applied and re-ran green.
+
+**CardInstance exact-equality audit (controller-requested).** Grepped every
+test file for a `toEqual`/`toStrictEqual` assertion against a *whole*
+`CardInstance` object (as opposed to one of its properties, e.g.
+`.attachedGear`/`.tempKeywords`/`.ready`, which are pervasive and
+unaffected by adding an optional field). Found none — every
+`CardInstance`-shaped object literal in the test suite (`tests/engine/
+combat.test.ts`'s `putUnit`/`attachGear`, `tests/cards/fixtures.ts`'s
+`instance`, etc.) is a *construction* fed into `state.cards[uid]`, never the
+*expected* side of an equality assertion, so an optional field neither of
+them sets is simply absent from both sides and `toEqual` never sees a
+mismatch. No test needed updating; the full pre-existing suite (465 tests
+going into this round, after §106's round-1 fix) stayed green throughout,
+with zero snapshot changes.
+
+**Verification:** `npx tsc --noEmit` clean, `npm test` 466/466 (the
+existing suite plus the round-1 and round-2 additions), `npm run build`
+clean, purity grep (`Math.random`/`Date.now`) clean on every touched file.

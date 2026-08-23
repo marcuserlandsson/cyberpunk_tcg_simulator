@@ -97,14 +97,29 @@ export function stealCount(power: number): number {
  * they're played", maxtac-suppression-team) denies the {adrenaline} exception
  * outright — Lag still gates the attack even with the keyword (docs/rulings.md
  * §81 ff.).
+ *
+ * **Fix round 2 (docs/rulings.md §106):** Lag alone cannot tell "no Lag
+ * because this Unit readied normally" apart from "no Lag because this is a
+ * {Go Solo} Legend that entered the field THIS turn" (§31 — Go Solo
+ * deliberately skips Lag entirely, "it can attack this turn"). The denial
+ * must catch the second case too, or a rival's `maxtac-suppression-team`
+ * would silently do nothing against a freshly-Go-Solo'd Legend. `card.
+ * playedThisTurn` (set on every field entry, cleared at the same boundary
+ * Lag clears) is the single source of truth for "entered the field this
+ * turn," independent of whether Lag itself was ever applied.
  */
 function canAttack(db: CardDb, state: GameState, uid: number): boolean {
   const card = state.cards[uid]
   if (!card.ready) return false
   if (cantAttack(db, state, uid)) return false
-  if (!card.lag) return true
-  if (!hasKeyword(db, state, uid, ADRENALINE)) return false
-  return !rivalDeniesFreshAttacks(db, state, uid)
+  if (card.lag) {
+    if (!hasKeyword(db, state, uid, ADRENALINE)) return false
+    return !rivalDeniesFreshAttacks(db, state, uid)
+  }
+  if (card.playedThisTurn === true) {
+    return !rivalDeniesFreshAttacks(db, state, uid)
+  }
+  return true
 }
 
 /**
@@ -346,6 +361,9 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
   card.tempPower = 0
   card.permPower = 0
   card.tempKeywords = []
+  // docs/rulings.md §106 fix round 2: a card replayed later is a fresh
+  // field entry, so its "played this turn" flag must not survive the exit.
+  card.playedThisTurn = false
 
   if (db[card.defId].type === 'legend') {
     owner.removed.push(uid)

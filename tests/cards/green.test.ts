@@ -174,18 +174,24 @@ describe('fool-on-the-hill', () => {
 // ---------------------------------------------------------------------------
 
 describe('goro-takemura-hands-unclean', () => {
-  it('is a vanilla Go Solo Blocker Legend', () => {
-    expect(db['goro-takemura-hands-unclean'].effects).toEqual([])
-    // Player 0's own Arasaka starter deck already includes this Legend
-    // face-down (data/decks/arasaka-embracing-power.json) — flip that
-    // existing instance rather than minting a second, disambiguating copy.
-    const { state } = fixtureWithHand(0, [])
+  // Player 0's own Arasaka starter deck already includes this Legend
+  // face-down (data/decks/arasaka-embracing-power.json) — flip that existing
+  // instance rather than minting a second, disambiguating copy.
+  function flipExisting(state: GameState): number {
     const existing = state.players[0].legends.find(
       (uid) => state.cards[uid].defId === 'goro-takemura-hands-unclean'
     )
     if (existing === undefined) throw new Error('fixture deck missing goro-takemura-hands-unclean')
     state.cards[existing].faceUp = true
     state.cards[existing].ready = true
+    return existing
+  }
+
+  it('is a vanilla Go Solo Blocker Legend that can attack the turn it is played', () => {
+    expect(db['goro-takemura-hands-unclean'].effects).toEqual([])
+    const { state } = fixtureWithHand(0, [])
+    flipExisting(state)
+    setGigs(state, 1, [{ size: 6, value: 4 }]) // a legal 'gigArea' target to attack
     const next = playCardByDef(db, state, 0, 'goro-takemura-hands-unclean')
     const uid = findFielded(next, 0, 'goro-takemura-hands-unclean')
     expect(next.cards[uid].ready).toBe(true)
@@ -193,6 +199,31 @@ describe('goro-takemura-hands-unclean', () => {
     expect(effectiveKeywords(db, next, uid)).toEqual(
       expect.arrayContaining(['go-solo', 'blocker', 'corpo'])
     )
+    const attacks = actionsOfType(db, next, 'attack').filter((action) => action.attacker === uid)
+    expect(attacks.length).toBeGreaterThan(0)
+  })
+
+  // Fix round 2 (docs/rulings.md §106): a {Go Solo} Legend enters the field
+  // with `lag: false`, so it has no Lag for {adrenaline}'s denial check to
+  // gate — without `playedThisTurn`, a rival's `maxtac-suppression-team`
+  // ("Rival Units can't attack the turn they're played") would silently do
+  // nothing against it.
+  it("cannot attack the turn it's played (but can the turn after) when the rival has maxtac-suppression-team", () => {
+    const { state } = fixtureWithHand(0, [])
+    flipExisting(state)
+    fieldCard(state, 1, 'maxtac-suppression-team', { ready: true })
+    setGigs(state, 1, [{ size: 6, value: 4 }]) // a legal 'gigArea' target to attack
+
+    let s = playCardByDef(db, state, 0, 'goro-takemura-hands-unclean')
+    const uid = findFielded(s, 0, 'goro-takemura-hands-unclean')
+    expect(s.cards[uid].playedThisTurn).toBe(true)
+    expect(actionsOfType(db, s, 'attack').filter((action) => action.attacker === uid)).toEqual([])
+
+    s = endBothTurnsOnce(db, s)
+    expect(s.cards[uid].playedThisTurn).toBe(false)
+    expect(
+      actionsOfType(db, s, 'attack').filter((action) => action.attacker === uid).length
+    ).toBeGreaterThan(0)
   })
 })
 

@@ -333,6 +333,11 @@ function resetTurnState(draft: GameState, player: PlayerId): void {
     const card = draft.cards[Number(key)]
     if (card.owner !== player) continue
     card.lag = false
+    // `playedThisTurn` (docs/rulings.md §106 fix round 2) clears at exactly
+    // the same turn boundary Lag does — it exists only to answer "entered
+    // the field this turn" for a {Go Solo} Legend, which never has Lag to
+    // clear in the first place.
+    card.playedThisTurn = false
   }
 }
 

@@ -1429,12 +1429,18 @@ export function playCardOnDraft(
     case 'unit':
       card.ready = true
       card.lag = true
+      card.playedThisTurn = true
       p.field.push(cardUid)
       break
     case 'legend':
       card.ready = true
       card.lag = false
       card.faceUp = true
+      // {Go Solo} deliberately skips Lag ("it can attack this turn", §31),
+      // but it still entered the field THIS turn — `playedThisTurn` is what
+      // lets a rival's `rivalCantAttackWhenPlayed` static (maxtac-suppression-
+      // team) still deny it (docs/rulings.md §106 fix round 2).
+      card.playedThisTurn = true
       p.field.push(cardUid)
       break
     case 'gear':
