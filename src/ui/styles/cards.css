@@ -148,8 +148,11 @@
   font-weight: 700;
   font-size: 11px;
   background: #0c0c14;
-  border: 1.5px solid var(--act);
-  color: var(--act);
+  /* Inert (matches .card-frame__ram-limit-badge's treatment), not --act:
+     these pips are always-on printed-keyword decor, not "you can act on
+     this now" — yellow is reserved for the real actionable pulse. */
+  border: 1.5px solid var(--line-bright);
+  color: var(--muted);
   clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
 }
 
