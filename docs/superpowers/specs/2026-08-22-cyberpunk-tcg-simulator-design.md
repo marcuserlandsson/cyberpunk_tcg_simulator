@@ -74,7 +74,7 @@ cyberpunk_tcg_simulator/
 - API: `newGame(deckA, deckB, seed)` · `legalActions(state): Action[]` · `applyAction(state, action): {state, events}`.
 - `legalActions` is the single source of truth for legality; UI affordances and AI choices both derive from it. `applyAction` rejects anything not in that set.
 - Seeded RNG inside the state: shuffles and die rolls fully reproducible.
-- **Event sourcing:** the emitted event log is the game record. Undo = replay from start minus the last human action-group. Save/resume and replay = serialized event history. The AI is stateless between decisions, so undo cannot leak hidden information.
+- **Action sourcing:** the game record is the initial config (decks + seed) plus the ordered action list, not the emitted events — events are derived by replaying that record, never stored as the record itself. Undo = replay from start minus the last human action-group. Save/resume and replay = the serialized config + action list. The AI is stateless between decisions, so undo cannot leak hidden information.
 
 ### Card data & effects
 

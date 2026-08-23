@@ -5565,14 +5565,24 @@ view (`src/ui/SimulateView.tsx`) now disable it there instead of letting a
 game or sim run against a deck the engine was never validated to allow.
 
 **One shared rule, `src/ui/deckPicker.ts`'s `isDeckPickable(db, deck)`,
-drives both pickers** so they can never drift apart: a deck is pickable when
-`deck.demo` is true, or when `validateDeck(db, deck)` reports zero errors.
-Demo decks are the deliberate exception — `deck.demo` exists to relax
-`validateDeck`'s 40-50 card-count check for decks that are intentionally
-undersized (both bundled starter decks are demo decks for exactly this
-reason), and per the brief's own UI spec a demo deck is simply always
-selectable, independent of whatever `validateDeck` still reports for it.
-`deckPickerLabel(db, deck)` appends "⚠ invalid" to a non-pickable deck's
+drives both pickers** so they can never drift apart: a non-demo deck is
+pickable when `validateDeck(db, deck)` reports zero errors.
+
+**Final-review correction: the demo waiver is narrower than first shipped.**
+The original Task 15 pass made *any* `deck.demo` deck pickable outright,
+independent of whatever `validateDeck` reported for it — reasoning that
+`deck.demo` exists to relax the 40-50 card-count check, so exempting demo
+decks from picking entirely felt like the same idea taken one step further.
+It wasn't: a demo deck with a real RAM violation is exactly as unplayable as
+a non-demo deck with one, and letting it through anyway was a silent-failure
+bug waiting to happen the moment a hand-built or imported demo deck carried
+one. The waiver now covers only what it was actually meant to: a demo deck
+is pickable when `validateDeckIgnoringSize(db, deck)` — `src/engine/deck.ts`,
+`validateDeck` with the 40-50 check always skipped, regardless of `demo` —
+reports zero errors. Both bundled starter decks are unaffected (their only
+`validateDeck` complaint is their size), so this is invisible in the common
+case; it only changes anything for a demo-flagged deck that is *also*
+otherwise broken. `deckPickerLabel(db, deck)` appends "⚠ invalid" to a non-pickable deck's
 name; each `<option>` for it is additionally given `disabled`, so a browser
 will not let it be selected at all (the label alone would only be a visual
 hint). Both views also re-check `isDeckPickable` defensively where a deck

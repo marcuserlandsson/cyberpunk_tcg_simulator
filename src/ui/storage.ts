@@ -301,6 +301,20 @@ export function listGameRecords(): { name: string; record: GameRecord }[] {
   return Object.entries(readGameRecords()).map(([name, record]) => ({ name, record }))
 }
 
+/**
+ * Deletes a saved game record by name. A silent no-op when `name` names
+ * nothing — e.g. a slot deleted twice, once from a stale render. Used by the
+ * Play view to let a player clear out a save that no longer replays (a
+ * rules/card-data change made it incompatible), which is otherwise stuck:
+ * loading it always fails, and there is no other way to get rid of it.
+ */
+export function deleteGameRecord(name: string): void {
+  const records = readGameRecords()
+  if (!(name in records)) return
+  delete records[name]
+  writeJson(GAME_RECORDS_KEY, records)
+}
+
 // ---------------------------------------------------------------------------
 // Last simulation result
 //

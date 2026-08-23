@@ -112,3 +112,19 @@ export function validateDeck(db: CardDb, deck: DeckList): string[] {
 
   return errors
 }
+
+/**
+ * `validateDeck`, minus the 40–50 card-count check — always skipped,
+ * regardless of `deck.demo` (which `validateDeck` above already checks on
+ * its own to decide whether to run that check at all). Every other rule
+ * (legends, RAM limits, copy counts, unknown ids, …) still applies in full.
+ *
+ * This is the "is this deck legal to actually play, size aside" question a
+ * demo deck's own picker waiver (src/ui/deckPicker.ts, docs/rulings.md §153)
+ * needs to ask — deliberately factored out here rather than inlined there,
+ * so it stays exactly one call to `validateDeck` and can never drift from
+ * what that function considers a size error vs. anything else.
+ */
+export function validateDeckIgnoringSize(db: CardDb, deck: DeckList): string[] {
+  return validateDeck(db, { ...deck, demo: true })
+}

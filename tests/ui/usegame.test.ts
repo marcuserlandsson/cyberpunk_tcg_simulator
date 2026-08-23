@@ -64,6 +64,7 @@ describe('useGame', () => {
     expect(hook.result.current.legal).toEqual([])
     expect(hook.result.current.canUndo).toBe(false)
     expect(hook.result.current.eventsForLog).toEqual([])
+    expect(hook.result.current.loadError).toBeNull()
   })
 
   it('starts a game against the heuristic AI and reaches a human decision', async () => {
@@ -223,6 +224,51 @@ describe('useGame', () => {
     // ...and it is playable: undo works on a loaded record too, because
     // attribution is recomputed from the record rather than remembered.
     expect(fresh.result.current.canUndo).toBe(true)
+  })
+
+  it('load surfaces an error for a record that no longer replays, instead of throwing', async () => {
+    const hook = mount()
+    // Hand-corrupted: `endTurn` is not legal as the very first action (the
+    // game opens in `chooseOrder`), the same shape a save written before a
+    // rules/card-data change would take once replay reaches the point that
+    // changed.
+    const corrupt = {
+      config: { decks: [arasaka, mercs], seed: SEED },
+      actions: [{ type: 'endTurn' }],
+    }
+
+    await act(async () => {
+      // Must not throw out of the click handler.
+      hook.result.current.load(corrupt as never)
+    })
+
+    expect(hook.result.current.loadError).toBe(
+      "This save predates a rules change and can't be resumed."
+    )
+    // The broken load must not leave a half-built game behind.
+    expect(hook.result.current.state).toBeNull()
+    expect(hook.result.current.record).toBeNull()
+
+    // A subsequent successful load/start clears the error.
+    await startAndWait(hook)
+    expect(hook.result.current.loadError).toBeNull()
+  })
+
+  it('clearLoadError dismisses the error without touching the game', async () => {
+    const hook = mount()
+    const corrupt = {
+      config: { decks: [arasaka, mercs], seed: SEED },
+      actions: [{ type: 'endTurn' }],
+    }
+    await act(async () => {
+      hook.result.current.load(corrupt as never)
+    })
+    expect(hook.result.current.loadError).not.toBeNull()
+
+    await act(async () => {
+      hook.result.current.clearLoadError()
+    })
+    expect(hook.result.current.loadError).toBeNull()
   })
 
   it('resumes a loaded record with the same AI, so play is reproducible', async () => {

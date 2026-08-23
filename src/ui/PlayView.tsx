@@ -27,7 +27,7 @@ import { LogPanel } from './LogPanel'
 import { ReactionBar } from './ReactionBar'
 import { ZonePanels } from './ZonePanels'
 import { AI, HUMAN, useGame } from './useGame'
-import { listDecks, listGameRecords } from './storage'
+import { deleteGameRecord, listDecks, listGameRecords } from './storage'
 import { deckPickerLabel, isDeckPickable } from './deckPicker'
 import {
   abilityUids,
@@ -132,6 +132,10 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
   const [saveName, setSaveName] = useState('')
   const [savedNote, setSavedNote] = useState<string | null>(null)
   const [records, setRecords] = useState<{ name: string; record: GameRecord }[]>([])
+  // The name of the save slot the most recent "resume" click tried to load,
+  // so a failed load (`game.loadError`) knows which slot to offer deleting —
+  // `game.load` only ever sees the record, never its name.
+  const [resumeAttempt, setResumeAttempt] = useState<string | null>(null)
 
   const actionCount = record?.actions.length ?? -1
   // Any change to the record (an action, or an undo) invalidates a half-made
@@ -338,6 +342,9 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     const ai = deckByName(aiDeckName)
     if (human === undefined || ai === undefined) return
     if (!isDeckPickable(db, human) || !isDeckPickable(db, ai)) return
+    // A fresh start is not an attempt to resume any particular slot — clears
+    // a stale delete-this-save button left over from an earlier failed load.
+    setResumeAttempt(null)
     const parsed = Number(seedText)
     game.start(human, ai, seedText.trim() !== '' && Number.isFinite(parsed) ? parsed : undefined)
     setSetupOpen(false)
@@ -411,6 +418,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
                 data-testid="resume-game"
                 data-name={entry.name}
                 onClick={() => {
+                  setResumeAttempt(entry.name)
                   game.load(entry.record)
                   setSetupOpen(false)
                 }}
@@ -420,6 +428,26 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             </li>
           ))}
         </ul>
+        {game.loadError !== null && (
+          <div className="play-setup__load-error" role="alert" data-testid="resume-error">
+            <p>{game.loadError}</p>
+            {resumeAttempt !== null && (
+              <button
+                type="button"
+                data-testid="delete-broken-save"
+                data-name={resumeAttempt}
+                onClick={() => {
+                  deleteGameRecord(resumeAttempt)
+                  setRecords(listGameRecords())
+                  setResumeAttempt(null)
+                  game.clearLoadError()
+                }}
+              >
+                Delete this save
+              </button>
+            )}
+          </div>
+        )}
       </section>
     )
   }

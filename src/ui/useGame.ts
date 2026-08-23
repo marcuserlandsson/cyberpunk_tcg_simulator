@@ -68,12 +68,36 @@ export interface UseGameApi {
   aiThinking: boolean
   /** True when there is a human action `undo` would strip. */
   canUndo: boolean
+  /**
+   * Set when `start` or (far more commonly) `load` was handed a config/record
+   * the engine can no longer replay — typically a save written before a rules
+   * or card-data change, which now fails partway through `replay` with an
+   * `IllegalActionError`. The game in progress, if any, is left untouched:
+   * this is reported rather than thrown so a stale save can never take down
+   * the click handler that tried to resume it. Cleared by a subsequent
+   * successful `start`/`load`, or explicitly by `clearLoadError`.
+   */
+  loadError: string | null
+  clearLoadError: () => void
   start: (humanDeck: DeckList, aiDeck: DeckList, seed?: number) => void
   act: (action: Action) => void
   undo: () => void
   save: (name: string) => void
   load: (record: GameRecord) => void
   eventsForLog: LogLine[]
+}
+
+/**
+ * The message shown for a config/record `gameFromRecord` could not replay.
+ * Every such failure is, from the player's point of view, the same story —
+ * the save/matchup no longer matches what the engine now enforces — so the
+ * underlying error (whatever `IllegalActionError` or other exception it was)
+ * is deliberately not surfaced verbatim; it is still logged to the console
+ * for anyone debugging.
+ */
+function describeLoadFailure(error: unknown): string {
+  console.error('Game could not be resumed:', error)
+  return "This save predates a rules change and can't be resumed."
 }
 
 /**
@@ -111,23 +135,36 @@ function randomSeed(): number {
 export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   const aiDelayMs = options.aiDelayMs ?? DEFAULT_AI_DELAY_MS
   const [game, setGame] = useState<Game | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   // `act` must not go stale between renders, so the reducer reads `db` through
   // a ref rather than closing over it.
   const dbRef = useRef(db)
   dbRef.current = db
 
   const start = useCallback((humanDeck: DeckList, aiDeck: DeckList, seed?: number) => {
-    setGame(
-      gameFromRecord(dbRef.current, {
+    try {
+      const next = gameFromRecord(dbRef.current, {
         config: { decks: [humanDeck, aiDeck], seed: seed ?? randomSeed() },
         actions: [],
       })
-    )
+      setGame(next)
+      setLoadError(null)
+    } catch (error) {
+      setLoadError(describeLoadFailure(error))
+    }
   }, [])
 
   const load = useCallback((record: GameRecord) => {
-    setGame(gameFromRecord(dbRef.current, record))
+    try {
+      const next = gameFromRecord(dbRef.current, record)
+      setGame(next)
+      setLoadError(null)
+    } catch (error) {
+      setLoadError(describeLoadFailure(error))
+    }
   }, [])
+
+  const clearLoadError = useCallback(() => setLoadError(null), [])
 
   const act = useCallback((action: Action) => {
     setGame((current) => (current === null ? current : applyOne(dbRef.current, current, action)))
@@ -203,6 +240,8 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
     legal,
     aiThinking,
     canUndo,
+    loadError,
+    clearLoadError,
     start,
     act,
     undo,
