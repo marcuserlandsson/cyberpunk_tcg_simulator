@@ -5422,3 +5422,67 @@ case pins the mechanism deterministically instead of sampling it:
 four-card hand reversed (a 4-cycle reversal has no fixed point) the two clones
 provably discard *different* cards, and the assertions are that they do, and
 that the score and the chosen action are nonetheless identical.
+
+## 151 — What the Play view decides for the player, and what it doesn't (Task 13)
+
+The playmat is driven entirely by `legalActions`: every glow, every clickable
+target and every button is a *view* of an entry in that list, so the UI cannot
+offer a move the engine would reject and cannot hide one it would allow. Three
+places where that mapping is not one-to-one need recording.
+
+**Payment selection is not offered — a UI simplification, not an engine
+limitation.** `legalActions` fills each `playCard`/`callLegend`/`quick`/
+`react callLegend` entry with the *canonical* payment (economy.ts's
+`canonicalPayment`), and `reduce.ts`'s `isLegal` deliberately accepts **any**
+combination of ready Eddies and Legends that satisfies `canPayWith` for the
+same cost — the engine has always supported paying "with those two Eddies
+rather than that Legend". The Play view simply never asks: it passes the
+canonical payment straight back. This matters in exactly one situation — a
+player who would rather keep a specific face-down Legend ready (to spend it as
+a reaction, §26) than an interchangeable Eddie — and a payment picker is a
+plausible later refinement. Nothing in the engine needs to change for it; the
+affordance layer would gain a second disambiguation step, alongside the target
+one described next.
+
+**Target disambiguation is progressive, and asks only about real decisions.**
+Clicking a card whose `legal` entries differ produces the first slot on which
+those entries disagree (`firstDivergentSlot`), highlights that slot's distinct
+values on the board, and narrows the surviving variants with each answer —
+ending the moment the survivors bind identical targets. So a slot whose value
+was already forced by an earlier answer is never asked about, and a
+`chooseOne` mode that binds fewer slots than its sibling stays reachable (the
+missing slot is its own option, `NO_TARGET`). The order the player is asked in
+is the engine's own slot order (docs/rulings.md §34: a Gear's equip host
+first, then one uid per fillable `onPlay` slot), not a re-ordering the UI
+invents.
+
+**A target slot's value is a uid *or* a Gig-die index, and the action does not
+say which.** `TargetSpec` (engine/types.ts) mixes card slots with Gig-die
+slots, and both arrive as bare numbers in `Action.targets` (§39). The view
+labels an option by card name when the number resolves to a live
+`CardInstance` and as "Gig die #N" otherwise, which means a Gig index that
+collides with a live uid reads as a card name. This is **cosmetic only** — the
+action applied is the engine's own entry, unmodified — and it is confined to
+the option *labels*; a fix would mean threading the per-slot `TargetSpec` out
+of `effects.ts`'s `effectTargetChoices` alongside the tuples, which is a
+larger change than the labelling defect warrants today.
+
+**The AI's seed is derived from the record, not stored in it.** A `GameRecord`
+(engine/replay.ts) is the new-game config plus the action list and nothing
+else. The opponent agent is re-created for every decision from
+`agentSeedFor(config.seed, actions.length)`, which makes the AI a pure
+function of the record: resuming a saved game reproduces the same opponent,
+and undoing back into a turn and repeating an action gets the same answer
+again. A single long-lived agent instance could offer neither guarantee — its
+rng position would depend on how many decisions it happened to have made,
+including ones that were later undone — and storing that position in the
+record would have made the record's meaning depend on when it was written.
+
+**Undo attributes actions by `actingPlayer`, never `activePlayer`.** Both
+players act inside a single game turn (a defender's `react` window, an
+effect-driven `chooseGig` whose thief is the rival, a would-be-defeated
+`answerIntercept`), so "whose action was this" is `actingPlayer` evaluated on
+the state *before* the action. `undoToLastDecisionOf` derives that by
+replaying rather than storing it, so a record produced by any writer (UI, sim,
+fuzz harness) is undoable, and the attribution can never disagree with the
+actions themselves.
