@@ -28,6 +28,7 @@ import { ReactionBar } from './ReactionBar'
 import { ZonePanels } from './ZonePanels'
 import { AI, HUMAN, useGame } from './useGame'
 import { listDecks, listGameRecords } from './storage'
+import { deckPickerLabel, isDeckPickable } from './deckPicker'
 import {
   abilityUids,
   abilityVariants,
@@ -312,8 +313,16 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
   // ---- new game / resume --------------------------------------------------
 
   const decks = useMemo(() => listDecks(), [])
-  const [humanDeckName, setHumanDeckName] = useState(() => decks[0]?.name ?? '')
-  const [aiDeckName, setAiDeckName] = useState(() => decks[1]?.name ?? decks[0]?.name ?? '')
+  // A non-demo deck that fails validateDeck cannot be offered as a seat
+  // (docs/rulings.md §153) — default to the first/second PICKABLE deck so
+  // the setup screen never opens with an already-illegal selection.
+  const pickableDecks = useMemo(() => decks.filter((deck) => isDeckPickable(db, deck)), [db, decks])
+  const [humanDeckName, setHumanDeckName] = useState(
+    () => pickableDecks[0]?.name ?? decks[0]?.name ?? ''
+  )
+  const [aiDeckName, setAiDeckName] = useState(
+    () => pickableDecks[1]?.name ?? pickableDecks[0]?.name ?? decks[0]?.name ?? ''
+  )
   const [seedText, setSeedText] = useState('')
 
   useEffect(() => {
@@ -328,6 +337,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     const human = deckByName(humanDeckName)
     const ai = deckByName(aiDeckName)
     if (human === undefined || ai === undefined) return
+    if (!isDeckPickable(db, human) || !isDeckPickable(db, ai)) return
     const parsed = Number(seedText)
     game.start(human, ai, seedText.trim() !== '' && Number.isFinite(parsed) ? parsed : undefined)
     setSetupOpen(false)
@@ -353,8 +363,8 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             onChange={(event) => setHumanDeckName(event.target.value)}
           >
             {decks.map((deck) => (
-              <option key={deck.name} value={deck.name}>
-                {deck.name}
+              <option key={deck.name} value={deck.name} disabled={!isDeckPickable(db, deck)}>
+                {deckPickerLabel(db, deck)}
               </option>
             ))}
           </select>
@@ -367,8 +377,8 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             onChange={(event) => setAiDeckName(event.target.value)}
           >
             {decks.map((deck) => (
-              <option key={deck.name} value={deck.name}>
-                {deck.name}
+              <option key={deck.name} value={deck.name} disabled={!isDeckPickable(db, deck)}>
+                {deckPickerLabel(db, deck)}
               </option>
             ))}
           </select>

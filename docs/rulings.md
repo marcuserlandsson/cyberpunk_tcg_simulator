@@ -5551,3 +5551,45 @@ both the card's own click and its `+` button are no-ops, so the one card in
 the current 141-card pool meeting that description can never be added as a
 legend. Nothing hardcodes the id; a future promo with the same printed shape
 would be caught the same way.
+
+## 153 — Play and Simulate deck pickers disable invalid non-demo decks (Task 15)
+
+§152 deliberately lets the Deck Builder show and even save an invalid deck
+under construction — refusing an edit mid-build would block violations that
+are often about to be fixed by the very next click. *Choosing a deck to
+actually play a game or run a simulation with* is a different moment: an
+invalid deck cannot legally take the field (a card may cost more RAM than
+its legends license, a legend slot may be empty, and so on), so both the
+Play view's new-game setup screen (`src/ui/PlayView.tsx`) and the Simulate
+view (`src/ui/SimulateView.tsx`) now disable it there instead of letting a
+game or sim run against a deck the engine was never validated to allow.
+
+**One shared rule, `src/ui/deckPicker.ts`'s `isDeckPickable(db, deck)`,
+drives both pickers** so they can never drift apart: a deck is pickable when
+`deck.demo` is true, or when `validateDeck(db, deck)` reports zero errors.
+Demo decks are the deliberate exception — `deck.demo` exists to relax
+`validateDeck`'s 40-50 card-count check for decks that are intentionally
+undersized (both bundled starter decks are demo decks for exactly this
+reason), and per the brief's own UI spec a demo deck is simply always
+selectable, independent of whatever `validateDeck` still reports for it.
+`deckPickerLabel(db, deck)` appends "⚠ invalid" to a non-pickable deck's
+name; each `<option>` for it is additionally given `disabled`, so a browser
+will not let it be selected at all (the label alone would only be a visual
+hint). Both views also re-check `isDeckPickable` defensively where a deck
+is actually committed to (`PlayView.startGame`, `SimulateView.handleRun`),
+in case a caller ever constructs one of these views with a non-`<select>`
+UI in front of it.
+
+**Defaulting.** Both pickers seed their initial selection from the first
+(and, for a second seat, second) *pickable* deck rather than `decks[0]`/
+`decks[1]` — so the setup screen and the Simulate form never open with an
+already-disabled option selected by default. Since both bundled starter
+decks are demo decks (and therefore always pickable), this is invisible in
+the common case and only matters once a player has saved an invalid deck of
+their own.
+
+**What did not change:** `storage.listDecks()` still returns every saved
+deck, valid or not (§152's own corollary) — filtering happens only in the
+two pickers that render it, not in storage. The Deck Builder is untouched:
+it still shows every deck's `validateDeck` errors live rather than hiding
+or disabling anything, exactly as §152 specifies.

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { PlayView } from './ui/PlayView'
 import { DeckBuilderView } from './ui/DeckBuilderView'
+import { SimulateView } from './ui/SimulateView'
 import { loadCardDb } from './engine/cardDb'
 import { getSettings, saveSettings } from './ui/storage'
 
@@ -78,11 +79,10 @@ export default function App() {
         <div hidden={view !== 'deckBuilder'}>
           <DeckBuilderView db={db} useOfficialImages={useOfficialImages} />
         </div>
-        {view === 'simulate' && (
-          <section aria-label="Simulate">
-            <p>Simulate placeholder</p>
-          </section>
-        )}
+        {/* Unmounted (not hidden) while not the active tab: a real Worker left
+            running in the background would otherwise keep spinning
+            invisibly, and SimulateView's own unmount effect terminates it. */}
+        {view === 'simulate' && <SimulateView db={db} />}
       </main>
     </div>
   )
