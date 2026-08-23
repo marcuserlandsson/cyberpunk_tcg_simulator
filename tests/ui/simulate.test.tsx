@@ -8,7 +8,7 @@
 // deterministically, rather than racing a real async worker.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { SimulateView, type SimWorkerLike } from '../../src/ui/SimulateView'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { saveDeck, saveSimResult } from '../../src/ui/storage'
@@ -41,9 +41,14 @@ class FakeWorker implements SimWorkerLike {
   postMessage = vi.fn()
   terminate = vi.fn()
   onmessage: ((event: MessageEvent<SimWorkerMessage>) => void) | null = null
+  onerror: ((event: ErrorEvent) => void) | null = null
 
   emit(message: SimWorkerMessage): void {
     this.onmessage?.({ data: message } as MessageEvent<SimWorkerMessage>)
+  }
+
+  fail(message: string): void {
+    this.onerror?.(new ErrorEvent('error', { message }))
   }
 }
 
@@ -123,6 +128,49 @@ describe('SimulateView — run, progress, cancel', () => {
   })
 })
 
+describe('SimulateView — worker failure (fix round 1)', () => {
+  it('a {type:"error"} message renders the error, stops the run, and re-enables Run', () => {
+    const { worker } = renderView()
+    fireEvent.click(screen.getByTestId('sim-run'))
+    expect(screen.getByTestId('sim-progress')).toBeTruthy()
+
+    act(() => worker().emit({ type: 'error', message: 'game 7 (seed 49) hit a dead end' }))
+
+    expect(screen.getByTestId('sim-error').textContent).toMatch(/game 7 \(seed 49\) hit a dead end/)
+    expect(screen.queryByTestId('sim-progress')).toBeNull()
+    expect((screen.getByTestId('sim-run') as HTMLButtonElement).disabled).toBe(false)
+    expect(worker().terminate).toHaveBeenCalledTimes(1)
+    // The hang the bug report described never happens: no results panel,
+    // and running has genuinely stopped rather than being stuck mid-run.
+    expect(screen.queryByTestId('sim-results')).toBeNull()
+  })
+
+  it("the worker's own onerror (a failure it never got to catch) is handled the same way", () => {
+    const { worker } = renderView()
+    fireEvent.click(screen.getByTestId('sim-run'))
+
+    act(() => worker().fail('worker module failed to load'))
+
+    expect(screen.getByTestId('sim-error').textContent).toMatch(/worker module failed to load/)
+    expect(screen.queryByTestId('sim-progress')).toBeNull()
+    expect((screen.getByTestId('sim-run') as HTMLButtonElement).disabled).toBe(false)
+    expect(worker().terminate).toHaveBeenCalledTimes(1)
+  })
+
+  it('a later successful run clears a previous error', () => {
+    const { worker } = renderView()
+    fireEvent.click(screen.getByTestId('sim-run'))
+    act(() => worker().emit({ type: 'error', message: 'boom' }))
+    expect(screen.getByTestId('sim-error')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('sim-run'))
+    act(() => worker().emit({ type: 'result', result: CANNED_RESULT }))
+
+    expect(screen.queryByTestId('sim-error')).toBeNull()
+    expect(screen.getByTestId('sim-results')).toBeTruthy()
+  })
+})
+
 describe('SimulateView — card table: sort and filter', () => {
   function runAndGetResult(): void {
     const { worker } = renderView()
@@ -162,7 +210,7 @@ describe('SimulateView — card table: sort and filter', () => {
 })
 
 describe('SimulateView — export', () => {
-  it('exports CSV as toCsv(result) via a Blob download', () => {
+  it('exports CSV as toCsv(result) via a Blob download', async () => {
     runResultAndCapture()
     const blobSpy = vi.spyOn(globalThis, 'Blob')
     const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-csv')
@@ -177,14 +225,17 @@ describe('SimulateView — export', () => {
     expect(options.type).toBe('text/csv')
     expect(createUrl).toHaveBeenCalledTimes(1)
     expect(clickSpy).toHaveBeenCalledTimes(1)
-    expect(revokeUrl).toHaveBeenCalledWith('blob:mock-csv')
+    // Revoke is deferred a macrotask (setTimeout(…, 0)) past the click, on
+    // purpose — see download()'s own comment — so it's asserted with a wait
+    // rather than immediately after the click.
+    await waitFor(() => expect(revokeUrl).toHaveBeenCalledWith('blob:mock-csv'))
   })
 
-  it('exports JSON as JSON.stringify(result, null, 2) via a Blob download', () => {
+  it('exports JSON as JSON.stringify(result, null, 2) via a Blob download', async () => {
     runResultAndCapture()
     const blobSpy = vi.spyOn(globalThis, 'Blob')
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-json')
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
     fireEvent.click(screen.getByTestId('sim-export-json'))
@@ -192,6 +243,7 @@ describe('SimulateView — export', () => {
     const [parts, options] = blobSpy.mock.calls[0] as [BlobPart[], { type: string }]
     expect(parts[0]).toBe(JSON.stringify(CANNED_RESULT, null, 2))
     expect(options.type).toBe('application/json')
+    await waitFor(() => expect(revokeUrl).toHaveBeenCalledWith('blob:mock-json'))
   })
 
   function runResultAndCapture(): void {
@@ -231,6 +283,21 @@ describe('SimulateView — last-result banner', () => {
 
   it('renders no banner when no prior result is stored', () => {
     render(<SimulateView db={db} createWorker={() => new FakeWorker()} />)
+    expect(screen.queryByTestId('sim-last-result-banner')).toBeNull()
+  })
+
+  it('does not resurface once a new run is started (minor fix: stale banner during a second run)', () => {
+    saveSimResult(CANNED_RESULT)
+    const { worker } = renderView()
+    expect(screen.getByTestId('sim-last-result-banner')).toBeTruthy()
+
+    // Starting a run sets `result` back to null transiently — before this
+    // fix, that briefly (and misleadingly) resurfaced the "last run" banner
+    // for the run that is now in progress rather than the one it describes.
+    fireEvent.click(screen.getByTestId('sim-run'))
+    expect(screen.queryByTestId('sim-last-result-banner')).toBeNull()
+
+    act(() => worker().emit({ type: 'result', result: CANNED_RESULT }))
     expect(screen.queryByTestId('sim-last-result-banner')).toBeNull()
   })
 })

@@ -17,6 +17,17 @@
 // deck that fails `validateDeck` is disabled and labelled "⚠ invalid" —
 // simulating an illegal deck would silently corrupt the stats with games
 // the engine was never validated to allow.
+//
+// WORKER FAILURE (fix round 1). Two independent ways a worker can fail to
+// deliver a result: `worker.ts`'s own try/catch posts a `{type:'error'}`
+// message when `runGames` throws, and the DOM `Worker`'s `onerror` fires
+// for failures the worker never gets to catch (a syntax error loading the
+// module, an uncaught exception outside the try block). Both are routed
+// through `handleWorkerFailure`, which surfaces a visible
+// `data-testid="sim-error"` message, flips `running` back to `false` (so
+// Run is clickable again), and terminates/nulls the worker — otherwise a
+// thrown error would hang the progress bar forever with no way to tell a
+// crash from a slow run.
 
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { isDeckPickable, deckPickerLabel } from './deckPicker'
@@ -35,6 +46,9 @@ export interface SimWorkerLike {
   postMessage: (message: SimOptions) => void
   terminate: () => void
   onmessage: ((event: MessageEvent<SimWorkerMessage>) => void) | null
+  /** Fires for failures the worker itself never gets to catch and report
+   * as a `{type:'error'}` message (e.g. the module failing to load). */
+  onerror: ((event: ErrorEvent) => void) | null
 }
 
 export type CreateSimWorker = () => SimWorkerLike
@@ -76,7 +90,12 @@ function download(filename: string, content: string, mime: string): void {
   anchor.href = url
   anchor.download = filename
   anchor.click()
-  URL.revokeObjectURL(url)
+  // Deferred rather than called immediately after `.click()`: revoking the
+  // URL synchronously is a well-known footgun — some browsers process the
+  // anchor's download asynchronously, so an immediate revoke can race it and
+  // occasionally produce an empty/failed download. A 0ms `setTimeout` pushes
+  // the revoke to the next macrotask, after the click's own handling.
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +206,10 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
   const [result, setResult] = useState<SimResult | null>(null)
   const [ranNames, setRanNames] = useState<{ a: string; b: string } | null>(null)
   const [minGamesSeen, setMinGamesSeen] = useState(0)
-  const [lastResult] = useState<SimResult | null>(() => (getLastSimResult() as SimResult | undefined) ?? null)
+  const [error, setError] = useState<string | null>(null)
+  const [lastResult, setLastResult] = useState<SimResult | null>(
+    () => (getLastSimResult() as SimResult | undefined) ?? null
+  )
 
   const workerRef = useRef<SimWorkerLike | null>(null)
 
@@ -226,6 +248,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
     setRunning(true)
     setProgress({ done: 0, total: games })
     setResult(null)
+    setError(null)
     setRanNames({ a: deckA.name, b: deckB.name })
 
     const worker = (createWorker ?? defaultCreateSimWorker)()
@@ -236,13 +259,35 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
         setProgress({ done: message.done, total: message.total })
         return
       }
+      if (message.type === 'error') {
+        handleWorkerFailure(message.message)
+        return
+      }
       setResult(message.result)
       saveSimResult(message.result)
+      setLastResult(message.result)
       setRunning(false)
       setProgress(null)
       workerRef.current = null
     }
+    worker.onerror = (event: ErrorEvent) => {
+      handleWorkerFailure(event.message || 'The simulation worker failed unexpectedly.')
+    }
     worker.postMessage(opts)
+  }
+
+  /**
+   * Both ways a worker can fail to deliver a result (its own caught-and-
+   * reported `{type:'error'}` message, or an `onerror` it never got to
+   * catch) land here: show the message, stop the run, and make sure the
+   * dead worker can't still be `postMessage`d or leaked.
+   */
+  function handleWorkerFailure(message: string): void {
+    setError(message)
+    setRunning(false)
+    setProgress(null)
+    workerRef.current?.terminate()
+    workerRef.current = null
   }
 
   function handleCancel(): void {
@@ -269,10 +314,16 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
     <section aria-label="Simulate" data-testid="simulate-view">
       <h2>Simulate</h2>
 
-      {lastResult !== null && result === null && (
+      {lastResult !== null && result === null && !running && (
         <div className="sim-banner" data-testid="sim-last-result-banner">
           Last run: {lastResult.games.length} games — Deck A won {pct(lastResult.winRateA)}, Deck B
           won {pct(1 - lastResult.winRateA)}.
+        </div>
+      )}
+
+      {error !== null && (
+        <div className="sim-error" role="alert" data-testid="sim-error">
+          Simulation failed: {error}
         </div>
       )}
 
