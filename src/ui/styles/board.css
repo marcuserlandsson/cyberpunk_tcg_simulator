@@ -303,6 +303,39 @@
   padding: 0.15em 0.45em;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Eddies and Legends: physical cards, tapped when spent                  */
+/* ---------------------------------------------------------------------- */
+
+/* Reserves row height up front (rather than only once a card is present) so
+   the strip doesn't jump when the first eddie/legend appears or taps. */
+.zone--eddies,
+.zone--legends {
+  min-height: 96px;
+  align-items: center;
+}
+
+.zone--eddies {
+  flex-direction: row;
+  gap: 0.6em;
+}
+
+/* No wrap here (unlike the generic `.zone__cards` rule above) — the row
+   compresses via overlap instead once it's too full for the strip. */
+.zone--eddies .zone__cards {
+  display: flex;
+}
+
+/* Activated only once eddies.length > 6 (ZonePanels.tsx), so a handful of
+   sold cards still reads as distinct cards before the row starts to overlap. */
+.zone--eddies--dense .card-frame {
+  margin-right: -46px;
+}
+
+.zone--eddies--dense .card-frame:last-child {
+  margin-right: 0;
+}
+
 .zone--gig.is-target {
   outline: 2px solid var(--rival);
   outline-offset: 2px;

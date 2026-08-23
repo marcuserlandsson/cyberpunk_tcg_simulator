@@ -356,3 +356,43 @@
     repeating-linear-gradient(45deg, rgba(255, 61, 90, 0.14) 0 2px, transparent 2px 7px),
     linear-gradient(150deg, #241018, #150b10);
 }
+
+/* A face-down eddie/pile's outer border is owner-keyed, not card-color-keyed
+   — the base rule's `border-color` (derived from `FACE_DOWN_DEF`'s inert
+   `def.color` via the inline `--card-border-color` custom property,
+   ZonePanels.tsx) is irrelevant once identity is hidden. Scoped to
+   `.zone--eddies`/`.pile` (rather than a blanket `.card-frame--face-down`
+   rule) so this touches only the markup this task renders — never Field.tsx's
+   `BoardCard` (a face-down Legend there doesn't thread an `owner` prop yet,
+   out of this task's scope to fix) or HandStrip's hand-rolled back, which
+   carries no owner class at all. */
+.zone--eddies .card-frame--face-down,
+.pile .card-frame--face-down {
+  border-color: var(--you);
+}
+
+.zone--eddies .card-frame--rival.card-frame--face-down,
+.pile .card-frame--rival.card-frame--face-down {
+  border-color: var(--rival);
+}
+
+/* ---- Deck/trash piles: a 46x64 face-down back with the count chip
+   overlaid, rather than a bare text count ---- */
+
+.pile {
+  position: relative;
+  width: 46px;
+}
+
+.pile .card-frame {
+  width: 46px;
+}
+
+.pile .chip {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
