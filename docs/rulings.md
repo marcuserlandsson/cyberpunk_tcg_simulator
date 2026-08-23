@@ -2951,3 +2951,66 @@ interception point, not a delayed/floating effect) and is not added to the
 §52 list, which is specifically about effects that outlive their own
 resolution across a turn boundary — this one is a same-instant redirect
 missing only its decision seam.
+
+# Task 8 batch 5 fix round 1
+
+## 106 — `canAttackGigAreaDespiteLag` must respect `rivalCantAttackWhenPlayed` too, plus an audit of every other fresh-attack path
+
+Batch review caught an interaction defect: §100's `attackGigAreaDespiteLag`
+(`nadia-fighting-through-grief`) is a Lag EXCEPTION for a fresh attack —
+structurally the same shape as {adrenaline} — but `canAttackGigAreaDespiteLag`
+never consulted `rivalDeniesFreshAttacks` (§82's `maxtac-suppression-team`
+denial), unlike `combat.ts`'s `canAttack`, which does for the {adrenaline}
+branch. A freshly-played Nadia, behind on Gigs, could still attack the rival
+Gig area against an opposing `maxtac-suppression-team` — the printed "Rival
+Units can't attack the turn they're played" states no carve-out, so this was
+a real fidelity bug, not a judgment call.
+
+**Ruling (fix):** `canAttackGigAreaDespiteLag` (`src/engine/query.ts`) now
+ends with `return !rivalDeniesFreshAttacks(db, state, uid)`, mirroring
+`canAttack`'s own final line exactly. Proven with a failing-test-first cycle:
+`tests/cards/green.test.ts`'s new case (fresh Nadia, behind on Gigs, an
+opposing `maxtac-suppression-team` in play) was verified to fail against the
+pre-fix code (reverting the query.ts patch and re-running reproduced exactly
+the reported bug — an `attack`/`gigArea` action offered when it must not be)
+before the fix landed it green; the two existing Nadia tests (gig-area
+attack offered with no `maxtac-suppression-team` present; no attack at all
+when not behind on Gigs) are unaffected, confirming the fix is additive.
+
+**Audit: every other path that lets a card attack despite Lag.** Grepped
+every site that ever sets `lag` to `false` outside the ordinary
+start-of-turn ready step (`resetTurnState`, which clears Lag for the ACTIVE
+player's own cards at their own turn start — not a "fresh attack" exception
+at all, since Lag is simply gone by then) and every `hasKeyword`/static
+check `combat.ts`'s `canAttack`/`attackTargets` consult:
+
+1. **{adrenaline} keyword** (printed, Gear-granted per §30, or
+   `grantKeyword`-granted per §43, including the two scripts that grant it —
+   `yorinobu-arasaka-steel-dragon`, `johnny-silverhand-rocking-renegade`, and
+   the vocabulary card `johnny-silverhand-rocking-renegade`'s sibling grants)
+   — already gated by `rivalDeniesFreshAttacks` inside `canAttack` itself,
+   confirmed unaffected by this fix round;
+2. **`attackGigAreaDespiteLag`** (§92 ff.) — the bug above, now fixed;
+3. **{go-solo} Legends entering the field with `lag: false`** from the start
+   (`effects.ts`'s `playCardOnDraft`, the Legend case) — "it can attack this
+   turn" is the printed rule (§31), and this Unit never has Lag to except in
+   the first place, so it skips `canAttack`'s Lag branch entirely (`if
+   (!card.lag) return true`) without ever reaching the {adrenaline}/denial
+   check. **This is NOT a new gap** — §82 already found and explicitly
+   accepted it ("A {go-solo} Legend enters the field with `lag: false` from
+   the start ... so `maxtac-suppression-team` does not, and cannot without
+   tracking a separate 'entered the field this turn' flag on every card
+   instance, stop a rival's freshly-played Go Solo Legend from attacking ...
+   the safe direction under §79/§80's policy"). Re-confirmed here rather than
+   silently re-fixed: closing it would need a new per-instance "entered the
+   field this turn" flag distinct from Lag (Go Solo's whole point is
+   *skipping* Lag, so Lag itself cannot double as that flag), which is a
+   genuine new engine feature, not a one-line mirror of `canAttack`'s
+   existing branch the way today's fix was. No card in the pool through
+   batch 5 needs it enough to justify building it now, so the gap stays
+   open, under-delivering (safe direction) exactly as §82 already ruled.
+
+No other fresh-attack permission path exists in the codebase as of batch 5 —
+`ATTACK_READY`/`attackableReadyKeyword` (§43/§58) widen the *target list* for
+an already-attack-eligible Unit and are orthogonal to the Lag question
+entirely, so they were not in scope for this audit.

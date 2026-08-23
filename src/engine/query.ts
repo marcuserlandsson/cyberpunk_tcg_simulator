@@ -571,21 +571,34 @@ export function cantAttackGigArea(db: CardDb, state: GameState, uid: number): bo
  * only while the owning `EffectDef`'s `condition` currently holds (already
  * enforced by `activeStaticNodes` only returning live static nodes). Callers
  * check this ONLY when the ordinary `canAttack` already failed on Lag alone.
+ *
+ * Like {adrenaline}, this is a Lag EXCEPTION for a fresh attack, so it must
+ * respect the same rival denial `canAttack` does (docs/rulings.md §81 ff. /
+ * fix round 1): `maxtac-suppression-team`'s "Rival Units can't attack the
+ * turn they're played" is a blanket denial of every such exception, not just
+ * the {adrenaline}-keyword one, so `rivalDeniesFreshAttacks` gates this path
+ * too — otherwise a fresh Nadia behind on Gigs could still reach the rival
+ * Gig area against an opposing `maxtac-suppression-team`, silently bypassing
+ * a restriction the printed text states with no carve-out.
  */
 export function canAttackGigAreaDespiteLag(db: CardDb, state: GameState, uid: number): boolean {
   const card = state.cards[uid]
   if (!card || !card.ready || !card.lag) return false
   if (cantAttack(db, state, uid)) return false
-  return activeStaticNodes(db, state, uid).some((node) => node.kind === 'attackGigAreaDespiteLag')
+  if (!activeStaticNodes(db, state, uid).some((node) => node.kind === 'attackGigAreaDespiteLag')) {
+    return false
+  }
+  return !rivalDeniesFreshAttacks(db, state, uid)
 }
 
 /**
  * "Rival Units can't attack the turn they're played" (maxtac-suppression-team,
  * docs/rulings.md §81 ff.) — does `uid`'s owner's OPPONENT have any in-play
  * card carrying a `rivalCantAttackWhenPlayed` static? Consulted by
- * `combat.ts`'s `canAttack` to deny the {adrenaline} exception to Lag for
- * every Unit on that opposing side, while `uid`'s own static defs are
- * unaffected (the restriction is about the RIVAL of whoever prints it).
+ * `combat.ts`'s `canAttack` to deny the {adrenaline} exception to Lag, and by
+ * `canAttackGigAreaDespiteLag` above to deny ITS exception too, for every
+ * Unit on that opposing side, while `uid`'s own static defs are unaffected
+ * (the restriction is about the RIVAL of whoever prints it).
  */
 export function rivalDeniesFreshAttacks(db: CardDb, state: GameState, uid: number): boolean {
   const card = state.cards[uid]

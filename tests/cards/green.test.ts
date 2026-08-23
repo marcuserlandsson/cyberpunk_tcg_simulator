@@ -411,6 +411,23 @@ describe('nadia-fighting-through-grief', () => {
     const attacks = actionsOfType(db, s, 'attack').filter((action) => action.attacker === nadia)
     expect(attacks).toEqual([])
   })
+
+  // Fix round 1 (batch-5 review): `attackGigAreaDespiteLag` is a Lag
+  // EXCEPTION for a fresh attack, exactly like {adrenaline}, so it must
+  // respect the same rival denial (`maxtac-suppression-team`'s "Rival Units
+  // can't attack the turn they're played") that `canAttack` already
+  // consults for {adrenaline} (docs/rulings.md §81 ff. / fix round 1).
+  it("cannot attack the rival Gig area despite Lag when the rival has maxtac-suppression-team in play", () => {
+    const { state } = fixtureWithHand(0, ['nadia-fighting-through-grief'])
+    setGigs(state, 0, []) // the automatic opening gig gain would otherwise tie the count
+    setGigs(state, 1, [{ size: 6, value: 4 }]) // still behind on Gigs
+    fieldCard(state, 1, 'maxtac-suppression-team', { ready: true })
+    const s = playCardByDef(db, state, 0, 'nadia-fighting-through-grief')
+    const nadia = findFielded(s, 0, 'nadia-fighting-through-grief')
+    expect(s.cards[nadia].lag).toBe(true)
+    const attacks = actionsOfType(db, s, 'attack').filter((action) => action.attacker === nadia)
+    expect(attacks).toEqual([])
+  })
 })
 
 // ---------------------------------------------------------------------------
