@@ -181,6 +181,11 @@ export interface TargetFilter {
    * enumerated tie-break, per the printed "choose 1."
    */
   lowestPower?: boolean
+  /**
+   * "a ready friendly Unit" (unlikely-bond, docs/rulings.md §134 ff.) — the
+   * mirror image of `spentOnly`.
+   */
+  readyOnly?: boolean
 }
 
 /**
@@ -296,6 +301,16 @@ export type EffectNode =
       kind: 'chooseOne'
       modes: EffectNode[]
       chooser?: 'controller' | 'rivalIfBehindStreetCred' | 'allUnlessBehindStreetCred'
+      /**
+       * "Choose one effect. If a friendly d4 is a min Gig, choose both
+       * instead." (pyramid-song, docs/rulings.md §134 ff.) — the mirror image
+       * of `allUnlessBehindStreetCred`: normally exactly one mode is chosen,
+       * but while this condition holds EVERY mode resolves instead, checked
+       * ahead of `chooser`. Generalizes the street-cred-specific chooser to
+       * an arbitrary board condition rather than adding a second
+       * narrowly-named chooser value.
+       */
+      allIf?: EffectCondition
     }
   // Static, printed on Gear: "If this Unit would be defeated, defeat its
   // <gear> instead" (docs/rulings.md §46).
@@ -424,6 +439,12 @@ export type EffectNode =
   // worth exactly 1 €$ when ready regardless of which card it was
   // (economy.ts), so *which* spent one is readied first is not a decision.
   | { kind: 'readyEddies'; count: number }
+  // Batch 8 addition (docs/rulings.md §134 ff.): "This Unit can't be
+  // blocked" (mt0d12-flathead), consulted only by `combat.ts`'s
+  // `reactActions`, which drops every `{Blocker}` reaction for the current
+  // pending attack's attacker while this static is active — the mirror
+  // image of `cantAttack` on the defending side of an attack.
+  | { kind: 'cantBeBlocked' }
 
 /**
  * The board facts an `EffectDef`/`conditionalEffect` node can gate on. Named
@@ -500,6 +521,11 @@ export interface EffectCondition {
   playedCardKeyword?: string
   /** `onFriendlyStealDie` only: the stealing card's own faction/keyword tag is one of these (evelyn-parker-beautiful-enigma's "a CORPO or GANGER Unit"). */
   stealerKeywordAnyOf?: string[]
+  // Batch 8 additions (docs/rulings.md §134 ff.):
+  /** "if you have less ☆ (Street Cred) than a Rival" — strictly less, the mirror of `streetCredAheadOfRival` (modded-muramasa, mt0d12-flathead). */
+  streetCredBehindRival?: boolean
+  /** "if a friendly d[N] is a min Gig" — a friendly Gig die of exactly this size currently showing 1 (pyramid-song). */
+  friendlyGigSizeAtMin?: DieSize
 }
 
 export interface EffectDef {

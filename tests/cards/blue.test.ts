@@ -1,6 +1,6 @@
-// Task 8 — Blue cards, batch 7: the first 17 Blue cards.
+// Task 8 — Blue cards, batches 7 and 8 (the full Blue color, 33 cards).
 //
-// Cards covered, in card-id order:
+// Batch 7 cards covered, in card-id order:
 //   alt-cunningham-soulkiller-architect, chrome-reverie, delamain-cab,
 //   delamain-rideshare-ai, dying-night-v-s-pistol,
 //   evelyn-parker-beautiful-enigma, evelyn-parker-scheming-siren, floor-it,
@@ -21,6 +21,27 @@
 // (never stronger), the same safe partial-encoding shape §60/§72 already
 // established — never a gameplay-affecting partial per §79/§80.
 //
+// Batch 8 cards covered (the last 16 Blue cards, and the last batch of all
+// 141), in card-id order: modded-kusanagi, modded-muramasa, mox-inciters,
+// mt0d12-flathead, netwatch-netdriver, placide-voodoo-sentinel, psycho-squad,
+// pyramid-song, reboot-optics, rita-wheeler-no-stupid-questions,
+// sasha-yakovleva-won-t-let-you-down, tetratronic-rippler, trust-no-one,
+// unlikely-bond, v-corporate-exile, wakako-okada-peace-and-harmony.
+// Two cards are fully deferred this batch (docs/rulings.md §134 ff.),
+// `effects: []`, joining the standing deferral list rather than shipping a
+// gameplay-affecting partial encoding (§79/§80):
+//   * mox-inciters — "{Play} A rival Unit must attack next turn if it can."
+//     needs the same "forced future action" capability §132 already
+//     reserved this exact card for (evelyn-parker-beautiful-enigma's
+//     {Spend} ability shares the gap);
+//   * reboot-optics — "{Quick} The next time a rival Unit fights this turn,
+//     it doesn't defeat the opposing friendly Unit." needs the
+//     `floatingEffects` gap (§52/§79/§91) — a delayed, conditional, one-shot
+//     effect tied to a future board event.
+// psycho-squad and v-corporate-exile are vanilla (a flavour-only line and a
+// bare {Go Solo} reminder respectively); every other batch-8 card is encoded
+// in full.
+//
 // Every test here drives a REAL card definition from `data/cards.json`
 // through the public engine API (`newGame` / `legalActions` / `applyAction`),
 // using the shared fixtures in ./fixtures.ts, exactly like the other
@@ -35,6 +56,7 @@ import {
   activate,
   actionsOfType,
   attackAndSteal,
+  blockWith,
   db,
   endBothTurnsOnce,
   fieldCard,
@@ -712,5 +734,490 @@ describe('misty-olszewski-mender-of-broken-spirits', () => {
     expect(keptInHand).toBe(!trashed)
     // An Eddie was readied exactly when the card was kept.
     expect(next.cards[spentEddie].ready).toBe(keptInHand)
+  })
+})
+
+// ===========================================================================
+// Task 8 batch 8 — the last 16 Blue cards (docs/rulings.md §134 ff.)
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// modded-kusanagi — "{Adrenaline} ... At the end of your turn, return this
+// Unit to its owner's hand."
+// ---------------------------------------------------------------------------
+
+describe('modded-kusanagi', () => {
+  it('returns to its own hand at the end of the turn it was played', () => {
+    const { state } = fixtureWithHand(0, ['modded-kusanagi'])
+    let s = playCardByDef(db, state, 0, 'modded-kusanagi')
+    expect(s.players[0].field).toContain(findFielded(s, 0, 'modded-kusanagi'))
+
+    s = endOneTurn(db, s)
+
+    expect(s.players[0].field.some((uid) => s.cards[uid].defId === 'modded-kusanagi')).toBe(false)
+    expect(s.players[0].hand.some((uid) => s.cards[uid].defId === 'modded-kusanagi')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// modded-muramasa — "At the end of your turn, if you have less ☆ (Street
+// Cred) than a Rival, ready this Unit."
+// ---------------------------------------------------------------------------
+
+describe('modded-muramasa', () => {
+  it('readies at the end of the turn while behind on Street Cred', () => {
+    const { state } = fixtureWithHand(0, ['modded-muramasa'])
+    let s = playCardByDef(db, state, 0, 'modded-muramasa')
+    const muramasa = findFielded(s, 0, 'modded-muramasa')
+    s.cards[muramasa].ready = false // [surgery] a spent Unit to observe
+    s = forceStreetCred(s, 0, 2)
+    s = forceStreetCred(s, 1, 10)
+
+    s = endOneTurn(db, s)
+
+    expect(s.cards[muramasa].ready).toBe(true)
+  })
+
+  it('stays spent when not behind on Street Cred', () => {
+    const { state } = fixtureWithHand(0, ['modded-muramasa'])
+    let s = playCardByDef(db, state, 0, 'modded-muramasa')
+    const muramasa = findFielded(s, 0, 'modded-muramasa')
+    s.cards[muramasa].ready = false
+    s = forceStreetCred(s, 0, 10)
+    s = forceStreetCred(s, 1, 2)
+
+    s = endOneTurn(db, s)
+
+    expect(s.cards[muramasa].ready).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// mox-inciters — "{Play} A rival Unit must attack next turn if it can.
+// {Blocker}" (the {Play} clause is deferred)
+// ---------------------------------------------------------------------------
+
+describe('mox-inciters', () => {
+  it('carries no effects (forced-attack clause deferred); {Blocker} still works via keywords', () => {
+    expect(db['mox-inciters'].effects).toEqual([])
+    const { state } = fixtureWithHand(0, ['mox-inciters'])
+    const s = playCardByDef(db, state, 0, 'mox-inciters')
+    const inciters = findFielded(s, 0, 'mox-inciters')
+    expect(hasKeyword(db, s, inciters, 'blocker')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// mt0d12-flathead — "If you have less ☆ (Street Cred) than a Rival, this
+// Unit can't be blocked."
+// ---------------------------------------------------------------------------
+
+describe('mt0d12-flathead', () => {
+  it("can't be blocked while behind on Street Cred", () => {
+    const { state } = fixtureWithHand(0, ['mt0d12-flathead'])
+    let s = playCardByDef(db, state, 0, 'mt0d12-flathead')
+    s = endBothTurnsOnce(db, s) // clear Lag
+    const flathead = findFielded(s, 0, 'mt0d12-flathead')
+    fieldCard(s, 1, 'mox-inciters') // has {Blocker}
+    s = forceStreetCred(s, 0, 2)
+    s = forceStreetCred(s, 1, 10)
+
+    s = startAttack(db, s, flathead, 'gigArea')
+
+    expect(actionsOfType(db, s, 'react').some((a) => a.reaction.type === 'block')).toBe(false)
+  })
+
+  it('can be blocked when not behind on Street Cred', () => {
+    const { state } = fixtureWithHand(0, ['mt0d12-flathead'])
+    let s = playCardByDef(db, state, 0, 'mt0d12-flathead')
+    s = endBothTurnsOnce(db, s)
+    const flathead = findFielded(s, 0, 'mt0d12-flathead')
+    fieldCard(s, 1, 'mox-inciters')
+    s = forceStreetCred(s, 0, 10)
+    s = forceStreetCred(s, 1, 2)
+
+    s = startAttack(db, s, flathead, 'gigArea')
+
+    expect(actionsOfType(db, s, 'react').some((a) => a.reaction.type === 'block')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// netwatch-netdriver — "(Equip to a friendly Unit or face-up Legend.) When
+// this Unit or Legend is spent, draw 1."
+// ---------------------------------------------------------------------------
+
+describe('netwatch-netdriver', () => {
+  it('draws 1 when its host is spent', () => {
+    const { state } = fixtureWithHand(0, ['netwatch-netdriver'])
+    const host = fieldCard(state, 0, 'animals-wrecker')
+    let s = playCardByDef(db, state, 0, 'netwatch-netdriver', { targetDef: 'animals-wrecker' })
+    s = endBothTurnsOnce(db, s)
+    setGigs(s, 1, [{ size: 6, value: 3 }])
+    const deckBefore = s.players[0].deck.length
+
+    s = attackAndSteal(db, s, host, 'gigArea', [0])
+
+    expect(s.players[0].deck.length).toBe(deckBefore - 1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// placide-voodoo-sentinel — "{Play} {Attack} You may discard 1 Program. If
+// you do, bottom-deck a rival Unit."
+// ---------------------------------------------------------------------------
+
+describe('placide-voodoo-sentinel', () => {
+  it('may discard 1 Program on play and bottom-deck a rival Unit', () => {
+    const { state } = fixtureWithHand(0, ['placide-voodoo-sentinel', 'floor-it'])
+    const floorIt = findInHand(state, 0, 'floor-it')
+    const rival = fieldCard(state, 1, 'animals-wrecker')
+
+    const s = playCardByDef(db, state, 0, 'placide-voodoo-sentinel', { targets: [0, floorIt] })
+
+    expect(s.players[0].hand).not.toContain(floorIt)
+    expect(s.players[0].trash).toContain(floorIt)
+    expect(s.players[1].field).not.toContain(rival)
+    expect(s.players[1].deck).toContain(rival)
+  })
+
+  it('may decline on play, leaving hand and rival field untouched', () => {
+    const { state } = fixtureWithHand(0, ['placide-voodoo-sentinel', 'floor-it'])
+    const floorIt = findInHand(state, 0, 'floor-it')
+    const rival = fieldCard(state, 1, 'animals-wrecker')
+    const card = findInHand(state, 0, 'placide-voodoo-sentinel')
+
+    const decline = actionsOfType(db, state, 'playCard').find(
+      (a) => a.card === card && a.targets[0] === 1
+    )
+    expect(decline).toBeDefined()
+    const s = applyAction(db, state, decline as Extract<Action, { type: 'playCard' }>)
+
+    expect(s.players[0].hand).toContain(floorIt)
+    expect(s.players[1].field).toContain(rival)
+  })
+
+  it('also offers the same discard-or-decline ability on {Attack}', () => {
+    const { state } = fixtureWithHand(0, ['placide-voodoo-sentinel'])
+    let s = playCardByDef(db, state, 0, 'placide-voodoo-sentinel', { targets: [1] }) // decline on play
+    s = endBothTurnsOnce(db, s)
+    const placide = findFielded(s, 0, 'placide-voodoo-sentinel')
+    const rival = fieldCard(s, 1, 'animals-wrecker')
+    setGigs(s, 1, [{ size: 6, value: 3 }])
+
+    // No Program is in hand, so — whichever mode the rng-picked {Attack}
+    // trigger resolves (docs/rulings.md §134 ff.: an onAttack effect fires
+    // with no pre-declared targets, so its chooseOne mode AND the take-it
+    // script's own target both fall back to the rng, exactly like a {Call}
+    // trigger, §45) — there is nothing to discard, so the rival is never
+    // bottom-decked either way.
+    s = passReact(db, startAttack(db, s, placide, 'gigArea'))
+
+    expect(s.players[1].field).toContain(rival)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// psycho-squad — "Their protocol stops at "shoot first."" (flavour text, no
+// game object named — the animals-wrecker/§51 precedent)
+// ---------------------------------------------------------------------------
+
+describe('psycho-squad', () => {
+  it('is a vanilla 4-cost 6-power NCPD Unit', () => {
+    const def = db['psycho-squad']
+    expect(def.effects).toEqual([])
+    expect([def.cost, def.power]).toEqual([4, 6])
+    expect(def.keywords).toEqual([])
+    expect(def.faction).toBe('NCPD')
+
+    const { state } = fixtureWithHand(0, ['psycho-squad'])
+    const next = playCardByDef(db, state, 0, 'psycho-squad')
+    const squad = findFielded(next, 0, 'psycho-squad')
+    expect(effectivePower(db, next, squad)).toBe(6)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// pyramid-song — "Choose one effect. If a friendly d4 is a min Gig, choose
+// both instead. Give a rival Unit -5 power this turn. // Bottom-deck a rival
+// Unit with power 0."
+// ---------------------------------------------------------------------------
+
+describe('pyramid-song', () => {
+  it('chooses one effect normally when no friendly d4 is a min Gig', () => {
+    const { state } = fixtureWithHand(0, ['pyramid-song'])
+    const rival = fieldCard(state, 1, 'animals-wrecker')
+    setGigs(state, 0, [{ size: 6, value: 3 }])
+
+    const s = playCardByDef(db, state, 0, 'pyramid-song', { targets: [0, rival] })
+
+    expect(effectivePower(db, s, rival)).toBe(5) // 10 - 5
+  })
+
+  it('resolves BOTH modes when a friendly d4 is a min Gig', () => {
+    const { state } = fixtureWithHand(0, ['pyramid-song'])
+    const strong = fieldCard(state, 1, 'animals-wrecker') // power 10
+    const weak = fieldCard(state, 1, 'japantown-jonin') // power 0
+    setGigs(state, 0, [{ size: 4, value: 1 }])
+
+    const s = playCardByDef(db, state, 0, 'pyramid-song', { targets: [strong, weak] })
+
+    expect(effectivePower(db, s, strong)).toBe(5) // the -5 power mode also resolved
+    expect(s.players[1].field).not.toContain(weak) // the bottom-deck mode also resolved
+    expect(s.players[1].deck).toContain(weak)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// reboot-optics — "{Quick} The next time a rival Unit fights this turn, it
+// doesn't defeat the opposing friendly Unit." (deferred: floatingEffects gap)
+// ---------------------------------------------------------------------------
+
+describe('reboot-optics', () => {
+  it('carries no effects (needs the floatingEffects engine gap)', () => {
+    // A delayed, conditional, one-shot effect tied to a FUTURE fight rather
+    // than to a chosen card or a turn boundary alone — the exact
+    // `floatingEffects` gap docs/rulings.md §52/§79/§91 already scoped and
+    // declined to half-solve for chrome-fang, appetite-for-destruction,
+    // cyberpsychosis and safety-override.
+    expect(db['reboot-optics'].effects).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// rita-wheeler-no-stupid-questions — "{Blocker} ... The first time this Unit
+// is spent each turn, draw 1, then discard 1."
+// ---------------------------------------------------------------------------
+
+describe('rita-wheeler-no-stupid-questions', () => {
+  it('draws 1 then discards 1 the first time it is spent (blocking) each turn', () => {
+    const { state } = fixtureWithHand(1, [])
+    const rita = fieldCard(state, 0, 'rita-wheeler-no-stupid-questions') // power 4
+    const attacker = fieldCard(state, 1, 'japantown-jonin') // power 0, so Rita wins the redirected fight and survives
+    setGigs(state, 0, [{ size: 6, value: 3 }]) // a legal attack target (gigArea)
+    mintInto(state, 0, 'hand', 'floor-it') // something to discard after drawing
+    const deckBefore = state.players[0].deck.length
+    const trashBefore = state.players[0].trash.length
+
+    const s = blockWith(db, startAttack(db, state, attacker, 'gigArea'), rita)
+
+    expect(s.players[0].deck.length).toBe(deckBefore - 1) // drew 1
+    expect(s.players[0].trash.length).toBe(trashBefore + 1) // discarded 1
+  })
+})
+
+// ---------------------------------------------------------------------------
+// sasha-yakovleva-won-t-let-you-down — "{Go Solo} {Attack} Reveal the top
+// card of your deck and add it to your hand. This Unit gains power equal to
+// that card's cost this turn. {Defeated} A Rival discards 1."
+// ---------------------------------------------------------------------------
+
+describe('sasha-yakovleva-won-t-let-you-down', () => {
+  it('reveals the top card to hand and gains power equal to its cost, on attack', () => {
+    const { state } = fixtureWithHand(0, [])
+    state.players[0].legends = []
+    mintInto(state, 0, 'legends', 'sasha-yakovleva-won-t-let-you-down', { faceUp: true, ready: true })
+    let s = playCardByDef(db, state, 0, 'sasha-yakovleva-won-t-let-you-down')
+    const sasha = findFielded(s, 0, 'sasha-yakovleva-won-t-let-you-down')
+    const top = mintInto(s, 0, 'deck', 'floor-it') // cost 1
+    s.players[0].deck = [top, ...s.players[0].deck.filter((uid) => uid !== top)]
+    setGigs(s, 1, [{ size: 6, value: 3 }])
+
+    const next = attackAndSteal(db, s, sasha, 'gigArea', [0])
+
+    expect(next.players[0].hand).toContain(top)
+    expect(effectivePower(db, next, sasha)).toBe(1) // 0 base + floor-it's cost 1
+  })
+
+  it('makes a Rival discard 1 when defeated', () => {
+    const { state } = fixtureWithHand(1, [])
+    state.players[1].legends = []
+    mintInto(state, 1, 'legends', 'sasha-yakovleva-won-t-let-you-down', { faceUp: true, ready: true })
+    let s = playCardByDef(db, state, 1, 'sasha-yakovleva-won-t-let-you-down')
+    const sasha = findFielded(s, 1, 'sasha-yakovleva-won-t-let-you-down')
+    s.cards[sasha].ready = false // [surgery] spent, so it becomes a legal attack target
+    s = endOneTurn(db, s) // player 0's turn now
+    mintInto(s, 0, 'hand', 'floor-it')
+    const attacker = fieldCard(s, 0, 'animals-wrecker')
+    const handBefore = s.players[0].hand.length
+
+    const next = passReact(db, startAttack(db, s, attacker, sasha))
+
+    expect(next.players[0].hand.length).toBe(handBefore - 1)
+    // A defeated {Go Solo} Legend is removed from the game, not trashed
+    // (docs/rulings.md §31) — `onDefeat` still fires either way.
+    expect(next.players[1].removed).toContain(sasha)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// tetratronic-rippler — "(Equip to a friendly Unit or face-up Legend.) When
+// this Unit or Legend is spent, search the top card of your deck. You may
+// trash it. (Otherwise, keep it on the top of your deck.)"
+// ---------------------------------------------------------------------------
+
+describe('tetratronic-rippler', () => {
+  it('searches the top card of the deck and either trashes it or keeps it on top', () => {
+    const { state } = fixtureWithHand(0, ['tetratronic-rippler'])
+    const host = fieldCard(state, 0, 'animals-wrecker')
+    let s = playCardByDef(db, state, 0, 'tetratronic-rippler', { targetDef: 'animals-wrecker' })
+    s = endBothTurnsOnce(db, s)
+    const top = mintInto(s, 0, 'deck', 'floor-it')
+    s.players[0].deck = [top, ...s.players[0].deck.filter((uid) => uid !== top)]
+    setGigs(s, 1, [{ size: 6, value: 3 }])
+
+    const next = attackAndSteal(db, s, host, 'gigArea', [0])
+
+    const trashed = next.players[0].trash.includes(top)
+    const keptOnTop = next.players[0].deck[0] === top
+    // Exactly one of the two happened — the search always resolves one way.
+    expect(trashed).toBe(!keptOnTop)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// trust-no-one — "Decrease a Gig by up to 3. Then, if you control a min Gig,
+// draw 1."
+// ---------------------------------------------------------------------------
+
+describe('trust-no-one', () => {
+  it('decreases a Gig by up to 3, clamped to 1, and draws when it becomes a min Gig', () => {
+    const { state } = fixtureWithHand(0, ['trust-no-one'])
+    setGigs(state, 0, [{ size: 6, value: 3 }])
+    const deckBefore = state.players[0].deck.length
+
+    const s = playCardByDef(db, state, 0, 'trust-no-one')
+
+    expect(gigValues(s, 0)).toEqual([1]) // 3 - 3, clamped to the floor of 1
+    expect(s.players[0].deck.length).toBe(deckBefore - 1)
+  })
+
+  it('does not draw when no friendly Gig ends up at 1', () => {
+    const { state } = fixtureWithHand(0, ['trust-no-one'])
+    setGigs(state, 0, [{ size: 6, value: 6 }])
+    const deckBefore = state.players[0].deck.length
+
+    const s = playCardByDef(db, state, 0, 'trust-no-one')
+
+    expect(gigValues(s, 0)).toEqual([3]) // 6 - 3
+    expect(s.players[0].deck.length).toBe(deckBefore)
+  })
+
+  it('draws from a bare, board-wide "min Gig" check, not just the touched die', () => {
+    // Unlike jackie-welles-pour-one-out-for-me's anaphoric "if IT becomes a
+    // min Gig" (docs/rulings.md §133), this card's "if you control a min
+    // Gig" names no antecedent — a board-wide check, so a DIFFERENT,
+    // untouched friendly Gig already at 1 still triggers the draw even
+    // though the die actually decreased lands elsewhere.
+    const { state } = fixtureWithHand(0, ['trust-no-one'])
+    setGigs(state, 0, [
+      { size: 6, value: 1 },
+      { size: 8, value: 6 },
+    ])
+    const deckBefore = state.players[0].deck.length
+
+    const s = playCardByDef(db, state, 0, 'trust-no-one', { targets: [1] }) // decrease the d8, not the d6
+
+    expect(gigValues(s, 0)).toEqual([1, 3])
+    expect(s.players[0].deck.length).toBe(deckBefore - 1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// unlikely-bond — "Bottom-deck a ready friendly Unit. If you do, bottom-deck
+// a spent rival Unit."
+// ---------------------------------------------------------------------------
+
+describe('unlikely-bond', () => {
+  it('bottom-decks a ready friendly Unit, then a spent rival Unit', () => {
+    const { state } = fixtureWithHand(0, ['unlikely-bond'])
+    const friendly = fieldCard(state, 0, 'animals-wrecker', { ready: true })
+    const rival = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+
+    const s = playCardByDef(db, state, 0, 'unlikely-bond', { targets: [friendly, rival] })
+
+    expect(s.players[0].field).not.toContain(friendly)
+    expect(s.players[0].deck).toContain(friendly)
+    expect(s.players[1].field).not.toContain(rival)
+    expect(s.players[1].deck).toContain(rival)
+  })
+
+  it('does not bottom-deck the rival Unit when there is no ready friendly Unit', () => {
+    const { state } = fixtureWithHand(0, ['unlikely-bond'])
+    const rival = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+
+    const s = playCardByDef(db, state, 0, 'unlikely-bond')
+
+    expect(s.players[1].field).toContain(rival)
+    expect(s.players[1].deck).not.toContain(rival)
+  })
+
+  it('never offers a SPENT friendly Unit as the "ready" target', () => {
+    const { state } = fixtureWithHand(0, ['unlikely-bond'])
+    const spentFriendly = fieldCard(state, 0, 'animals-wrecker', { ready: false })
+    const rival = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+
+    const s = playCardByDef(db, state, 0, 'unlikely-bond')
+
+    // The spent friendly Unit is never a legal "ready" candidate, so the
+    // whole "if you do" chain never fires.
+    expect(s.players[0].field).toContain(spentFriendly)
+    expect(s.players[1].field).toContain(rival)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// v-corporate-exile — "{Go Solo}" (reminder only)
+// ---------------------------------------------------------------------------
+
+describe('v-corporate-exile', () => {
+  it('is a vanilla Go Solo Legend that can attack the turn it is played', () => {
+    expect(db['v-corporate-exile'].effects).toEqual([])
+    const { state } = fixtureWithHand(0, [])
+    mintInto(state, 0, 'legends', 'v-corporate-exile', { faceUp: true, ready: true })
+    setGigs(state, 1, [{ size: 6, value: 4 }])
+
+    const s = playCardByDef(db, state, 0, 'v-corporate-exile')
+
+    const uid = findFielded(s, 0, 'v-corporate-exile')
+    expect(s.cards[uid].ready).toBe(true)
+    expect(s.cards[uid].lag).toBe(false)
+    expect(actionsOfType(db, s, 'attack').some((a) => a.attacker === uid)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// wakako-okada-peace-and-harmony — "{Call} Choose one effect. Give a rival
+// Unit -2 power this turn. // Draw 1. {Spend}: Decrease a Gig by up to 2."
+// ---------------------------------------------------------------------------
+
+describe('wakako-okada-peace-and-harmony', () => {
+  it('{Call} resolves exactly one of its two modes when it flips face-up', () => {
+    const { state } = fixtureWithHand(0, [], { eddies: 3 })
+    state.players[0].legends = []
+    const wakako = mintInto(state, 0, 'legends', 'wakako-okada-peace-and-harmony', { faceUp: false })
+    const rival = fieldCard(state, 1, 'animals-wrecker')
+    const deckBefore = state.players[0].deck.length
+
+    const s = applyAction(db, state, {
+      type: 'callLegend',
+      payment: [state.players[0].eddies[0]],
+    })
+
+    expect(s.cards[wakako].faceUp).toBe(true)
+    const debuffed = effectivePower(db, s, rival) === 8
+    const drew = s.players[0].deck.length === deckBefore - 1
+    expect(debuffed).toBe(!drew) // exactly one mode, auto-chosen (§32/§45)
+  })
+
+  it('{Spend} decreases a Gig by up to 2', () => {
+    const { state } = fixtureWithHand(0, [])
+    const wakako = mintInto(state, 0, 'legends', 'wakako-okada-peace-and-harmony')
+    setGigs(state, 0, [{ size: 6, value: 5 }])
+
+    const s = activate(db, state, wakako, 1, { targets: [0] })
+
+    expect(gigValues(s, 0)).toEqual([3])
+    expect(s.cards[wakako].ready).toBe(false)
   })
 })

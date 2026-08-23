@@ -2457,7 +2457,12 @@
       "vehicle"
     ],
     "text": "{Adrenaline} (This Unit can attack the turn it's played.)\nAt the end of your turn, return this Unit to its owner's hand.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onEndTurn",
+        "effect": { "kind": "bounce", "target": "self" }
+      }
+    ]
   },
   {
     "id": "modded-muramasa",
@@ -2476,7 +2481,13 @@
       "vehicle"
     ],
     "text": "At the end of your turn, if you have less ☆ (Street Cred) than a Rival, ready this Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onEndTurn",
+        "condition": { "streetCredBehindRival": true },
+        "effect": { "kind": "readyCard", "target": "self" }
+      }
+    ]
   },
   {
     "id": "mox-inciters",
@@ -2517,7 +2528,13 @@
       "drone"
     ],
     "text": "If you have less ☆ (Street Cred) than a Rival, this Unit can't be blocked.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "condition": { "streetCredBehindRival": true },
+        "effect": { "kind": "cantBeBlocked" }
+      }
+    ]
   },
   {
     "id": "muamar-reyes-el-capita-n",
@@ -2616,7 +2633,12 @@
       "netrunner"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onSpend",
+        "effect": { "kind": "draw", "count": 1 }
+      }
+    ]
   },
   {
     "id": "octant",
@@ -3010,7 +3032,41 @@
       "netrunner"
     ],
     "text": "{Play} {Attack} You may discard 1 Program. If you do, bottom-deck a rival Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "chooseOne",
+          "chooser": "controller",
+          "modes": [
+            {
+              "kind": "scripted",
+              "name": "placide-voodoo-sentinel:take-it",
+              "targets": ["friendlyHandCard"],
+              "filters": [{ "cardType": "program" }]
+            },
+            { "kind": "sequence", "effects": [] }
+          ]
+        }
+      },
+      {
+        "trigger": "onAttack",
+        "effect": {
+          "kind": "chooseOne",
+          "chooser": "controller",
+          "modes": [
+            {
+              "kind": "scripted",
+              "name": "placide-voodoo-sentinel:take-it",
+              "targets": ["friendlyHandCard"],
+              "filters": [{ "cardType": "program" }]
+            },
+            { "kind": "sequence", "effects": [] }
+          ]
+        }
+      }
+    ],
+    "scripted": "placide-voodoo-sentinel:take-it"
   },
   {
     "id": "psycho-squad",
@@ -3047,7 +3103,23 @@
       "braindance"
     ],
     "text": "Choose one effect. If a friendly d4 is a min Gig, choose both instead.\nGive a rival Unit -5 power this turn. // Bottom-deck a rival Unit with power 0.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "chooseOne",
+          "allIf": { "friendlyGigSizeAtMin": 4 },
+          "modes": [
+            { "kind": "buffPower", "amount": -5, "target": "rivalUnit", "duration": "turn" },
+            {
+              "kind": "bottomDeck",
+              "target": "rivalUnit",
+              "filter": { "maxPower": 0 }
+            }
+          ]
+        }
+      }
+    ]
   },
   {
     "id": "rebecca-having-a-moment",
@@ -3153,7 +3225,19 @@
       "ganger"
     ],
     "text": "{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)\nThe first time this Unit is spent each turn, draw 1, then discard 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onSpend",
+        "oncePerTurn": true,
+        "effect": {
+          "kind": "sequence",
+          "effects": [
+            { "kind": "draw", "count": 1 },
+            { "kind": "discardCard", "target": "friendlyHandCard" }
+          ]
+        }
+      }
+    ]
   },
   {
     "id": "river-ward-detective-on-the-hunt",
@@ -3504,7 +3588,17 @@
       "netrunner"
     ],
     "text": "{Go Solo}\n{Attack} Reveal the top card of your deck and add it to your hand. This Unit gains power equal to that card's cost this turn.\n{Defeated} A Rival discards 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "effect": { "kind": "scripted", "name": "sasha-yakovleva-won-t-let-you-down" }
+      },
+      {
+        "trigger": "onDefeat",
+        "effect": { "kind": "discardRandomRival", "count": 1 }
+      }
+    ],
+    "scripted": "sasha-yakovleva-won-t-let-you-down"
   },
   {
     "id": "satori-sword-of-saburo",
@@ -3823,7 +3917,13 @@
       "cyberware"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\nWhen this Unit or Legend is spent, search the top card of your deck. You may trash it. (Otherwise, keep it on the top of your deck.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onSpend",
+        "effect": { "kind": "scripted", "name": "tetratronic-rippler" }
+      }
+    ],
+    "scripted": "tetratronic-rippler"
   },
   {
     "id": "the-heist",
@@ -3932,7 +4032,17 @@
       "braindance"
     ],
     "text": "Decrease a Gig by up to 3. Then, if you control a min Gig, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": { "kind": "changeGig", "amount": -3, "target": "anyGigDie" }
+      },
+      {
+        "trigger": "onPlay",
+        "condition": { "friendlyGigValueEquals": 1 },
+        "effect": { "kind": "draw", "count": 1 }
+      }
+    ]
   },
   {
     "id": "unlikely-bond",
@@ -3952,7 +4062,18 @@
       "mox"
     ],
     "text": "Bottom-deck a ready friendly Unit. If you do, bottom-deck a spent rival Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "unlikely-bond",
+          "targets": ["friendlyUnit", "rivalSpentUnit"],
+          "filters": [{ "readyOnly": true }]
+        }
+      }
+    ],
+    "scripted": "unlikely-bond"
   },
   {
     "id": "v-corporate-exile",
@@ -4252,7 +4373,23 @@
       "fixer"
     ],
     "text": "{Call} Choose one effect.\nGive a rival Unit -2 power this turn. // Draw 1.\n{Spend}: Decrease a Gig by up to 2.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onCall",
+        "effect": {
+          "kind": "chooseOne",
+          "modes": [
+            { "kind": "buffPower", "amount": -2, "target": "rivalUnit", "duration": "turn" },
+            { "kind": "draw", "count": 1 }
+          ]
+        }
+      },
+      {
+        "trigger": "activated",
+        "cost": { "selfSpend": true },
+        "effect": { "kind": "changeGig", "amount": -2, "target": "anyGigDie" }
+      }
+    ]
   },
   {
     "id": "wild-in-the-streets",

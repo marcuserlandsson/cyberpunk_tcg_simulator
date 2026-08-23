@@ -57,6 +57,7 @@ import type {
   Action,
   CardDb,
   CardDef,
+  EffectCondition,
   EffectDef,
   EffectNode,
   GameState,
@@ -141,6 +142,8 @@ type SlotSpec =
       kind: 'mode'
       count: number
       chooser: 'controller' | 'rivalIfBehindStreetCred' | 'allUnlessBehindStreetCred'
+      /** "... choose both instead" (docs/rulings.md §134 ff.) — see `EffectNode`'s `chooseOne.allIf`. */
+      allIf?: EffectCondition
     }
   // "Adjust a Gig by up to N": the signed amounts the player may pick from
   // (docs/rulings.md §39).
@@ -218,7 +221,12 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
       }))
     case 'chooseOne':
       return [
-        { kind: 'mode', count: node.modes.length, chooser: node.chooser ?? 'controller' },
+        {
+          kind: 'mode',
+          count: node.modes.length,
+          chooser: node.chooser ?? 'controller',
+          allIf: node.allIf,
+        },
         ...node.modes.flatMap(slotSpecs),
       ]
     case 'sequence':
@@ -261,6 +269,13 @@ function candidatesFor(
   if (slot.kind === 'amount') return slot.options.map((_option, index) => index)
 
   if (slot.kind === 'mode') {
+    // "Choose one effect. If a friendly d4 is a min Gig, choose both
+    // instead." (docs/rulings.md §134 ff.) — checked ahead of `chooser`:
+    // while the condition holds, every mode resolves, so there is nothing to
+    // choose.
+    if (slot.allIf !== undefined && conditionHolds(state, controller, slot.allIf, {}, sourceUid)) {
+      return []
+    }
     // "If you have less ☆ than a Rival, they instead choose one effect for
     // you" — a rival's private choice is not ours to enumerate, so the slot
     // offers nothing and resolution falls back to the rng (docs/rulings.md §45).
@@ -672,6 +687,21 @@ function applyNode(
         slots.next = offset
         note(draft, ctx.sourceUid, `mode ${index}`)
         applyNode(db, draft, mode, ctx, slots)
+      }
+
+      // "Choose one effect. If a friendly d4 is a min Gig, choose both
+      // instead." (docs/rulings.md §134 ff.) — checked ahead of `chooser`,
+      // the mirror image of `allUnlessBehindStreetCred` below.
+      if (
+        node.allIf !== undefined &&
+        conditionHolds(draft, ctx.player, node.allIf, ctx.context ?? {}, ctx.sourceUid)
+      ) {
+        for (let index = 0; index < node.modes.length; index++) {
+          if (draft.winner !== null) break
+          applyMode(index)
+        }
+        slots.next = end
+        return
       }
 
       // "Give a friendly Unit these effects. If you have less ☆ than a Rival,

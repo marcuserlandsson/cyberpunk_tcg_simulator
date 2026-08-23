@@ -273,6 +273,9 @@ export function filterTargets(
     if (filter.spentOnly === true && state.cards[uid].ready) return false
     // Batch 7 addition (docs/rulings.md §120 ff.):
     if (filter.lowestPower === true && effectivePower(db, state, uid) !== lowest) return false
+    // Batch 8 addition (docs/rulings.md §134 ff.): "a ready Unit" — the
+    // mirror image of `spentOnly`.
+    if (filter.readyOnly === true && !state.cards[uid].ready) return false
     return true
   })
 }

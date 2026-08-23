@@ -44,6 +44,7 @@ import {
   canAttackUnitDespiteLag,
   cantAttack,
   cantAttackGigArea,
+  cantBeBlocked,
   cardTags,
   defeatShieldOf,
   effectivePower,
@@ -212,17 +213,26 @@ export function attackActions(db: CardDb, state: GameState): Action[] {
  * (`mandibular-upgrade`, `riot-shield`) can never block by itself — it grants
  * the keyword to the Unit or Legend wearing it instead (docs/rulings.md §30),
  * which is why the test below is `hasKeyword`, not the printed keyword list.
+ *
+ * No `block` reaction at all is offered while the current pending attack's
+ * attacker carries a `cantBeBlocked` static (mt0d12-flathead, docs/rulings.md
+ * §134 ff.) — the mirror image of `cantAttack` gating `attackTargets`.
  */
 export function reactActions(db: CardDb, state: GameState): Action[] {
   const defender = opponentOf(state.activePlayer)
   const p = state.players[defender]
   const actions: Action[] = [{ type: 'react', reaction: { type: 'pass' } }]
 
-  for (const uid of p.field) {
-    const card = state.cards[uid]
-    if (!card.ready) continue
-    if (!hasKeyword(db, state, uid, BLOCKER)) continue
-    actions.push({ type: 'react', reaction: { type: 'block', blocker: uid } })
+  const attacker = state.pendingAttack?.attacker
+  const blockable = attacker === undefined || !cantBeBlocked(db, state, attacker)
+
+  if (blockable) {
+    for (const uid of p.field) {
+      const card = state.cards[uid]
+      if (!card.ready) continue
+      if (!hasKeyword(db, state, uid, BLOCKER)) continue
+      actions.push({ type: 'react', reaction: { type: 'block', blocker: uid } })
+    }
   }
 
   const payment = legendCallPayment(db, state, defender)

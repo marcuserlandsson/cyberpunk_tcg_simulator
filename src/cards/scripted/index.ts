@@ -1254,4 +1254,127 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   'misty-olszewski-mender-of-broken-spirits:unit': mistyReveal('unit'),
   'misty-olszewski-mender-of-broken-spirits:gear': mistyReveal('gear'),
   'misty-olszewski-mender-of-broken-spirits:program': mistyReveal('program'),
+
+  // -------------------------------------------------------------------------
+  // Task 8 batch 8 (Blue, last 16) — docs/rulings.md §134 ff.
+  // -------------------------------------------------------------------------
+
+  /**
+   * `placide-voodoo-sentinel` — "{Play} {Attack} You may discard 1 Program.
+   * If you do, bottom-deck a rival Unit." Discarding the controller's own
+   * hand card is a COSTED option, so — the `maman-brigitte-spirit-of-death`
+   * shape (docs/rulings.md §133) — it is a `chooseOne` (in data/cards.json,
+   * on both the {Play} and {Attack} EffectDefs) with a do-nothing decline
+   * mode; "which Program" is this script's own declared `friendlyHandCard`
+   * slot (filtered `program`), a real decision. "Which rival Unit" is picked
+   * through the rng exactly like Maman Brigitte's, since the printed text
+   * draws no distinction among rival Units.
+   */
+  'placide-voodoo-sentinel:take-it': (_db, state, ctx) => {
+    const program = ctx.targets[0]
+    if (program === undefined) return state
+    const p = state.players[ctx.player]
+    if (!p.hand.includes(program)) return state
+    p.hand = p.hand.filter((uid) => uid !== program)
+    p.trash.push(program)
+    state.events.push({ type: 'cardTrashed', uid: program })
+    const rival = opponentOf(ctx.player)
+    const target = pick(state, state.players[rival].field)
+    if (target !== undefined) {
+      state.players[rival].field = state.players[rival].field.filter((uid) => uid !== target)
+      state.players[rival].deck.push(target)
+      state.events.push({ type: 'cardBottomDecked', uid: target })
+    }
+    return state
+  },
+
+  /**
+   * `sasha-yakovleva-won-t-let-you-down` — "{Attack} Reveal the top card of
+   * your deck and add it to your hand. This Unit gains power equal to that
+   * card's cost this turn." "That card's cost" needs the specific card this
+   * same step just revealed — the `heywood-ripperdoc`/§73 "its cost" shape.
+   * An empty deck simply reveals nothing (no card enters hand, no buff),
+   * matching `judy-a-lvarez-nothing-to-doubt`'s identical "reveal the top
+   * card" convention rather than the mandatory-draw deck-out rule (§36),
+   * which only ever applies to an explicit `draw` node.
+   */
+  'sasha-yakovleva-won-t-let-you-down': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const uid = p.deck.shift()
+    if (uid === undefined) return state
+    p.hand.push(uid)
+    const cost = db[state.cards[uid].defId].cost
+    const source = state.cards[ctx.sourceUid]
+    if (source) source.tempPower += cost
+    return state
+  },
+
+  /**
+   * `tetratronic-rippler` — "(Equip to a friendly Unit or face-up Legend.)
+   * When this Unit or Legend is spent, search the top card of your deck. You
+   * may trash it. (Otherwise, keep it on the top of your deck.)" Unlike
+   * `judy-a-lvarez-braindance-maestro`'s "you may add it to hand" (no cost or
+   * drawback — auto-taken per docs/rulings.md §50), trashing THIS card's own
+   * revealed top card is a genuine dilemma with no stated default winner:
+   * keeping it guarantees drawing that exact card next, trashing it removes
+   * it forever, and neither is strictly better than the other. The revealed
+   * card only exists once this script runs, and the firing action (an
+   * attack, a block, an ability {Spend} cost, ...) has no channel to carry a
+   * pre-declared trash/keep answer for a card nobody has seen yet — the same
+   * "no enumerable decision left" shape `sketchy-ripper`'s "which Gear" rng
+   * pick already covers (docs/rulings.md §48), extended here to a binary
+   * yes/no instead of a multi-way pick. This card is itself the sibling
+   * docs/rulings.md §88 already cites for the pool-wide "keep it on top"
+   * default when nothing is trashed.
+   */
+  'tetratronic-rippler': (_db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const uid = p.deck[0]
+    if (uid === undefined) return state
+    const [roll, rng] = nextInt(state.rng, 2)
+    state.rng = rng
+    if (roll === 0) {
+      p.deck.shift()
+      p.trash.push(uid)
+      state.events.push({ type: 'cardTrashed', uid })
+    }
+    return state
+  },
+
+  /**
+   * `unlikely-bond` — "Bottom-deck a ready friendly Unit. If you do,
+   * bottom-deck a spent rival Unit." Two real, declared target slots
+   * (`friendlyUnit` filtered `readyOnly`, then the existing `rivalSpentUnit`
+   * zone) rather than two independent EffectDefs, because "if you do" ties
+   * the second bottom-deck to the first ACTUALLY happening — two independent
+   * EffectDefs would let the rival Unit get bottom-decked even with no ready
+   * friendly Unit to sacrifice, which the printed "if you do" forbids.
+   * Targets are classified by zone/readiness rather than array position,
+   * since an unfillable EARLIER slot collapses out of `ctx.targets` and would
+   * otherwise shift a later slot's value into the wrong index (docs/
+   * rulings.md §133's `bound.filter` note).
+   */
+  'unlikely-bond': (_db, state, ctx) => {
+    const rival = opponentOf(ctx.player)
+    let friendly: number | undefined
+    let rivalTarget: number | undefined
+    for (const uid of ctx.targets) {
+      if (state.players[ctx.player].field.includes(uid)) friendly = uid
+      else if (state.players[rival].field.includes(uid)) rivalTarget = uid
+    }
+    // `friendly`'s readiness is already guaranteed by the declared slot's
+    // own `readyOnly` filter (docs/rulings.md §134 ff.) — not re-checked
+    // here, the same trust the filter machinery gets everywhere else.
+    if (friendly === undefined) return state
+    state.players[ctx.player].field = state.players[ctx.player].field.filter(
+      (uid) => uid !== friendly
+    )
+    state.players[ctx.player].deck.push(friendly)
+    state.events.push({ type: 'cardBottomDecked', uid: friendly })
+    if (rivalTarget === undefined) return state
+    state.players[rival].field = state.players[rival].field.filter((uid) => uid !== rivalTarget)
+    state.players[rival].deck.push(rivalTarget)
+    state.events.push({ type: 'cardBottomDecked', uid: rivalTarget })
+    return state
+  },
 }

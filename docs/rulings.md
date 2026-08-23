@@ -4056,3 +4056,334 @@ review, all fixed — see §133 for the full write-up. Re-verified: `npx tsc
 **Verification (original batch, superseded by fix round 1's numbers
 above):** `npx tsc --noEmit` clean, `npm test` 523/523 (492 pre-existing +
 31 new), `npm run build` clean.
+
+# Task 8 batch 8 (Blue, last 16 cards) — the final batch of all 141
+
+The last Blue batch, and the last card-content batch of Task 8. Sixteen
+cards needed five vocabulary extensions, four scripted cards, and two full
+deferrals (both already anticipated by earlier batches' own rulings) — no
+new engine-level fix was required, unlike the last two batches.
+
+## 134 — `streetCredBehindRival`: the mirror image of `streetCredAheadOfRival`
+
+`modded-muramasa` ("At the end of your turn, if you have less ☆ than a
+Rival, ready this Unit.") and `mt0d12-flathead` ("If you have less ☆ than a
+Rival, this Unit can't be blocked.") both print "you have less ☆ than a
+Rival" as a plain board condition. §55 already built `streetCredAheadOfRival`
+("more ☆ than a Rival," strictly greater) for the identical comparison in the
+opposite direction; nothing before this batch needed the "behind" half as a
+reusable `EffectCondition` field — `effects.ts`'s local `behindOnStreetCred`
+helper existed only to drive the `chooseOne` chooser mechanism (§45/§54), not
+as something a card's own `condition` could name.
+
+**Ruling:** `EffectCondition` gains `streetCredBehindRival?: boolean`,
+checked in `query.ts`'s `conditionHolds` as `streetCred(state, player) <
+streetCred(state, opponentOf(player))` — the exact mirror of the existing
+`streetCredAheadOfRival` check, one comparison operator flipped. Both cards
+use it directly: `modded-muramasa` as `{ trigger: 'onEndTurn', condition: {
+streetCredBehindRival: true }, effect: { kind: 'readyCard', target: 'self'
+} }`, and `mt0d12-flathead` as the new `cantBeBlocked` static below, gated by
+the same condition. `effects.ts`'s own `behindOnStreetCred` helper is
+untouched (it still drives `chooseOne`'s rival-choice/`allUnlessBehindStreetCred`
+machinery, a different consumer of the identical board fact).
+
+## 135 — `cantBeBlocked`: a static consulted by `reactActions`, the mirror image of `cantAttack`
+
+`mt0d12-flathead`: "If you have less ☆ (Street Cred) than a Rival, this Unit
+can't be blocked." No earlier card restricts *being blocked* — every static
+restriction so far (`cantAttack`, `cantAttackGigArea`, `rivalCantAttackWhenPlayed`)
+is about attacking, not defending.
+
+**Rulings:**
+
+- `EffectNode` gains `{ kind: 'cantBeBlocked' }`, a `static`-trigger-only
+  node consulted by a new `query.cantBeBlocked(db, state, uid)` — exactly
+  `cantAttack`'s own one-line shape (`activeStaticNodes(...).some((node) =>
+  node.kind === 'cantBeBlocked')`);
+- `combat.ts`'s `reactActions` reads `state.pendingAttack?.attacker` and
+  skips the entire `{Blocker}` reaction loop when that attacker carries the
+  static — no `block` reaction is offered *at all* for that attack, for any
+  candidate blocker, rather than filtering candidates one at a time. This
+  mirrors how `canAttack` gates a static restriction on the ATTACKING side:
+  a single early check rather than narrowing the per-candidate loop;
+- the condition is evaluated from the ATTACKER's controller's own point of
+  view (`mt0d12-flathead`'s own owner), exactly like every other
+  `EffectCondition` on a `static` def — `staticNodes` (`query.ts`) already
+  judges every static from the printing card's OWN owner's perspective, so
+  no new plumbing was needed beyond the new node kind and the new condition
+  field (§134).
+
+## 136 — `chooseOne.allIf`: "choose both instead", and `friendlyGigSizeAtMin`
+
+`pyramid-song`: "Choose one effect. If a friendly d4 is a min Gig, choose
+both instead. Give a rival Unit -5 power this turn. // Bottom-deck a rival
+Unit with power 0." This is the mirror image of `gunpoint-diplomacy`'s
+`allUnlessBehindStreetCred` (§45/§54): there, the DEFAULT is "both," and
+being behind on ☆ is the penalty that narrows to "one." Here the DEFAULT is
+"one" (the ordinary `chooseOne`), and a specific board condition — unrelated
+to Street Cred — is the exception that widens to "both."
+
+**Rulings:**
+
+- rather than add a second, narrowly-named chooser value (which would not
+  generalize to the next card that needs "normally one, but both under
+  condition X" for some OTHER condition), `chooseOne` gains an independent
+  `allIf?: EffectCondition` field, checked AHEAD of `chooser`: when
+  `allIf`'s condition holds, every mode resolves and `chooser` is not
+  consulted at all; otherwise resolution proceeds exactly as before
+  (`chooser` defaulting to `'controller'`). `effects.ts`'s `SlotSpec`'s
+  `'mode'` variant carries the same field through to `candidatesFor` (which
+  returns no candidates for the mode slot while `allIf` holds — the "nothing
+  to choose" shape `allUnlessBehindStreetCred`'s own "not behind" branch
+  already uses) and to `applyNode`'s `chooseOne` case (which resolves every
+  mode in printed order, exactly like the `allUnlessBehindStreetCred`
+  branch, just gated on a different fact);
+- unlike `gunpoint-diplomacy` (wrapped in a `sameTarget`, §53, so both modes
+  land on ONE chosen Unit), `pyramid-song`'s two modes are NOT tied to a
+  single target — the card names "a rival Unit" and, separately, "a rival
+  Unit with power 0," which need not be the same Unit. Each mode keeps its
+  own real target slot; when `allIf` holds, BOTH slots are enumerated
+  (verified empirically: with two rival Units, one power 10 and one power 0,
+  the resulting `playCard` actions offer every combination of {either Unit
+  for the debuff} × {the power-0 Unit for the bottom-deck}), and when it does
+  not hold, only the CHOSEN mode's own target ends up mattering (the other
+  mode's slot is still reserved per §45's "reserve every mode's slots
+  regardless of which is chosen" rule, but is dropped from the flat array
+  automatically whenever its own candidate list happens to be empty — no new
+  mechanism, the existing `fillableSlots`/`effectTargetChoices` behavior);
+- "a friendly d4 is a min Gig" needed one more condition field:
+  `EffectCondition.friendlyGigSizeAtMin?: DieSize` — a friendly Gig die of
+  EXACTLY that printed size currently showing 1. This is deliberately
+  size-specific, unlike `chrome-reverie`'s bare "a min Gig" (§121's
+  `friendlyGigValueEquals: 1`, size-agnostic) — `pyramid-song` names a d4
+  specifically, and a d6/d8/... die at 1 does not qualify. `query.ts`'s
+  `conditionHolds` checks `state.players[player].gigArea.some((die) =>
+  die.size === condition.friendlyGigSizeAtMin && die.value === 1)`. Like
+  `chrome-reverie`'s bare phrasing, this has no antecedent to be anaphoric
+  about (§133's jackie fix does not apply here) — it is a plain board read,
+  unconditioned on which die (if any) an earlier clause touched, since this
+  card's own text has no earlier "decrease/increase a Gig" clause to be
+  anaphoric ABOUT in the first place.
+
+## 137 — `readyOnly` filter, and two "if you do" scripts needing correlated-but-different-zone target slots
+
+`unlikely-bond` ("Bottom-deck a ready friendly Unit. If you do, bottom-deck a
+spent rival Unit.") and `placide-voodoo-sentinel` ("{Play} {Attack} You may
+discard 1 Program. If you do, bottom-deck a rival Unit.") both tie a SECOND
+real decision to whether a FIRST one actually resolved — the "if you do"
+shape `maman-brigitte-spirit-of-death` established a scripted precedent for
+(§133), but neither of these two cards shares Maman Brigitte's "both slots
+read the identical zone+filter" correlation that made her two slots always
+jointly fillable or jointly empty. Here the two slots are DIFFERENT zones
+(a friendly Unit, then a rival Unit), so they can be independently fillable
+— exactly the risk profile the task brief's "no 3+-slot node with an
+unfillable middle slot" warning is about, one slot short of that count.
+
+**Rulings:**
+
+- `TargetFilter` gains `readyOnly?: boolean` — "a **ready** friendly Unit,"
+  the mirror image of the existing `spentOnly` (§107 ff.). `targets.ts`'s
+  `filterTargets` gains the matching one-line check
+  (`!state.cards[uid].ready` excludes a candidate). `unlikely-bond`'s first
+  slot is `{ spec: 'friendlyUnit', filter: { readyOnly: true } }`; its
+  second slot reuses the ALREADY-EXISTING `rivalSpentUnit` `TargetSpec`
+  (Task 7 vocabulary — bare "a spent Unit" restricted to the rival side, no
+  new spec needed) for "a spent rival Unit";
+- both cards stay SCRIPTED (rather than becoming a new "chained bottom-deck"
+  node, since no other card in the pool shares this exact two-different-
+  zone shape) with two DECLARED target slots, so both halves stay real,
+  enumerated decisions per §73/§80 — never an rng pick for either "which
+  friendly Unit" or "which rival Unit." The scripts classify a bound uid by
+  ZONE MEMBERSHIP (is it in the controller's own field? the rival's field?)
+  rather than by ARRAY POSITION, because an unfillable EARLIER slot
+  collapses out of `ctx.targets` entirely (§133's `bound.filter` note) and
+  would otherwise silently shift a LATER, still-fillable slot's value into
+  the wrong logical role — confirmed by `unlikely-bond`'s own second test
+  (no ready friendly Unit; only the rival-Unit slot is fillable; the single
+  bound uid is still correctly read as "the rival," never mistaken for "the
+  friendly," because the script checks which player's field actually
+  contains it rather than trusting its position);
+- the FIRST slot's success gates the second: `unlikely-bond`'s script
+  bottom-decks the friendly Unit first and returns early (leaving the rival
+  Unit on the field) if that slot did not bind; `placide-voodoo-sentinel`'s
+  discards the chosen Program first and returns early if it is not actually
+  in hand. Neither card lets the SECOND effect fire without the first
+  actually having happened, matching "if you do" exactly — unlike a naive
+  two-independent-`EffectDef` encoding, which would let the rival-side effect
+  fire even when the friendly-side one had nothing to act on;
+- `placide-voodoo-sentinel`'s discard is a COSTED option (discarding the
+  controller's own hand card), so — the `maman-brigitte-spirit-of-death`
+  shape (§133) — it is a `chooseOne` (two identical copies, one on the
+  `{Play}` `EffectDef` and one on the `{Attack}` `EffectDef`, since "{Play}
+  {Attack} X" is two separate `EffectDef`s sharing one printed clause, the
+  established `dexter-deshawn-one-last-chance` shape, §39) with a
+  do-nothing decline mode, rather than an auto-take. "Which Program" is the
+  `chooseOne`'s `friendlyHandCard` (filtered `program`) slot; "which rival
+  Unit" stays rng-picked inside the script (the printed text draws no
+  distinction among rival Units, matching Maman Brigitte's own precedent for
+  the identical "which rival Unit" gap);
+- the `{Attack}`-triggered copy of `placide-voodoo-sentinel`'s ability
+  cannot carry a pre-declared mode or target at all — `combat.ts`'s
+  `attack` action has no generic slot for a triggered effect's own targets
+  (only `payOptionalCosts`, §49's narrower mechanism), so `fireTriggerOnDraft`
+  always fires `onAttack` with an empty `targets` array. Both the
+  `chooseOne`'s mode AND (when "take it" is picked) the script's own
+  `friendlyHandCard` slot therefore fall back to the rng, exactly like a
+  `{Call}`-triggered `chooseOne` (§45) — an existing, accepted consequence of
+  `bindSlots`'s generic "no supplied value, pick uniformly" rule (§32),
+  not a new gap this card introduces.
+
+## 138 — `tetratronic-rippler`: a genuine binary "keep or trash" decision, with no channel to carry it, falls to the rng
+
+"(Equip to a friendly Unit or face-up Legend.) When this Unit or Legend is
+spent, search the top card of your deck. You may trash it. (Otherwise, keep
+it on the top of your deck.)" This card is itself the sibling §88 already
+cited, pool-wide, as the evidence for what an unstated "search the top N"
+default means (a searched-but-not-acted-on card returns to the top, in the
+order encountered) — but its OWN encoding was still outstanding until this
+batch.
+
+**Ruling:** unlike `judy-a-lvarez-braindance-maestro`'s "you may add it to
+hand" (§120 ff.) — a cost-free, drawback-free upside auto-taken per §50 —
+`tetratronic-rippler`'s "you may trash it" is a genuine dilemma with no
+stated default winner: keeping the card guarantees drawing that exact card
+next; trashing it removes it from the deck forever. Neither branch is
+strictly better than the other (it depends entirely on what the revealed
+card is), so §50's auto-take reasoning does not apply here. However, the
+revealed card only exists once this `onSpend` script actually runs, and the
+firing action (an attack, a block, an ability `{Spend}` cost, ...) has no
+channel to carry a pre-declared "trash y/n" answer for a card nobody has
+seen yet — the identical "no enumerable decision left" shape `sketchy-
+ripper`'s "which Gear" rng pick already covers (§48), extended here from a
+multi-way pick to a binary one. The script flips a fair coin through
+`state.rng` (`nextInt(state.rng, 2)`) to decide trash vs. keep, fully
+encoding both branches (never silently favoring one), so this is a complete,
+faithful encoding rather than a partial one — the missing piece is *which
+branch a real player would have picked*, not *what either branch does*,
+exactly the distinction §79/§80 draws between a forbidden gameplay-affecting
+partial and an accepted "no decision channel, so rng" resolution.
+
+## 139 — `sasha-yakovleva-won-t-let-you-down`: "that card's cost" (the `heywood-ripperdoc` shape), and a defeated {Go Solo} Legend is removed, not trashed
+
+"{Go Solo} {Attack} Reveal the top card of your deck and add it to your
+hand. This Unit gains power equal to that card's cost this turn. {Defeated}
+A Rival discards 1." "That card's cost" needs the specific card THIS SAME
+step just revealed — the identical "read a property of what a prior step
+touched" shape §73/§129 already forced into a script for `heywood-
+ripperdoc`'s "its cost" and `judy-a-lvarez-braindance-maestro`'s "it."
+
+**Rulings:**
+
+- scripted: reveal the top card (an unconditional move to hand — no "you
+  may," unlike `tetratronic-rippler`), then buff the source's own
+  `tempPower` by that specific card's printed cost, this turn. An empty deck
+  simply reveals nothing (no card, no buff) — the established "reveal" (not
+  `draw`) convention (§36 only ever applies to an explicit `draw` node,
+  confirmed by `judy-a-lvarez-nothing-to-doubt`'s identical "reveal the top
+  card" script never checking for a deck-out);
+  - the `{Defeated}` clause needs no script: `discardRandomRival` (Task 7
+    vocabulary) already covers "A Rival discards 1" verbatim;
+  - `{Go Solo}` is the printed reminder only, already covered by the
+    `keywords` array (the established `meredith-stout-stone-cold-corpo`
+    precedent for a bare keyword line);
+- **incidental confirmation, not a new ruling:** a defeated `{Go Solo}`
+  Legend goes to `owner.removed` (`combat.ts`'s `leaveField`), not
+  `owner.trash` — §31's "when it leaves the field, remove it from the game"
+  applies to EVERY exit route uniformly, including a fight defeat, not just
+  a voluntary bounce/bottom-deck. `onDefeat` still fires normally either
+  way (confirmed by this card's own test: the Rival's hand still loses a
+  card even though Sasha herself lands in `removed`, not `trash`).
+
+## 140 — Two more full deferrals, both already anticipated by earlier batches
+
+- `mox-inciters`: "{Play} A rival Unit must attack next turn if it can.
+  {Blocker}" — §132 already named this EXACT card, by id, as sharing
+  `evelyn-parker-beautiful-enigma`'s deferred `{Spend}` ability's gap: a
+  positive obligation on the RIVAL's own future legal-action list ("no
+  `endTurn` should be legal for the rival while an attack they COULD still
+  make remains unmade"), which nothing in the pool has built. Since this
+  forced-attack clause is `mox-inciters`' ONLY non-reminder clause (its
+  `{Blocker}` line needs no `EffectDef` at all, per the established bare-
+  keyword-reminder precedent), the card is left with `effects: []` in full
+  — not a partial encoding of a single-clause card, simply the deferred
+  clause plus a reminder line that was never going to need an `EffectDef`;
+- `reboot-optics`: "{Quick} The next time a rival Unit fights this turn, it
+  doesn't defeat the opposing friendly Unit." — precisely the shape §91
+  already scoped for `safety-override` ("{Quick} The next time a friendly
+  Unit loses a fight this turn, defeat the opposing rival Unit."): a
+  delayed, conditional, one-shot effect tied to a FUTURE fight (whichever
+  one happens to qualify first, involving whichever two cards happen to be
+  fighting), not to a chosen card or a turn boundary alone — the
+  `floatingEffects` gap §52 scoped and §79/§80 made standing policy never to
+  half-solve. `reboot-optics` joins `chrome-fang`, `appetite-for-
+  destruction`, `cyberpsychosis` and `safety-override` on that deferral
+  list, `effects: []` in full.
+
+Both cards' tests in `tests/cards/blue.test.ts` are the same bookkeeping-only
+assertion (`expect(db['<id>'].effects).toEqual([])`) the existing deferred
+cards already use, plus (for `mox-inciters`) a confirmation that its
+`{Blocker}` keyword still functions normally despite the deferred clause.
+
+## Task 8 batch 8 summary
+
+**Cards:** `modded-kusanagi`, `modded-muramasa`, `mox-inciters`,
+`mt0d12-flathead`, `netwatch-netdriver`, `placide-voodoo-sentinel`,
+`psycho-squad`, `pyramid-song`, `reboot-optics`,
+`rita-wheeler-no-stupid-questions`, `sasha-yakovleva-won-t-let-you-down`,
+`tetratronic-rippler`, `trust-no-one`, `unlikely-bond`, `v-corporate-exile`,
+`wakako-okada-peace-and-harmony`. Fourteen fully encoded (two of them,
+`psycho-squad` and `v-corporate-exile`, vanilla — a flavour-only line and a
+bare `{Go Solo}` reminder respectively); two (`mox-inciters`,
+`reboot-optics`) fully deferred (§140) — no partial encodings this batch.
+
+**Vocabulary extensions:** `cantBeBlocked` (`EffectNode`, static);
+`streetCredBehindRival`, `friendlyGigSizeAtMin` (`EffectCondition`);
+`allIf` (`EffectNode`'s `chooseOne`); `readyOnly` (`TargetFilter`). No new
+`Trigger` or `TargetSpec` was needed this batch — `rivalSpentUnit` (Task 7)
+and every trigger `unlikely-bond`/`placide-voodoo-sentinel`/others needed
+already existed.
+
+**Engine changes (non-vocabulary):** `combat.ts`'s `reactActions` now
+consults `query.cantBeBlocked` against the current `pendingAttack`'s
+attacker before offering any `{Blocker}` reaction.
+
+**Scripted cards (4):** `placide-voodoo-sentinel:take-it`,
+`sasha-yakovleva-won-t-let-you-down`, `tetratronic-rippler`,
+`unlikely-bond`.
+
+**Deferred (2, §140):** `mox-inciters` (forced-future-attack gap, joining
+`evelyn-parker-beautiful-enigma`'s clause per §132's own anticipation),
+`reboot-optics` (`floatingEffects` gap, joining `chrome-fang`,
+`appetite-for-destruction`, `cyberpsychosis`, `safety-override`).
+
+**TDD evidence:** every vocabulary extension was exercised by a failing-
+first real-card test before its engine change landed — verified by
+temporarily neutralizing each in turn and re-running the corresponding new
+test, confirming a failure, then restoring and re-running green:
+`combat.ts`'s `cantBeBlocked` gate (`mt0d12-flathead`'s "can't be blocked"
+case), `effects.ts`'s `chooseOne.allIf` branch (`pyramid-song`'s "resolves
+BOTH modes" case), `query.ts`'s `streetCredBehindRival` and
+`friendlyGigSizeAtMin` checks (`modded-muramasa`'s "stays spent" case and
+`pyramid-song`'s "chooses one effect normally" case respectively — disabling
+either check flips the condition to always-true, breaking the case that
+depends on it being FALSE), and `targets.ts`'s `readyOnly` filter
+(`unlikely-bond`'s dedicated "never offers a SPENT friendly Unit" case,
+added specifically because the first two `unlikely-bond` cases turned out
+not to exercise the filter at all — both happened to use boards where the
+filter's exclusion never mattered, a gap only surfaced by attempting this
+verification pass). `tests/cards/blue.test.ts` gained 27 new cases (35 ->
+62) covering all sixteen cards, including both branches of every
+conditional static/trigger and both outcomes of every `chooseOne`/rng-
+fallback shape (`pyramid-song`'s one-mode vs. both-modes,
+`wakako-okada-peace-and-harmony`'s two {Call} modes, `mt0d12-flathead`'s
+blockable/unblockable, `modded-muramasa`'s readies/stays-spent,
+`tetratronic-rippler`'s either/or search outcome, `unlikely-bond`'s
+"if you do" gate firing, not firing, and correctly excluding a spent
+friendly Unit).
+
+**Verification:** `npx tsc --noEmit` clean, `npm test` 554/554 (527
+pre-batch-8 + 27 new in `tests/cards/blue.test.ts`), `npm run build` clean,
+purity grep (`Math.random`/`Date.now`) clean on every touched file
+(`src/engine/types.ts`, `src/engine/query.ts`, `src/engine/combat.ts`,
+`src/engine/cardDb.ts`, `src/cards/effects.ts`, `src/cards/targets.ts`,
+`src/cards/scripted/index.ts`, `data/cards.json`).

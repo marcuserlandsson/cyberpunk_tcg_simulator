@@ -70,6 +70,7 @@ const targetFilterSchema = z.strictObject({
   unequipped: z.boolean().optional(),
   spentOnly: z.boolean().optional(),
   lowestPower: z.boolean().optional(),
+  readyOnly: z.boolean().optional(),
 })
 
 const costReductionSchema = z.discriminatedUnion('per', [
@@ -153,6 +154,8 @@ const conditionSchema = z.strictObject({
   playedCardType: cardTypeSchema.optional(),
   playedCardKeyword: z.string().optional(),
   stealerKeywordAnyOf: z.array(z.string()).optional(),
+  streetCredBehindRival: z.boolean().optional(),
+  friendlyGigSizeAtMin: dieSizeSchema.optional(),
 })
 
 export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
@@ -234,6 +237,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       chooser: z
         .enum(['controller', 'rivalIfBehindStreetCred', 'allUnlessBehindStreetCred'])
         .optional(),
+      allIf: conditionSchema.optional(),
     }),
     z.strictObject({ kind: z.literal('defeatShield') }),
     z.strictObject({ kind: z.literal('winsFightVsKeyword'), keyword: z.string() }),
@@ -293,6 +297,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       filter: targetFilterSchema.optional(),
     }),
     z.strictObject({ kind: z.literal('readyEddies'), count: z.number() }),
+    z.strictObject({ kind: z.literal('cantBeBlocked') }),
   ])
 )
 

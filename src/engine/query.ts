@@ -308,6 +308,21 @@ export function conditionHolds(
   ) {
     return false
   }
+  // Batch 8 additions (docs/rulings.md §134 ff.):
+  if (
+    condition.streetCredBehindRival === true &&
+    streetCred(state, player) >= streetCred(state, opponentOf(player))
+  ) {
+    return false
+  }
+  if (
+    condition.friendlyGigSizeAtMin !== undefined &&
+    !state.players[player].gigArea.some(
+      (die) => die.size === condition.friendlyGigSizeAtMin && die.value === 1
+    )
+  ) {
+    return false
+  }
   return true
 }
 
@@ -816,6 +831,16 @@ export function hasKeyword(db: CardDb, state: GameState, uid: number, keyword: K
  */
 export function cantAttack(db: CardDb, state: GameState, uid: number): boolean {
   return activeStaticNodes(db, state, uid).some((node) => node.kind === 'cantAttack')
+}
+
+/**
+ * Is `uid` under a static "this Unit can't be blocked" restriction
+ * (mt0d12-flathead, docs/rulings.md §134 ff.)? Consulted by `combat.ts`'s
+ * `reactActions` for the current pending attack's attacker, the mirror image
+ * of `cantAttack` on the defending side of an attack.
+ */
+export function cantBeBlocked(db: CardDb, state: GameState, uid: number): boolean {
+  return activeStaticNodes(db, state, uid).some((node) => node.kind === 'cantBeBlocked')
 }
 
 /**
