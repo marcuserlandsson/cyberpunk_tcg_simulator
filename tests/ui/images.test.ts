@@ -1,6 +1,29 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
+import { readdirSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { buildImageIndex, getOfficialImageUrl } from '../../src/ui/images'
+
+const IMAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../data/images')
+
+/**
+ * The on-disk filename for `defId` in the real (gitignored) `data/images/`
+ * directory, or `undefined` if there is none — either because the
+ * directory doesn't exist at all (fresh clone, nothing fetched yet) or
+ * because it exists but has no file for this particular id. Used to make
+ * the `getOfficialImageUrl` tests below strict in BOTH environments,
+ * instead of a tautology that passes no matter what the function returns.
+ */
+function realImageFilenameFor(defId: string): string | undefined {
+  let files: string[]
+  try {
+    files = readdirSync(IMAGES_DIR)
+  } catch {
+    return undefined
+  }
+  return files.find((f) => f.replace(/\.(png|jpg|jpeg|webp)$/i, '') === defId)
+}
 
 describe('buildImageIndex', () => {
   it('maps a glob-module record to defId -> url, stripping directory and extension', () => {
@@ -30,18 +53,31 @@ describe('buildImageIndex', () => {
 })
 
 describe('getOfficialImageUrl', () => {
-  // Real behavior against the actual `data/images/` directory — not mocked.
-  // The directory is gitignored, so what's in it (nothing on a fresh clone,
-  // up to 141 files after `node scripts/fetch-images.mjs`) varies by
-  // environment. Both outcomes are legitimate: assert only what's true of
-  // BOTH — a resolved URL is a non-empty string when present, and an id that
-  // is not a real card id is never resolved.
+  // Real behavior against the actual `data/images/` directory and the real
+  // `import.meta.glob` wiring in src/ui/images.ts — not mocked. The
+  // directory is gitignored, so what's in it (nothing on a fresh clone, up
+  // to 141 files after `node scripts/fetch-images.mjs`) varies by
+  // environment. Rather than loosening the assertion to tolerate both
+  // outcomes (a tautology that can't catch a broken lookup), each test below
+  // independently discovers which branch this environment is actually in
+  // (via `realImageFilenameFor`, a plain `fs.readdirSync` — not the glob
+  // under test) and then asserts that specific, strict outcome.
   it('returns undefined for an id that is not a real card', () => {
+    expect(realImageFilenameFor('does-not-exist')).toBeUndefined()
     expect(getOfficialImageUrl('does-not-exist')).toBeUndefined()
   })
 
-  it('returns undefined or a non-empty URL for a real card id, never anything else', () => {
+  it('resolves to a URL naming the on-disk file when data/images/ has one for this id, and to undefined otherwise', () => {
+    const filename = realImageFilenameFor('mantis-blades')
     const url = getOfficialImageUrl('mantis-blades')
-    expect(url === undefined || (typeof url === 'string' && url.length > 0)).toBe(true)
+    if (filename === undefined) {
+      // Fresh clone / no fetch run yet: the glob has nothing to resolve.
+      expect(url).toBeUndefined()
+    } else {
+      // `node scripts/fetch-images.mjs` has been run: the glob must resolve
+      // to a URL that actually names the real file it found on disk.
+      expect(url).toBeDefined()
+      expect(url).toContain(filename)
+    }
   })
 })
