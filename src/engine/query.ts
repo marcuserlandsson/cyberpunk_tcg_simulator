@@ -107,6 +107,15 @@ export interface ConditionContext {
   defeatedOwner?: PlayerId
   /** `onUnitDefeated` only: did the defeated Unit carry ≥1 attached Gear before it left the field? */
   defeatedWasEquipped?: boolean
+  // Batch 7 additions (docs/rulings.md §120 ff.):
+  /** `onFriendlyCardPlayed` only: the played card's own `CardDef.color`. */
+  playedCardColor?: string
+  /** `onFriendlyCardPlayed` only: the played card's own `CardDef.type`. */
+  playedCardType?: CardType
+  /** `onFriendlyCardPlayed` only: the played card's own faction/keyword tags. */
+  playedCardTags?: string[]
+  /** `onFriendlyStealDie` only: the stealing card's own faction/keyword tags. */
+  stealerTags?: string[]
 }
 
 /**
@@ -269,6 +278,35 @@ export function conditionHolds(
       ...state.players[player].legends.filter((uid) => state.cards[uid].faceUp),
     ].filter((uid) => state.cards[uid].attachedGear.length > 0).length
     if (equipped < condition.friendlyEquippedCountAtLeast) return false
+  }
+  // Batch 7 additions (docs/rulings.md §120 ff.):
+  if (condition.sourceStoleGigThisTurn === true) {
+    const source = sourceUid !== undefined ? state.cards[sourceUid] : undefined
+    if (source === undefined || source.stoleGigThisTurn !== true) return false
+  }
+  if (
+    condition.friendlyProgramNotPlayedThisTurn === true &&
+    state.players[player].playedProgramThisTurn === true
+  ) {
+    return false
+  }
+  if (condition.playedCardColor !== undefined && context.playedCardColor !== condition.playedCardColor) {
+    return false
+  }
+  if (condition.playedCardType !== undefined && context.playedCardType !== condition.playedCardType) {
+    return false
+  }
+  if (
+    condition.playedCardKeyword !== undefined &&
+    !(context.playedCardTags ?? []).includes(condition.playedCardKeyword)
+  ) {
+    return false
+  }
+  if (
+    condition.stealerKeywordAnyOf !== undefined &&
+    !condition.stealerKeywordAnyOf.some((k) => (context.stealerTags ?? []).includes(k))
+  ) {
+    return false
   }
   return true
 }

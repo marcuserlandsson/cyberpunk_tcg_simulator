@@ -645,17 +645,24 @@ export function takeStolenGig(draft: GameState, db: CardDb, dieIndex: number): v
   draft.players[thief].gigArea.push(die)
   draft.events.push({ type: 'gigStolen', from: victim, die: { ...die } })
 
+  // "if this Unit stole a Gig this turn" (delamain-cab, docs/rulings.md §120
+  // ff.) — set on the card that actually did the stealing, attack- or
+  // effect-driven alike; cleared alongside `tempPower` in `clearTurnBuffs`.
+  if (draft.cards[steal.attacker]) draft.cards[steal.attacker].stoleGigThisTurn = true
+
   // [trigger seam] "When a friendly Unit steals a d6, ..." — a watcher trigger,
   // fired on every in-play card of the thief (docs/rulings.md §42).
   // `stealerUid` answers "When THIS Unit steals a Gig" (docs/rulings.md §55 ff.).
   // `stolenDieValue`/`stealerIsLegend` answer "if its value is even/odd" and
   // "a friendly LEGEND steals" (rogue-amendiares-preem-solo, docs/rulings.md
-  // §81 ff.).
+  // §81 ff.). `stealerTags` answers "a CORPO or GANGER Unit steals"
+  // (evelyn-parker-beautiful-enigma, docs/rulings.md §120 ff.).
   fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
     stolenDieSize: die.size,
     stolenDieValue: die.value,
     stealerUid: steal.attacker,
     stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
+    stealerTags: db[draft.cards[steal.attacker].defId] ? cardTags(db[draft.cards[steal.attacker].defId]) : [],
   })
 
   steal.remaining -= 1

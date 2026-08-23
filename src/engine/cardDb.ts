@@ -23,6 +23,7 @@ const triggerSchema = z.enum([
   'onLoseFight',
   'onStartTurn',
   'onFriendlyBlock',
+  'onFriendlyCardPlayed',
   'activated',
   'static',
 ])
@@ -48,6 +49,7 @@ const targetSpecSchema = z.enum([
   'fightFoe',
   'friendlyFaceUpLegend',
   'selfGear',
+  'friendlyHandOrTrashProgram',
 ])
 
 const gigDieSpecSchema = z.enum(['friendlyGigDie', 'rivalGigDie', 'anyGigDie'])
@@ -66,6 +68,7 @@ const targetFilterSchema = z.strictObject({
   maxPowerVsFriendlyD20: z.boolean().optional(),
   unequipped: z.boolean().optional(),
   spentOnly: z.boolean().optional(),
+  lowestPower: z.boolean().optional(),
 })
 
 const costReductionSchema = z.discriminatedUnion('per', [
@@ -143,6 +146,12 @@ const conditionSchema = z.strictObject({
   sourceSpent: z.boolean().optional(),
   friendlyGigValuePair: z.boolean().optional(),
   friendlyEquippedCountAtLeast: z.number().optional(),
+  sourceStoleGigThisTurn: z.boolean().optional(),
+  friendlyProgramNotPlayedThisTurn: z.boolean().optional(),
+  playedCardColor: z.string().optional(),
+  playedCardType: cardTypeSchema.optional(),
+  playedCardKeyword: z.string().optional(),
+  stealerKeywordAnyOf: z.array(z.string()).optional(),
 })
 
 export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
@@ -282,6 +291,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       target: targetSpecSchema,
       filter: targetFilterSchema.optional(),
     }),
+    z.strictObject({ kind: z.literal('readyEddies'), count: z.number() }),
   ])
 )
 

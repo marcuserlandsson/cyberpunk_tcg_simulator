@@ -75,6 +75,13 @@ export type Trigger =
   | 'onLoseFight'
   | 'onStartTurn'
   | 'onFriendlyBlock'
+  // Batch 7 (docs/rulings.md §120 ff.): "When you play a BRAINDANCE Program,
+  // ..." / "The first time you play a Blue Unit or Blue Gear each turn, ..."
+  // — a watcher, broadcast to every in-play card of the player who just
+  // played ANY card, carrying the played card's own color/type/tags so the
+  // condition can narrow which plays qualify (judy-a-lvarez-braindance-
+  // maestro, jackie-welles-pour-one-out-for-me).
+  | 'onFriendlyCardPlayed'
   | 'activated'
   | 'static'
 
@@ -123,6 +130,10 @@ export type TargetSpec =
   // attached to the source card itself (panam-palmer-nomad-cavalry), unlike
   // `friendlyGear` which gathers every friendly Unit/Legend's Gear.
   | 'selfGear'
+  // Batch 7 (docs/rulings.md §120 ff.): "a Program ... from your hand or
+  // trash" (lizzy-wizzy-delicate-weapon) — the `friendlyHandOrTrashUnit`
+  // shape (§63), baked to `'program'` instead of `'unit'`.
+  | 'friendlyHandOrTrashProgram'
 
 /** The three Gig-die scopes a card's text can name (docs/rulings.md §39). */
 export type GigDieSpec = 'friendlyGigDie' | 'rivalGigDie' | 'anyGigDie'
@@ -155,6 +166,14 @@ export interface TargetFilter {
   unequipped?: boolean
   /** bare "a spent Unit" — either side, not ready (wild-in-the-streets, docs/rulings.md §107 ff.). */
   spentOnly?: boolean
+  /**
+   * "a Rival's lowest-power Unit. (If there are multiple, choose 1.)"
+   * (les-e-le-mens, docs/rulings.md §120 ff.) — narrows the candidate list to
+   * only the ones tied for the minimum `effectivePower` within it, computed
+   * over the RAW candidate list before this filter applies. A real,
+   * enumerated tie-break, per the printed "choose 1."
+   */
+  lowestPower?: boolean
 }
 
 /**
@@ -391,6 +410,13 @@ export type EffectNode =
   // `CardInstance.fightPowerBonusThisTurn`, read only by `fightPowerBonus`,
   // never by `effectivePower`).
   | { kind: 'buffFightPower'; amount: number | DynamicAmount; target: TargetSpec; filter?: TargetFilter }
+  // Batch 7 addition (docs/rulings.md §120 ff.): "ready N Eddie(s)"
+  // (delamain-cab, dying-night-v-s-pistol, evelyn-parker-beautiful-enigma,
+  // misty-olszewski-mender-of-broken-spirits) — readies up to `count` SPENT
+  // cards in the controller's own Eddies zone. No target slot: every Eddie is
+  // worth exactly 1 €$ when ready regardless of which card it was
+  // (economy.ts), so *which* spent one is readied first is not a decision.
+  | { kind: 'readyEddies'; count: number }
 
 /**
  * The board facts an `EffectDef`/`conditionalEffect` node can gate on. Named
@@ -454,6 +480,19 @@ export interface EffectCondition {
   // Batch 6 addition (docs/rulings.md §107 ff.):
   /** "if 5 or more friendly Units and/or Legends are equipped" (panam-palmer-nomad-cavalry). */
   friendlyEquippedCountAtLeast?: number
+  // Batch 7 additions (docs/rulings.md §120 ff.):
+  /** `onEndTurn` only: "if this Unit stole a Gig this turn" (delamain-cab) — reads the SOURCE card's own per-turn flag. */
+  sourceStoleGigThisTurn?: boolean
+  /** "This Unit can't attack UNLESS you played a Program this turn" (jacked-in-voodoo-boy) — true when the controller has NOT played one. */
+  friendlyProgramNotPlayedThisTurn?: boolean
+  /** `onFriendlyCardPlayed` only: the played card's own `CardDef.color` (jackie-welles-pour-one-out-for-me). */
+  playedCardColor?: string
+  /** `onFriendlyCardPlayed` only: the played card's own `CardDef.type` (jackie-welles-pour-one-out-for-me, judy-a-lvarez-braindance-maestro). */
+  playedCardType?: CardType
+  /** `onFriendlyCardPlayed` only: the played card's own faction/keyword tag (judy-a-lvarez-braindance-maestro's "a BRAINDANCE Program"). */
+  playedCardKeyword?: string
+  /** `onFriendlyStealDie` only: the stealing card's own faction/keyword tag is one of these (evelyn-parker-beautiful-enigma's "a CORPO or GANGER Unit"). */
+  stealerKeywordAnyOf?: string[]
 }
 
 export interface EffectDef {
@@ -559,6 +598,12 @@ export interface CardInstance {
   fightPowerBonusThisTurn?: number
   /** "steals 1 fewer Gig this turn" (take-control) — read by `combat.ts`'s attack-driven steal count. */
   stealReduction?: number
+  // Batch 7 addition (docs/rulings.md §120 ff.): "if this Unit stole a Gig
+  // this turn" (delamain-cab) — set in `combat.ts`'s `takeStolenGig` for
+  // whichever card actually did the stealing (attack- or effect-driven
+  // alike), cleared alongside `tempPower` in `clearTurnBuffs`. Optional for
+  // the same reason `skipNextReady`/`playedThisTurn` are.
+  stoleGigThisTurn?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -580,6 +625,13 @@ export interface PlayerState {
   soldThisTurn: boolean
   calledLegendThisTurn: boolean
   mulliganDone: boolean
+  // Batch 7 addition (docs/rulings.md §120 ff.): "unless you played a
+  // Program this turn" (jacked-in-voodoo-boy) — set in `playCardOnDraft`
+  // whenever the player plays a Program (main-phase or {Quick}), cleared for
+  // that player only at their own next turn start (`resetTurnState`), the
+  // same own-turn-only scope as `soldThisTurn`. Optional so no existing
+  // `PlayerState` literal needs updating.
+  playedProgramThisTurn?: boolean
 }
 
 export type Phase = 'chooseOrder' | 'mulligan' | 'start' | 'main' | 'react' | 'chooseGig' | 'gameOver'

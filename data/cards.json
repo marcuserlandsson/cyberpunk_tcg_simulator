@@ -238,7 +238,28 @@
       "netrunner"
     ],
     "text": "1 €$, {Spend} Play a Program from your trash. Bottom-deck it after you play it. (You still pay its cost.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true,
+          "eddies": 1
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "alt-cunningham-soulkiller-architect",
+          "targets": [
+            "friendlyTrashCard"
+          ],
+          "filters": [
+            {
+              "cardType": "program"
+            }
+          ]
+        }
+      }
+    ],
+    "scripted": "alt-cunningham-soulkiller-architect"
   },
   {
     "id": "animals-wrecker",
@@ -548,7 +569,19 @@
       "braindance"
     ],
     "text": "A rival Unit can't attack until your next turn. If you control a min Gig, you may Call a Legend for free. (You can only Call a Legend once per turn.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "condition": {
+          "friendlyGigValueEquals": 1
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "chrome-reverie"
+        }
+      }
+    ],
+    "scripted": "chrome-reverie"
   },
   {
     "id": "corpo-security",
@@ -660,7 +693,18 @@
       "vehicle"
     ],
     "text": "At the end of your turn, if this Unit stole a Gig this turn, ready 1 Eddie.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onEndTurn",
+        "condition": {
+          "sourceStoleGigThisTurn": true
+        },
+        "effect": {
+          "kind": "readyEddies",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "delamain-rideshare-ai",
@@ -680,7 +724,15 @@
       "ai"
     ],
     "text": "{Play} Draw 2.\n(Units with power 0 don't steal Gigs.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "draw",
+          "count": 2
+        }
+      }
+    ]
   },
   {
     "id": "dexter-deshawn-off-the-grid",
@@ -872,7 +924,24 @@
       "weapon"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\n{Attack} Decrease a Gig by up to 2. At the end of your turn, if this Unit is named \"V\", ready 2 Eddies.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "effect": {
+          "kind": "changeGig",
+          "amount": -2,
+          "target": "anyGigDie"
+        }
+      },
+      {
+        "trigger": "onEndTurn",
+        "effect": {
+          "kind": "scripted",
+          "name": "dying-night-v-s-pistol"
+        }
+      }
+    ],
+    "scripted": "dying-night-v-s-pistol"
   },
   {
     "id": "el-sombrero-n-la-venganza-lenta",
@@ -947,7 +1016,21 @@
       "doll"
     ],
     "text": "When a friendly CORPO or GANGER Unit steals 1 or more Gigs, ready 1 Eddie.\n1 €$, {Spend} A rival Unit must attack next turn if it can.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyStealDie",
+        "condition": {
+          "stealerKeywordAnyOf": [
+            "corpo",
+            "ganger"
+          ]
+        },
+        "effect": {
+          "kind": "readyEddies",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "evelyn-parker-scheming-siren",
@@ -967,7 +1050,25 @@
       "doll"
     ],
     "text": "{Attack} Draw 1. Then, if you have more ☆ (Street Cred) than a Rival, discard 1.\n(Units with power 0 don't steal Gigs.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onAttack",
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      },
+      {
+        "trigger": "onAttack",
+        "condition": {
+          "streetCredAheadOfRival": true
+        },
+        "effect": {
+          "kind": "discardCard",
+          "target": "friendlyHandCard"
+        }
+      }
+    ]
   },
   {
     "id": "field-operator",
@@ -1015,7 +1116,27 @@
       "quickhack"
     ],
     "text": "{Quick} Give a rival Unit -1 power this turn. Draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "quick": true,
+        "effect": {
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "buffPower",
+              "amount": -1,
+              "target": "rivalUnit",
+              "duration": "turn"
+            },
+            {
+              "kind": "draw",
+              "count": 1
+            }
+          ]
+        }
+      }
+    ]
   },
   {
     "id": "fool-on-the-hill",
@@ -1269,7 +1390,16 @@
       "corpo"
     ],
     "text": "{Play} Trash 3. Add a Program from among them to your hand.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "hacked-corpo"
+        }
+      }
+    ],
+    "scripted": "hacked-corpo"
   },
   {
     "id": "hanako-arasaka-daughter-of-the-emperor",
@@ -1422,7 +1552,17 @@
       "netrunner"
     ],
     "text": "This Unit can't attack unless you played a Program this turn.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "condition": {
+          "friendlyProgramNotPlayedThisTurn": true
+        },
+        "effect": {
+          "kind": "cantAttack"
+        }
+      }
+    ]
   },
   {
     "id": "jackie-welles-mama-s-favorite",
@@ -1463,7 +1603,64 @@
       "merc"
     ],
     "text": "The first time you play a Blue Unit or Blue Gear each turn, you may decrease a friendly Gig by up to 2. If it becomes a min Gig, draw 1.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyCardPlayed",
+        "oncePerTurn": true,
+        "onceKey": "pour-one-out-for-me",
+        "condition": {
+          "playedCardColor": "Blue",
+          "playedCardType": "unit"
+        },
+        "effect": {
+          "kind": "changeGig",
+          "amount": -2,
+          "target": "friendlyGigDie"
+        }
+      },
+      {
+        "trigger": "onFriendlyCardPlayed",
+        "oncePerTurn": true,
+        "onceKey": "pour-one-out-for-me",
+        "condition": {
+          "playedCardColor": "Blue",
+          "playedCardType": "gear"
+        },
+        "effect": {
+          "kind": "changeGig",
+          "amount": -2,
+          "target": "friendlyGigDie"
+        }
+      },
+      {
+        "trigger": "onFriendlyCardPlayed",
+        "oncePerTurn": true,
+        "onceKey": "pour-one-out-for-me",
+        "condition": {
+          "playedCardColor": "Blue",
+          "playedCardType": "unit",
+          "friendlyGigValueEquals": 1
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      },
+      {
+        "trigger": "onFriendlyCardPlayed",
+        "oncePerTurn": true,
+        "onceKey": "pour-one-out-for-me",
+        "condition": {
+          "playedCardColor": "Blue",
+          "playedCardType": "gear",
+          "friendlyGigValueEquals": 1
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
+      }
+    ]
   },
   {
     "id": "jackie-welles-ride-or-die-choom",
@@ -1643,7 +1840,32 @@
       "techie"
     ],
     "text": "When you play a BRAINDANCE Program, give a friendly Unit +1 power this turn.\n{Spend} Trash the top card of your deck. If it's a Program, you may add it to your hand.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onFriendlyCardPlayed",
+        "condition": {
+          "playedCardType": "program",
+          "playedCardKeyword": "braindance"
+        },
+        "effect": {
+          "kind": "buffPower",
+          "amount": 1,
+          "target": "friendlyUnit",
+          "duration": "turn"
+        }
+      },
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "judy-a-lvarez-braindance-maestro"
+        }
+      }
+    ],
+    "scripted": "judy-a-lvarez-braindance-maestro"
   },
   {
     "id": "judy-a-lvarez-nothing-to-doubt",
@@ -1665,7 +1887,20 @@
       "techie"
     ],
     "text": "1 €$, {Spend} Reveal the top card of your deck. You may play it for free. Otherwise, add it to your hand.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "activated",
+        "cost": {
+          "selfSpend": true,
+          "eddies": 1
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "judy-a-lvarez-nothing-to-doubt"
+        }
+      }
+    ],
+    "scripted": "judy-a-lvarez-nothing-to-doubt"
   },
   {
     "id": "kerry-eurodyne-axe-attitude-audience",
@@ -1799,7 +2034,18 @@
       "corpo"
     ],
     "text": "Bottom-deck a Rival's lowest-power Unit. (If there are multiple, choose 1.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "bottomDeck",
+          "target": "rivalUnit",
+          "filter": {
+            "lowestPower": true
+          }
+        }
+      }
+    ]
   },
   {
     "id": "live-with-the-aftermath",
@@ -1851,7 +2097,25 @@
       "rocker"
     ],
     "text": "{Play} You may play a Program with cost 3 or less from your hand or trash for free. Bottom-deck it after you play it.\n{Blocker}",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "sameTarget",
+          "target": "friendlyHandOrTrashProgram",
+          "filter": {
+            "maxCost": 3
+          },
+          "effects": [
+            {
+              "kind": "scripted",
+              "name": "lizzy-wizzy-delicate-weapon"
+            }
+          ]
+        }
+      }
+    ],
+    "scripted": "lizzy-wizzy-delicate-weapon"
   },
   {
     "id": "maelstrom-goons",
@@ -1930,7 +2194,16 @@
       "netrunner"
     ],
     "text": "{Play} You may discard 2 Programs. If you do, bottom-deck a rival unequipped Unit.",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "maman-brigitte-spirit-of-death"
+        }
+      }
+    ],
+    "scripted": "maman-brigitte-spirit-of-death"
   },
   {
     "id": "mandibular-upgrade",
@@ -2136,7 +2409,35 @@
       "mystic"
     ],
     "text": "This Unit can't attack.\nAt the end of your turn, choose a card type. Then, reveal the top card of your deck. If it's the chosen type, add it to your hand and ready 1 Eddie. Otherwise, trash it.\n(Card types include Unit, Gear, and Program.)",
-    "effects": []
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "cantAttack"
+        }
+      },
+      {
+        "trigger": "onEndTurn",
+        "effect": {
+          "kind": "chooseOne",
+          "modes": [
+            {
+              "kind": "scripted",
+              "name": "misty-olszewski-mender-of-broken-spirits:unit"
+            },
+            {
+              "kind": "scripted",
+              "name": "misty-olszewski-mender-of-broken-spirits:gear"
+            },
+            {
+              "kind": "scripted",
+              "name": "misty-olszewski-mender-of-broken-spirits:program"
+            }
+          ]
+        }
+      }
+    ],
+    "scripted": "misty-olszewski-mender-of-broken-spirits"
   },
   {
     "id": "modded-kusanagi",

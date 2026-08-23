@@ -25,11 +25,19 @@
 // documented at the top of ../effects.ts.
 
 import { defeatGear, defeatUnit } from '../../engine/combat'
+import { canonicalPayment } from '../../engine/economy'
 import { endGame, drawCards } from '../../engine/game'
-import { cardTags, effectivePower, hasKeyword, opponentOf, valuePairCount } from '../../engine/query'
+import {
+  cardTags,
+  effectiveCardCost,
+  effectivePower,
+  hasKeyword,
+  opponentOf,
+  valuePairCount,
+} from '../../engine/query'
 import { nextInt, shuffle } from '../../engine/rng'
 import type { CardDb, GameState, PlayerId } from '../../engine/types'
-import { fireTriggerOnDraft, spendOnDraft, type EffectCtx } from '../effects'
+import { fireTriggerOnDraft, readyFriendlyEddies, spendOnDraft, type EffectCtx } from '../effects'
 
 export type ScriptedCard = (db: CardDb, state: GameState, ctx: EffectCtx) => GameState
 
@@ -83,6 +91,28 @@ function trashFromTop(state: GameState, player: PlayerId, count: number): number
     moved.push(uid)
   }
   return moved
+}
+
+/**
+ * `misty-olszewski-mender-of-broken-spirits`'s onEndTurn effect, one closure
+ * per chosen card type (the `chooseOne` mode) — "reveal the top card of your
+ * deck. If it's the chosen type, add it to your hand and ready 1 Eddie.
+ * Otherwise, trash it." (docs/rulings.md §120 ff.)
+ */
+function mistyReveal(cardType: 'unit' | 'gear' | 'program'): ScriptedCard {
+  return (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const uid = p.deck.shift()
+    if (uid === undefined) return state
+    if (db[state.cards[uid].defId]?.type === cardType) {
+      p.hand.push(uid)
+      readyFriendlyEddies(state, ctx.player, 1)
+    } else {
+      p.trash.push(uid)
+      state.events.push({ type: 'cardTrashed', uid })
+    }
+    return state
+  }
 }
 
 export const scriptedCards: Record<string, ScriptedCard> = {
@@ -936,4 +966,243 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (target !== undefined) state.cards[target].ready = true
     return state
   },
+
+  // -------------------------------------------------------------------------
+  // Task 8 batch 7 (Blue) — docs/rulings.md §120 ff.
+  // -------------------------------------------------------------------------
+
+  /**
+   * `hacked-corpo` — "{Play} Trash 3. Add a Program from among them to your
+   * hand." The exact `all-is-lost` shape (docs/rulings.md §48), just Program
+   * instead of Unit: which of the (unknown until trashed) 3 qualifies, and
+   * which one comes back if several do, is picked through the rng.
+   */
+  'hacked-corpo': (db, state, ctx) => {
+    const trashed = trashFromTop(state, ctx.player, 3)
+    const programs = trashed.filter((uid) => db[state.cards[uid].defId].type === 'program')
+    const chosen = pick(state, programs)
+    if (chosen === undefined) return state
+    const p = state.players[ctx.player]
+    p.trash = p.trash.filter((uid) => uid !== chosen)
+    p.hand.push(chosen)
+    return state
+  },
+
+  /**
+   * `alt-cunningham-soulkiller-architect` — "1 €$, {Spend} Play a Program
+   * from your trash. Bottom-deck it after you play it. (You still pay its
+   * cost.)" Unlike every earlier "play ... for free" script, this Program is
+   * NOT free: the printed reminder is explicit that its own play cost is a
+   * SECOND, separate payment on top of this activated ability's own 1 €$ +
+   * self-spend (already paid by `activateAbilityOnDraft` before this script
+   * runs). Since `canonicalPayment` is how every other play in this engine
+   * settles "which cards actually pay" (never a player decision — every
+   * ready Eddie/Legend is worth a fungible 1 €$, docs/rulings.md's
+   * economy.ts comment), the nested cost is paid the identical way here. If
+   * the chosen Program turns out to be unaffordable once Alt's own cost is
+   * already spent, the activation is simply wasted — the same risk any
+   * activated ability run without checking its OWN follow-on runs, not a new
+   * kind of bug. "Which Program" is the one real, declared target
+   * (`friendlyTrashCard`, filtered to Programs).
+   */
+  'alt-cunningham-soulkiller-architect': (db, state, ctx) => {
+    const program = ctx.targets[0]
+    if (program === undefined) return state
+    const p = state.players[ctx.player]
+    if (!p.trash.includes(program)) return state
+    const cost = effectiveCardCost(db, state, ctx.player, program)
+    const payment = canonicalPayment(state, ctx.player, cost)
+    if (payment === null) return state
+    spendOnDraft(db, state, payment)
+    p.trash = p.trash.filter((uid) => uid !== program)
+    // A Program never enters a zone before its own onPlay resolves (matching
+    // `playCardOnDraft`) — no `ready`/`lag` to set.
+    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: program })
+    fireTriggerOnDraft(db, state, 'onPlay', program, [])
+    // "Bottom-deck it after you play it" — instead of a Program's ordinary
+    // post-play trash fate.
+    p.deck.push(program)
+    state.events.push({ type: 'cardBottomDecked', uid: program })
+    return state
+  },
+
+  /**
+   * `chrome-reverie` — "... If you control a min Gig, you may Call a Legend
+   * for free. (You can only Call a Legend once per turn.)" Reuses
+   * `t-bug-amateur-philosopher`'s free-Call shape, gated by this def's own
+   * `condition.friendlyGigValueEquals: 1` ("a min Gig" — a Gig die showing
+   * its floor face of 1, docs/rulings.md §120 ff.) rather than firing
+   * unconditionally. The card's first clause ("A rival Unit can't attack
+   * until your next turn") is deferred — see docs/rulings.md §120 ff.
+   */
+  'chrome-reverie': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    if (p.calledLegendThisTurn) return state
+    const legend = pick(
+      state,
+      p.legends.filter((uid) => !state.cards[uid].faceUp)
+    )
+    if (legend === undefined) return state
+    state.cards[legend].faceUp = true
+    p.calledLegendThisTurn = true
+    state.events.push({ type: 'legendCalled', player: ctx.player, uid: legend })
+    fireTriggerOnDraft(db, state, 'onCall', legend, [])
+    return state
+  },
+
+  /**
+   * `dying-night-v-s-pistol` — "At the end of your turn, if this Unit is
+   * named 'V', ready 2 Eddies." Printed on Gear, fired via the `onEndTurn`
+   * watcher (`sandevistan` precedent, docs/rulings.md §107 ff.'s
+   * `equipHostUid` seam) — "this Unit" is the wearer, whose printed
+   * `CardDef.name` this checks directly (a static fact, no per-instance
+   * state needed, unlike the ready-2-eddies effect itself).
+   */
+  'dying-night-v-s-pistol': (db, state, ctx) => {
+    const hostUid = ctx.context?.equipHostUid
+    if (hostUid === undefined || !state.cards[hostUid]) return state
+    const hostDef = db[state.cards[hostUid].defId]
+    if (hostDef?.name !== 'V') return state
+    readyFriendlyEddies(state, ctx.player, 2)
+    return state
+  },
+
+  /**
+   * `judy-a-lvarez-braindance-maestro` — "{Spend} Trash
+   * the top card of your deck. If it's a Program, you may add it to your
+   * hand." "It" names the specific card just trashed, not any Program
+   * already in the trash — the same "read a property of what a prior step
+   * touched" shape §73 forced into a script for `heywood-ripperdoc`'s "its
+   * cost." The "you may" is auto-taken per docs/rulings.md §50 (no stated
+   * cost or drawback to retrieving it).
+   */
+  'judy-a-lvarez-braindance-maestro': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const uid = p.deck.shift()
+    if (uid === undefined) return state
+    p.trash.push(uid)
+    state.events.push({ type: 'cardTrashed', uid })
+    if (db[state.cards[uid].defId]?.type === 'program') {
+      p.trash = p.trash.filter((u) => u !== uid)
+      p.hand.push(uid)
+    }
+    return state
+  },
+
+  /**
+   * `judy-a-lvarez-nothing-to-doubt` — "1 €$, {Spend} Reveal the top card of
+   * your deck. You may play it for free. Otherwise, add it to your hand."
+   * The revealed card is unknown until this resolves, so — like `the-heist`
+   * — playing it for free is taken whenever legal (docs/rulings.md §50),
+   * with a Gear's equip host picked through the rng and a graceful fall-back
+   * to hand when no host exists. Mirrors `playCardOnDraft`'s own per-type
+   * entry sequence (docs/rulings.md §32/§48) rather than a generic
+   * vocabulary node, since no other card in the pool needs this exact
+   * "reveal-then-branch" shape.
+   */
+  'judy-a-lvarez-nothing-to-doubt': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const uid = p.deck.shift()
+    if (uid === undefined) return state
+    const def = db[state.cards[uid].defId]
+    const card = state.cards[uid]
+
+    if (def.type === 'gear') {
+      const hosts = [...p.field, ...p.legends.filter((h) => state.cards[h].faceUp)]
+      const host = pick(state, hosts)
+      if (host === undefined) {
+        p.hand.push(uid)
+        return state
+      }
+      state.cards[host].attachedGear.push(uid)
+    } else if (def.type === 'unit') {
+      card.ready = true
+      card.lag = true
+      card.playedThisTurn = true
+      p.field.push(uid)
+    }
+    // A Program is not placed in any zone before it resolves (matching
+    // `playCardOnDraft`), so its own `self` reference still works.
+    state.events.push({ type: 'cardPlayed', player: ctx.player, uid })
+    fireTriggerOnDraft(db, state, 'onPlay', uid, [])
+    if (def.type === 'program') {
+      p.trash.push(uid)
+      state.events.push({ type: 'cardTrashed', uid })
+    }
+    return state
+  },
+
+  /**
+   * `lizzy-wizzy-delicate-weapon` — "{Play} You may play a Program with cost
+   * 3 or less from your hand or trash for free. Bottom-deck it after you
+   * play it." The `yorinobu-arasaka-steel-dragon`/§63 shape — the real
+   * decision ("which Program") is the enclosing `sameTarget`'s
+   * `friendlyHandOrTrashProgram` slot, read here via `ctx.chosen`; this
+   * script only performs the "play it, then bottom-deck instead of trash"
+   * mechanics. The trailing `{Blocker}` line is the printed keyword
+   * (already in `keywords`), needing no effect of its own.
+   */
+  'lizzy-wizzy-delicate-weapon': (db, state, ctx) => {
+    const target = ctx.chosen
+    if (target === undefined) return state
+    const p = state.players[ctx.player]
+    const inHand = p.hand.includes(target)
+    const inTrash = p.trash.includes(target)
+    if (!inHand && !inTrash) return state
+    if (inHand) p.hand = p.hand.filter((uid) => uid !== target)
+    if (inTrash) p.trash = p.trash.filter((uid) => uid !== target)
+    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: target })
+    fireTriggerOnDraft(db, state, 'onPlay', target, [])
+    // "Bottom-deck it after you play it" — instead of a Program's ordinary
+    // post-play trash fate.
+    p.deck.push(target)
+    state.events.push({ type: 'cardBottomDecked', uid: target })
+    return state
+  },
+
+  /**
+   * `maman-brigitte-spirit-of-death` — "{Play} You may discard 2 Programs.
+   * If you do, bottom-deck a rival unequipped Unit." "If you do" ties the
+   * bottom-deck to whether the discard actually happened; with 2 discard
+   * slots feeding a 3rd conditional slot, a declared-target version risks
+   * exactly the "3+ slots, an unfillable middle one" shape this batch's
+   * brief calls out to avoid, so this stays fully scripted with both the
+   * discarded Programs and the bottom-decked Unit picked through the rng
+   * (docs/rulings.md §32/§50) — "which 2 Programs" and "which rival Unit"
+   * are not distinguished by the printed text.
+   */
+  'maman-brigitte-spirit-of-death': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const programs = p.hand.filter((uid) => db[state.cards[uid].defId]?.type === 'program')
+    if (programs.length < 2) return state
+    const discarded = pickN(state, programs, 2)
+    for (const uid of discarded) {
+      p.hand = p.hand.filter((u) => u !== uid)
+      p.trash.push(uid)
+      state.events.push({ type: 'cardTrashed', uid })
+    }
+    const rival = opponentOf(ctx.player)
+    const candidates = state.players[rival].field.filter(
+      (uid) => state.cards[uid].attachedGear.length === 0
+    )
+    const target = pick(state, candidates)
+    if (target !== undefined) {
+      state.players[rival].field = state.players[rival].field.filter((uid) => uid !== target)
+      state.players[rival].deck.push(target)
+      state.events.push({ type: 'cardBottomDecked', uid: target })
+    }
+    return state
+  },
+
+  /**
+   * `misty-olszewski-mender-of-broken-spirits` — "At the end of your turn,
+   * choose a card type. Then, reveal the top card of your deck. If it's the
+   * chosen type, add it to your hand and ready 1 Eddie. Otherwise, trash
+   * it. (Card types include Unit, Gear, and Program.)" "Choose a card type"
+   * is a real, 3-way decision — exactly what `chooseOne` is for — with one
+   * scripted mode per type sharing this same reveal-then-branch shape.
+   */
+  'misty-olszewski-mender-of-broken-spirits:unit': mistyReveal('unit'),
+  'misty-olszewski-mender-of-broken-spirits:gear': mistyReveal('gear'),
+  'misty-olszewski-mender-of-broken-spirits:program': mistyReveal('program'),
 }

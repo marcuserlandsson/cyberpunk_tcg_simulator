@@ -3490,3 +3490,388 @@ the attack-legality side.
 **Verification:** `npx tsc --noEmit` clean, `npm test` 492/492 (466
 pre-existing + 26 new), `npm run build` clean, purity grep
 (`Math.random`/`Date.now`) clean on every touched file.
+
+# Task 8 rulings, batch 7 (Blue, 17 cards)
+
+The first Blue batch. Fifteen of the seventeen are encoded in full; two
+(`chrome-reverie`, `evelyn-parker-beautiful-enigma`) are *partially* encoded
+under the safe, Meredith-Stout-shaped exception §60/§72/§80 already
+established (the omitted clause is a separate, independently-triggered piece
+whose absence can only make the card weaker than printed, never stronger) —
+see §132.
+
+## 120 — `onFriendlyCardPlayed`: a watcher for "when you play a [color/type/
+keyword] card"
+
+`jackie-welles-pour-one-out-for-me` ("The first time you play a Blue Unit or
+Blue Gear each turn, ...") and `judy-a-lvarez-braindance-maestro` ("When you
+play a BRAINDANCE Program, ...") both watch *any* card the controller plays,
+narrowed by a printed color/type/keyword — no earlier trigger reads a played
+card's own color at all, and every earlier "watch a play" fact
+(`firstMatchingPlayDiscount`) was a cost STATIC, not a trigger.
+
+**Rulings:**
+
+- `Trigger` gains `onFriendlyCardPlayed`, fired from `playCardOnDraft` via
+  `fireWatcherTrigger` right after the played card's own `onPlay` resolves,
+  broadcasting to every in-play card of the player who just played (the
+  ordinary watcher shape, §42/§60/§72/§92 ff.) — including a Legend, a Gear,
+  or a Program (which is never itself a "watcher" recipient, since it never
+  sits in `field`/`legends`, but it is still the SUBJECT of the broadcast);
+- the firing context carries the played card's own `CardDef.color`,
+  `CardDef.type` and `cardTags` (role/faction tags), read once at the
+  `playCardOnDraft` call site (which already has `db`/`def` in scope) rather
+  than re-derived inside `conditionHolds`;
+- `EffectCondition` gains three matching fields: `playedCardColor`,
+  `playedCardType`, `playedCardKeyword` (checked against the new
+  `ConditionContext.playedCardColor`/`playedCardType`/`playedCardTags`,
+  mirroring `attackerKeyword`/`attackerTags`'s existing shape exactly);
+- "Blue Unit **or** Blue Gear" is not a single OR-condition but two sibling
+  `EffectDef`s (one per `playedCardType`) sharing one `oncePerTurn` +
+  `onceKey` allowance (§67) — the established way to encode "the first
+  time X or Y happens each turn" as one compound event without inventing a
+  list-valued `playedCardType`. `jackie-welles-pour-one-out-for-me`'s
+  four-`EffectDef` shape (two for the decrease, two for the conditional
+  draw, all sharing `onceKey: "pour-one-out-for-me"`) is exactly
+  §67's `yorinobu-arasaka-embracing-destruction` pattern, generalized to a
+  trigger with two qualifying variants instead of one: whichever variant's
+  `EffectDef` runs first (`fireCardTrigger`'s printed order) evaluates the
+  whole group, so a Blue Unit play cannot double-fire alongside a
+  Blue Gear play later the same turn, and the "if it becomes a min Gig, draw
+  1" pair reads the board *after* the matching decrease def already ran
+  (`fireCardTrigger` resolves defs of one firing in printed order, mutating
+  the same draft — the identical "two EffectDefs on one trigger" shape the
+  schema doc's own closing paragraph describes for
+  `industrial-assembly`/`la-llorona-ghost-of-the-past`).
+
+## 121 — "a min Gig" is `friendlyGigValueEquals: 1` — no new vocabulary
+
+`chrome-reverie` ("If you control a min Gig, ...") and
+`jackie-welles-pour-one-out-for-me` ("If it becomes a min Gig, ...") are the
+first two cards to print "min Gig," alongside the already-landed "max Gig"
+(§39's `'friendlyMaxGig'` `DynamicAmount`, reading the *highest currently
+showing* value, not "a die literally at its printed maximum face").
+
+**Ruling:** every Gig die's rolled value ranges `[1, size]` (`GigDie.value`,
+`types.ts`) — there is no die-specific "minimum face" distinct from 1, since
+every die type in the pool numbers its faces from 1. So "a min Gig" reads
+as "a friendly Gig die currently showing 1," which is *exactly* the shape
+`friendlyGigEvenAndOdd`'s neighbour `friendlyGigValueEquals` already covers
+(§68 ff., "if [a fixed number] equals the value of a friendly Gig") — no new
+condition field, just the literal value `1`. This is confirmed by
+`jackie-welles-pour-one-out-for-me`'s own printed dependency: the card
+prints a *decrease*, then checks "if it **becomes** a min Gig," i.e. the
+board-wide `friendlyGigValueEquals: 1` check on a SECOND `EffectDef`, run
+after the first def's `changeGig` already resolved (§120's ordering note) —
+the identical "two EffectDefs, second reads the board the first just wrote"
+shape as `industrial-assembly`'s "Increase a Gig by up to 4. If you control
+a Gig with 8+ value, draw 1."
+
+## 122 — `readyEddies`: a fungible, no-target "ready N Eddie(s)" node
+
+Four Blue cards print "ready N Eddie(s)": `delamain-cab`, `dying-night-v-s-
+pistol`, `evelyn-parker-beautiful-enigma`, `misty-olszewski-mender-of-broken-
+spirits`. No earlier card readied anything from the Eddies zone
+specifically (only Gig dice, cards, or "1 €$" cost reductions).
+
+**Ruling:** `EffectNode` gains `{ kind: 'readyEddies'; count: number }`. No
+target slot: `economy.ts`'s own comment establishes every ready Eddie or
+Legend is worth exactly 1 €$ regardless of which specific card it is, so
+*which* spent Eddie becomes ready first is not a printed decision the way
+*which* Gig die to touch is (§39) — `effects.readyFriendlyEddies` picks
+deterministically in zone order (the first `count` not-yet-ready cards in
+`player.eddies`), exported so the two scripted cards needing the identical
+effect inside a larger script (`dying-night-v-s-pistol`'s "if named V,"
+`misty-olszewski-...`'s three `chooseOne` modes) share it rather than
+reimplementing the loop.
+
+## 123 — `sourceStoleGigThisTurn`: a per-instance "stole a Gig this turn" flag
+
+`delamain-cab`: "At the end of your turn, if this Unit stole a Gig this
+turn, ready 1 Eddie." No existing state tracks *which specific card*
+performed a steal this turn — `GameEvent.gigStolen` only carries the
+victim's `PlayerId`, not the thief's uid, and `ConditionContext.stealerUid`
+only exists inside an `onFriendlyStealDie` firing, not at an unrelated
+later `onEndTurn`.
+
+**Ruling:** `CardInstance` gains `stoleGigThisTurn?: boolean`, set in
+`combat.ts`'s `takeStolenGig` for `steal.attacker` (the card that actually
+did the stealing — attack- or effect-driven alike, since `stealGig`'s own
+`pendingSteal` construction already names its controller as `attacker`, per
+§32) the moment a die changes hands, and cleared alongside `tempPower` in
+`clearTurnBuffs` — the same until-end-of-game-turn lifetime, read by the new
+`EffectCondition.sourceStoleGigThisTurn` (checked against the SOURCE card's
+own instance, mirroring `sourceEquipped`/`sourceSpent`'s existing pattern).
+`reduce.ts`'s `endTurn` already fires the `onEndTurn` watcher *before*
+`clearTurnBuffs` runs (§55 ff.), so the flag is still `true` when a card
+that stole this turn checks it, and reset immediately after for the next
+turn.
+
+## 124 — `friendlyProgramNotPlayedThisTurn`: the first condition needing the
+FALSE branch of a per-turn flag
+
+`jacked-in-voodoo-boy`: "This Unit can't attack unless you played a Program
+this turn." Every earlier boolean `EffectCondition` field gates on being
+`true` (`sourceEquipped === true`, `allFriendlyLegendsFaceUp === true`,
+etc.); this is the first "**unless**" — the static restriction is active
+exactly when the fact is FALSE.
+
+**Rulings:**
+
+- `PlayerState` gains `playedProgramThisTurn?: boolean`, set in
+  `effects.playCardOnDraft`'s existing `case 'program':` branch (true for
+  both a main-phase play and a `{Quick}` reaction, since both route through
+  the same function) and cleared in `game.ts`'s `resetTurnState` for the
+  OWNER only — the identical own-turn-only scope as `soldThisTurn`, because
+  "you played a Program this turn" is asked only during the controller's own
+  turn (attacking never happens on the rival's turn), so any stray
+  `{Quick}`-Program play during the rival's preceding turn is already wiped
+  by the time the controller's own turn (and any attack) begins;
+- rather than generalize every existing boolean field to a "match this
+  declared value" comparison (touching fields no card needs inverted),
+  `EffectCondition` gains a field NAMED for the negated fact —
+  `friendlyProgramNotPlayedThisTurn?: boolean` — so the existing `=== true`
+  check style stays uniform across the whole condition object;
+- the static reads `{ trigger: 'static', condition: {
+  friendlyProgramNotPlayedThisTurn: true }, effect: { kind: 'cantAttack' } }`
+  — `cantAttack`'s existing consultation path (`query.cantAttack` ->
+  `activeStaticNodes` -> per-def `conditionMet`) already gates a static node
+  on its own `condition` for every other card, so no new consultation seam
+  is needed, only the new field.
+
+## 125 — `stealerKeywordAnyOf`: an OR of tags on the *stealing* card
+
+`evelyn-parker-beautiful-enigma`: "When a friendly CORPO or GANGER Unit
+steals 1 or more Gigs, ready 1 Eddie." `onFriendlyStealDie` already reads
+`context.stealerUid` (§55 ff., `selfIsStealer`) but nothing yet reads the
+STEALER's own tags — the closest sibling, `attackerKeyword`, checks a single
+string against `onFriendlyAttack`'s `attackerTags`.
+
+**Rulings:**
+
+- `ConditionContext` gains `stealerTags?: string[]`, populated once in
+  `combat.ts`'s `takeStolenGig` via the same `cardTags(def)` helper
+  `onFriendlyAttack`'s firing already uses, passed alongside the existing
+  `stealerUid`/`stealerIsLegend`/`stolenDieValue` facts on the same
+  `fireWatcherTrigger('onFriendlyStealDie', ...)` call;
+- `EffectCondition` gains `stealerKeywordAnyOf?: string[]` rather than a
+  singular `stealerKeyword` — "CORPO **or** GANGER" is a genuine OR across
+  two tags a single card could (if the pool ever prints one) carry BOTH of,
+  and a single-string field would need two sibling `EffectDef`s (§120's
+  Blue-Unit-or-Blue-Gear shape) that could double-fire — readying 2 Eddies
+  instead of 1 — for a hypothetical CORPO-and-GANGER Unit's steal, which the
+  printed "or" plainly does not intend. No card in the 141-card pool
+  currently carries both tags (checked), but the array shape costs nothing
+  extra and closes the gap outright rather than leaving it latent;
+- "steals 1 or more Gigs" fires the watcher **once per die stolen**, the
+  same granularity every other `onFriendlyStealDie` card already uses
+  (§42) — the phrase reads as "even a single Gig counts," not "batch a
+  multi-die steal into one firing," since nothing in the pool ever
+  aggregates a steal's die count before this trigger fires. A Unit
+  power-thresholded into a 2-die steal this turn therefore readies 2
+  Eddies, one per die — the natural per-die event granularity, not an
+  approximation.
+
+## 126 — `lowestPower`: "a Rival's lowest-power Unit... choose 1"
+
+`les-e-le-mens`: "Bottom-deck a Rival's lowest-power Unit. (If there are
+multiple, choose 1.)" No existing `TargetFilter` narrows a zone to its own
+extremal member — `weakerThanAFriendlyUnit` compares against a DIFFERENT
+zone's best, and `maxPowerVsFriendlyD20`/`maxPowerIfAheadOnStreetCred` are
+printed caps, not "the zone's own minimum."
+
+**Ruling:** `TargetFilter` gains `lowestPower?: boolean`. `targets.ts`'s
+`filterTargets` computes the minimum `effectivePower` over the RAW candidate
+list (before this filter's own narrowing — there is nothing else on this
+card's filter to interact with, but this is the same "read once per filter
+call, not per candidate" discipline `weakerThanAFriendlyUnit`/
+`maxPowerIfAheadOnStreetCred` already follow) and keeps only ties at that
+minimum. The printed "(If there are multiple, choose 1)" is exactly what
+this produces: `bottomDeck`'s ordinary target-slot machinery offers one
+legal `playCard` entry per tied candidate, a real enumerated decision, never
+an rng pick, matching every other explicit "choose 1" in the pool.
+
+## 127 — `friendlyHandOrTrashProgram`: the Program sibling §63 already
+anticipated
+
+`lizzy-wizzy-delicate-weapon`: "{Play} You may play a Program with cost 3 or
+less from your hand or trash for free. Bottom-deck it after you play it."
+§63 built `friendlyHandOrTrashUnit` for `yorinobu-arasaka-steel-dragon` and
+explicitly named this card as the "hand-or-trash Program" sibling it was
+deferring to a later batch.
+
+**Ruling:** `TargetSpec` gains `friendlyHandOrTrashProgram` — the identical
+shape, type baked into the spec's own name (§63's reasoning: a mixed
+hand+trash zone holds every card type, so a generic filter would not
+promise "a Program" the way the spec's name does). The card is encoded with
+the established `sameTarget` + scripted-child shape (§63/§53): the
+`sameTarget`'s own slot is the real "which Program" decision (filtered
+`maxCost: 3`), and the scripted child reads `ctx.chosen` to move it onto the
+field for free — unlike `yorinobu`'s script, this one bottom-decks
+afterward instead of granting {adrenaline}, since the printed text has no
+"it can attack" clause. The trailing bare `{Blocker}` line needs no
+`EffectDef` at all — it duplicates the printed `keywords` entry, the same
+`meredith-stout-stone-cold-corpo` precedent the schema doc's Keyword
+vocabulary section already establishes.
+
+## 128 — `alt-cunningham-soulkiller-architect`: a NESTED, non-free "play from
+trash" cost
+
+"1 €$, {Spend} Play a Program from your trash. Bottom-deck it after you
+play it. (You still pay its cost.)" Every earlier "play X for free" script
+(`the-heist`, `yorinobu-arasaka-steel-dragon`, `river-ward-detective-on-the-
+hunt:free-gear`, `lizzy-wizzy-delicate-weapon` above) explicitly waives the
+played card's own cost. This card's parenthetical is the pool's only
+explicit reminder that the SECOND cost still applies on top of the
+ability's own.
+
+**Ruling:** since `legal.ts`'s `canonicalPayment` already settles "which
+cards actually pay a cost" deterministically for every ordinary play — no
+card in this engine ever exposes "which Eddie/Legend pays" as a player
+decision, because every one is fungibly worth 1 €$ (`economy.ts`'s own
+comment) — the SAME function is reachable, and correct, from inside a
+script: `alt-cunningham-soulkiller-architect`'s scripted node prices the
+chosen trash Program with `effectiveCardCost`, settles it with
+`canonicalPayment`, and only proceeds (firing the Program's own `onPlay`,
+then bottom-decking instead of the ordinary post-play trash fate) if that
+payment exists. `activateAbilityOnDraft` has already paid Alt's OWN 1 €$ +
+self-spend before this script runs, so the two payments are genuinely
+independent — if the trash Program turns out to be unaffordable once Alt's
+own cost is already spent, the activation is simply wasted, no different in
+kind from any other activated ability whose printed payoff depends on a
+board state the player misjudged. "Which Program" is the one real,
+declared target (`friendlyTrashCard`, filtered `cardType: 'program'`).
+
+## 129 — Two more `onEndTurn`/`{Spend}` scripts on the established
+"reveal-then-branch" and "named host" shapes
+
+- `dying-night-v-s-pistol`'s second clause ("if this Unit is named 'V', ready
+  2 Eddies") reuses `sandevistan`'s `equipHostUid` seam (§107 ff.) to read
+  the WEARER's own `CardDef.name` directly — a static fact needing no new
+  per-instance state, unlike the ready-2-Eddies half (§122);
+- `judy-a-lvarez-nothing-to-doubt`'s "{Spend} Reveal the top card of your
+  deck. You may play it for free. Otherwise, add it to your hand." mirrors
+  `playCardOnDraft`'s own per-type entry sequence (Unit -> field with Lag,
+  Gear -> equips to an rng-picked host with a hand fallback exactly like
+  `the-heist`'s §48 precedent, Program -> resolves then trashes) rather than
+  becoming vocabulary, since no other card needs this exact "the revealed
+  card's own type decides the entry point" shape;
+- `judy-a-lvarez-braindance-maestro`'s `{Spend}` ability ("Trash the top
+  card of your deck. If it's a Program, you may add it to your hand.")
+  needs "it" to name the SPECIFIC card just trashed, the same "read a
+  property of what a prior step touched" shape §73 already forced into a
+  script for `heywood-ripperdoc`'s "its cost."
+
+## 130 — `maman-brigitte-spirit-of-death`: fully scripted to avoid a 3-slot,
+unfillable-middle shape
+
+"{Play} You may discard 2 Programs. If you do, bottom-deck a rival
+unequipped Unit." Declaring "which 2 Programs" as two real target slots
+plus "which rival Unit" as a third would put an inherently-sometimes-
+unfillable pair of slots in the MIDDLE of the def's slot list whenever fewer
+than 2 Programs are in hand — exactly the shape this batch's own brief
+flags to avoid, since a later real slot (the bottom-deck target) would need
+to still enumerate correctly whether or not the earlier pair bound.
+Following §57's residual-risk note and §102/§103's "if you do" precedent,
+this stays fully scripted: "which 2 Programs" and "which rival Unit" are
+both picked through the rng (`pickN`/`pick`), since the printed text
+distinguishes neither, and the discard step is auto-taken whenever ≥2
+Programs are in hand (docs/rulings.md §50) — declined only when the hand
+does not hold enough, never a real yes/no dilemma.
+
+## 131 — `misty-olszewski-mender-of-broken-spirits`: a `chooseOne` mode
+picked off the rng at a WATCHER trigger
+
+"At the end of your turn, choose a card type. Then, reveal the top card of
+your deck. If it's the chosen type, add it to your hand and ready 1 Eddie.
+Otherwise, trash it." "Choose a card type" reads as a genuine 3-way
+decision, and `chooseOne` is exactly the vocabulary for that — but
+`onEndTurn` is a WATCHER trigger (§55 ff.), broadcast via
+`fireWatcherTrigger` with an always-empty `targets` array, the same as every
+other watcher. §45 already established that "a `chooseOne` reached from a
+trigger that carries no player choice ({Call}) picks its mode off the rng";
+the identical reasoning applies here for the identical reason — there is no
+per-card action a player commits to when their turn ends that could carry a
+pre-chosen mode for potentially several different watching cards at once.
+**Misty's "choose a card type" is therefore rng-picked, not a real
+decision**, an accepted, precedented outcome rather than a shortcut: the
+`chooseOne`'s three modes (one scripted closure per card type, sharing a
+`mistyReveal(cardType)` factory) are otherwise ordinary. The static "This
+Unit can't attack" clause is unrelated and unconditional (`cantAttack`).
+
+## 132 — Two safe partial encodings: `chrome-reverie`, `evelyn-parker-
+beautiful-enigma`
+
+Both cards print two independent clauses; one clause of each needs a
+capability nothing in the pool has built, and — per §60/§72/§80's standing
+test — omitting it can only ever make the encoded card WEAKER than printed,
+never stronger, so both stay partially encoded rather than fully deferred:
+
+- `chrome-reverie`: "**A rival Unit can't attack until your next turn.** If
+  you control a min Gig, you may Call a Legend for free." The first clause
+  is a targeted, LASTING restriction spanning a turn boundary beyond the
+  controller's own current turn — exactly the shape §52 already scoped and
+  declined to half-build for `chrome-fang` ("Until your next turn, rival
+  Units can't steal friendly Gigs with value higher than their power") and
+  named as the reason the `floatingEffects` zone is still worth building
+  properly rather than three separate ad-hoc per-card flags. `chrome-
+  reverie`'s first clause joins that deferral list (alongside `chrome-fang`,
+  `appetite-for-destruction`, `cyberpsychosis`, `safety-override`); its
+  second clause (the free Call) is unconditional on the first and is
+  encoded in full;
+- `evelyn-parker-beautiful-enigma`: "When a friendly CORPO or GANGER Unit
+  steals 1 or more Gigs, ready 1 Eddie. **1 €$, {Spend} A rival Unit must
+  attack next turn if it can.**" The second clause needs a genuinely new
+  engine capability this pool has not needed before: forcing a FUTURE
+  action (an attack, specifically, on the RIVAL's own next turn) rather than
+  applying an immediate effect or a passive restriction — closer in shape
+  to §105's deferred `jackie-welles-mama-s-favorite` (a new interception
+  point) than to `floatingEffects`, since it is not merely a lasting
+  restriction but an obligation the legal-action space would need to
+  enforce (no `endTurn`/other action should be legal for the rival while an
+  attack they COULD still make remains unmade). **New deferral, not
+  previously named:** this "forced action" gap is recorded here rather
+  than folded into `floatingEffects`, since the two are different engine
+  primitives (a lasting restriction vs. a positive obligation on the legal-
+  action list) even though both are "the printed effect outlives its own
+  resolution." A later batch's `mox-inciters` ("A rival Unit must attack
+  next turn if it can.") shares this exact gap and should defer the same
+  clause when it lands. `evelyn-parker-beautiful-enigma`'s first clause
+  (the watcher/ready-Eddie) is independent and encoded in full.
+
+## Task 8 batch 7 summary
+
+**Cards:** `alt-cunningham-soulkiller-architect`, `chrome-reverie`,
+`delamain-cab`, `delamain-rideshare-ai`, `dying-night-v-s-pistol`,
+`evelyn-parker-beautiful-enigma`, `evelyn-parker-scheming-siren`,
+`floor-it`, `hacked-corpo`, `jacked-in-voodoo-boy`,
+`jackie-welles-pour-one-out-for-me`, `judy-a-lvarez-braindance-maestro`,
+`judy-a-lvarez-nothing-to-doubt`, `les-e-le-mens`,
+`lizzy-wizzy-delicate-weapon`, `maman-brigitte-spirit-of-death`,
+`misty-olszewski-mender-of-broken-spirits`. Fifteen fully encoded; two
+partially encoded (§132) — no card fully deferred this batch.
+
+**Vocabulary extensions:** `onFriendlyCardPlayed` (`Trigger`);
+`readyEddies` (`EffectNode`); `friendlyHandOrTrashProgram` (`TargetSpec`);
+`lowestPower` (`TargetFilter`); `sourceStoleGigThisTurn`,
+`friendlyProgramNotPlayedThisTurn`, `playedCardColor`, `playedCardType`,
+`playedCardKeyword`, `stealerKeywordAnyOf` (`EffectCondition`);
+`playedCardColor`, `playedCardType`, `playedCardTags`, `stealerTags`
+(`ConditionContext`); `stoleGigThisTurn` (`CardInstance`);
+`playedProgramThisTurn` (`PlayerState`).
+
+**Scripted cards (9):** `alt-cunningham-soulkiller-architect`,
+`chrome-reverie`, `dying-night-v-s-pistol`, `hacked-corpo` (reusing the
+`all-is-lost` shape), `judy-a-lvarez-braindance-maestro`,
+`judy-a-lvarez-nothing-to-doubt`, `lizzy-wizzy-delicate-weapon`,
+`maman-brigitte-spirit-of-death`,
+`misty-olszewski-mender-of-broken-spirits` (three registry entries —
+`:unit`/`:gear`/`:program` — for its `chooseOne` modes). 11 registry entries
+across these 9 card ids.
+
+**Partial encodings (§132):** `chrome-reverie` (first clause deferred, needs
+`floatingEffects`), `evelyn-parker-beautiful-enigma` (its `{Spend}` ability
+deferred, needs a new "forced action" capability).
+
+**Verification:** `npx tsc --noEmit` clean, `npm test` 523/523 (492
+pre-existing + 31 new), `npm run build` clean.

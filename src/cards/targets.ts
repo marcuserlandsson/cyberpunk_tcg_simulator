@@ -133,6 +133,13 @@ export function targetsFor(
     // Unit/Legend's Gear (panam-palmer-nomad-cavalry).
     case 'selfGear':
       return state.cards[sourceUid]?.attachedGear.slice() ?? []
+    // Batch 7 (docs/rulings.md §120 ff.): "a Program ... from your hand or
+    // trash" (lizzy-wizzy-delicate-weapon) — the `friendlyHandOrTrashUnit`
+    // shape (§63), baked to Program instead of Unit.
+    case 'friendlyHandOrTrashProgram':
+      return [...state.players[me].hand, ...state.players[me].trash].filter(
+        (uid) => db[state.cards[uid].defId]?.type === 'program'
+      )
   }
 }
 
@@ -226,6 +233,15 @@ export function filterTargets(
       ? streetCred(state, controller) > streetCred(state, opponentOf(controller))
       : false
   const d20Cap = filter.maxPowerVsFriendlyD20 ? friendlyD20Value(state, controller) : null
+  // "A Rival's lowest-power Unit. (If there are multiple, choose 1.)"
+  // (les-e-le-mens, docs/rulings.md §120 ff.) — the minimum is read off the
+  // RAW candidate list, before any other filter narrows it.
+  const lowest = filter.lowestPower
+    ? candidates.reduce(
+        (min, uid) => Math.min(min, effectivePower(db, state, uid)),
+        Infinity
+      )
+    : null
   return candidates.filter((uid) => {
     if (filter.excludeSelf === true && uid === sourceUid) return false
     if (filter.keyword !== undefined && !hasKeyword(db, state, uid, filter.keyword)) return false
@@ -255,6 +271,8 @@ export function filterTargets(
     // Batch 6 additions (docs/rulings.md §107 ff.):
     if (filter.unequipped === true && state.cards[uid].attachedGear.length > 0) return false
     if (filter.spentOnly === true && state.cards[uid].ready) return false
+    // Batch 7 addition (docs/rulings.md §120 ff.):
+    if (filter.lowestPower === true && effectivePower(db, state, uid) !== lowest) return false
     return true
   })
 }

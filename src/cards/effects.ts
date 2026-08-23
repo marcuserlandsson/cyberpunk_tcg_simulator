@@ -31,6 +31,7 @@ import { defeatUnit, leaveField } from '../engine/combat'
 import { canonicalPayment, pay } from '../engine/economy'
 import { draftState, drawCards, endGame } from '../engine/game'
 import {
+  cardTags,
   conditionHolds,
   conditionMet,
   effectiveCardCost,
@@ -864,6 +865,12 @@ function applyNode(
       return
     }
 
+    case 'readyEddies': {
+      readyFriendlyEddies(draft, ctx.player, node.count)
+      note(draft, ctx.sourceUid, `ready ${node.count} eddie(s)`)
+      return
+    }
+
     case 'sequence': {
       for (const child of node.effects) {
         // A node can end the game (a `draw` off an empty deck): stop resolving.
@@ -1430,6 +1437,27 @@ export function playCardTargetChoices(db: CardDb, state: GameState, uid: number)
 }
 
 /**
+ * Readies up to `count` SPENT cards in `player`'s own Eddies zone — "ready N
+ * Eddie(s)" (docs/rulings.md §120 ff.). Every Eddie is worth exactly 1 €$ when
+ * ready regardless of which card it is (economy.ts), so which spent one is
+ * readied first is not a decision: picked deterministically in zone order.
+ * Exported so the handful of `scripted` cards needing the identical effect
+ * (dying-night-v-s-pistol, misty-olszewski-mender-of-broken-spirits) share it
+ * rather than re-implementing the loop.
+ */
+export function readyFriendlyEddies(draft: GameState, player: PlayerId, count: number): void {
+  const p = draft.players[player]
+  let readied = 0
+  for (const uid of p.eddies) {
+    if (readied >= count) break
+    if (!draft.cards[uid].ready) {
+      draft.cards[uid].ready = true
+      readied += 1
+    }
+  }
+}
+
+/**
  * The zones as they will be the moment `uid`'s onPlay effects resolve: out of
  * hand (or the legends zone), and on the field for a Unit or a {go-solo}
  * Legend. Only the zone arrays that target enumeration reads are rebuilt, so
@@ -1506,6 +1534,10 @@ export function playCardOnDraft(
       effectTargets = targets.slice(1)
       break
     case 'program':
+      // "unless you played a Program this turn" (jacked-in-voodoo-boy,
+      // docs/rulings.md §120 ff.) — cleared for this player only at their own
+      // next turn start (`resetTurnState`), matching `soldThisTurn`'s scope.
+      p.playedProgramThisTurn = true
       break
   }
 
@@ -1527,6 +1559,16 @@ export function playCardOnDraft(
   // is `fireCardTrigger`, not `fireTriggerOnDraft`, for the same reason: onPlay
   // never propagates to the host's other Gear (docs/rulings.md §37).
   fireCardTrigger(db, draft, 'onPlay', cardUid, effectTargets, player)
+
+  // "When you play a BRAINDANCE Program, ..." / "The first time you play a
+  // Blue Unit or Blue Gear each turn, ..." — a watcher broadcast to every
+  // in-play card of the player who just played, carrying the played card's
+  // own color/type/tags (docs/rulings.md §120 ff.).
+  fireWatcherTrigger(db, draft, 'onFriendlyCardPlayed', player, {
+    playedCardColor: def.color,
+    playedCardType: def.type,
+    playedCardTags: cardTags(def),
+  })
 
   if (def.type === 'program') {
     p.trash.push(cardUid)

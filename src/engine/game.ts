@@ -304,6 +304,11 @@ export function clearTurnBuffs(draft: GameState): void {
     // game-turn lifetime as `tempPower`.
     draft.cards[Number(key)].fightPowerBonusThisTurn = 0
     draft.cards[Number(key)].stealReduction = 0
+    // Batch 7 addition (docs/rulings.md §120 ff.): the same until-end-of-
+    // game-turn lifetime as `tempPower` — set mid-turn by a steal, read by
+    // `onEndTurn` before this clear runs (`reduce.ts`'s `endTurn` fires the
+    // watcher first).
+    draft.cards[Number(key)].stoleGigThisTurn = false
   }
   draft.oncePerTurnUsed = []
 }
@@ -331,6 +336,9 @@ export function clearTurnBuffs(draft: GameState): void {
 function resetTurnState(draft: GameState, player: PlayerId): void {
   const p = draft.players[player]
   p.soldThisTurn = false
+  // "unless you played a Program this turn" (jacked-in-voodoo-boy,
+  // docs/rulings.md §120 ff.) — same own-turn-only scope as `soldThisTurn`.
+  p.playedProgramThisTurn = false
   draft.players[0].calledLegendThisTurn = false
   draft.players[1].calledLegendThisTurn = false
   for (const key of Object.keys(draft.cards)) {
