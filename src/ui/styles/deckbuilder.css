@@ -1,0 +1,212 @@
+.deck-error {
+  color: var(--neon-magenta);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Deck Builder (Task 14)                                                 */
+/* ---------------------------------------------------------------------- */
+
+.deck-builder {
+  display: flex;
+  gap: 1em;
+  align-items: flex-start;
+}
+
+.card-browser {
+  flex: 1 1 60%;
+  min-width: 0;
+}
+
+.card-browser__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em;
+  align-items: center;
+  margin-bottom: 0.6em;
+}
+
+.card-browser__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em;
+}
+
+.chip {
+  font-size: 0.75em;
+  padding: 0.2em 0.6em;
+  border: 1px solid var(--neon-cyan);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--neon-cyan);
+}
+
+.chip--active {
+  background: var(--neon-cyan);
+  color: var(--bg-color, #05060a);
+}
+
+.card-browser__cost-range {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 0.8em;
+}
+
+.card-browser__cost-range input {
+  width: 3.5em;
+}
+
+.card-browser__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.card-browser__cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.card-browser__cell.disabled {
+  opacity: 0.4;
+}
+
+.card-browser__overlay {
+  display: flex;
+  gap: 0.25em;
+  margin-top: 0.2em;
+  font-size: 0.7em;
+  align-items: center;
+}
+
+.card-browser__count {
+  color: var(--neon-yellow);
+}
+
+.deck-panel {
+  flex: 1 1 40%;
+  min-width: 18em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+}
+
+.deck-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  align-items: center;
+}
+
+.deck-panel__badge {
+  font-size: 0.75em;
+  border: 1px solid var(--neon-yellow);
+  border-radius: 4px;
+  padding: 0.15em 0.5em;
+  color: var(--neon-yellow);
+}
+
+.deck-panel__badge--readonly {
+  border-color: var(--neon-magenta);
+  color: var(--neon-magenta);
+}
+
+.deck-panel__legends {
+  display: flex;
+  gap: 0.5em;
+}
+
+.deck-panel__legend-slot {
+  border: 1px dashed var(--neon-cyan);
+  border-radius: 6px;
+  min-width: 120px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.deck-panel__legend-empty {
+  font-size: 0.8em;
+  opacity: 0.6;
+  padding: 0.5em;
+}
+
+.deck-panel__ram-chips {
+  display: flex;
+  gap: 0.5em;
+  flex-wrap: wrap;
+}
+
+.deck-panel__ram-chip {
+  font-size: 0.8em;
+  border: 1px solid var(--neon-cyan);
+  border-radius: 4px;
+  padding: 0.15em 0.5em;
+}
+
+.deck-panel__errors {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  font-size: 0.8em;
+}
+
+.deck-panel__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.deck-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 0.85em;
+}
+
+.deck-panel__row-name {
+  flex: 1;
+}
+
+.deck-panel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  align-items: center;
+}
+
+.deck-panel__export textarea,
+.deck-panel__import textarea {
+  width: 100%;
+  min-height: 8em;
+  font-family: monospace;
+  font-size: 0.75em;
+}
+
+.deck-panel__import-error,
+.deck-panel__export-error {
+  color: var(--neon-magenta);
+  font-size: 0.8em;
+}
+
+.deck-builder__zoom {
+  position: fixed;
+  top: 10%;
+  right: 5%;
+  background: var(--panel-bg);
+  border: 2px solid var(--neon-yellow);
+  border-radius: 8px;
+  padding: 0.6em;
+  z-index: 50;
+}

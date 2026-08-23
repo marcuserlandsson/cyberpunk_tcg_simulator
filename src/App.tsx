@@ -58,7 +58,7 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <label className="settings-toggle">
+        <label className="settings-toggle chip">
           <input
             type="checkbox"
             checked={useOfficialImages}

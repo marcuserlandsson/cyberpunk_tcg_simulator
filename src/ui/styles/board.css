@@ -1,0 +1,358 @@
+.card-row,
+.die-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75em;
+  align-items: flex-end;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Dice                                                                    */
+/* ---------------------------------------------------------------------- */
+
+.die {
+  color: var(--neon-cyan);
+  overflow: visible;
+}
+
+.die--unrolled {
+  opacity: 0.5;
+}
+
+.die__shape {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.die__value {
+  fill: currentColor;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Play view — playmat                                                     */
+/*                                                                        */
+/* The layout mirrors the official playmat (guide p4/p5): the rival's half */
+/* across the top, yours along the bottom, log panel down the right. The   */
+/* three glow colors are the whole interaction vocabulary — cyan for a     */
+/* legal play, magenta for a legal attack, yellow for a pending target     */
+/* choice — and each is applied only from an entry in `legalActions`.      */
+/* ---------------------------------------------------------------------- */
+
+.play-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6em;
+  padding: 1em;
+}
+
+.play-setup__field {
+  display: flex;
+  gap: 0.6em;
+  align-items: center;
+  font-size: 0.9em;
+}
+
+.play-setup__field select,
+.play-setup__field input,
+.playmat__actions input {
+  background: var(--panel-bg);
+  color: var(--neon-cyan);
+  border: 1px solid var(--neon-cyan);
+  font-family: var(--font-display);
+  padding: 0.3em 0.5em;
+}
+
+.play-setup__saves {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+}
+
+.playmat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  padding: 0.5em;
+}
+
+.playmat__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+  border: 1px solid var(--neon-cyan);
+  border-radius: 4px;
+  padding: 0.4em 0.6em;
+  background: var(--panel-bg);
+}
+
+.playmat__chip {
+  font-size: 0.8em;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  border-radius: 999px;
+  padding: 0.15em 0.7em;
+  white-space: nowrap;
+}
+
+.playmat__chip--thinking {
+  color: var(--neon-magenta);
+  border-color: var(--neon-magenta);
+}
+
+.playmat__chip--seed {
+  opacity: 0.6;
+}
+
+.playmat__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  margin-left: auto;
+}
+
+.playmat__actions button {
+  padding: 0.3em 0.7em;
+  font-size: 0.85em;
+}
+
+.playmat__actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+.playmat__body {
+  display: flex;
+  gap: 0.6em;
+  align-items: stretch;
+}
+
+.playmat__board {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  min-width: 0;
+}
+
+.playmat__side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 4px;
+  padding: 0.35em;
+}
+
+.playmat__side--rival {
+  border-color: rgba(255, 42, 109, 0.35);
+}
+
+.playmat__center {
+  text-align: center;
+  font-size: 0.8em;
+  letter-spacing: 0.15em;
+  opacity: 0.7;
+  border-top: 1px dashed rgba(0, 240, 255, 0.3);
+  border-bottom: 1px dashed rgba(0, 240, 255, 0.3);
+  padding: 0.2em 0;
+}
+
+.zone-panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  align-items: flex-start;
+}
+
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  min-width: 0;
+}
+
+.zone__label {
+  font-size: 0.7em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.zone__cards,
+.zone__dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em;
+  align-items: flex-end;
+  min-height: 2em;
+}
+
+.zone__empty {
+  font-size: 0.7em;
+  opacity: 0.3;
+}
+
+.zone--counts {
+  flex-direction: row;
+  gap: 0.5em;
+  align-items: center;
+}
+
+.zone__count {
+  font-size: 0.75em;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 3px;
+  padding: 0.15em 0.45em;
+}
+
+.zone--gig.is-target {
+  outline: 2px solid var(--neon-magenta);
+  outline-offset: 2px;
+}
+
+.zone__attack-gig {
+  align-self: flex-start;
+  font-size: 0.75em;
+  padding: 0.2em 0.6em;
+  border-color: var(--neon-magenta);
+  color: var(--neon-magenta);
+}
+
+.die-slot {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--neon-cyan);
+  cursor: default;
+  line-height: 0;
+}
+
+.die-slot:disabled {
+  opacity: 0.85;
+}
+
+.die-slot.is-choosable,
+.die-slot.is-stealable {
+  cursor: pointer;
+  opacity: 1;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+.die-slot.is-choosable {
+  color: var(--neon-cyan);
+}
+
+.die-slot.is-stealable {
+  color: var(--neon-yellow);
+}
+
+/* --- one in-play/hand card -------------------------------------------- */
+
+.board-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+}
+
+.board-card__hit {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: default;
+  line-height: 0;
+}
+
+.board-card__hit:hover {
+  border: none;
+}
+
+.board-card.is-clickable .board-card__hit {
+  cursor: pointer;
+}
+
+.board-card.is-playable .card-frame {
+  box-shadow: 0 0 10px 2px var(--neon-cyan);
+}
+
+.board-card.is-attacker .card-frame {
+  box-shadow: 0 0 10px 2px var(--neon-magenta);
+}
+
+.board-card.is-target .card-frame {
+  box-shadow: 0 0 12px 3px var(--neon-yellow);
+}
+
+.board-card.is-selected .card-frame {
+  outline: 2px solid var(--neon-magenta);
+  outline-offset: 2px;
+}
+
+.board-card__gear {
+  font-size: 0.65em;
+  color: var(--ram-green);
+}
+
+.board-card__buttons {
+  display: flex;
+  gap: 0.2em;
+}
+
+.board-card__action {
+  font-size: 0.65em;
+  padding: 0.1em 0.4em;
+}
+
+.board-card--hand-back .card-frame {
+  opacity: 0.8;
+}
+
+/* --- log panel --------------------------------------------------------- */
+
+.log-panel {
+  flex: 0 0 20em;
+  max-width: 20em;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  padding: 0.4em;
+}
+
+.log-panel__title {
+  margin: 0 0 0.3em;
+  font-size: 0.8em;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.log-panel__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  max-height: 32em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  font-size: 0.75em;
+}
+
+.log-panel__line {
+  display: flex;
+  gap: 0.5em;
+}
+
+.log-panel__turn {
+  flex: 0 0 2.2em;
+  opacity: 0.45;
+}

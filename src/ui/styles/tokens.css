@@ -1,0 +1,32 @@
+:root {
+  /* grounds */
+  --void: #07070d;
+  --panel: #10101a;
+  --panel-2: #161624;
+  --line: #262638;
+  --line-bright: #3a3a52;
+  /* text */
+  --text: #e8ecf2;
+  --muted: #8b94a8;
+  /* semantics: cyan = you, red = rival, yellow = actionable now */
+  --you: #00e5ff;
+  --rival: #ff3d5a;
+  --act: #fcee0a;
+  /* RAM colors: cards and deck budgets ONLY, never chrome */
+  --ram-red: #ff4655;
+  --ram-yellow: #fcee0a;
+  --ram-green: #2dff87;
+  --ram-blue: #38a8ff;
+  /* legacy aliases so unmigrated rules keep resolving until their task */
+  --bg: var(--void);
+  --panel-bg: var(--panel);
+  --neon-cyan: var(--you);
+  --neon-magenta: var(--rival);
+  --neon-yellow: var(--act);
+  /* type */
+  --font-display: 'Rajdhani', 'Arial Narrow', sans-serif;
+  --font-body: 'Chakra Petch', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', Consolas, monospace;
+  /* geometry */
+  --cut: 10px; /* corner clip size */
+}

@@ -1,0 +1,3 @@
+/* Motion: animations and transitions, added task-by-task.
+   Every animation here must be gated behind
+   @media (prefers-reduced-motion: no-preference). */
