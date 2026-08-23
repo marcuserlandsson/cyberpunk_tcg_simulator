@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { CardFrame } from '../../src/ui/CardFrame'
 import { loadCardDb } from '../../src/engine/cardDb'
 import type { CardDef } from '../../src/engine/types'
@@ -34,11 +34,21 @@ const MANTIS_BLADES = card('mantis-blades')
 // A real Unit with a static "can't attack" effect and no ram.value pips
 // beyond 1, useful as a plain example.
 const CORPO_SECURITY = card('corpo-security')
+// Fixtures named per the brief's size-semantics tests. `unitDef` must be a
+// def the file-wide image mock resolves (MANTIS_BLADES) so the image-mode
+// power-chip test actually exercises image mode rather than falling back to
+// the text face. `blockerDef` is a card whose printed text contains
+// `{Blocker}` — GORO already qualifies, so it doubles as both fixtures.
+const unitDef = MANTIS_BLADES
+const blockerDef = GORO
 
 describe('CardFrame', () => {
   it('shows the name, cost, power, and keyword text for a real card def', () => {
+    // "medium" is now a compact hand-card rendition (no rules text/subtitle,
+    // per the brief's size semantics) — this smoke test wants the full face,
+    // so it moved to "zoom".
     const { container } = render(
-      <CardFrame def={GORO} size="medium" useOfficialImages={false} />
+      <CardFrame def={GORO} size="zoom" useOfficialImages={false} />
     )
     const text = container.textContent ?? ''
     expect(text).toContain('Goro Takemura')
@@ -49,6 +59,41 @@ describe('CardFrame', () => {
     expect(text).toContain('{Go Solo}')
     expect(text).toContain('{Blocker}')
     expect(container.querySelectorAll('.card-frame__keyword')).toHaveLength(2)
+  })
+
+  it('small size omits rules text and subtitle', () => {
+    render(<CardFrame def={unitDef} size="small" useOfficialImages={false} />)
+    expect(screen.queryByText(unitDef.text)).toBeNull()
+    // getByText throws if no match is found, which is assertion enough; the
+    // explicit truthy check below is belt-and-suspenders. (`toBeInTheDocument`
+    // needs @testing-library/jest-dom, which this project does not depend on
+    // — "no new dependencies" is a binding constraint, so this uses only
+    // built-in Vitest matchers.)
+    expect(screen.getByText(unitDef.name)).toBeTruthy()
+  })
+
+  it('zoom size renders rules text with keyword capsules', () => {
+    render(<CardFrame def={blockerDef} size="zoom" useOfficialImages={false} />)
+    expect(screen.getByText(/redirect a rival/i)).toBeTruthy()
+    expect(document.querySelector('.card-frame__keyword')).not.toBeNull()
+  })
+
+  it('image mode shows a power chip only when effective differs from printed', () => {
+    const { rerender } = render(
+      <CardFrame def={unitDef} size="small" useOfficialImages tempPower={0} />
+    )
+    expect(document.querySelector('.card-frame__power-chip')).toBeNull()
+    rerender(<CardFrame def={unitDef} size="small" useOfficialImages tempPower={2} />)
+    expect(document.querySelector('.card-frame__power-chip')?.textContent).toContain(
+      String(unitDef.power! + 2)
+    )
+  })
+
+  it('face-down back is keyed by owner', () => {
+    render(
+      <CardFrame def={unitDef} size="small" faceDown owner="rival" useOfficialImages={false} />
+    )
+    expect(document.querySelector('.card-frame--rival')).not.toBeNull()
   })
 
   it('hides the name when face down', () => {
@@ -98,10 +143,12 @@ describe('CardFrame', () => {
   })
 
   it('does not render a LAG chip when lag is false (the default)', () => {
+    // Class renamed card-frame__lag-chip -> card-frame__lag-band (a banner
+    // across the art, not a bottom-row chip) as part of this task's restyle.
     const { container } = render(
       <CardFrame def={CORPO_SECURITY} size="small" useOfficialImages={false} />
     )
-    expect(container.querySelector('.card-frame__lag-chip')).toBeNull()
+    expect(container.querySelector('.card-frame__lag-band')).toBeNull()
   })
 
   it('adds tempPower to the printed power in the displayed value', () => {
@@ -142,16 +189,22 @@ describe('CardFrame official images (useOfficialImages: true)', () => {
     expect(img?.alt).toBe(MANTIS_BLADES.name)
   })
 
-  it('renders the hover/zoom text fallback alongside the image', () => {
+  it('falls back to the plain text face when the official image fails to load', () => {
+    // The always-mounted `.card-frame__zoom-fallback` (hover-to-reveal text
+    // behind the art) is removed by this task — a dedicated zoom panel
+    // (Task 6) now owns that job. The image face's only remaining fallback
+    // path is `onError`: if the official image 404s/fails, flip to the same
+    // text face so the card is never blank.
     const { container } = render(
       <CardFrame def={MANTIS_BLADES} size="medium" useOfficialImages />
     )
-    const fallback = container.querySelector('.card-frame__zoom-fallback')
-    expect(fallback).not.toBeNull()
-    // The fallback is the same text face — name, keywords, and power should
-    // all still be reachable for a reader hovering the art.
-    expect(fallback?.textContent ?? '').toContain('Mantis Blades')
-    expect(fallback?.textContent ?? '').toContain(String(MANTIS_BLADES.power))
+    expect(container.querySelector('.card-frame__zoom-fallback')).toBeNull()
+    const img = container.querySelector('img.card-frame__image') as HTMLImageElement
+    expect(img).not.toBeNull()
+    fireEvent.error(img)
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.textContent ?? '').toContain('Mantis Blades')
+    expect(container.textContent ?? '').toContain(String(MANTIS_BLADES.power))
   })
 
   it('falls back to the plain text frame when no official image resolves for this def', () => {

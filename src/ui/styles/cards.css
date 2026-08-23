@@ -1,184 +1,299 @@
 /* ---------------------------------------------------------------------- */
-/* CardFrame                                                               */
+/* CardFrame — three renditions of one card: compact board/hand face       */
+/* (size small/medium), full print-like zoom face (size zoom), and the     */
+/* official-image overlay (any size, when useOfficialImages resolves).     */
 /* ---------------------------------------------------------------------- */
 
 .card-frame {
-  --card-border-color: var(--neon-cyan);
   position: relative;
+  font-family: var(--font-display);
+  background: #0d0d15;
+  border: 2px solid var(--card-border-color, var(--line-bright));
+  border-radius: 7px;
+  color: var(--text);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+/* Layout + depth additive to the block above (kept as its own rule so the
+   brief's exact declarations above stay verbatim and easy to diff). */
+.card-frame {
   display: flex;
   flex-direction: column;
-  gap: 0.35em;
-  box-sizing: border-box;
-  background: var(--panel-bg);
-  color: var(--neon-cyan);
-  border: 2px solid var(--card-border-color);
-  border-radius: 6px;
-  padding: 0.5em;
-  font-family: var(--font-display);
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  gap: 4px;
+  padding: 5px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.7), 0 4px 18px rgba(0, 0, 0, 0.6);
 }
 
-.card-frame--small {
-  width: 120px;
-  min-height: 168px;
-  font-size: 0.6rem;
-}
+.card-frame--small { width: 92px; }
+.card-frame--medium { width: 118px; }
+.card-frame--zoom { width: 250px; padding: 7px; }
 
-.card-frame--medium {
-  width: 200px;
-  min-height: 280px;
-  font-size: 0.75rem;
-}
-
-.card-frame--zoom {
-  width: 320px;
-  min-height: 448px;
-  font-size: 0.9rem;
-}
-
-/* Spent: rotated 90 degrees in place. */
+/* Spent: tap rotation + desaturation (the Task 4 headroom task reserves the
+   layout room this needs). */
 .card-frame--spent {
   transform: rotate(90deg);
+  filter: saturate(0.55) brightness(0.75);
 }
 
-/* Lag: dimmed, with a LAG chip rendered in the bottom row. */
-.card-frame--lag {
-  opacity: 0.55;
+.card-frame--lag .card-frame__art {
+  filter: brightness(0.8);
 }
+
+/* ---- top row: hex cost badge, sell tag, type capsule, RAM pips ---- */
 
 .card-frame__top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 4px;
 }
 
 .card-frame__cost-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.25em;
-  border: 1px solid var(--card-border-color);
+  position: relative;
+  width: 26px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 15px;
+  background: #0c0c14;
+  border: 2px solid var(--card-border-color, var(--line-bright));
+  clip-path: polygon(50% 0, 100% 26%, 100% 74%, 50% 100%, 0 74%, 0 26%);
   border-radius: 4px;
-  padding: 0.1em 0.4em;
-  font-weight: bold;
+  flex: none;
+}
+
+.card-frame--zoom .card-frame__cost-badge {
+  width: 38px;
+  height: 42px;
+  font-size: 21px;
 }
 
 .card-frame__sell-tag {
-  color: var(--neon-yellow);
-  font-size: 0.85em;
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  font-size: 10px;
+  color: var(--act);
 }
 
 .card-frame__type-col {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.2em;
+  gap: 3px;
 }
 
-.card-frame__type-label {
+.card-frame__type-capsule {
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  opacity: 0.8;
+  padding: 2px 7px;
+  background: var(--card-border-color, var(--line-bright));
+  color: #05130a;
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+.card-frame--zoom .card-frame__type-capsule {
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
+.card-frame__ram-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .card-frame__ram-pips {
   display: flex;
-  gap: 0.15em;
+  gap: 3px;
 }
 
 .card-frame__ram-pip {
-  width: 0.6em;
-  height: 0.6em;
-  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   display: inline-block;
 }
 
 .card-frame__ram-limit-badge {
-  border: 1px solid var(--neon-cyan);
+  font-size: 9px;
+  font-weight: 700;
+  border: 1px solid var(--line-bright);
   border-radius: 3px;
-  padding: 0 0.3em;
-  font-weight: bold;
+  padding: 0 3px;
+  color: var(--text);
 }
 
+/* ---- keyword pips: hex letter badges hanging off the left edge ---- */
+
+.card-frame__kw-pips {
+  position: absolute;
+  left: -7px;
+  top: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+
+.card-frame__kw-pip {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  background: #0c0c14;
+  border: 1.5px solid var(--act);
+  color: var(--act);
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+
+/* ---- art placeholder block ---- */
+
+.card-frame__art {
+  position: relative;
+  height: 38px;
+  margin: 3px 0;
+  border: 1px solid var(--line);
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 3px),
+    linear-gradient(145deg, #14202a, #0a1410 55%, #101a24);
+}
+
+.card-frame--zoom .card-frame__art {
+  height: 128px;
+  margin: 6px 0;
+}
+
+.card-frame__lag-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 24%;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  font-size: 10px;
+  padding: 1px 0;
+  color: var(--void);
+  background: rgba(252, 238, 10, 0.92);
+}
+
+/* ---- name, subtitle, tags, rules text (zoom only past this point) ---- */
+
 .card-frame__name {
-  font-weight: bold;
+  font-weight: 700;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
   display: flex;
   flex-direction: column;
 }
 
+.card-frame--zoom .card-frame__name {
+  font-size: 17px;
+}
+
 .card-frame__subtitle {
-  font-weight: normal;
-  opacity: 0.75;
-  font-size: 0.85em;
+  font-weight: 600;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--card-border-color, var(--muted));
+  margin-top: 1px;
 }
 
 .card-frame__tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25em;
+  gap: 5px;
+  margin-top: 2px;
 }
 
 .card-frame__tag {
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  padding: 0 0.3em;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  font-size: 0.7em;
-  opacity: 0.8;
+  padding: 2px 8px;
+  border: 1px solid var(--line-bright);
+  color: var(--muted);
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
 }
 
 .card-frame__text {
-  flex: 1;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  line-height: 1.45;
+  margin-top: 5px;
+  color: var(--text);
   white-space: pre-wrap;
-  line-height: 1.3;
 }
 
+/* `.kw-capsule` (chrome.css) supplies the capsule visuals; this adds only
+   card-specific spacing so inline keyword markers don't crowd the text. */
 .card-frame__keyword {
-  color: var(--neon-yellow);
-  font-weight: bold;
+  margin: 0 2px;
 }
 
 .card-frame__bottom {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  margin-top: 6px;
 }
 
-.card-frame__lag-chip {
-  color: var(--neon-magenta);
-  border: 1px solid var(--neon-magenta);
-  border-radius: 3px;
-  padding: 0 0.3em;
-  font-weight: bold;
-  letter-spacing: 0.05em;
+.card-frame__barcode {
+  width: 58px;
+  height: 14px;
+  opacity: 0.5;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--muted) 0 2px,
+    transparent 2px 4px,
+    var(--muted) 4px 5px,
+    transparent 5px 8px
+  );
 }
 
 .card-frame__power {
   margin-left: auto;
-  font-weight: bold;
-  font-size: 1.2em;
+  min-width: 30px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 17px;
+  background: #0c0c14;
+  border: 2px solid var(--card-border-color, var(--line-bright));
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  padding: 0 4px;
 }
 
-.card-frame__power-delta {
-  margin-left: 0.25em;
-  font-size: 0.7em;
-  color: var(--neon-yellow);
+.card-frame--zoom .card-frame__power {
+  min-width: 42px;
+  height: 40px;
+  font-size: 24px;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
 }
 
-.card-frame__back {
-  flex: 1;
-  border-radius: 4px;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--card-border-color) 0,
-    var(--card-border-color) 2px,
-    var(--panel-bg) 2px,
-    var(--panel-bg) 10px
-  );
-}
+.card-frame__power.is-buffed { color: var(--ram-green); border-color: var(--ram-green); }
+.card-frame__power.is-reduced { color: var(--rival); border-color: var(--rival); }
+
+/* ---- image mode: official art + status overlays ---- */
 
 .card-frame__image-wrap {
   position: relative;
-  flex: 1;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  overflow: hidden;
+  border-radius: 5px;
 }
 
 .card-frame__image {
@@ -186,23 +301,55 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 4px;
 }
 
-.card-frame__zoom-fallback {
+.card-frame__power-chip {
   position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35em;
-  background: var(--panel-bg);
-  padding: 0.5em;
-  border-radius: 4px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  overflow: auto;
+  right: -7px;
+  bottom: -7px;
+  min-width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 16px;
+  background: #0c0c14;
+  border: 2px solid var(--line-bright);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
 }
 
-.card-frame__image-wrap:hover .card-frame__zoom-fallback {
-  opacity: 1;
+.card-frame__power-chip.is-buffed { color: var(--ram-green); border-color: var(--ram-green); }
+.card-frame__power-chip.is-reduced { color: var(--rival); border-color: var(--rival); }
+
+.card-frame__live-chips {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ---- face-down back: diagonal circuit-hatch, keyed by owner ---- */
+
+/* The brief's essentials scope this under `.card-frame--face-down`; done
+   here too, though `.card-frame__back` only ever renders in that branch.
+   Sized via `aspect-ratio` + `width: 100%` rather than `position: absolute;
+   inset: 0` — the latter needs a sized positioned ancestor, which the
+   flex-column `.card-frame` (height driven by its children) doesn't have. */
+.card-frame--face-down .card-frame__back {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: 5px;
+  background:
+    repeating-linear-gradient(45deg, rgba(0, 229, 255, 0.14) 0 2px, transparent 2px 7px),
+    linear-gradient(150deg, #101826, #0b1018);
+}
+
+.card-frame--rival.card-frame--face-down .card-frame__back {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 61, 90, 0.14) 0 2px, transparent 2px 7px),
+    linear-gradient(150deg, #241018, #150b10);
 }
