@@ -5324,3 +5324,68 @@ payment card (a `{ eddies: 0 }` fixture forces the canonical payment to
 reach for the Legend, since no eddie exists to prefer instead) — asserting
 the Legend ends up both equipped and spent, and that Alt's own draw
 actually fired (`cardDrawn` in the event log).
+
+## 150 — What the heuristic AI is allowed to look at (Task 10)
+
+`legalActions` hands an agent a list; nothing in the engine stops that
+agent from reading the whole `GameState` it is given, rival hand included.
+The brief's constraint is that the AI must not — so this entry is the
+information policy the Task 10 agent holds itself to, and the seam where it
+cannot hold itself to it completely.
+
+**Ruling (the clean part):** `src/ai/evaluate.ts` is the AI's *only*
+scoring read of the state, and it reads exclusively public facts: both Gig
+areas (sizes and top faces), both fields' `effectivePower` (Units are
+played face-up, and `query.inPlay` already withholds a face-down Legend's
+statics, so no face-down identity can leak into a power number), face-up
+Legend counts, ZONE SIZES only for hand/deck/eddies (a face-down €$ is
+worth exactly 1 €$ whichever card it is, so its identity is never
+material), the ready/spent split of the eddies and legends zones, and
+`winner`. It never reads the rival's hand contents, either deck's contents
+or order, or any face-down Legend's `defId`. Ignoring its OWN hand's
+contents too is not required by the brief but is what lets the invariance
+test shuffle *both* decks in a clone and still demand a bit-identical
+score.
+
+**Ruling (the seam):** `applyAction` is the simulator, and simulating an
+action necessarily rolls the dice and draws the cards that action causes —
+so a candidate's resulting state can contain facts the AI could not have
+known when it chose. That is the engine simulating rather than the AI
+peeking, and it cannot steer the choice through `evaluate` (which scores
+zone sizes, not contents). It *can* steer it wherever the rng outcome is
+the whole point of the decision, so the three decisions of that shape are
+answered by policy BEFORE any simulation runs, rather than by argmax over
+simulated outcomes:
+
+  * `chooseGigDie` — take the largest die still in the fixer. Every die is
+    rolled in eventually (turns 1-6), so the order only decides how much
+    Street Cred arrives early; simulating instead would pick whichever die
+    happened to roll well against the current rng state.
+  * `chooseGigReroll` (§143) — reroll exactly when the face *already
+    showing* is below the die's own average. Decided from the face it has,
+    never from the face it would land on.
+  * `mulligan` — judged from the hand the AI already holds (its own hand is
+    legitimately visible), never from the hand it would draw.
+
+`choosePlayOrder` is likewise a fixed answer, since simulating it deals
+both opening hands.
+
+**Residual, documented compromise:** a simulated `playCard`/`activateAbility`/
+`attack` whose effect draws, mills, `discardRandomRival`s, or flips a random
+face-down Legend (`callLegend`) still resolves that randomness inside the
+candidate's state. The AI cannot read *what* it got (only counts), but it
+does see the *consequences* — e.g. which of its own Legends turned face-up,
+and therefore that Legend's statics. Removing this would mean expectimax
+over the rng rather than a one-ply greedy search, which is out of scope
+here; it is called out so a later search-based agent knows the seam is
+there. Note the quiescence layer removes one such hole rather than adding
+it: because a would-be-stolen interception (§144) is played forward with a
+"decline" default, whether the rival *had* an intercept available (a read of
+their hand as a set) does not change the score the AI computes.
+
+**TDD evidence:** `tests/ai/heuristic.test.ts`'s hidden-information suite
+harvests mid-game states out of real seeded games and, for each, clones it
+with the rival's hand order, the rival's deck order, the rival's face-down
+Legend `defId`s and the AI's own deck order all permuted — asserting first
+that `legalActions` is unchanged (so the two clones pose the same question)
+and then that both `evaluate` and `chooseAction` answer identically.
