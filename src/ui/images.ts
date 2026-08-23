@@ -14,7 +14,14 @@ const officialImageModules = import.meta.glob('/data/images/*', {
   import: 'default',
 }) as Record<string, string>
 
-function buildIndex(modules: Record<string, string>): Map<string, string> {
+/**
+ * Turns an `import.meta.glob` result (path -> resolved URL) into a
+ * `defId -> URL` lookup, stripping the directory and the image extension.
+ * Exported (pure, no glob involved) so tests can exercise the parsing logic
+ * directly with a synthetic modules record, without depending on
+ * `data/images/` actually containing anything.
+ */
+export function buildImageIndex(modules: Record<string, string>): Map<string, string> {
   const index = new Map<string, string>()
   for (const [path, url] of Object.entries(modules)) {
     const filename = path.split('/').pop() ?? ''
@@ -24,7 +31,7 @@ function buildIndex(modules: Record<string, string>): Map<string, string> {
   return index
 }
 
-const officialImageIndex = buildIndex(officialImageModules)
+const officialImageIndex = buildImageIndex(officialImageModules)
 
 /** The official art URL for `defId`, or `undefined` if none is bundled. */
 export function getOfficialImageUrl(defId: string): string | undefined {

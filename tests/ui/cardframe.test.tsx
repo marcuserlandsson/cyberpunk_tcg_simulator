@@ -1,9 +1,21 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { CardFrame } from '../../src/ui/CardFrame'
 import { loadCardDb } from '../../src/engine/cardDb'
 import type { CardDef } from '../../src/engine/types'
+
+// Only the "official image" describe block below ever passes
+// `useOfficialImages={true}`; every other test in this file passes `false`
+// (never consulting this mock), so overriding it file-wide is safe. A fixed
+// fake URL for exactly one card id lets tests exercise both the "resolves"
+// and "does not resolve" branches of CardFrame without touching the real
+// (gitignored, empty-until-Task-16) `data/images/` directory.
+const FAKE_IMAGE_URL = 'https://cdn.example/mantis-blades.png'
+vi.mock('../../src/ui/images', () => ({
+  getOfficialImageUrl: (defId: string) =>
+    defId === 'mantis-blades' ? FAKE_IMAGE_URL : undefined,
+}))
 
 afterEach(cleanup)
 
@@ -116,5 +128,46 @@ describe('CardFrame', () => {
     const el = container.querySelector('[data-testid="card-frame"]') as HTMLElement
     el.click()
     expect(clicks).toBe(1)
+  })
+})
+
+describe('CardFrame official images (useOfficialImages: true)', () => {
+  it('renders the official image when the lookup resolves', () => {
+    const { container } = render(
+      <CardFrame def={MANTIS_BLADES} size="medium" useOfficialImages />
+    )
+    const img = container.querySelector('img.card-frame__image') as HTMLImageElement | null
+    expect(img).not.toBeNull()
+    expect(img?.src).toBe(FAKE_IMAGE_URL)
+    expect(img?.alt).toBe(MANTIS_BLADES.name)
+  })
+
+  it('renders the hover/zoom text fallback alongside the image', () => {
+    const { container } = render(
+      <CardFrame def={MANTIS_BLADES} size="medium" useOfficialImages />
+    )
+    const fallback = container.querySelector('.card-frame__zoom-fallback')
+    expect(fallback).not.toBeNull()
+    // The fallback is the same text face — name, keywords, and power should
+    // all still be reachable for a reader hovering the art.
+    expect(fallback?.textContent ?? '').toContain('Mantis Blades')
+    expect(fallback?.textContent ?? '').toContain(String(MANTIS_BLADES.power))
+  })
+
+  it('falls back to the plain text frame when no official image resolves for this def', () => {
+    const { container } = render(
+      <CardFrame def={CORPO_SECURITY} size="medium" useOfficialImages />
+    )
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('.card-frame__zoom-fallback')).toBeNull()
+    expect(container.textContent ?? '').toContain('Corpo Security')
+  })
+
+  it('falls back to the plain text frame when useOfficialImages is false, even for a def with a resolvable image', () => {
+    const { container } = render(
+      <CardFrame def={MANTIS_BLADES} size="medium" useOfficialImages={false} />
+    )
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('.card-frame__zoom-fallback')).toBeNull()
   })
 })

@@ -63,6 +63,17 @@ describe('saveDeck / listDecks / deleteDeck round trip', () => {
   it('silently no-ops deleting a name that does not exist anywhere', () => {
     expect(() => deleteDeck('Not A Real Deck')).not.toThrow()
   })
+
+  it('reverts to the bundled deck after deleting a localStorage save that shadowed it by name', () => {
+    const shadow: DeckList = { ...STARTER_DECK, cards: { 'mantis-blades': 1 } }
+    saveDeck(shadow)
+    // The localStorage save overrides the bundled deck of the same name...
+    expect(listDecks().find((deck) => deck.name === STARTER_DECK.name)).toEqual(shadow)
+
+    deleteDeck(STARTER_DECK.name)
+    // ...and deleting it reveals the original bundled deck again, unchanged.
+    expect(listDecks().find((deck) => deck.name === STARTER_DECK.name)).toEqual(STARTER_DECK)
+  })
 })
 
 describe('exportDeckText / importDeckText', () => {
@@ -88,6 +99,32 @@ describe('exportDeckText / importDeckText', () => {
       '2x Not A Real Card',
     ].join('\n')
     expect(() => importDeckText(db, text)).toThrowError(/Not A Real Card/)
+  })
+
+  it('collects and reports every unknown/ambiguous name in one error, not just the first', () => {
+    const text = [
+      '# Bad Deck',
+      '## Legends',
+      'Not A Real Legend',
+      'Yorinobu Arasaka — Embracing Destruction',
+      'Saburo Arasaka — Stubborn Patriarch',
+      '## Cards',
+      '2x Not A Real Card One',
+      '1x Not A Real Card Two',
+    ].join('\n')
+
+    let message = ''
+    try {
+      importDeckText(db, text)
+      throw new Error('importDeckText should have thrown')
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err)
+    }
+
+    // All three bad names are reported together, from a single thrown error.
+    expect(message).toContain('Not A Real Legend')
+    expect(message).toContain('Not A Real Card One')
+    expect(message).toContain('Not A Real Card Two')
   })
 
   it('round-trips ambiguous card names using the "Name — Subtitle" form', () => {
@@ -153,5 +190,41 @@ describe('sim result', () => {
     const result = { games: 100, wins: [55, 45] }
     saveSimResult(result)
     expect(getLastSimResult()).toEqual(result)
+  })
+})
+
+describe('corrupt localStorage', () => {
+  // Every reader goes through the same internal `readJson` helper, which
+  // must fall back to its default rather than throwing when a key holds
+  // non-JSON garbage (e.g. from a manual edit, a botched migration, or a
+  // future format change). Exercised here through two different public
+  // readers backed by two different keys/fallback shapes.
+  it('getSettings falls back to the default settings when its key holds invalid JSON', () => {
+    localStorage.setItem('ctcg:settings:v1', '{not valid json')
+    expect(() => getSettings()).not.toThrow()
+    expect(getSettings()).toEqual({ useOfficialImages: false })
+  })
+
+  it('listDecks falls back to just the bundled decks when the decks key holds invalid JSON', () => {
+    localStorage.setItem('ctcg:decks:v1', '{not valid json')
+    expect(() => listDecks()).not.toThrow()
+    const names = listDecks().map((deck) => deck.name)
+    expect(names).toContain(STARTER_DECK.name)
+  })
+
+  it('saveDeck still works normally after a prior read tolerated corrupt JSON', () => {
+    localStorage.setItem('ctcg:decks:v1', 'garbage')
+    listDecks() // tolerates the garbage, falling back to {}
+    const deck: DeckList = {
+      name: 'Recovered Deck',
+      legends: [
+        'goro-takemura-hands-unclean',
+        'yorinobu-arasaka-embracing-destruction',
+        'saburo-arasaka-stubborn-patriarch',
+      ],
+      cards: { 'mantis-blades': 1 },
+    }
+    saveDeck(deck)
+    expect(listDecks().find((d) => d.name === deck.name)).toEqual(deck)
   })
 })
