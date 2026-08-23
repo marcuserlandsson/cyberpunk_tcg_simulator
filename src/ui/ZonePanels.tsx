@@ -123,7 +123,7 @@ function CardZones(props: ZonePanelsProps): ReactElement {
             owner={owner}
             useOfficialImages={useOfficialImages}
           />
-          <span className="chip pile__count" data-testid="deck-count">
+          <span className="chip" data-testid="deck-count">
             Deck {p.deck.length}
           </span>
         </div>
@@ -135,7 +135,7 @@ function CardZones(props: ZonePanelsProps): ReactElement {
             owner={owner}
             useOfficialImages={useOfficialImages}
           />
-          <span className="chip pile__count" data-testid="trash-count">
+          <span className="chip" data-testid="trash-count">
             Trash {p.trash.length}
           </span>
         </div>

@@ -320,19 +320,42 @@
   gap: 0.6em;
 }
 
-/* No wrap here (unlike the generic `.zone__cards` rule above) — the row
-   compresses via overlap instead once it's too full for the strip. */
+/* No wrap here (unlike the generic `.zone__cards` rule above, whose
+   `flex-wrap: wrap` this must explicitly override) — the row compresses via
+   overlap instead once it's too full for the strip. */
 .zone--eddies .zone__cards {
   display: flex;
+  flex-wrap: nowrap;
 }
 
 /* Activated only once eddies.length > 6 (ZonePanels.tsx), so a handful of
-   sold cards still reads as distinct cards before the row starts to overlap. */
-.zone--eddies--dense .card-frame {
+   sold cards still reads as distinct cards before the row starts to overlap.
+   Targets `.eddie-card` (the actual flex item in `.zone__cards`), not the
+   `.card-frame` it wraps: a margin on a non-flex-item descendant doesn't
+   pull the next sibling closer, and — since each `.card-frame` is the sole
+   child of its own `.eddie-card` wrapper — `.card-frame:last-child` would be
+   trivially true for every card, not just the actual last one in the row
+   (verified in a real browser: that version computed `margin-right: 0px` on
+   every card, not just the last). */
+.zone--eddies--dense .eddie-card {
   margin-right: -46px;
 }
 
-.zone--eddies--dense .card-frame:last-child {
+/* A tapped card's *layout* box stays 92px (rotate() doesn't change it), but
+   its rendered footprint is the swapped 123x92 rotated rectangle, centered
+   on that same 92px-wide box — 15.5px of painted card overhangs each side
+   beyond the box the -46px above was sized for. Left unadjusted, two tapped
+   neighbors in a dense row overlap by ~59% of their width instead of the
+   ~46% upright neighbors get, reading as a merged blob (verified in a real
+   browser with a 7-eddie/3-spent state — screenshotted, then re-screenshotted
+   after this fix). `:has()` covers both boundaries a tapped card touches: its
+   own outgoing gap, and the incoming gap from a ready card right before it. */
+.zone--eddies--dense .eddie-card[data-ready='false'],
+.zone--eddies--dense .eddie-card:has(+ .eddie-card[data-ready='false']) {
+  margin-right: -8px;
+}
+
+.zone--eddies--dense .eddie-card:last-child {
   margin-right: 0;
 }
 
