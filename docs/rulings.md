@@ -4852,3 +4852,153 @@ turns chrome-fang's cap off for the remainder of that episode
 predicate is vacuous in a two-player game and its comment does not say so; and
 `forcedAttackers` (query.ts) carries a second `as number` cast the slice report
 did not disclose — the slice report claimed one cast, there are two.
+
+# Task 9 — fuzz harness, fix round 1
+
+`tests/fuzz/invariants.test.ts` plays thousands of random-vs-random games
+(both curated demo decks and freshly-generated legal synthetic decks,
+`tests/fuzz/deckGenerator.ts`) and checks a battery of structural invariants
+after every applied action. At default scale (300 seeds) nothing broke; at
+6,000–20,000 seeds it found five bugs, four of them the same missing
+convention repeated at four different call sites: once `endGame` commits
+`winner`/`phase: 'gameOver'`, nothing downstream may still run as though the
+game were live. §145's item 2 above (`chooseGigDie`/`chooseGigReroll`
+clobbering a phase an `onGigRoll` trigger opened) is the same family, found
+one round earlier by hand-review instead of by fuzzing.
+
+## 146 — Once the game ends mid-resolution, nothing else may still run
+
+**1. `callLegend`'s own flip can be outrun by a nested free Call it just paid
+for (Important).** `callLegend` (`reduce.ts`) spends its payment, THEN picks
+a uniformly random face-down Legend to flip. `arasaka-emergency-radioport`'s
+own text — "When this Unit or Legend is spent, you may ... Call it for
+free" — is a Gear, `onSpend`-triggered, propagated (`GEAR_PROPAGATED_TRIGGERS`)
+from whichever Legend wears it. Paying for an explicit Call a Legend by
+spending a Legend that happens to wear this Gear fires that Gear's own nested
+free Call BEFORE the outer call's flip runs — and when only one face-down
+Legend exists on the board, the nested call already flips it (and marks
+`calledLegendThisTurn`), so the outer call's own `p.legends.filter(!faceUp)`
+comes back empty. `nextInt(rng, 0)` then hands back index 0 of an empty
+array, and `draft.cards[undefined].faceUp = true` throws.
+
+**Ruling:** "You may only Call a Legend once per turn" is a hard cap of one
+flip per player per turn, full stop — including when a nested Gear-driven
+free Call gets there first while paying for an entirely separate,
+explicit Call a Legend. The outer call fizzles exactly like an attack whose
+target vanished mid-react (§27's fizzle convention): the €$ (or spent-Legend)
+cost already paid stands, but the call itself does nothing further. Fixed by
+checking `p.calledLegendThisTurn` (set the moment ANY flip lands, nested or
+not) and `faceDown.length === 0` before touching the rng, both as early
+returns ahead of the flip.
+
+**TDD evidence:** `tests/cards/red.test.ts`'s `arasaka-emergency-radioport`
+suite gains a case that equips the Gear onto a face-up Legend, leaves exactly
+one OTHER Legend face-down, and pays for an explicit `callLegend` with the
+Gear's host — asserting the face-down Legend still flips (the nested call did
+it), `calledLegendThisTurn` is true, and exactly one `legendCalled` event
+exists (the outer call fizzled, it did not also try for a second Legend).
+Verified failing-first: reverting the two-line guard reproduces the exact
+`Cannot set properties of undefined (setting 'faceUp')` crash the fuzz
+harness printed (seed 500142, synthetic decks).
+
+**2. A Program sat in no zone at all while its own `onPlay` resolved
+(Minor).** `playCardOnDraft` fired a Program's `onPlay` effects, THEN moved it
+to the trash — deliberately, per its own comment, "so a `self` reference
+still works while it resolves." Between leaving hand and landing in trash, a
+Program's uid is in `state.cards` but in none of the seven zone arrays. A
+Program whose OWN `onPlay` (or the `onFriendlyCardPlayed` watcher it can
+chain into) ends the game outright — a forced draw off an empty deck,
+deckout — leaves the game over with that Program permanently unzoned, and the
+"move it to trash" bookkeeping that ran anyway afterward appended a
+`cardTrashed` event AFTER the terminal `gameEnded` one.
+
+**Ruling:** no printed Program effect in the 141-card pool targets a
+trash-zone card of its own (checked exhaustively — none use
+`friendlyTrashCard`/`friendlyHandOrTrashUnit`/`friendlyHandOrTrashProgram`),
+so the "self reference" the original comment guarded against cannot actually
+observe the zone change. A Program now moves to the trash immediately — in
+the same `switch` arm that pushes a Unit onto the field or a Legend's
+`faceUp`/`lag` flip, ahead of `onPlay` — exactly mirroring how a Unit/Legend
+is placed in its own zone before its own `onPlay` fires. It is *never* in no
+zone at all, whatever its own effects do.
+
+**TDD evidence:** `tests/engine/economy.test.ts` gains a case playing
+`industrial-assembly` ("Increase a Gig by up to 4. If it now has 8+ value,
+draw 1.") with the sole friendly Gig die swapped to a d10 showing 4 (so the
++4 reaches exactly 8 without a d4's own face capping it) and the deck
+emptied, asserting `gameOver`/`winner`/a `gameEnded`-terminal event log AND
+that the Program landed in the trash. Verified failing-first: reverting
+`effects.ts` reproduces the trailing `cardTrashed` event past `gameEnded`.
+
+**3. `endAttack` clobbered a fight-ended game back to `main` (Important).**
+`resolveAttack` calls `fight()` (which can chain into an `onDefeat`/
+`onUnitDefeated`-triggered draw and a deckout), then unconditionally calls
+`endAttack`, which unconditionally sets `draft.phase = 'main'` (or
+`'chooseGig'`) — overwriting the `'gameOver'` `endGame` had just committed.
+`winner` stayed correctly set, so `legalActions` still correctly returned
+`[]` (it checks `winner` first), but `phase` lied about it, and
+`pendingAttack` was left dangling.
+
+**Ruling:** `endAttack` is bookkeeping for a LIVE game; once `winner` is set
+there is nothing left to hand back to. Fixed with a one-line guard at the top
+of `endAttack`, matching the "stop touching anything once the game is over"
+convention every other phase-setting seam in `game.ts`/`reduce.ts` already
+followed (`beginTurn`, `declareAttack`, `settleAfterGigRoll`'s callers) —
+this one function had simply been missed.
+
+**TDD evidence:** `tests/engine/combat.test.ts`'s `fights` suite gains a case
+equipping `satori-sword-of-saburo` (`{onWinFight}` draw 1) onto an attacker
+that wins its fight, with the deck emptied first — asserting `phase ===
+'gameOver'` survives the win. Verified failing-first: reverting the guard
+reproduces `phase === 'main'` with `winner` still set (seed 6198, starter
+decks).
+
+**4. `finishSteal` clobbered a steal-ended game back to `chooseGig`/`main`
+(Important).** The mirror image of #3, one level down: `takeStolenGig` fires
+`onFriendlyStealDie`/`onFriendlyStealComplete` (either of which can chain into
+a deckout-causing draw — `rogue-amendiares-preem-solo`'s "if its value is
+even, draw 1"), then unconditionally calls `finishSteal`, which unconditionally
+resumes into `chooseGig` or the interrupted phase.
+
+**Ruling:** same as #3 — `finishSteal` gets the same one-line guard.
+
+**TDD evidence:** `tests/engine/combat.test.ts`'s `gig-area attacks` suite
+gains a case fielding `rogue-amendiares-preem-solo` (a `{Go Solo}` Legend,
+so `stealerIsLegend` reads true) stealing a single even-valued die with the
+deck emptied, asserting `gameOver` survives the completed steal. Verified
+failing-first the same way as #3.
+
+**5. The `'scripted'` EffectNode wrapper logged a trailing note after
+`gameEnded` (Minor).** Every scripted card function that can deckout
+(`jackie-welles-pour-one-out-for-me` and half a dozen siblings in
+`scripted/index.ts`) already returns immediately after calling `endGame`
+itself — but the generic `'scripted'` case in `applyNode` (`effects.ts`) then
+logged its OWN `effectResolved` "scripted:..." note unconditionally
+afterward, regardless of what the script just did.
+
+**Ruling:** the wrapper's bookkeeping is subject to the same rule as
+everything else in this round — once `winner` is set, stop. Guarded with the
+same one-line check before the `note()` call.
+
+**TDD evidence:** `tests/cards/blue.test.ts`'s
+`jackie-welles-pour-one-out-for-me` suite gains a case decreasing the sole
+friendly Gig die to a min Gig with the deck emptied, asserting the last event
+is `gameEnded`, not a trailing `effectResolved`. Verified failing-first
+(seed 4511, starter decks).
+
+**Hardening beyond the five reproduced failures:** `fireCardTrigger`'s
+per-effect loop, `fireWatcherTrigger`'s per-watcher loop, and
+`fireTriggerOnDraft`'s Gear-propagation loop now all stop the instant
+`draft.winner !== null`, not just after the specific calls #1/#5 above
+needed. No card in the current 141-card pool reaches the wider gap this
+closes (a multi-effect card, or a multi-watcher broadcast, where an EARLIER
+entry ends the game and a LATER one would otherwise still run) — ledgered
+here as hardening without its own isolated repro, the same status §145 gave
+its `onGigRoll` finding before this round's fuzzing happened to reach it a
+different way.
+
+**Scale note:** the fuzz harness's default 300 seeds passed clean before any
+of the above were found — all five needed thousands of seeds to surface.
+Two consecutive clean runs at 6,000, then at 20,000, then a single clean run
+at 60,000 seeds (0% action-cap hit rate throughout; `sevenGigs`/
+`overtimeMajority`/`deckout` all naturally represented) close this round.
