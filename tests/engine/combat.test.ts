@@ -77,6 +77,25 @@ function putUnit(state: GameState, player: PlayerId, defId: string, opts: UnitOp
   return uid
 }
 
+/** Mints a fresh instance of `defId` face-up into `player`'s legends zone. Mutates `state`. */
+function putLegend(state: GameState, player: PlayerId, defId: string): number {
+  const uid = state.nextUid++
+  state.cards[uid] = {
+    uid,
+    defId,
+    owner: player,
+    ready: true,
+    lag: false,
+    faceUp: true,
+    attachedGear: [],
+    tempPower: 0,
+    permPower: 0,
+    tempKeywords: [],
+  }
+  state.players[player].legends.push(uid)
+  return uid
+}
+
 /** Mints a fresh gear instance attached to `host`. Mutates `state`. */
 function attachGear(state: GameState, player: PlayerId, defId: string, host: number): number {
   const uid = state.nextUid++
@@ -656,6 +675,39 @@ describe('blocker reactions', () => {
     for (const blocker of [spentBlocker, nonBlocker, ownBlocker]) {
       expect(() => react(window, { type: 'block', blocker })).toThrow(IllegalActionError)
     }
+  })
+
+  // Regression (Critical, found by task review of the Task 9 fuzz harness's
+  // fix round 1): `blockAttack` fires `onBlock` then `onFriendlyBlock` and
+  // unconditionally falls through into `resolveAttack` -> `fight`.
+  // `goro-takemura-vengeful-bodyguard`'s `{onFriendlyBlock}` ("you may
+  // discard 1; if you do, draw 1") can end the game outright — with an
+  // empty deck, the draw fails and decks the blocking player's controller
+  // out — and neither `resolveAttack` nor `fight` used to check that before
+  // resolving a full fight on top of the now-finished game.
+  it("doesn't resolve a fight when the block's own onFriendlyBlock decks the blocker's controller out (Critical)", () => {
+    const s = base()
+    const attacker = putUnit(s, 0, 'minotaur') // power 9
+    const blocker = putUnit(s, 1, 'secondhand-bombus') // power 0, {blocker}
+    putLegend(s, 1, 'goro-takemura-vengeful-bodyguard') // face-up: {onFriendlyBlock} discard-then-draw
+    s.players[1].gigArea = dice(4)
+    // A hand card to discard, and an empty deck so the resulting draw fails.
+    const handCard = s.players[1].deck.shift()
+    if (handCard === undefined) throw new Error('expected at least one card left in the deck')
+    s.players[1].hand = [handCard]
+    s.players[1].deck = []
+
+    const next = react(declare(s, attacker, 'gigArea'), { type: 'block', blocker })
+
+    expect(next.phase).toBe('gameOver')
+    expect(next.winner).toBe(0) // player 1 decked out
+    expect(next.events.at(-1)).toMatchObject({ type: 'gameEnded', reason: 'deckout' })
+    // No fight (or anything past the block) ever ran: neither unit was
+    // touched, and no post-block combat event exists at all.
+    expect(next.events.some((e) => e.type === 'unitDefeated')).toBe(false)
+    expect(next.players[0].field).toContain(attacker)
+    expect(next.players[1].field).toContain(blocker)
+    expect(next.players[1].trash).not.toContain(blocker)
   })
 })
 

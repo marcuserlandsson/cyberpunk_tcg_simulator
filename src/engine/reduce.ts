@@ -386,10 +386,11 @@ function callLegend(draft: GameState, db: CardDb, player: PlayerId, payment: num
   // free Call, which can beat this call to the punch — flipping the very
   // last face-down Legend and/or using up the once-per-turn allowance before
   // this call's own resolution runs. When that happens this call has been
-  // outrun (docs/rulings.md's fizzle convention, e.g. §27's vanished attack
-  // target): the €$/spent-Legend cost already paid stands, but the call
-  // itself does nothing further, exactly like an attack whose target
-  // vanished mid-react.
+  // outrun: the €$/spent-Legend cost already paid stands, but the call
+  // itself does nothing further — the same "a vanished target simply
+  // fizzles the resolution, cost already spent" shape `resolveAttack` uses
+  // when a quick effect defeats or bounces a combatant mid-react (that one
+  // is a code comment there, not its own numbered rulings.md entry).
   if (p.calledLegendThisTurn) return
   const faceDown = p.legends.filter((uid) => !draft.cards[uid].faceUp)
   if (faceDown.length === 0) return

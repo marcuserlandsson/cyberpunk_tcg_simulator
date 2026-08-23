@@ -231,8 +231,8 @@ describe('arasaka-emergency-radioport', () => {
   // "pick a face-down Legend" step with none to pick, which crashed with
   // `Cannot set properties of undefined (setting 'faceUp')` instead of
   // fizzling like every other "the thing this was about to affect is
-  // already gone" case in the engine (docs/rulings.md's fizzle convention,
-  // e.g. §27's vanished attack target).
+  // already gone" case in the engine (e.g. `resolveAttack`'s own comment on
+  // a combatant vanishing mid-react).
   it('fizzles the explicit Call instead of crashing when its own payment card wears this Gear', () => {
     const fixture = fixtureWithHand(0, ['arasaka-emergency-radioport'])
     const state = fixture.state

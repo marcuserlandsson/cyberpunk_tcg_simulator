@@ -479,6 +479,14 @@ export function defeatUnit(
   uid: number,
   opts: { allowIntercept?: boolean } = {}
 ): void {
+  // Entry guard (docs/rulings.md §147 — Task 9 fuzz harness, fix round 2):
+  // `defeatUnit` is called in loops (a tied `fight`, a mass-`defeat` effect
+  // node) where an EARLIER call's own on-defeat trigger chain can end the
+  // game outright. Once that happens, a card still nominally "defeated"
+  // this resolution simply stays wherever it currently sits — the game is
+  // over, and every OTHER choke point (`endGame`, the trigger wrappers)
+  // already stopped for the same reason.
+  if (draft.winner !== null) return
   // "If this Unit would be defeated, defeat its DEADMAN TRANSMITTER instead":
   // the Gear soaks the hit and the Unit stays put (docs/rulings.md §46). An
   // unconditional, costless substitution, so it settles the question before
@@ -576,6 +584,8 @@ export function defeatUnit(
  * card needs "defeat a Gear" as a real, enumerated decision yet.
  */
 export function defeatGear(draft: GameState, db: CardDb, gearUid: number): void {
+  // Entry guard, same reasoning as `defeatUnit`'s (docs/rulings.md §147).
+  if (draft.winner !== null) return
   let host: number | null = null
   for (const player of [0, 1] as const) {
     for (const candidate of [...draft.players[player].field, ...draft.players[player].legends]) {
@@ -602,6 +612,11 @@ export function defeatGear(draft: GameState, db: CardDb, gearUid: number): void 
  * "strictly higher wins, tie kills both".
  */
 function fight(draft: GameState, db: CardDb, attacker: number, defender: number): void {
+  // Entry guard (docs/rulings.md §147): defends any future direct caller,
+  // matching `resolveAttack`'s own entry guard which is what stops today's
+  // only caller (`blockAttack`'s fall-through — the Critical this round
+  // fixes).
+  if (draft.winner !== null) return
   // "+2 power while fighting a Legend" — a bonus that only exists for the
   // duration of this specific fight, never folded into `effectivePower`
   // (docs/rulings.md §55 ff.).
@@ -675,6 +690,14 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
     defeatUnit(draft, db, uid)
   }
 
+  // The `onLoseFight`/on-defeat chains just fired can end the game outright
+  // (docs/rulings.md §147). Everything below is non-trigger bookkeeping
+  // (`resolveNodeOnDraft` for a floating `winFightMarginSteal`, a second
+  // `defeatUnit` call for `loseFightDefeatFoe`) that the trigger wrappers'
+  // OWN entry guards don't reach on their own — this fight is fully over
+  // either way, win/loss bookkeeping included.
+  if (draft.winner !== null) return
+
   // [trigger seam] "when this Unit wins a fight": the survivor of a fight that
   // actually defeated the other side (docs/rulings.md §41). A tie has no
   // winner, and neither does a fight whose loser was saved by a `defeatShield`
@@ -738,6 +761,11 @@ export function blockAttack(draft: GameState, db: CardDb, blocker: number): void
   if (attack === null) return
 
   spendOnDraft(db, draft, [blocker])
+  // The blocker's own {Spend} trigger (spent here as the cost of blocking)
+  // can end the game outright (docs/rulings.md §147) — the rest of this
+  // function (the `attackBlocked` event, `onBlock`/`onFriendlyBlock`, the
+  // fight) must not still run.
+  if (draft.winner !== null) return
   attack.redirectedTo = blocker
   draft.events.push({ type: 'attackBlocked', blocker })
   // [trigger seam] "When this Unit uses {Blocker}, ..." — before the fight, so
@@ -760,6 +788,15 @@ export function blockAttack(draft: GameState, db: CardDb, blocker: number): void
  * (docs/rulings.md §25).
  */
 export function resolveAttack(draft: GameState, db: CardDb): void {
+  // Entry guard (docs/rulings.md §147 — Task 9 fuzz harness, fix round 2,
+  // CRITICAL finding): `blockAttack` fires `onBlock`/`onFriendlyBlock` and
+  // then unconditionally falls through into this function. Either watcher
+  // can end the game outright (e.g. goro-takemura-vengeful-bodyguard's
+  // `onFriendlyBlock` discard/draw against an empty deck) — without this
+  // guard, a full fight (or steal) still resolved on a finished game. This
+  // single check also covers the `react: 'pass'` path into this same
+  // function, and any future caller.
+  if (draft.winner !== null) return
   const attack = draft.pendingAttack
   // Unreachable: `legalActions` only offers reactions inside a react window.
   if (attack === null) return

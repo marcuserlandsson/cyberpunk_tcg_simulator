@@ -253,11 +253,24 @@ export function draftState(state: GameState): GameState {
 // Shared mutations on a draft
 // ---------------------------------------------------------------------------
 
+/**
+ * Idempotent by construction: a second call (e.g. a scripted card's own
+ * post-`defeatGear`/`defeatUnit` deckout check re-running after that call's
+ * OWN chained trigger already ended the game) is a silent no-op rather than
+ * overwriting `winner`/`reason` or pushing a second `gameEnded` event. This
+ * is the single root choke point every ending (`sevenGigs`, `deckout`,
+ * `overtimeMajority`, `concede`) funnels through, so guarding it here is the
+ * one change that makes every OTHER "did this already end the game?" check
+ * in the engine a belt-and-suspenders nice-to-have rather than a
+ * correctness requirement (docs/rulings.md §147 — Task 9 fuzz harness, fix
+ * round 2).
+ */
 export function endGame(
   draft: GameState,
   winner: PlayerId,
   reason: 'sevenGigs' | 'overtimeMajority' | 'deckout' | 'concede'
 ): void {
+  if (draft.winner !== null) return
   draft.winner = winner
   draft.phase = 'gameOver'
   draft.events.push({ type: 'gameEnded', winner, reason })

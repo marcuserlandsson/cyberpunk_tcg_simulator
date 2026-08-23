@@ -4884,12 +4884,17 @@ array, and `draft.cards[undefined].faceUp = true` throws.
 **Ruling:** "You may only Call a Legend once per turn" is a hard cap of one
 flip per player per turn, full stop — including when a nested Gear-driven
 free Call gets there first while paying for an entirely separate,
-explicit Call a Legend. The outer call fizzles exactly like an attack whose
-target vanished mid-react (§27's fizzle convention): the €$ (or spent-Legend)
-cost already paid stands, but the call itself does nothing further. Fixed by
-checking `p.calledLegendThisTurn` (set the moment ANY flip lands, nested or
-not) and `faceDown.length === 0` before touching the rng, both as early
-returns ahead of the flip.
+explicit Call a Legend. The outer call fizzles — the same "a vanished
+target simply fizzles the resolution, cost already spent" shape
+`resolveAttack` already uses when a quick effect defeats or bounces a
+combatant mid-react (that one is a code comment there, not its own numbered
+entry in this log — corrected here after review; an earlier draft of this
+entry mis-cited it as §27, which is actually about blocking closing the
+react window, a different rule): the €$ (or spent-Legend) cost already paid
+stands, but the call itself does nothing further. Fixed by checking
+`p.calledLegendThisTurn` (set the moment ANY flip lands, nested or not) and
+`faceDown.length === 0` before touching the rng, both as early returns ahead
+of the flip.
 
 **TDD evidence:** `tests/cards/red.test.ts`'s `arasaka-emergency-radioport`
 suite gains a case that equips the Gear onto a face-up Legend, leaves exactly
@@ -5002,3 +5007,157 @@ of the above were found — all five needed thousands of seeds to surface.
 Two consecutive clean runs at 6,000, then at 20,000, then a single clean run
 at 60,000 seeds (0% action-cap hit rate throughout; `sevenGigs`/
 `overtimeMajority`/`deckout` all naturally represented) close this round.
+
+# Task 9 — fuzz harness, fix round 2 (review)
+
+A task review of fix round 1 above returned one Critical and two Important
+findings. This round fixes the Critical, centralizes the "once the game
+ends, nothing else may run" guard instead of hand-copying it call site by
+call site (the Important the Critical's own root cause was traced to), and
+restates the brief's turn-bound invariant — silently dropped in round 1 in
+favor of the action cap alone — as a real, computed ceiling. It also
+corrects a mis-citation in §146.1 above (fixed in place there, not repeated
+here): that entry attributed the "a vanished target simply fizzles" shape to
+§27, which is actually about a block closing the react window — a different
+rule. No numbered entry documents the fizzle shape itself; it is a code
+comment in `resolveAttack`, not a rulings.md ruling, and §146.1's citation
+now says so.
+
+## 147 — `endGame` becomes the one idempotent choke point; the trigger
+wrappers guard their own entry; a real turn-number ceiling
+
+**1. CRITICAL — `blockAttack` fell through into a full fight/steal on a
+game that had just ended.** `blockAttack` fires `onBlock` then
+`onFriendlyBlock` (a watcher broadcast to every friendly in-play card) and
+then unconditionally calls `resolveAttack`, which unconditionally proceeds
+into `fight()` for a redirected attack. Neither `onBlock`/`onFriendlyBlock`
+firing, `resolveAttack`, nor `fight` itself checked `draft.winner` first.
+`goro-takemura-vengeful-bodyguard` (`{onFriendlyBlock}`: discard 1, draw 1)
+blocking with the controller's deck empty and hand non-empty is reachable
+today: the discard/draw ends the game via deckout mid-`{Blocker}`, and the
+engine then ran a complete fight (or steal) to conclusion on top of a
+finished game — defeating units, moving Gigs, logging events, all after
+`gameEnded`.
+
+**2. IMPORTANT — round 1's fix was seven-plus hand-copied
+`if (draft.winner !== null) return` checks with no shared idiom, which is
+exactly what let the Critical above slip through.** Round 1 guarded the
+specific call sites a reproduced failure pointed at
+(`endAttack`, `finishSteal`, the `'scripted'` node wrapper, three
+per-iteration loop checks) but never asked "what's the SMALLEST set of
+functions that, if guarded at their own entry, protect every caller —
+present and future — by construction?" `blockAttack`'s fall-through is
+what that gap costs: a sixth call site of the identical bug class, sitting
+one function away from three that were already fixed.
+
+**Ruling (architecture):** guard the choke points themselves, not their
+callers:
+- `endGame` (`game.ts`) is now idempotent — `if (draft.winner !== null) return`
+  as its first line. It is the ONE function every ending
+  (`sevenGigs`/`overtimeMajority`/`deckout`/`concede`) funnels through, so
+  this single change makes a duplicate/conflicting second call harmless
+  everywhere, not just at the sites this round happened to look at.
+- `fireCardTrigger`, `fireTriggerOnDraft`, `fireWatcherTrigger`
+  (`effects.ts`) — the three "trigger-firing wrappers" — now all guard their
+  own entry, on top of the per-iteration checks round 1 already added
+  inside them. A caller that fires a SECOND trigger after an earlier one
+  already ended the game (`spendOnDraft`'s payment loop, `playCardOnDraft`'s
+  `onPlay` → `onFriendlyCardPlayed`, `takeStolenGig`'s
+  `onFriendlyStealDie` → `onFriendlyStealComplete`) is now safe without
+  ANY of those call sites needing their own check — this is what "by
+  construction" means in practice: six previously-fragile call sites closed
+  by two functions gaining one line each.
+- `resolveAttack`, `fight`, `defeatUnit`, `defeatGear`, `resolveNodeOnDraft`
+  (the non-trigger "resolution choke points" a fight/defeat/steal actually
+  runs through) each gain the same one-line entry guard.
+  `resolveAttack`'s is what fixes the Critical: `blockAttack`'s fall-through
+  now hits it and no-ops immediately, whichever watcher ended the game.
+  `defeatUnit`'s protects a SECOND simultaneously-defeated Unit in a tied
+  fight (a real ruling, not just a safety net: once the game has ended
+  mid-fight, the other casualty of the SAME tie simply stays wherever it
+  currently sits — the game is over, full stop, the same "freeze
+  everything" reading round 1 already gave `endAttack`/`finishSteal`).
+- `fight` itself additionally gains one guard mid-body, right after its own
+  defeat loop and before computing the winner/floating-effects tail
+  (`winFightMarginSteal`'s `resolveNodeOnDraft` call, `loseFightDefeatFoe`'s
+  `defeatUnit` call): those two are reached via a plain function call, not
+  a trigger wrapper, so nothing else automatically protects them.
+- `blockAttack` and `playCardOnDraft` each also needed one LOCAL guard,
+  because they spend a cost (the blocker; the payment) whose OWN
+  `{Spend}` trigger can end the game before the rest of the function's
+  bookkeeping runs — `blockAttack` right after `spendOnDraft([blocker])`,
+  before the `attackBlocked` event. `playCardOnDraft` needed a small
+  reorder instead of a bare guard: its zone assignment (the field/trash/
+  Gear-equip push) now happens BEFORE `spendOnDraft(payment)`, not after,
+  so the just-played card is ALWAYS correctly zoned even if the payment's
+  own `{Spend}` trigger (e.g. §146.1's nested free Call) ends the game
+  before `spendOnDraft` returns — the guard sits right after `spendOnDraft`,
+  ahead of the `cardPlayed` event and everything past it.
+
+**Sweep results:** every `fireCardTrigger`/`fireTriggerOnDraft`/
+`fireWatcherTrigger` call site in `src/` was re-examined for what runs
+immediately after it, with the entry guards above already in place:
+
+| Site | Verdict |
+|---|---|
+| `effects.ts` `changeGig`/`swapGig`/`matchGig` → `onRivalAdjustFriendlyGig` | Safe — each `case` `return`s immediately after; the enclosing `sequence`/`sameTarget`/`chooseOne` iterators already checked `winner` between sibling nodes (pre-existing, not this round's work) |
+| `effects.ts` `fireTriggerOnDraft`'s own Gear-propagation loop | Safe — per-iteration guard (round 1) + this round's entry guard |
+| `effects.ts` `spendOnDraft`'s per-uid loop (`onSpend`, `onFriendlyEquippedSpend`) | Fixed by construction — a later uid's fire call now no-ops the instant an earlier uid's trigger ends the game |
+| `effects.ts` `fireWatcherTrigger`'s own per-watcher loop | Safe — per-iteration guard (round 1) + this round's entry guard |
+| `effects.ts` `fireGigRollTrigger` (wraps one `fireWatcherTrigger` call) | Safe — last statement in its own function; all 3 callers (`reduce.ts` ×2, the `rerollGig` node) already `return`/check right after |
+| `effects.ts` `playCardOnDraft`'s `onPlay` → `onFriendlyCardPlayed` | Fixed by construction (the watcher wrapper's entry guard) — no local change needed beyond the reorder in #2 above |
+| `combat.ts` `declareAttack`'s `onAttack`/`onFriendlyAttack` | Safe — pre-existing explicit checks after each (round 0, before this task) |
+| `combat.ts` `defeatUnit`'s `onUnitDefeated` (both players) | Safe — pre-existing explicit check right after (round 0) |
+| `combat.ts` `defeatUnit`'s `onDefeat` (uid + its Gear, in a loop) | Safe — last statements in the function; a second Gear's fire now also guarded by construction |
+| `combat.ts` `defeatGear`'s `onDefeat` | Safe — last statement in the function |
+| `combat.ts` `fight`'s `onLoseFight` (looped over up to 2 defeated uids) | Fixed by construction for a second casualty; the loop's OWN first casualty is what can end the game, and nothing runs between iterations besides the now-guarded fire call |
+| `combat.ts` `fight`'s `onWinFight` | Fixed — the new post-defeat-loop guard returns before this is even reached |
+| `combat.ts` `blockAttack`'s `onBlock`/`onFriendlyBlock` → `resolveAttack` | **Fixed — the Critical.** `resolveAttack`'s new entry guard |
+| `combat.ts` `takeStolenGig`'s `onFriendlyStealDie` → (bookkeeping) → `onFriendlyStealComplete` → `finishSteal` | Fixed by construction — `onFriendlyStealComplete`'s own call now no-ops if `onFriendlyStealDie` already ended it; `finishSteal` was already guarded (round 1) |
+| `reduce.ts` `startTurn`'s `onStartTurn` | Safe — last statement, reached only past `beginTurn`'s own check (round 0) |
+| `reduce.ts` `callLegend`'s `onCall` | Safe — last statement in the function |
+| `reduce.ts` `endTurn`'s `onEndTurn` | Safe — pre-existing explicit checks after it and after `resolveEndOfTurnFloating` (round 0), and `resolveEndOfTurnFloating`'s own `defeatUnit` loop already re-checks per iteration |
+
+Net: one Critical fixed directly (`resolveAttack`'s entry guard), five more
+call sites fixed AS A SIDE EFFECT of the three trigger-wrapper entry guards
+alone (no per-site code), and everything else in the sweep was already
+correctly guarded before this round — mostly by the codebase's own
+pre-existing convention (round 0, predating this task) rather than round 1's
+patches.
+
+**3. IMPORTANT — the brief's "turn 30" invariant was replaced with an
+action cap alone, never re-derived as its own check.** Round 1 substituted
+the brief's turn-bound guess with `ACTION_CAP = 400` (measured) and reported
+the substitution, but never added a turn-NUMBER assertion at all — a
+distinct invariant from "how many actions did this take."
+
+**Ruling:** compute the real ceiling instead of re-guessing one.
+`deck.ts`'s `MAX_DECK_SIZE` is 50; `OPENING_HAND_SIZE` is 6; every turn's
+`beginTurn` forces exactly one more draw per player, unconditionally
+(the same rule the opening-hand/mulligan draw already uses to end the game
+on failure). With zero extra-draw effects and zero cards ever returned to a
+deck — the worst case for how LONG a deck can last — a 50-card deck's owner
+decks out on their 45th own turn (`50 - 6 = 44` further draws exhausts it;
+the 45th is the one that fails). Since `turnNumber` advances once per
+ROUND, that is `turnNumber === 45`; extra draws only shorten this, and no
+printed effect returns cards to a deck fast enough, or often enough, to
+plausibly race a uniform-random agent past it turn after turn.
+`MAX_TURN_NUMBER = 50` (`tests/fuzz/invariants.test.ts`) is that computed 45
+plus a flat margin — a real, provable-for-normal-play ceiling, not the
+brief's blind 30 and not an arbitrarily large number either. It is checked
+every action (via `checkInvariants`), not only at game end, so a genuinely
+unbounded game fails on `turnNumber` growing past it, independent of
+whether it would also eventually trip `ACTION_CAP`.
+
+**Measured:** an instrumented 24,000-seed sample (4,000 then 20,000,
+starter- and synthetic-deck matchups mixed) found a maximum observed
+`turnNumber` of **14** — nowhere near either the brief's 30 or the computed
+45, because `checkOvertimeWin` (turn 8+) ends most games within a few turns
+of overtime starting, well before any deck gets close to running out. The
+brief's 30 was not wrong in spirit, just unexamined; 14 observed vs. 50
+enforced leaves both a real margin and a real ceiling.
+
+**Verification for this round:** `npx vitest run` (full suite) and
+`npm run build` green; a ≥20,000-seed fuzz confirmation run clean at the
+final committed state (see task-9-report.md for the exact count and
+timing).

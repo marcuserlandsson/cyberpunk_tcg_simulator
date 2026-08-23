@@ -57,6 +57,24 @@ const SYNTHETIC_SEEDS = FUZZ_SEEDS - STARTER_SEEDS
 const ACTION_CAP = 400
 const MAX_CAP_HIT_RATE = 0.05
 
+// The brief guessed "turn 30 at the latest." That number doesn't survive
+// contact with the real deck sizes: `deck.ts`'s `MAX_DECK_SIZE` is 50, so a
+// player's WORST-CASE deck life — with zero extra draws and zero cards ever
+// returned to a deck — is `50 - OPENING_HAND_SIZE(6) = 44` more forced
+// start-of-turn draws before the required draw off an empty deck ends the
+// game via deckout (`beginTurn`'s own `drawCards(..., 1)` guarantee, the
+// same hard rule as the opening-hand/mulligan draw). Since `turnNumber`
+// advances once per ROUND (both players' Nth turn), a player's 45th own
+// turn lands at `turnNumber === 45`; extra-draw effects only shorten this,
+// and no printed effect returns cards to a deck faster than a uniform-random
+// agent could plausibly sustain turn after turn. 50 is that ceiling (45)
+// plus a flat margin, not a re-guess: a game that reaches it is a real bug,
+// not an unlucky shuffle. (Measured for real: across 24,000 sampled
+// starter+synthetic games, the observed maximum was `turnNumber === 14` —
+// see task-9-report.md's "turn-bound" section for the full derivation and
+// the sample.)
+const MAX_TURN_NUMBER = 50
+
 // ---------------------------------------------------------------------------
 // Game construction
 // ---------------------------------------------------------------------------
@@ -200,12 +218,29 @@ function checkGameOver(state: GameState): string[] {
   return problems
 }
 
+/**
+ * The brief's turn-bound invariant, restated as a real ceiling instead of a
+ * guessed one — see `MAX_TURN_NUMBER`'s own comment for the derivation. This
+ * is checked every action (not just at game end) so a genuinely unbounded
+ * game fails here, from `turnNumber` alone, independent of whether it would
+ * also eventually trip `ACTION_CAP`.
+ */
+function checkTurnBound(state: GameState): string[] {
+  if (state.turnNumber <= MAX_TURN_NUMBER) return []
+  return [
+    `turnNumber is ${state.turnNumber}, past the ${MAX_TURN_NUMBER}-turn provable ` +
+      `ceiling (deckout guarantees termination by turn ~45 for the largest legal ` +
+      `deck) — this game is not bounded the way the rules guarantee it should be`,
+  ]
+}
+
 function checkInvariants(state: GameState): string[] {
   return [
     ...checkDice(state),
     ...checkZones(state),
     ...checkPendingClearedInMainOrStart(state),
     ...checkGameOver(state),
+    ...checkTurnBound(state),
   ]
 }
 

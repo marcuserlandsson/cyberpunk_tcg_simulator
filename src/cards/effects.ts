@@ -1151,6 +1151,14 @@ export function fireCardTrigger(
   controller?: PlayerId,
   context: TriggerContext = {}
 ): void {
+  // The central choke point every trigger fire funnels through: once the
+  // game has ended, no card's text may resolve any further, whoever calls
+  // this (docs/rulings.md §147 — Task 9 fuzz harness, fix round 2). Callers
+  // still get their OWN guard right after a firing that could have just
+  // caused this (see e.g. `resolveAttack`), but this entry check is what
+  // makes every downstream/sibling call safe BY CONSTRUCTION rather than by
+  // each caller remembering to check.
+  if (draft.winner !== null) return
   const def = defOf(db, draft, sourceUid)
   if (!def) return
   const player = controller ?? effectController(draft, sourceUid)
@@ -1231,6 +1239,12 @@ export function fireTriggerOnDraft(
   targets: number[],
   context: TriggerContext = {}
 ): void {
+  // Entry guard, same choke-point reasoning as `fireCardTrigger`'s own
+  // (docs/rulings.md §147) — redundant with that function's own guard for
+  // the FIRST call below, but it's what stops a fresh call to THIS function
+  // (from any caller, present or future) from even reaching for `sourceUid`
+  // once the game is over.
+  if (draft.winner !== null) return
   const card = draft.cards[sourceUid]
   if (!card) return
   const controller = effectController(draft, sourceUid)
@@ -1317,6 +1331,14 @@ export function fireWatcherTrigger(
   player: PlayerId,
   context: TriggerContext
 ): void {
+  // Entry guard, same choke-point reasoning as `fireCardTrigger`'s own
+  // (docs/rulings.md §147): a watcher broadcast reaches every in-play card
+  // of `player`, so without this a single call after the game already ended
+  // (e.g. `playCardOnDraft`'s `onFriendlyCardPlayed` right after `onPlay`
+  // itself decked the player out) would still fire the FIRST watching
+  // card's effect for real before any later, per-iteration check got a
+  // chance to stop it.
+  if (draft.winner !== null) return
   const p = draft.players[player]
   const watchers = [...p.field, ...p.legends.filter((uid) => draft.cards[uid].faceUp)]
   for (const uid of watchers) {
@@ -1386,6 +1408,11 @@ export function resolveNodeOnDraft(
   sourceUid: number,
   player: PlayerId
 ): void {
+  // Entry guard (docs/rulings.md §147): this bypasses `applyEffectDefOnDraft`'s
+  // own guard (it calls `applyNode` directly), so it needs its own — e.g.
+  // `fight`'s floating `winFightMarginSteal` resolution, which runs after a
+  // fight whose OWN on-defeat chain may already have ended the game.
+  if (draft.winner !== null) return
   const def: EffectDef = { trigger: 'activated', effect: node }
   const slots = bindSlots(db, draft, def, sourceUid, [], player)
   applyNode(db, draft, node, { player, sourceUid, targets: [] }, slots)
@@ -1684,9 +1711,16 @@ export function playCardOnDraft(
 
   p.hand = p.hand.filter((uid) => uid !== cardUid)
   p.legends = p.legends.filter((uid) => uid !== cardUid)
-  spendOnDraft(db, draft, payment)
-  draft.events.push({ type: 'cardPlayed', player, uid: cardUid })
 
+  // Zone assignment happens before paying (`spendOnDraft`, below) and before
+  // `onPlay` fires, so this card is ALWAYS in exactly one zone regardless of
+  // what paying for it (the payment's own {Spend} trigger — e.g. a nested
+  // free Call, docs/rulings.md §146.1) or its own `onPlay` effect does
+  // afterward (docs/rulings.md §144's "every card is in exactly one zone"
+  // invariant, hardened by the Task 9 fuzz harness). No printed Program
+  // effect targets a trash-zone card of its own, so moving a Program's own
+  // trash push this early cannot let its text see (or select) itself as
+  // already-trashed.
   let effectTargets = targets
   switch (def.type) {
     case 'unit':
@@ -1715,20 +1749,17 @@ export function playCardOnDraft(
       // docs/rulings.md §120 ff.) — cleared for this player only at their own
       // next turn start (`resetTurnState`), matching `soldThisTurn`'s scope.
       p.playedProgramThisTurn = true
-      // Moved to the trash HERE — before `onPlay` fires — for the same
-      // reason a Unit/Legend's field push happens before its own `onPlay`:
-      // a card leaving `onPlay` mid-resolution (e.g. a forced draw off an
-      // empty deck ending the game outright) must never leave this card
-      // parked in no zone at all while its own trigger chain is still
-      // unwinding (docs/rulings.md §144's "every card is in exactly one
-      // zone" invariant, hardened by the Task 9 fuzz harness). No printed
-      // Program effect targets a trash-zone card of its own, so moving this
-      // ahead of `onPlay` cannot let a Program's own text see (or select)
-      // itself as already-trashed.
       p.trash.push(cardUid)
       draft.events.push({ type: 'cardTrashed', uid: cardUid })
       break
   }
+
+  spendOnDraft(db, draft, payment)
+  // The payment's own {Spend} trigger can end the game outright — nothing
+  // below (the `cardPlayed` event, the once-per-turn discount marking,
+  // `onPlay`, `onFriendlyCardPlayed`) may still run (docs/rulings.md §147).
+  if (draft.winner !== null) return
+  draft.events.push({ type: 'cardPlayed', player, uid: cardUid })
 
   // "Play your first CYBERWARE Gear each turn for -3 €$, to a minimum of
   // 1 €$" (viktor-vektor-drop-your-illusions, docs/rulings.md §81 ff.) — mark
