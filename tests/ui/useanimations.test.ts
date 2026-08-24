@@ -118,6 +118,53 @@ describe('useAnimations', () => {
     expect(result.current.lungeUid).toBe(9)
   })
 
+  it('gives each field an independent ~600ms lifetime — a later trigger of one kind never cuts another kind short', () => {
+    vi.useFakeTimers()
+    const attack7: GameEvent = { type: 'attackDeclared', attacker: 7, target: 'gigArea' }
+    const roll: GameEvent = { type: 'dieRolled', player: 0, size: 6, value: 4 }
+    // Pre-typed as `GameEvent[]` (not an inline literal at the call site) —
+    // mirrors every other array in this file. `renderHook`'s `Props`
+    // inference otherwise narrows to whichever discriminated member the
+    // FIRST `initialProps` literal happens to contain, which would make a
+    // later `rerender` with a *different* member (dieRolled) a type error.
+    const onlyAttack: GameEvent[] = [attack7]
+    const withRoll: GameEvent[] = [attack7, roll]
+
+    const { result, rerender } = renderHook(
+      ({ ev }: { ev: GameEvent[] }) => useAnimations(ev, true),
+      { initialProps: { ev: onlyAttack } }
+    )
+    expect(result.current.lungeUid).toBe(7)
+    expect(result.current.tumble).toBeNull()
+
+    // A second, unrelated kind of event lands 200ms later. This must start
+    // ITS OWN 600ms window (tumble) without touching the lunge's — which
+    // still has 400ms left on its own clock.
+    act(() => vi.advanceTimersByTime(200))
+    rerender({ ev: withRoll })
+    expect(result.current.lungeUid).toBe(7) // not clobbered by the new batch
+    expect(result.current.tumble).toEqual({ player: 0, size: 6 })
+
+    // t=500 overall (300 more since the roll landed at t=200): the lunge's
+    // own window (0-600) is still open — a shared-timer bug would have
+    // already reset everything the moment the roll's batch arrived, long
+    // before this point.
+    act(() => vi.advanceTimersByTime(300))
+    expect(result.current.lungeUid).toBe(7)
+    expect(result.current.tumble).toEqual({ player: 0, size: 6 })
+
+    // t=700 overall: the lunge's window (started at t=0) has closed, but the
+    // tumble's own window (started at t=200, closes at t=800) has not — the
+    // lunge reverting must not touch the still-live tumble.
+    act(() => vi.advanceTimersByTime(200))
+    expect(result.current.lungeUid).toBeNull()
+    expect(result.current.tumble).toEqual({ player: 0, size: 6 })
+
+    // t=900 overall: the tumble's own window has now closed too.
+    act(() => vi.advanceTimersByTime(200))
+    expect(result.current.tumble).toBeNull()
+  })
+
   it('clears its timer on unmount without throwing', () => {
     vi.useFakeTimers()
     const { result, rerender, unmount } = renderHook(

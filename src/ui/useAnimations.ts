@@ -51,26 +51,64 @@ const NONE: AnimationState = { lungeUid: null, tumble: null, steal: null, glitch
 /** How long each triggered flag stays non-null before reverting. */
 const ANIMATION_MS = 600
 
+/** The four fields, each with its own independent revert clock. */
+type Field = keyof AnimationState
+
 export function useAnimations(events: readonly GameEvent[], enabled: boolean): AnimationState {
   const lastSeenRef = useRef(0)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // ONE timer ref PER FIELD — not one shared timer/state-write for all four.
+  // A batch that triggers, say, only `tumble` must not touch `lungeUid`'s own
+  // still-running window: an earlier implementation wrote the *entire*
+  // `AnimationState` object on every trigger, which nulled out every field
+  // the current batch didn't itself set — cutting a still-playing lunge off
+  // the instant an unrelated die-roll landed. Per-field timers plus a
+  // per-field functional `setState` merge are what make the four fields
+  // genuinely independent.
+  const timerRefs = useRef<Record<Field, ReturnType<typeof setTimeout> | null>>({
+    lungeUid: null,
+    tumble: null,
+    steal: null,
+    glitch: null,
+  })
   const [state, setState] = useState<AnimationState>(NONE)
+
+  const clearTimer = (field: Field): void => {
+    const timer = timerRefs.current[field]
+    if (timer !== null) {
+      clearTimeout(timer)
+      timerRefs.current[field] = null
+    }
+  }
+
+  const clearAllTimers = (): void => {
+    clearTimer('lungeUid')
+    clearTimer('tumble')
+    clearTimer('steal')
+    clearTimer('glitch')
+  }
+
+  /** Sets one field non-null (or `true`) now, reverting only THAT field
+   *  ~600ms later — replacing whichever timer that same field already had,
+   *  never touching the other three. */
+  function trigger<K extends Field>(field: K, value: AnimationState[K], revertTo: AnimationState[K]): void {
+    clearTimer(field)
+    setState((prev) => ({ ...prev, [field]: value }))
+    timerRefs.current[field] = setTimeout(() => {
+      timerRefs.current[field] = null
+      setState((prev) => ({ ...prev, [field]: revertTo }))
+    }, ANIMATION_MS)
+  }
 
   // Any pending timer must die with the component — a `setState` fired after
   // unmount is a React warning at best, a leak at worst.
   useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current)
-    }
+    return () => clearAllTimers()
   }, [])
 
   useEffect(() => {
     if (!enabled) {
       lastSeenRef.current = events.length
-      if (timerRef.current !== null) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
+      clearAllTimers()
       setState(NONE)
       return
     }
@@ -81,10 +119,7 @@ export function useAnimations(events: readonly GameEvent[], enabled: boolean): A
       // Undo/replay shrank the log — reset the watermark and show nothing;
       // see the module comment above.
       lastSeenRef.current = events.length
-      if (timerRef.current !== null) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
+      clearAllTimers()
       setState(NONE)
       return
     }
@@ -118,16 +153,14 @@ export function useAnimations(events: readonly GameEvent[], enabled: boolean): A
       }
     }
 
-    if (lungeUid === null && tumble === null && steal === null && !glitch) return
-
-    // A fresh trigger replaces whatever is already showing (and its own
-    // timer) rather than stacking — the newest event always wins.
-    if (timerRef.current !== null) clearTimeout(timerRef.current)
-    setState({ lungeUid, tumble, steal, glitch })
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null
-      setState(NONE)
-    }, ANIMATION_MS)
+    // Each field that this batch actually triggered gets its OWN ~600ms
+    // window, independent of the other three — a batch that triggers none of
+    // a field leaves that field exactly as it was (still counting down its
+    // own earlier timer, or still null).
+    if (lungeUid !== null) trigger('lungeUid', lungeUid, null)
+    if (tumble !== null) trigger('tumble', tumble, null)
+    if (steal !== null) trigger('steal', steal, null)
+    if (glitch) trigger('glitch', true, false)
   }, [events, enabled])
 
   return state
