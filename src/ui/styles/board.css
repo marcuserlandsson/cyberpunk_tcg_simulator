@@ -131,20 +131,23 @@
 /* ---------------------------------------------------------------------- */
 /* Playmat — main grid: board column + fixed right rail                   */
 /* (docs/superpowers/specs/2026-08-23-visual-overhaul-design.md, "Play     */
-/* view"). The header above (App.tsx) measures ~74px tall at 1366×768 in a  */
-/* real browser (Playwright, `header.boundingBox()`) — the design spec's    */
-/* assumed 52px did not match. `.playmat`'s calc reserves 78px (a few px of */
-/* slack over the measurement) and clips to it, so nothing here ever grows  */
-/* the page past the viewport — not even the prompt bars, which is why they */
-/* overlay the board (`.playmat__prompts`, below) rather than sit in flow:  */
-/* the design spec calls them "pinned above the hand", and a bar that only */
-/* appears while a decision is pending must not shove the whole page around */
-/* every time one opens and closes.                                         */
+/* view"). The header above (App.tsx) measures ~73.78px tall at 1366×768 in */
+/* a real browser (Playwright, `header.boundingBox()`) — the design spec's  */
+/* assumed 52px did not match. `.playmat`'s calc reserves 75px (re-measured */
+/* and trimmed from an earlier 78px during the Task 10 fix-round density    */
+/* pass — 78px carried ~4.2px of unused slack over the 73.78px measurement; */
+/* 75px keeps ~1.2px of rounding margin, the smallest safe reservation) and  */
+/* clips to it, so nothing here ever grows the page past the viewport — not */
+/* even the prompt bars, which is why they overlay the board                */
+/* (`.playmat__prompts`, below) rather than sit in flow: the design spec    */
+/* calls them "pinned above the hand", and a bar that only appears while a  */
+/* decision is pending must not shove the whole page around every time one  */
+/* opens and closes.                                                        */
 /* ---------------------------------------------------------------------- */
 
 .playmat {
   position: relative;
-  height: calc(100vh - 78px);
+  height: calc(100vh - 75px);
   padding: 0;
   overflow: hidden;
 }
@@ -171,9 +174,17 @@
   overflow-y: auto;
   display: grid;
   grid-template-rows: auto auto 1fr auto;
-  gap: 6px;
+  /* 3px gap / 4px 6px padding (Task 10 fix-round density pass, down from the
+     original 6px gap / 10px 12px padding, via an intermediate 4px/6px8px)
+     — a plain trim of dead space around the four stacked rows (rival strip
+     / street / player zone / hand), none of it inside a protected floor
+     (hand-fan reserve, eddies/legends tapped-diagonal min-heights, card
+     content sizes) — see board.css's own overflow analysis further down
+     for how much this and the other trims in this pass bought against the
+     1366×768 no-scroll budget. */
+  gap: 3px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 4px 6px;
   position: relative;
   background:
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.016) 0 1px, transparent 1px 4px),
@@ -186,7 +197,12 @@
 .player-zone {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  /* 1px, down from an original 4px (Task 10 fix-round density pass, via an
+     intermediate 2px) — a plain trim of the vertical gap between each
+     strip's own internal rows (meta/zone-panels/field/hand for the rival
+     strip; field/zone-panels for the player zone); none of these rows
+     themselves shrank. */
+  gap: 1px;
 }
 
 /* Neither `.rival-strip` nor `.player-zone` overrides the grid's default
@@ -300,12 +316,22 @@
    contributor. This is not the rare pathological case the surrounding
    comments anticipate; calling all three Legends is routine by midgame.
    Uncalled (face-down) Legends are already shrunk to 46px width above and
-   are untouched by this — the selectors below only ever reach a real
-   `.card-frame` (never `.card-frame--face-down`, which renders
-   `.card-frame__back` instead of any of these elements). */
+   must stay untouched by this: unlike `.zone--field`/`.zone--hand` (whose
+   cards are always face-up), a `.zone--legends .card-frame` IS reached by a
+   face-down Legend too — `faceDown` only adds `card-frame--face-down`
+   alongside the base `card-frame` class (CardFrame.tsx), it doesn't replace
+   it — so the legends selector below carries its own
+   `:not(.card-frame--face-down)` (a Task 10 fix-round review finding: an
+   earlier version of this rule lacked it and nudged the face-down Legend
+   back's own padding/gap along with the called-Legend content it was meant
+   for). `.zone--field`/`.zone--hand` need no such guard: field cards are
+   never face-down, and the human's own hand never is either — only the
+   rival's hidden hand renders face-down, and that's a separate `.zone--hand
+   .zone--hand-hidden` combination this rule already reached before this
+   task, unrelated to the Legends fix here. */
 .playmat__board .zone--field .card-frame,
 .playmat__board .zone--hand .card-frame,
-.playmat__board .zone--legends .card-frame {
+.playmat__board .zone--legends .card-frame:not(.card-frame--face-down) {
   gap: 2px;
   padding: 4px;
 }
@@ -535,7 +561,10 @@
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 8px 12px;
+  /* 5px vertical (down from an original 8px, Task 10 fix-round density
+     pass, via an intermediate 6px) — the die row/vs-block content is
+     untouched, only the strip's own top/bottom breathing room shrank. */
+  padding: 5px 12px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.015);
@@ -627,13 +656,22 @@
 .zone {
   display: flex;
   flex-direction: column;
-  gap: 0.2em;
+  /* 0.1em, down from 0.2em (Task 10 fix-round density pass) — the label-to-
+     cards gap common to every zone (field, hand, legends, eddies, counts). */
+  gap: 0.1em;
   min-width: 0;
 }
 
 .zone__label {
   font-family: var(--font-mono);
   font-size: 9px;
+  /* Tight (down from the inherited ~1.4 body line-height, Task 10 fix-round
+     density pass) — a 9px label's default line box carries several px of
+     dead space above/below the glyphs that every zone (field/hand/legends/
+     eddies/counts) pays for once, on top of its `.zone` gap to the cards
+     row below. Purely a label metric; the zone's own content sizing (card
+     dimensions, min-heights) is untouched. */
+  line-height: 1.1;
   letter-spacing: 0.28em;
   text-transform: uppercase;
   color: var(--muted);
