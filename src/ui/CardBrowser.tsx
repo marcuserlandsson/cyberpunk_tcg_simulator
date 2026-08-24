@@ -6,9 +6,9 @@
 // (DeckBuilderView), which is also why `counts`/`legends` are read-only
 // inputs rather than state here.
 
-import { useMemo, useState, type ReactElement } from 'react'
+import { useMemo, useState, type CSSProperties, type ReactElement } from 'react'
 import type { CardDb, CardDef, CardType } from '../engine/types'
-import { CardFrame } from './CardFrame'
+import { CardFrame, ramColorVar } from './CardFrame'
 
 export interface CardBrowserProps {
   db: CardDb
@@ -101,9 +101,11 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
               key={color}
               data-testid={`filter-color-${color}`}
               aria-pressed={colors.has(color)}
-              className={colors.has(color) ? 'filter-chip filter-chip--active' : 'filter-chip'}
+              className="filter-chip filter-chip--ram"
+              style={{ '--ram-chip-color': ramColorVar(color) } as CSSProperties}
               onClick={() => toggle(colors, color, setColors)}
             >
+              <span className="filter-chip__swatch" aria-hidden="true" />
               {color}
             </button>
           ))}
@@ -115,7 +117,7 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
               key={type}
               data-testid={`filter-type-${type}`}
               aria-pressed={types.has(type)}
-              className={types.has(type) ? 'filter-chip filter-chip--active' : 'filter-chip'}
+              className="filter-chip"
               onClick={() => toggle(types, type, setTypes)}
             >
               {type}
@@ -129,7 +131,7 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
               key={keyword}
               data-testid={`filter-keyword-${keyword}`}
               aria-pressed={keywords.has(keyword)}
-              className={keywords.has(keyword) ? 'filter-chip filter-chip--active' : 'filter-chip'}
+              className="filter-chip"
               onClick={() => toggle(keywords, keyword, setKeywords)}
             >
               {keyword}
@@ -169,16 +171,16 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
             >
               <CardFrame
                 def={def}
-                size="small"
+                size="zoom"
                 useOfficialImages={useOfficialImages}
                 onClick={disabled ? undefined : () => onAdd(def.id)}
               />
+              {count > 0 && (
+                <span className="card-browser__count" data-testid={`browser-count-${def.id}`}>
+                  x{count}
+                </span>
+              )}
               <div className="card-browser__overlay">
-                {count > 0 && (
-                  <span className="card-browser__count" data-testid={`browser-count-${def.id}`}>
-                    x{count}
-                  </span>
-                )}
                 <button
                   type="button"
                   data-testid={`add-${def.id}`}

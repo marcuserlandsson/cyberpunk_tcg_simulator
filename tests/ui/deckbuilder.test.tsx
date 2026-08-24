@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { DeckBuilderView } from '../../src/ui/DeckBuilderView'
+import { DeckPanel } from '../../src/ui/DeckPanel'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { isReadOnlyDeck, listDecks, saveDeck } from '../../src/ui/storage'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
@@ -17,6 +18,18 @@ const BLUE_RAM_CARD = Object.values(db).find(
   (def) => def.type !== 'legend' && def.ram !== null && def.ram.color === 'Blue'
 )
 if (BLUE_RAM_CARD === undefined) throw new Error('fixture assumption failed: no Blue-ram card')
+
+// A Green-ram-3 card, found dynamically, paired below with the
+// 'goro-takemura-hands-unclean' legend (Green ramLimit 2, already used by the
+// tests above) to exercise the RAM budget bar's "used > limit" path.
+const GREEN_RAM_3_CARD = Object.values(db).find(
+  (def) =>
+    def.type !== 'legend' &&
+    def.ram !== null &&
+    def.ram.color === 'Green' &&
+    def.ram.value === 3
+)
+if (GREEN_RAM_3_CARD === undefined) throw new Error('fixture assumption failed: no Green-ram-3 card')
 
 beforeEach(() => {
   localStorage.clear()
@@ -133,6 +146,85 @@ describe('DeckBuilderView — adding cards & live validation', () => {
 
     fireEvent.click(browserFrame(container, BLUE_RAM_CARD.id))
     expect(errorsText(container)).toMatch(/Blue RAM/)
+  })
+})
+
+describe('DeckBuilderView — RAM budget bars & the empty-slot error fix', () => {
+  it('a new empty deck shows no Unknown-card-id errors, and shows the legend hint', () => {
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    fireEvent.click(container.querySelector('[data-testid="new-deck-button"]') as HTMLElement)
+
+    const errors = container.querySelector('[data-testid="deck-errors"]')?.textContent ?? ''
+    expect(errors).not.toMatch(/Unknown card id: ""/)
+    expect(container.querySelector('[data-testid="legend-hint"]')).not.toBeNull()
+  })
+
+  it('the legend hint disappears once all 3 legend slots are filled', () => {
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    fireEvent.click(browserFrame(container, 'goro-takemura-hands-unclean'))
+    fireEvent.click(browserFrame(container, 'yorinobu-arasaka-embracing-destruction'))
+    fireEvent.click(browserFrame(container, 'saburo-arasaka-stubborn-patriarch'))
+
+    expect(container.querySelector('[data-testid="legend-hint"]')).toBeNull()
+  })
+
+  it('ram bar reflects highest card demand vs legend budget, and flags is-over', () => {
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    fireEvent.click(browserFrame(container, 'goro-takemura-hands-unclean')) // Green ramLimit 2
+    fireEvent.click(browserFrame(container, GREEN_RAM_3_CARD.id)) // Green ram 3
+
+    const bar = container.querySelector('[data-testid="ram-bar-Green"]')
+    expect(bar).not.toBeNull()
+    expect(bar?.getAttribute('data-used')).toBe('3')
+    expect(bar?.getAttribute('data-limit')).toBe('2')
+    expect(bar?.className).toContain('is-over')
+    // `ram-chip-<Color>` testids survive, on the numerals inside the bar row.
+    expect(container.querySelector('[data-testid="ram-chip-Green"]')?.textContent).toContain('3')
+    expect(container.querySelector('[data-testid="ram-chip-Green"]')?.textContent).toContain('2')
+  })
+
+  it('a color with no legend and no deck cards shows used 0 / limit 0, not is-over', () => {
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    const bar = container.querySelector('[data-testid="ram-bar-Yellow"]')
+    expect(bar).not.toBeNull()
+    expect(bar?.getAttribute('data-used')).toBe('0')
+    expect(bar?.getAttribute('data-limit')).toBe('0')
+    expect(bar?.className).not.toContain('is-over')
+  })
+
+  it('renders a deck size meter alongside the existing counter text', () => {
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    expect(container.querySelector('[data-testid="deck-size-meter"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="deck-size-counter"]')?.textContent).toContain(
+      '40'
+    )
+  })
+
+  it('filters exactly the empty-legend-slot artifact but keeps a real unknown-id error verbatim', () => {
+    const deck: DeckList = {
+      name: 'Test',
+      legends: ['', '', ''],
+      cards: { 'not-a-real-card': 1 },
+    }
+    const { container } = render(
+      <DeckPanel
+        db={db}
+        deck={deck}
+        decks={[]}
+        isReadOnly={false}
+        useOfficialImages={false}
+        deleteError={null}
+        onChangeDeck={() => {}}
+        onSave={() => {}}
+        onLoad={() => {}}
+        onDelete={() => {}}
+        onNew={() => {}}
+      />
+    )
+    const errors = container.querySelector('[data-testid="deck-errors"]')?.textContent ?? ''
+    expect(errors).not.toMatch(/Unknown card id: ""/)
+    expect(errors).toMatch(/Unknown card id: "not-a-real-card"/)
+    expect(container.querySelector('[data-testid="legend-hint"]')).not.toBeNull()
   })
 })
 

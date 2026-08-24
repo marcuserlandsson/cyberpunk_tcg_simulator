@@ -35,7 +35,13 @@ const RAM_COLOR_VARS: Record<string, string> = {
   Blue: 'var(--ram-blue)',
 }
 
-function ramColorVar(color: string): string {
+/** Maps a printed RAM color name ('Red'/'Yellow'/'Green'/'Blue') onto its
+ *  `--ram-*` custom property, falling back to the "you" cyan for anything
+ *  else. Exported so other RAM-color UI (deck budget bars, browser filter
+ *  chips — the Deck Builder's other sanctioned home for these colors,
+ *  alongside the card itself) shares this one mapping rather than
+ *  duplicating the literal color-to-var table. */
+export function ramColorVar(color: string): string {
   return RAM_COLOR_VARS[color] ?? 'var(--you)'
 }
 

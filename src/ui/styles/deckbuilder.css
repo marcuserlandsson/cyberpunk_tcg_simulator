@@ -1,9 +1,9 @@
 .deck-error {
-  color: var(--neon-magenta);
+  color: var(--rival);
 }
 
 /* ---------------------------------------------------------------------- */
-/* Deck Builder (Task 14)                                                 */
+/* Deck Builder                                                           */
 /* ---------------------------------------------------------------------- */
 
 .deck-builder {
@@ -15,6 +15,9 @@
 .card-browser {
   flex: 1 1 60%;
   min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 0.8em;
 }
 
 .card-browser__filters {
@@ -31,18 +34,56 @@
   gap: 0.3em;
 }
 
+/* Capsule filter toggle: the shared `.chip` look (chrome.css), pressed
+   state borrowed from `header nav button[aria-pressed='true']`'s "fills
+   solid" convention so every aria-pressed toggle in the app reads the
+   same way. */
 .filter-chip {
-  font-size: 0.75em;
-  padding: 0.2em 0.6em;
-  border: 1px solid var(--neon-cyan);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--neon-cyan);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
 }
 
-.filter-chip--active {
-  background: var(--neon-cyan);
-  color: var(--bg-color, #05060a);
+/* `:hover` repeated on each pressed rule below: the base chrome.css
+   `button:hover:not(:disabled)` rule is (accidentally, pre-existing)
+   *more* specific than a bare `[aria-pressed='true']` rule — two
+   pseudo-classes outrank one attribute selector — so without this a
+   hovered pressed chip would lose its pressed color to the generic cyan
+   hover tint. */
+.filter-chip[aria-pressed='true'],
+.filter-chip[aria-pressed='true']:hover {
+  background: var(--you);
+  color: var(--void);
+  border-color: var(--you);
+}
+
+/* RAM-color filter chips (Deck Builder's other sanctioned home for RAM
+   colors, alongside the printed card itself): a small colored swatch keys
+   each chip to its RAM color, and the pressed state fills with that same
+   color instead of the generic cyan above. */
+.filter-chip--ram[aria-pressed='true'],
+.filter-chip--ram[aria-pressed='true']:hover {
+  background: var(--ram-chip-color, var(--you));
+  color: var(--void);
+  border-color: var(--ram-chip-color, var(--you));
+}
+
+.filter-chip__swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--ram-chip-color, var(--muted));
+  flex: none;
 }
 
 .card-browser__cost-range {
@@ -50,49 +91,102 @@
   align-items: center;
   gap: 0.3em;
   font-size: 0.8em;
+  color: var(--muted);
 }
 
 .card-browser__cost-range input {
   width: 3.5em;
 }
 
+/* Zoom-rendition browser grid: a responsive grid of full print-like cards
+   (the carried decision from Task 2's review — a browser of `size="small"`
+   cells shows no rules text, which is wrong for a browser meant to be
+   read, not just recognized). */
 .card-browser__grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5em;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.8em;
   max-height: 70vh;
   overflow-y: auto;
+  padding: 0.2em;
+}
+
+/* The grid's fixed column width should drive the card's width, not
+   `.card-frame--zoom`'s own 250px (that fixed width is still correct for
+   the other size="zoom" call sites — the floating zoom panel, the hand's
+   hover zoom — which aren't laid out in a responsive grid). */
+.card-browser__grid .card-frame--zoom {
+  width: 100%;
 }
 
 .card-browser__cell {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
 }
 
 .card-browser__cell.disabled {
   opacity: 0.4;
 }
 
-.card-browser__overlay {
-  display: flex;
-  gap: 0.25em;
-  margin-top: 0.2em;
-  font-size: 0.7em;
-  align-items: center;
+@media (prefers-reduced-motion: no-preference) {
+  .card-browser__cell .card-frame {
+    transition: transform 140ms ease, box-shadow 140ms ease;
+  }
+}
+
+.card-browser__cell:not(.disabled) .card-frame:hover {
+  transform: translateY(-4px);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.7), 0 10px 22px rgba(0, 0, 0, 0.65);
+  cursor: pointer;
 }
 
 .card-browser__count {
-  color: var(--neon-yellow);
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 7px;
+  background: var(--act);
+  color: #131200;
+  border-radius: 3px;
+  pointer-events: none;
 }
+
+.card-browser__overlay {
+  display: flex;
+  gap: 0.3em;
+  margin-top: 0.35em;
+  justify-content: center;
+}
+
+/* The base `button` clip-path (chrome.css) cuts an 8px corner meant for
+   full-size buttons — at this compact toolbar size that corner eats most
+   of the glyph, mangling +/−/🔍. Squared corners read fine this small. */
+.card-browser__overlay button {
+  font-size: 10px;
+  padding: 3px 9px;
+  clip-path: none;
+  border-radius: 3px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Deck pane                                                              */
+/* ---------------------------------------------------------------------- */
 
 .deck-panel {
   flex: 1 1 40%;
   min-width: 18em;
   display: flex;
   flex-direction: column;
-  gap: 0.6em;
+  gap: 0.7em;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 0.8em;
 }
 
 .deck-panel__header {
@@ -103,51 +197,178 @@
 }
 
 .deck-panel__badge {
-  font-size: 0.75em;
-  border: 1px solid var(--neon-yellow);
-  border-radius: 4px;
-  padding: 0.15em 0.5em;
-  color: var(--neon-yellow);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border: 1px solid var(--act);
+  padding: 2px 8px;
+  color: var(--act);
 }
 
 .deck-panel__badge--readonly {
-  border-color: var(--neon-magenta);
-  color: var(--neon-magenta);
+  border-color: var(--rival);
+  color: var(--rival);
 }
 
 .deck-panel__legends {
   display: flex;
-  gap: 0.5em;
+  gap: 0.6em;
 }
 
+/* Card-silhouette drop target: a dashed RAM-yellow (--act) border standing
+   in for "this is where a card goes", with a faint ghost hex badge (the
+   same cost-hex clip-path as `.card-frame__cost-badge`) centered inside an
+   empty slot to echo the printed card it's waiting for. */
 .deck-panel__legend-slot {
-  border: 1px dashed var(--neon-cyan);
+  position: relative;
+  border: 2px dashed var(--line-bright);
   border-radius: 6px;
-  min-width: 120px;
-  min-height: 60px;
+  min-width: 100px;
+  min-height: 72px;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  background: var(--panel-2);
+}
+
+.deck-panel__legend-slot.is-empty {
+  border-color: var(--act);
+}
+
+.deck-panel__legend-slot-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+}
+
+/* The ghost hex badge: the same cost-hex silhouette as a real card's
+   `.card-frame__cost-badge`, standing in for the card that goes here,
+   holding this slot's ordinal (1/2/3) rather than a cost. */
+.deck-panel__legend-slot-ghost {
+  width: 34px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  clip-path: polygon(50% 0, 100% 26%, 100% 74%, 50% 100%, 0 74%, 0 26%);
+  border: 2px solid var(--act);
+  color: var(--act);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  opacity: 0.45;
 }
 
 .deck-panel__legend-empty {
-  font-size: 0.8em;
-  opacity: 0.6;
-  padding: 0.5em;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: center;
+  opacity: 0.75;
+  color: var(--muted);
 }
 
-.deck-panel__ram-chips {
+.deck-panel__legend-hint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--act);
+  margin: 0;
+}
+
+/* ---- RAM budget bars ---- */
+
+.deck-panel__ram-bars {
+  display: grid;
+  gap: 0.4em;
+}
+
+.ram-bar {
+  display: grid;
+  gap: 3px;
+}
+
+.ram-bar__label {
   display: flex;
-  gap: 0.5em;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.deck-panel__ram-chip {
-  font-size: 0.8em;
-  border: 1px solid var(--neon-cyan);
-  border-radius: 4px;
-  padding: 0.15em 0.5em;
+.ram-bar__color-name {
+  color: var(--ram-bar-color, var(--text));
+}
+
+.ram-bar__numerals {
+  font-family: var(--font-mono);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.ram-bar__track {
+  height: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.ram-bar__fill {
+  height: 100%;
+  background: var(--ram-bar-color, var(--you));
+}
+
+/* Per the spec: the fill stays "in the RAM color" even over budget — only
+   the border and the numerals flag red, so the bar you're looking at is
+   still identifiable by its color while also reading as "over". */
+.ram-bar.is-over .ram-bar__track {
+  border-color: var(--rival);
+  border-width: 2px;
+}
+
+.ram-bar.is-over .ram-bar__numerals {
+  color: var(--rival);
+  border-color: var(--rival);
+}
+
+/* ---- deck size meter ---- */
+
+.deck-panel__size-meter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.deck-size-meter {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+/* The 40-50 legal band, marked as a translucent highlighted zone on the
+   track underneath the fill. */
+.deck-size-meter__band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 229, 255, 0.16);
+  border-left: 1px solid var(--line-bright);
+  border-right: 1px solid var(--line-bright);
+}
+
+.deck-size-meter__fill {
+  position: relative;
+  height: 100%;
+  background: var(--you);
+}
+
+.deck-panel__counter {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .deck-panel__errors {
@@ -158,25 +379,71 @@
   flex-direction: column;
   gap: 0.2em;
   font-size: 0.8em;
+  font-family: var(--font-mono);
 }
 
 .deck-panel__cards {
   display: flex;
   flex-direction: column;
-  gap: 0.4em;
+  gap: 0.35em;
   max-height: 40vh;
   overflow-y: auto;
+}
+
+.deck-panel__group h4 {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0.5em 0 0.25em;
 }
 
 .deck-panel__row {
   display: flex;
   align-items: center;
-  gap: 0.4em;
+  gap: 0.5em;
   font-size: 0.85em;
+  padding: 3px 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--card-border-color, var(--line-bright));
+}
+
+/* Cost hex: the same hexagonal badge shape as `.card-frame__cost-badge`,
+   scaled down for a compact deck-list row. */
+.deck-panel__row-cost {
+  flex: none;
+  width: 20px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  background: #0c0c14;
+  border: 1.5px solid var(--card-border-color, var(--line-bright));
+  clip-path: polygon(50% 0, 100% 26%, 100% 74%, 50% 100%, 0 74%, 0 26%);
 }
 
 .deck-panel__row-name {
   flex: 1;
+}
+
+.deck-panel__row-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.deck-panel__row-stepper button {
+  font-size: 10px;
+  padding: 2px 7px;
+  clip-path: none;
+  border-radius: 3px;
+}
+
+.deck-panel__row-count {
+  font-family: var(--font-mono);
+  min-width: 1.4em;
+  text-align: center;
 }
 
 .deck-panel__controls {
@@ -190,23 +457,22 @@
 .deck-panel__import textarea {
   width: 100%;
   min-height: 8em;
-  font-family: monospace;
-  font-size: 0.75em;
+  resize: vertical;
 }
 
 .deck-panel__import-error,
 .deck-panel__export-error {
-  color: var(--neon-magenta);
+  color: var(--rival);
   font-size: 0.8em;
+  font-family: var(--font-mono);
 }
 
 .deck-builder__zoom {
   position: fixed;
   top: 10%;
   right: 5%;
-  background: var(--panel-bg);
-  border: 2px solid var(--neon-yellow);
-  border-radius: 8px;
+  background: var(--panel);
+  border: 2px solid var(--act);
   padding: 0.6em;
   z-index: 50;
 }

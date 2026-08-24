@@ -11,11 +11,11 @@
 // decks; this view's job is to let you build and see why something doesn't
 // pass yet).
 
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactElement } from 'react'
 import type { CardDb, CardType } from '../engine/types'
 import { deckSize, validateDeck, type DeckList } from '../engine/deck'
 import { exportDeckText, importDeckText } from './storage'
-import { CardFrame } from './CardFrame'
+import { CardFrame, ramColorVar } from './CardFrame'
 
 export interface DeckPanelProps {
   db: CardDb
@@ -51,6 +51,44 @@ function ramLimitsByColor(db: CardDb, legends: readonly string[]): Record<string
   return limits
 }
 
+/** Per-color RAM demand: the highest single `ram.value` among the deck's
+ * cards of that color (not a sum — one card's printed RAM cost is what has
+ * to fit under the legends' pooled limit at any one time, not the total
+ * across every copy/card of that color). 0 for a color with no such cards. */
+function ramUsage(db: CardDb, cards: Record<string, number>): Record<string, number> {
+  const usage: Record<string, number> = {}
+  for (const id of Object.keys(cards)) {
+    const def = db[id]
+    if (def?.ram) {
+      usage[def.ram.color] = Math.max(usage[def.ram.color] ?? 0, def.ram.value)
+    }
+  }
+  return usage
+}
+
+/** Percent width for a RAM budget bar's fill, per the brief:
+ * `min(100%, used/limit * 100%)`, with a `limit === 0` divide-by-zero
+ * treated as "maxed out the instant there's any usage, otherwise empty". */
+function ramBarFillPercent(used: number, limit: number): number {
+  if (limit <= 0) return used > 0 ? 100 : 0
+  return Math.min(100, (used / limit) * 100)
+}
+
+// The empty-legend-slot artifact `validateDeck` (src/engine/deck.ts) emits
+// for each of the 3 legend slots while a deck is new/in-progress — engine
+// code is correct to flag an empty slot as "unknown card id ''", but that
+// string is meaningless to a person building a deck, so it's filtered from
+// what's *displayed* here (validateDeck itself stays untouched: a later
+// Play/Simulate view still needs the real, unfiltered validation result).
+const EMPTY_LEGEND_SLOT_ERROR = 'Unknown card id: "".'
+
+const MIN_DECK_SIZE = 40
+const MAX_DECK_SIZE = 50
+// The meter's visual scale extends a bit past MAX_DECK_SIZE so the 40-50
+// legal band doesn't sit flush against the track's right edge (an
+// over-sized deck should visibly overflow the band, not the whole meter).
+const SIZE_METER_SCALE_MAX = 60
+
 export function DeckPanel(props: DeckPanelProps): ReactElement {
   const {
     db,
@@ -77,8 +115,14 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
   const [importError, setImportError] = useState<string | null>(null)
 
   const errors = validateDeck(db, deck)
+  const displayedErrors = errors.filter((error) => error !== EMPTY_LEGEND_SLOT_ERROR)
   const size = deckSize(deck)
   const limits = ramLimitsByColor(db, deck.legends)
+  const usage = ramUsage(db, deck.cards)
+  const hasEmptyLegendSlot = deck.legends.some((id) => id === '')
+  const sizeMeterPercent = Math.min(100, (size / SIZE_METER_SCALE_MAX) * 100)
+  const bandStartPercent = (MIN_DECK_SIZE / SIZE_METER_SCALE_MAX) * 100
+  const bandWidthPercent = ((MAX_DECK_SIZE - MIN_DECK_SIZE) / SIZE_METER_SCALE_MAX) * 100
 
   function setLegend(index: 0 | 1 | 2, id: string): void {
     const legends = [...deck.legends] as [string, string, string]
@@ -149,39 +193,85 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
           return (
             <div
               key={index}
-              className="deck-panel__legend-slot"
+              className={def !== undefined ? 'deck-panel__legend-slot' : 'deck-panel__legend-slot is-empty'}
               data-testid={`legend-slot-${index}`}
               onClick={() => def !== undefined && setLegend(index as 0 | 1 | 2, '')}
             >
               {def !== undefined ? (
                 <CardFrame def={def} size="small" useOfficialImages={useOfficialImages} />
               ) : (
-                <span className="deck-panel__legend-empty">Empty legend slot</span>
+                <div className="deck-panel__legend-slot-inner">
+                  <span className="deck-panel__legend-slot-ghost" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <span className="deck-panel__legend-empty">Empty legend slot</span>
+                </div>
               )}
             </div>
           )
         })}
       </div>
 
-      <div className="deck-panel__ram-chips" data-testid="ram-chips">
-        {RAM_COLORS.map((color) => (
-          <span
-            key={color}
-            className="deck-panel__ram-chip"
-            data-testid={`ram-chip-${color}`}
-          >
-            {color}: {limits[color] ?? 0}
-          </span>
-        ))}
+      {hasEmptyLegendSlot && (
+        <p className="deck-panel__legend-hint" data-testid="legend-hint">
+          Choose 3 Legends — cards unlock RAM in their colors.
+        </p>
+      )}
+
+      <div className="deck-panel__ram-bars" data-testid="ram-chips">
+        {RAM_COLORS.map((color) => {
+          const used = usage[color] ?? 0
+          const limit = limits[color] ?? 0
+          const isOver = used > limit
+          return (
+            <div
+              key={color}
+              className={isOver ? 'ram-bar is-over' : 'ram-bar'}
+              data-testid={`ram-bar-${color}`}
+              data-used={used}
+              data-limit={limit}
+              style={{ '--ram-bar-color': ramColorVar(color) } as CSSProperties}
+            >
+              <div className="ram-bar__label">
+                <span className="ram-bar__color-name">{color} RAM</span>
+                <span
+                  className="ram-bar__numerals chip"
+                  data-testid={`ram-chip-${color}`}
+                >
+                  {used} / {limit}
+                </span>
+              </div>
+              <div className="ram-bar__track">
+                <div
+                  className="ram-bar__fill"
+                  style={{ width: `${ramBarFillPercent(used, limit)}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
       </div>
 
-      <div className="deck-panel__counter" data-testid="deck-size-counter">
-        Cards: {size}/40–50
+      <div className="deck-panel__size-meter-row">
+        <div
+          className="deck-size-meter"
+          data-testid="deck-size-meter"
+          data-size={size}
+        >
+          <div
+            className="deck-size-meter__band"
+            style={{ left: `${bandStartPercent}%`, width: `${bandWidthPercent}%` }}
+          />
+          <div className="deck-size-meter__fill" style={{ width: `${sizeMeterPercent}%` }} />
+        </div>
+        <div className="deck-panel__counter" data-testid="deck-size-counter">
+          Cards: {size}/40–50
+        </div>
       </div>
 
-      {errors.length > 0 && (
+      {displayedErrors.length > 0 && (
         <ul className="deck-panel__errors" data-testid="deck-errors">
-          {errors.map((error, index) => (
+          {displayedErrors.map((error, index) => (
             <li key={index} className="deck-error">
               {error}
             </li>
@@ -196,25 +286,35 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
             {group.entries.map(([id, count]) => {
               const def = db[id]
               return (
-                <div key={id} className="deck-panel__row" data-testid={`card-row-${id}`}>
-                  <span className="deck-panel__row-name">{def?.name ?? id}</span>
-                  <button
-                    type="button"
-                    data-testid={`card-row-minus-${id}`}
-                    onClick={() => setCount(id, count - 1)}
-                  >
-                    −
-                  </button>
-                  <span className="deck-panel__row-count" data-testid={`card-row-count-${id}`}>
-                    {count}
+                <div
+                  key={id}
+                  className="deck-panel__row"
+                  data-testid={`card-row-${id}`}
+                  style={def ? ({ '--card-border-color': ramColorVar(def.color) } as CSSProperties) : undefined}
+                >
+                  <span className="deck-panel__row-cost" aria-hidden="true">
+                    {def?.cost ?? '?'}
                   </span>
-                  <button
-                    type="button"
-                    data-testid={`card-row-plus-${id}`}
-                    onClick={() => setCount(id, count + 1)}
-                  >
-                    +
-                  </button>
+                  <span className="deck-panel__row-name">{def?.name ?? id}</span>
+                  <div className="deck-panel__row-stepper">
+                    <button
+                      type="button"
+                      data-testid={`card-row-minus-${id}`}
+                      onClick={() => setCount(id, count - 1)}
+                    >
+                      −
+                    </button>
+                    <span className="deck-panel__row-count" data-testid={`card-row-count-${id}`}>
+                      {count}
+                    </span>
+                    <button
+                      type="button"
+                      data-testid={`card-row-plus-${id}`}
+                      onClick={() => setCount(id, count + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
               )
             })}
