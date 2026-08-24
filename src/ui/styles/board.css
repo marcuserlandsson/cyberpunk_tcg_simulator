@@ -42,6 +42,47 @@
   fill: var(--muted);
 }
 
+/* Short-viewport tier (Task 10 fix round 2 — the controller's own framing:
+   the protected floors below are INVARIANTS — the tapped-card diagonal
+   fits, the fan's droop never clips — not fixed pixel values, so scaling
+   every linear dimension in this file by the same ×0.8 factor preserves
+   them exactly, the same way scaling a photograph preserves its own
+   geometry. 820px covers both the 1366×768 target and Playwright's default
+   1280×720 viewport (used by every e2e test unless a spec sets its own),
+   while 1920×1080 stays safely outside it and renders unchanged.
+   `Dice.tsx`'s `SIZE_PX` (44/48/48/52/56/56 for d4/d6/d8/d10/d12/d20) is a
+   plain JS constant baked into each die's own `width`/`height` HTML
+   attributes and `viewBox` at render time — CSS `width`/`height` on the
+   `<svg>` (an ordinary author-stylesheet declaration) always outranks a
+   presentation attribute regardless of its own specificity, so this is a
+   genuine CSS-only override: the browser rescales the whole coordinate
+   system (silhouette + centered value) proportionally, undistorted, with
+   no `Dice.tsx`/`Die` component change. ×0.8 of each: 44→35, 48→38,
+   52→42, 56→45. */
+@media (max-height: 820px) {
+  .die--d4 {
+    width: 35px;
+    height: 35px;
+  }
+
+  .die--d6,
+  .die--d8 {
+    width: 38px;
+    height: 38px;
+  }
+
+  .die--d10 {
+    width: 42px;
+    height: 42px;
+  }
+
+  .die--d12,
+  .die--d20 {
+    width: 45px;
+    height: 45px;
+  }
+}
+
 /* ---------------------------------------------------------------------- */
 /* Play view — playmat                                                     */
 /*                                                                        */
@@ -193,6 +234,16 @@
     var(--void);
 }
 
+/* Fix round 2's short-viewport tier (see the die-size comment above for the
+   ×0.8/820px rationale): the last of the whitespace-only trims, on top of
+   the much bigger wins below from actually scaling card/dice content. */
+@media (max-height: 820px) {
+  .playmat__board {
+    gap: 0;
+    padding: 1px 3px;
+  }
+}
+
 .rival-strip,
 .player-zone {
   display: flex;
@@ -203,6 +254,13 @@
      strip; field/zone-panels for the player zone); none of these rows
      themselves shrank. */
   gap: 1px;
+}
+
+@media (max-height: 820px) {
+  .rival-strip,
+  .player-zone {
+    gap: 0;
+  }
 }
 
 /* Neither `.rival-strip` nor `.player-zone` overrides the grid's default
@@ -239,6 +297,16 @@
   width: 46px;
 }
 
+/* ×0.8 of the 46px mini width (fix round 2's short-viewport tier): a
+   face-down back has no internal content to break, so — like the full-size
+   round-1 trim below — this is a plain proportional resize, not a rebuilt
+   layout. */
+@media (max-height: 820px) {
+  .rival-strip .zone--hand-hidden .card-frame {
+    width: 37px;
+  }
+}
+
 /* Legends read as a small badge rather than a full card on the table itself
    (both sides — matching the mockup's tiny legend backs), which is also load-
    bearing for the height budget: an uncalled Legend is face-down with the
@@ -251,11 +319,28 @@
   width: 46px;
 }
 
+@media (max-height: 820px) {
+  .zone--legends .card-frame--face-down {
+    width: 37px;
+  }
+}
+
 /* `.zone.zone--legends` (rather than the bare `.zone--legends` the base rule
    below uses) beats it on specificity regardless of source order — the base
    96px reservation stays intact for anything that isn't this override. */
 .zone.zone--legends {
   min-height: 70px;
+}
+
+/* ×0.8 (fix round 2's short-viewport tier): this is only ever the *empty/
+   uncalled* floor — a called Legend's real height comes from its scaled
+   content stack below (comfortably taller than either floor), so scaling
+   this down cannot itself cause a called Legend to feel cramped; it only
+   changes how much room an all-face-down Legends row reserves. */
+@media (max-height: 820px) {
+  .zone.zone--legends {
+    min-height: 56px;
+  }
 }
 
 /* Eddies row, both sides (superseding Task 4's 92px-card overlap math for
@@ -283,6 +368,44 @@
 .playmat__board .zone--eddies--dense .eddie-card[data-ready='false'],
 .playmat__board .zone--eddies--dense .eddie-card:has(+ .eddie-card[data-ready='false']) {
   margin-right: -4px;
+}
+
+/* ×0.8 of every dimension above (fix round 2's short-viewport tier): a
+   uniform linear scale of the card width AND both overlap margins together
+   is exactly what keeps the tapped-card-diagonal invariant these margins
+   encode — "two ready neighbors show ~46% of each other, two tapped
+   neighbors don't merge into a blob" — true at the smaller size: scaling a
+   rotated rectangle and every offset measured against it by the same
+   factor produces a similar rectangle with identical overlap *ratios*,
+   which is what the round-1 comments above actually reasoned about (not
+   the absolute pixel counts). 46→37, 70→56, -23→-18, -4→-3. */
+@media (max-height: 820px) {
+  .playmat__board .zone--eddies .card-frame {
+    width: 37px;
+  }
+
+  .playmat__board .zone--eddies {
+    min-height: 56px;
+  }
+
+  .playmat__board .zone--eddies--dense .eddie-card {
+    margin-right: -18px;
+  }
+
+  .playmat__board .zone--eddies--dense .eddie-card[data-ready='false'],
+  .playmat__board .zone--eddies--dense .eddie-card:has(+ .eddie-card[data-ready='false']) {
+    margin-right: -3px;
+  }
+
+  /* The deck/trash piles (cards.css's `.pile`) are the same 46px mini card
+     as eddies/legends — scoped to `.playmat__board` rather than overriding
+     `.pile` bare, since `.pile` is only ever rendered inside the playmat
+     (ZonePanels.tsx), but Deck Builder's own card browser shares the global
+     `.card-frame--small` class this tier deliberately never touches. */
+  .playmat__board .pile,
+  .playmat__board .pile .card-frame {
+    width: 37px;
+  }
 }
 
 /* Field + Hand cards (both sides — this is the one place *face-up* cards get
@@ -336,6 +459,85 @@
   padding: 4px;
 }
 
+/* Fix round 2's short-viewport tier: the field/hand/called-Legend content
+   stack, scaled ×0.8 throughout — the same ratio the grid track and hand
+   card width below settle on (92px → 74px, 74/92 ≈ 0.804). Every fixed-px
+   content row this task's brief protects ("card content legibility sizes")
+   shrinks together rather than being deleted, so the card still reads as
+   the same design at a smaller size instead of losing rows. Font sizes
+   that live in cards.css un-scoped (name, cost-badge digit, type capsule,
+   RAM pips) get their own board-scoped override here too, for the same
+   reason board.css already overrides their box sizes: a smaller box with
+   an unshrunk font either overflows its own clip-path or crowds the row
+   next to it. */
+@media (max-height: 820px) {
+  .playmat__board .zone--field .card-frame,
+  .playmat__board .zone--hand .card-frame,
+  .playmat__board .zone--legends .card-frame:not(.card-frame--face-down) {
+    gap: 1px;
+    padding: 2px;
+  }
+
+  .playmat__board .zone--field .card-frame__name,
+  .playmat__board .zone--hand .card-frame__name,
+  .playmat__board .zone--legends .card-frame__name {
+    font-size: 10px;
+    line-height: 1.05;
+  }
+
+  .playmat__board .zone--field .card-frame__cost-badge,
+  .playmat__board .zone--hand .card-frame__cost-badge,
+  .playmat__board .zone--legends .card-frame__cost-badge {
+    font-size: 12px;
+  }
+
+  .playmat__board .zone--field .card-frame__type-capsule,
+  .playmat__board .zone--hand .card-frame__type-capsule,
+  .playmat__board .zone--legends .card-frame__type-capsule {
+    font-size: 7px;
+    padding: 2px 6px;
+  }
+
+  .playmat__board .zone--field .card-frame__ram-pip,
+  .playmat__board .zone--hand .card-frame__ram-pip,
+  .playmat__board .zone--legends .card-frame__ram-pip {
+    width: 6px;
+    height: 6px;
+  }
+
+  .playmat__board .zone--field .card-frame__ram-pips,
+  .playmat__board .zone--hand .card-frame__ram-pips,
+  .playmat__board .zone--legends .card-frame__ram-pips {
+    gap: 2px;
+  }
+
+  .playmat__board .zone--field .card-frame__ram-limit-badge,
+  .playmat__board .zone--hand .card-frame__ram-limit-badge,
+  .playmat__board .zone--legends .card-frame__ram-limit-badge {
+    font-size: 7px;
+    padding: 0 2px;
+  }
+
+  /* Kw-pips hang off the card's own left edge (`position: absolute; left:
+     -7px`, cards.css) — untouched here (still comfortable per the round-1
+     QA note even before this tier), but their own hex badges shrink too:
+     at the grid's new 48px floor a neighbor sits close enough that a full
+     20px badge stack risks touching it, where a 16px one still clears. */
+  .playmat__board .zone--field .card-frame__kw-pip,
+  .playmat__board .zone--hand .card-frame__kw-pip,
+  .playmat__board .zone--legends .card-frame__kw-pip {
+    width: 16px;
+    height: 16px;
+    font-size: 9px;
+  }
+
+  .playmat__board .zone--field .card-frame__kw-pips,
+  .playmat__board .zone--hand .card-frame__kw-pips,
+  .playmat__board .zone--legends .card-frame__kw-pips {
+    gap: 3px;
+  }
+}
+
 /* Fills whatever width the shrink-then-wrap grid track below settles on
    (56–92px) instead of the global `.card-frame--small`'s fixed 92px — that
    fixed width is exactly what made a crowded row wrap instead of shrinking,
@@ -370,6 +572,36 @@
   font-size: 14px;
 }
 
+/* ×0.8 of the three fixed-pixel content rows above (fix round 2's
+   short-viewport tier) — art 20→16, cost-badge 22×24→18×19, power
+   24×22/14→19×18/11. These are exactly the rows the round-1 comment above
+   identifies as what a narrower `width` alone never shrinks; scaling them
+   here is what lets the card frame's own natural height shrink in step
+   with its narrower grid/hand width instead of staying tall and square. */
+@media (max-height: 820px) {
+  .playmat__board .zone--field .card-frame__art,
+  .playmat__board .zone--hand .card-frame__art,
+  .playmat__board .zone--legends .card-frame__art {
+    height: 14px;
+    margin: 1px 0;
+  }
+
+  .playmat__board .zone--field .card-frame__cost-badge,
+  .playmat__board .zone--hand .card-frame__cost-badge,
+  .playmat__board .zone--legends .card-frame__cost-badge {
+    width: 18px;
+    height: 18px;
+  }
+
+  .playmat__board .zone--field .card-frame__power,
+  .playmat__board .zone--hand .card-frame__power,
+  .playmat__board .zone--legends .card-frame__power {
+    min-width: 19px;
+    height: 17px;
+    font-size: 11px;
+  }
+}
+
 /* The binding rule's own mechanism ("cards shrink evenly to keep one row,
    down to a 56px-width floor, then the row wraps") — field only since Task 6
    (the hand fan below replaces this for `.zone--hand`, with its own overflow
@@ -393,6 +625,30 @@
   align-items: end;
   gap: 0.3em;
   min-height: 0;
+}
+
+/* Fix round 2's short-viewport tier: the field's own shrink-then-wrap
+   ceiling and floor come down with everything else (92→74 matches the hand
+   card width override just below; 56→48 is the coordinator's own worked
+   example) — the row still shrinks-then-wraps exactly as the round-1
+   comment above describes, just around a smaller ceiling. */
+@media (max-height: 820px) {
+  .playmat__board .zone--field .zone__cards {
+    grid-template-columns: repeat(auto-fill, minmax(48px, 74px));
+  }
+
+  /* The hand fan (below) never shrinks its cards via the field's grid — it
+     has no floor/ceiling of its own to come down, so it needs an explicit
+     width override here to land on the same 74px ceiling instead of
+     cards.css's un-scoped, un-scaled `.card-frame--small { width: 92px }`
+     (deliberately left alone: Deck Builder's own card browser shares that
+     global rule and has no height problem to fix). Excludes the rival's
+     hidden hand, which is the SEPARATE 46→37px mini-card rule above, not
+     this one — equal specificity, so `:not()` (rather than relying on
+     source order across the file) is what actually guarantees it. */
+  .playmat__board .zone--hand:not(.zone--hand-hidden) .card-frame {
+    width: 74px;
+  }
 }
 
 /* Grid items default to `justify-self: stretch` (filling their column), but
@@ -450,6 +706,48 @@
              translateY(calc(((var(--i) - (var(--n) - 1) / 2) * (var(--i) - (var(--n) - 1) / 2)) * 1.4px));
 }
 
+/* Fix round 2's short-viewport tier: RECOMPUTES the fan-droop headroom
+   formula for the ×0.8 card, rather than deleting or re-guessing it — the
+   invariant it protects ("the fan's own worst-case droop never paints past
+   `.zone__cards`'s bottom edge, where `.playmat__board`'s scroll ancestor
+   would clip it with no way back") is a fact about the CARD's geometry
+   (its own height and the rotation trig around a transform-origin below
+   it), not a fixed pixel count, and every term above scales linearly with
+   that geometry:
+   - the squared term's own `1.4px` coefficient — the translateY half of
+     the worst-case droop — is a distance measured against the card's own
+     height, so it becomes `1.4 × 0.8 ≈ 1.1px`;
+   - the flat `+46px` — the *extra* droop the rotation swing adds beyond
+     translateY alone, around a `transform-origin` positioned at a fixed
+     *fraction* (140%) of the card's own height below it — is `46 × 0.8 ≈
+     37px` for the same reason: that transform-origin offset, and the
+     resulting swing, are both proportional to card height.
+   The rotation angle itself (4deg/step, ±22deg at n=12, `.board-card`'s
+   `transform: rotate(...)` below) is dimensionless — an angle, not a
+   length — so it is deliberately left unscaled: the fan's own *shape*
+   (how far it fans out per card) is a design choice independent of card
+   size, only the droop THAT shape produces at a given size needs
+   recomputing here. Both the padding-bottom term below and the matching
+   term in `.board-card`'s own `translateY(...)` must change together —
+   they describe the same physical droop from two different rules. */
+@media (max-height: 820px) {
+  .zone--hand .zone__cards {
+    /* 150→120 (×0.8): the fan's resting height floor, same scale as the
+       card width it was sized against. */
+    min-height: 120px;
+    padding-bottom: calc(((var(--n, 1) - 1) / 2) * ((var(--n, 1) - 1) / 2) * 1.1px + 37px);
+  }
+
+  .zone--hand .board-card {
+    /* Horizontal overlap range, same ×0.8: a narrower card needs
+       proportionally less overlap to fit the same count in the same
+       fraction of the rail's width. -6px→-5px, -14px→-11px. */
+    margin: 0 calc(-5px - 11px * clamp(0, (var(--n) - 7) / 5, 1));
+    transform: rotate(calc((var(--i) - (var(--n) - 1) / 2) * 4deg))
+               translateY(calc(((var(--i) - (var(--n) - 1) / 2) * (var(--i) - (var(--n) - 1) / 2)) * 1.1px));
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .zone--hand .board-card {
     transition: transform 160ms ease;
@@ -468,6 +766,17 @@
    guards. */
 .rival-strip .zone--hand-hidden .zone__cards {
   min-height: 75px;
+}
+
+/* ×0.8 (fix round 2's short-viewport tier), same relationship as the
+   full-size rule above: the rival's mini fan (37px-wide backs at this
+   tier) keeps its own separately-halved floor, while still sharing the
+   scaled `.zone--hand .zone__cards` padding-bottom formula immediately
+   above it — exactly the same division of labor the un-scaled rules use. */
+@media (max-height: 820px) {
+  .rival-strip .zone--hand-hidden .zone__cards {
+    min-height: 60px;
+  }
 }
 
 .playmat__meta {
@@ -646,6 +955,52 @@
   color: var(--muted);
 }
 
+/* Fix round 2's short-viewport tier: the ~29px of headroom identified in
+   fix round 1's own residual analysis, between the die pool's rendered
+   height (~75px/side, dominated by the largest silhouettes — d12/d20 at
+   56px) and the `.street__vs` block's own floor (~46px) — now spent partly
+   on the dice themselves (the ×0.8 die-size media query at the top of this
+   file) and partly on tightening the vs-block's own three stacked lines,
+   which were never a fixed-pixel "protected" row, just untuned slack. Dice
+   stay legible and still distinct in shape at 35–45px (down from 44–56);
+   the vs-block's line-height is pulled tight (it previously relied on the
+   inherited ~1.4 body value, the same slack `.zone__label` had in fix
+   round 1) rather than only shrinking its font sizes. */
+@media (max-height: 820px) {
+  .street {
+    padding: 1px 8px;
+  }
+
+  .street__side {
+    gap: 3px;
+  }
+
+  .street__label {
+    font-size: 0.6em;
+  }
+
+  .street__pool,
+  .street__pool .zone--gig,
+  .street__pool .zone--fixer {
+    gap: 3px;
+  }
+
+  .street__turn {
+    font-size: 0.7em;
+    line-height: 1.05;
+  }
+
+  .street__active {
+    font-size: 0.6em;
+    line-height: 1.05;
+  }
+
+  .street__win-condition {
+    font-size: 7px;
+    line-height: 1.05;
+  }
+}
+
 .zone-panels {
   display: flex;
   flex-wrap: wrap;
@@ -662,6 +1017,12 @@
   min-width: 0;
 }
 
+@media (max-height: 820px) {
+  .zone {
+    gap: 0;
+  }
+}
+
 .zone__label {
   font-family: var(--font-mono);
   font-size: 9px;
@@ -675,6 +1036,12 @@
   letter-spacing: 0.28em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+@media (max-height: 820px) {
+  .zone__label {
+    line-height: 1;
+  }
 }
 
 .zone__cards,
