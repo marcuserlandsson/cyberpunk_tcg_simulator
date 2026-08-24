@@ -11,7 +11,12 @@
   border: 2px solid var(--card-border-color, var(--line-bright));
   border-radius: 7px;
   color: var(--text);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card-frame {
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
 }
 
 /* Layout + depth additive to the block above (kept as its own rule so the
@@ -357,22 +362,30 @@
     linear-gradient(150deg, #241018, #150b10);
 }
 
-/* A face-down eddie/pile's outer border is owner-keyed, not card-color-keyed
-   — the base rule's `border-color` (derived from `FACE_DOWN_DEF`'s inert
-   `def.color` via the inline `--card-border-color` custom property,
-   ZonePanels.tsx) is irrelevant once identity is hidden. Scoped to
-   `.zone--eddies`/`.pile` (rather than a blanket `.card-frame--face-down`
-   rule) so this touches only the markup this task renders — never Field.tsx's
-   `BoardCard` (a face-down Legend there doesn't thread an `owner` prop yet,
-   out of this task's scope to fix) or HandStrip's hand-rolled back, which
-   carries no owner class at all. */
-.zone--eddies .card-frame--face-down,
-.pile .card-frame--face-down {
+/* A face-down card's outer border is owner-keyed, not card-color-keyed —
+   CardFrame.tsx omits the inline `--card-border-color` custom property
+   entirely while faceDown (rather than leaving the def's RAM color set on
+   an element the border-color rule below overrides — a hidden card's
+   identity has no business sitting in the DOM at all, inline style or not),
+   so the base `.card-frame` rule's `var(--card-border-color, var(--line-
+   bright))` fallback already lands on a neutral border; this rule makes
+   that explicit, then the owner variants below tint it. A blanket
+   `.card-frame--face-down` rule (rather than one scoped to `.zone--eddies`/
+   `.pile`, as an earlier pass had it) reaches every face-down card in the
+   app the same way: Field.tsx's `BoardCard` (which now threads `owner`),
+   ZonePanels.tsx's eddies/deck/trash piles, and HandStrip's hand-rolled
+   rival-hand back (which sets `card-frame`/`card-frame--face-down`/
+   `card-frame--rival` directly, no `CardFrame` component involved, but the
+   same classes this rule matches on). */
+.card-frame--face-down {
+  border-color: var(--line-bright);
+}
+
+.card-frame--face-down.card-frame--you {
   border-color: var(--you);
 }
 
-.zone--eddies .card-frame--rival.card-frame--face-down,
-.pile .card-frame--rival.card-frame--face-down {
+.card-frame--face-down.card-frame--rival {
   border-color: var(--rival);
 }
 

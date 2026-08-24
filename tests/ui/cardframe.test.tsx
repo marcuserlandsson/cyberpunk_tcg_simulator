@@ -104,6 +104,14 @@ describe('CardFrame', () => {
     expect(container.querySelector('.card-frame__back')).not.toBeNull()
   })
 
+  it('carries no --card-border-color inline style when face down (that var is the def\'s RAM color, which would leak a hidden card\'s identity)', () => {
+    const { container } = render(
+      <CardFrame def={GORO} size="medium" faceDown useOfficialImages={false} />
+    )
+    const frame = container.querySelector('[data-testid="card-frame"]') as HTMLElement
+    expect(frame.style.getPropertyValue('--card-border-color')).toBe('')
+  })
+
   it('carries no data-def-id when face down (a face-down card must not leak its identity into the DOM)', () => {
     const { container } = render(
       <CardFrame def={GORO} size="medium" faceDown useOfficialImages={false} />

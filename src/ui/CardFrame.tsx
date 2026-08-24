@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties, ReactElement, ReactNode } from 'react'
 import type { CardDef } from '../engine/types'
 import { getOfficialImageUrl } from './images'
@@ -18,12 +18,6 @@ export interface CardFrameProps {
    *  human or the rival. Defaults to 'you' so every existing call site (which
    *  predates this prop) keeps rendering exactly as before. */
   owner?: CardFrameOwner
-  /** Zoom-panel live-state strip (effective power, active keyword pips) shown
-   *  alongside the official image. Task 6 wires richer live state (granted
-   *  keywords, attachments, turn buffs) through this same strip; here it
-   *  reflects only what CardFrame already knows (tempPower, printed
-   *  keywords). Has no effect outside size="zoom" image mode. */
-  showLiveChips?: boolean
   onClick?: () => void
 }
 
@@ -238,11 +232,19 @@ export function CardFrame(props: CardFrameProps): ReactElement {
     tempPower = 0,
     useOfficialImages,
     owner = 'you',
-    showLiveChips = false,
     onClick,
   } = props
 
   const [imageFailed, setImageFailed] = useState(false)
+
+  // A card def can change identity under the same mounted component (e.g. a
+  // zone slot that gets reused for a different card), and `imageFailed` must
+  // not survive that: without this, a card whose image once failed would
+  // keep falling back to the text face forever, even for a def whose image
+  // resolves fine.
+  useEffect(() => {
+    setImageFailed(false)
+  }, [def.id])
 
   const classes = [
     'card-frame',
@@ -255,7 +257,12 @@ export function CardFrame(props: CardFrameProps): ReactElement {
     .filter(Boolean)
     .join(' ')
 
-  const style: StyleWithVars = { '--card-border-color': ramColorVar(def.color) }
+  // Omitted entirely while face down — not just visually overridden — so a
+  // hidden card's identity (its RAM color) never sits in the DOM at all, not
+  // even in an inline style a curious player could inspect.
+  const style: StyleWithVars | undefined = faceDown
+    ? undefined
+    : { '--card-border-color': ramColorVar(def.color) }
   const imageUrl = useOfficialImages && !imageFailed ? getOfficialImageUrl(def.id) : undefined
   const effectivePower = def.power === null ? null : def.power + tempPower
 
@@ -286,11 +293,6 @@ export function CardFrame(props: CardFrameProps): ReactElement {
           )}
           <KeywordPips def={def} />
           {lag && <span className="card-frame__lag-band">LAG</span>}
-          {size === 'zoom' && showLiveChips && (
-            <div className="card-frame__live-chips">
-              {effectivePower !== null && <span className="chip">PWR {effectivePower}</span>}
-            </div>
-          )}
         </div>
       ) : (
         <CardFrameFace def={def} tempPower={tempPower} lag={lag} compact={size !== 'zoom'} />

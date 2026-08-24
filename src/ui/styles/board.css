@@ -572,12 +572,15 @@
   font-size: 14px;
 }
 
-/* ×0.8 of the three fixed-pixel content rows above (fix round 2's
-   short-viewport tier) — art 20→16, cost-badge 22×24→18×19, power
-   24×22/14→19×18/11. These are exactly the rows the round-1 comment above
-   identifies as what a narrower `width` alone never shrinks; scaling them
-   here is what lets the card frame's own natural height shrink in step
-   with its narrower grid/hand width instead of staying tall and square. */
+/* Roughly ×0.8 of the three fixed-pixel content rows above (fix round 2's
+   short-viewport tier) — art 20→14, cost-badge 22×24→18×18, power
+   24×22/14→19×17/11. Not an exact ×0.8 on every value: an extra manual
+   convergence pass nudged these three off the clean ratio (verified in a
+   real browser) to close the last few px of overflow the plain ratio still
+   left. These are exactly the rows the round-1 comment above identifies as
+   what a narrower `width` alone never shrinks; scaling them here is what
+   lets the card frame's own natural height shrink in step with its
+   narrower grid/hand width instead of staying tall and square. */
 @media (max-height: 820px) {
   .playmat__board .zone--field .card-frame__art,
   .playmat__board .zone--hand .card-frame__art,
@@ -1044,8 +1047,7 @@
   }
 }
 
-.zone__cards,
-.zone__dice {
+.zone__cards {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3em;
@@ -1140,8 +1142,8 @@
   align-self: flex-start;
   font-size: 0.75em;
   padding: 0.2em 0.6em;
-  border-color: var(--neon-magenta);
-  color: var(--neon-magenta);
+  border-color: var(--rival);
+  color: var(--rival);
 }
 
 .die-slot {
@@ -1200,20 +1202,35 @@
   cursor: pointer;
 }
 
-.board-card.is-playable .card-frame {
-  box-shadow: 0 0 10px 2px var(--neon-cyan);
+/* Actionable-now glow — same semantics and the same `pulse-act` keyframe
+   (motion.css, gated there behind prefers-reduced-motion) as the dice pulse
+   above: yellow (`--act`) means "you can act with this right now", whether
+   that action is playing a card from hand (`is-playable`) or declaring it
+   as an attacker (`is-attacker`). `is-target` is a different fact — a card
+   that's a legal *choice* for whatever's currently resolving, not something
+   the human can unilaterally act with — so it gets the cooler, static `--you`
+   cyan instead of yellow, keeping "act" and "choose" visually distinct.
+   `is-selected` (the attacker already committed to, while its target is
+   being picked) reuses `--act` too, as a solid outline layered on top of the
+   pulsing glow it started from, rather than reintroducing a fourth color. */
+.board-card.is-playable .card-frame,
+.board-card.is-attacker .card-frame {
+  box-shadow: 0 0 10px 2px var(--act);
 }
 
-.board-card.is-attacker .card-frame {
-  box-shadow: 0 0 10px 2px var(--neon-magenta);
+@media (prefers-reduced-motion: no-preference) {
+  .board-card.is-playable .card-frame,
+  .board-card.is-attacker .card-frame {
+    animation: pulse-act 1.6s infinite;
+  }
 }
 
 .board-card.is-target .card-frame {
-  box-shadow: 0 0 12px 3px var(--neon-yellow);
+  box-shadow: 0 0 12px 3px var(--you);
 }
 
 .board-card.is-selected .card-frame {
-  outline: 2px solid var(--neon-magenta);
+  outline: 2px solid var(--act);
   outline-offset: 2px;
 }
 

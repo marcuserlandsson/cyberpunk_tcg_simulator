@@ -24,11 +24,14 @@ type LungeVars = CSSProperties & { '--lunge-dir': string }
 /**
  * One in-play card, with every affordance class the playmat can put on it.
  *
- * The classes are the whole interaction vocabulary: `is-playable` (cyan, a
- * legal `playCard`), `is-attacker` (magenta, a legal `attack`), `is-selected`
- * (the attacker whose target is being picked), `is-target` (a candidate of the
- * pending choice). Each one is derived from `legal` by playAffordances.ts, so a
- * glow and a legal action are the same fact.
+ * The classes are the whole interaction vocabulary: `is-playable` (yellow
+ * pulse, a legal `playCard`), `is-attacker` (yellow pulse, a legal `attack`)
+ * — both read as "you can act with this right now", per tokens.css's
+ * cyan/red/yellow semantics — `is-selected` (a solid yellow outline on the
+ * attacker whose target is being picked), `is-target` (cyan, a candidate of
+ * the pending choice — a thing you can choose, not something you can act
+ * with unilaterally). Each one is derived from `legal` by playAffordances.ts,
+ * so a glow and a legal action are the same fact.
  */
 export function BoardCard(props: {
   db: CardDb
