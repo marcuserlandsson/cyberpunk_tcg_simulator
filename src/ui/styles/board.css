@@ -285,9 +285,27 @@
    directly — while leaving typography/readability alone — is what actually
    buys the vertical room the calc() budget below assumes; official-image
    mode isn't touched (its `.card-frame__image-wrap` already scales off
-   `width` via `aspect-ratio`, so it never had this problem). */
+   `width` via `aspect-ratio`, so it never had this problem).
+
+   A *called* Legend (Task 10 QA sweep finding) hits the exact same problem:
+   `size="small"` (`compact`, ZonePanels.tsx/Field.tsx both pass it) means a
+   called Legend's `CardFrame` renders the identical stripped-down content a
+   field card does — no subtitle/tags/text/barcode (CardFrame.tsx's own
+   `!compact &&` guards) — so it is safe to fold into the same trim rather
+   than inventing a second one. A real mid-game measurement at 1366×768
+   (turn 4, one modest field each side, an 8-card hand, no called Legends yet
+   beyond a normal game's pace) found `.playmat__board`'s content 1003px
+   tall against 690px available — 313px over — and three called Legends at
+   the *untrimmed* small size (163px for the row) were the single largest
+   contributor. This is not the rare pathological case the surrounding
+   comments anticipate; calling all three Legends is routine by midgame.
+   Uncalled (face-down) Legends are already shrunk to 46px width above and
+   are untouched by this — the selectors below only ever reach a real
+   `.card-frame` (never `.card-frame--face-down`, which renders
+   `.card-frame__back` instead of any of these elements). */
 .playmat__board .zone--field .card-frame,
-.playmat__board .zone--hand .card-frame {
+.playmat__board .zone--hand .card-frame,
+.playmat__board .zone--legends .card-frame {
   gap: 2px;
   padding: 4px;
 }
@@ -305,19 +323,22 @@
 }
 
 .playmat__board .zone--field .card-frame__art,
-.playmat__board .zone--hand .card-frame__art {
+.playmat__board .zone--hand .card-frame__art,
+.playmat__board .zone--legends .card-frame__art {
   height: 20px;
   margin: 2px 0;
 }
 
 .playmat__board .zone--field .card-frame__cost-badge,
-.playmat__board .zone--hand .card-frame__cost-badge {
+.playmat__board .zone--hand .card-frame__cost-badge,
+.playmat__board .zone--legends .card-frame__cost-badge {
   width: 22px;
   height: 24px;
 }
 
 .playmat__board .zone--field .card-frame__power,
-.playmat__board .zone--hand .card-frame__power {
+.playmat__board .zone--hand .card-frame__power,
+.playmat__board .zone--legends .card-frame__power {
   min-width: 24px;
   height: 22px;
   font-size: 14px;
@@ -640,7 +661,11 @@
 
 .zone__count {
   font-size: 0.75em;
-  border: 1px solid rgba(0, 240, 255, 0.3);
+  /* rgba(0, 229, 255, …) is --you (#00e5ff) decomposed, matching chrome.css's
+     own hover-tint convention — this was a stray pre-token literal
+     (rgba(0, 240, 255, …), the old #00f0ff cyan) found during the Task 10
+     QA sweep for leftover old-palette colors. */
+  border: 1px solid rgba(0, 229, 255, 0.3);
   border-radius: 3px;
   padding: 0.15em 0.45em;
 }

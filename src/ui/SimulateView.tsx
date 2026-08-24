@@ -310,26 +310,28 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
   const winsA = result?.games.filter((g) => g.winner === 0).length ?? 0
   const winsB = result === null ? 0 : result.games.length - winsA
 
+  const winRateB = result === null ? 0 : 1 - result.winRateA
+
   return (
-    <section aria-label="Simulate" data-testid="simulate-view">
+    <section aria-label="Simulate" className="simulate-view" data-testid="simulate-view">
       <h2>Simulate</h2>
 
       {lastResult !== null && result === null && !running && (
-        <div className="sim-banner" data-testid="sim-last-result-banner">
+        <div className="sim-banner panel" data-testid="sim-last-result-banner">
           Last run: {lastResult.games.length} games — Deck A won {pct(lastResult.winRateA)}, Deck B
           won {pct(1 - lastResult.winRateA)}.
         </div>
       )}
 
       {error !== null && (
-        <div className="sim-error" role="alert" data-testid="sim-error">
+        <div className="sim-error panel" role="alert" data-testid="sim-error">
           Simulation failed: {error}
         </div>
       )}
 
-      <div className="sim-setup" data-testid="sim-setup">
+      <div className="sim-setup panel clip-corners" data-testid="sim-setup">
         <label className="sim-setup__field">
-          Deck A
+          <span className="sim-setup__field-label">Deck A</span>
           <select
             data-testid="sim-deck-a"
             value={deckAName}
@@ -344,7 +346,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
         </label>
 
         <label className="sim-setup__field">
-          Agent A
+          <span className="sim-setup__field-label">Agent A</span>
           <select
             data-testid="sim-agent-a"
             value={agentA}
@@ -356,7 +358,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
         </label>
 
         <label className="sim-setup__field">
-          Deck B
+          <span className="sim-setup__field-label">Deck B</span>
           <select
             data-testid="sim-deck-b"
             value={deckBName}
@@ -371,7 +373,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
         </label>
 
         <label className="sim-setup__field">
-          Agent B
+          <span className="sim-setup__field-label">Agent B</span>
           <select
             data-testid="sim-agent-b"
             value={agentB}
@@ -383,7 +385,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
         </label>
 
         <label className="sim-setup__field">
-          Games
+          <span className="sim-setup__field-label">Games</span>
           <input
             data-testid="sim-games"
             type="number"
@@ -395,7 +397,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
         </label>
 
         <label className="sim-setup__field">
-          Seed
+          <span className="sim-setup__field-label">Seed</span>
           <input
             data-testid="sim-seed"
             type="number"
@@ -404,53 +406,82 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
           />
         </label>
 
-        <button type="button" data-testid="sim-run" disabled={!canRun} onClick={handleRun}>
+        <button
+          type="button"
+          className="btn--primary sim-setup__run"
+          data-testid="sim-run"
+          disabled={!canRun}
+          onClick={handleRun}
+        >
           Run
         </button>
       </div>
 
       {running && progress !== null && (
-        <div className="sim-progress" data-testid="sim-progress">
+        <div className="sim-progress panel" data-testid="sim-progress">
           <progress
+            className="sim-progress__bar"
             data-testid="sim-progress-bar"
             value={progress.done}
             max={progress.total}
           />
-          <span data-testid="sim-progress-text">
+          <span className="sim-progress__text" data-testid="sim-progress-text">
             {progress.done} / {progress.total}
           </span>
-          <button type="button" data-testid="sim-cancel" onClick={handleCancel}>
+          <button type="button" className="btn--danger" data-testid="sim-cancel" onClick={handleCancel}>
             Cancel
           </button>
         </div>
       )}
 
       {result !== null && ranNames !== null && (
-        <section className="sim-results" data-testid="sim-results">
+        <section className="sim-results panel clip-corners" data-testid="sim-results">
           <h3>Results</h3>
 
           <div className="sim-winrates" data-testid="sim-winrates">
-            <div data-testid="sim-winrate-a">
+            <div className="sim-splitbar" aria-hidden="true">
+              <div
+                className="sim-splitbar__fill sim-splitbar__fill--a"
+                style={{ width: pct(result.winRateA) }}
+              >
+                {result.winRateA >= 0.12 && (
+                  <span className="sim-splitbar__label">{pct(result.winRateA)}</span>
+                )}
+              </div>
+              <div
+                className="sim-splitbar__fill sim-splitbar__fill--b"
+                style={{ width: pct(winRateB) }}
+              >
+                {winRateB >= 0.12 && <span className="sim-splitbar__label">{pct(winRateB)}</span>}
+              </div>
+            </div>
+            <div className="sim-winrates__row sim-winrates__row--a" data-testid="sim-winrate-a">
               {ranNames.a}: {winsA} wins ({pct(result.winRateA)})
             </div>
-            <div data-testid="sim-winrate-b">
-              {ranNames.b}: {winsB} wins ({pct(1 - result.winRateA)})
+            <div className="sim-winrates__row sim-winrates__row--b" data-testid="sim-winrate-b">
+              {ranNames.b}: {winsB} wins ({pct(winRateB)})
             </div>
           </div>
 
-          <div data-testid="sim-avg-turns">
-            Average game length: {result.avgTurns.toFixed(1)} turns
+          <div className="sim-summary-row">
+            <div data-testid="sim-avg-turns">
+              <span className="chip">
+                Average game length: {result.avgTurns.toFixed(1)} turns
+              </span>
+            </div>
+
+            <div className="sim-reasons" data-testid="sim-reasons">
+              <span className="sim-reasons__label">End reasons:</span>
+              {Object.entries(result.reasons).map(([reason, count]) => (
+                <span key={reason} className="chip">
+                  {reason}: {count}
+                </span>
+              ))}
+            </div>
           </div>
 
-          <div className="sim-reasons" data-testid="sim-reasons">
-            End reasons:{' '}
-            {Object.entries(result.reasons)
-              .map(([reason, count]) => `${reason}: ${count}`)
-              .join(', ')}
-          </div>
-
-          <label className="sim-setup__field">
-            Min games seen
+          <label className="sim-setup__field sim-min-games">
+            <span className="sim-setup__field-label">Min games seen</span>
             <input
               data-testid="sim-min-games-seen"
               type="number"
@@ -460,26 +491,42 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
             />
           </label>
 
-          <CardStatsTable
-            db={db}
-            title={ranNames.a}
-            stats={result.cardStatsA}
-            minGamesSeen={minGamesSeen}
-            testId="sim-table-a"
-          />
-          <CardStatsTable
-            db={db}
-            title={ranNames.b}
-            stats={result.cardStatsB}
-            minGamesSeen={minGamesSeen}
-            testId="sim-table-b"
-          />
+          <div className="sim-tables">
+            <div className="sim-table-wrap panel">
+              <CardStatsTable
+                db={db}
+                title={ranNames.a}
+                stats={result.cardStatsA}
+                minGamesSeen={minGamesSeen}
+                testId="sim-table-a"
+              />
+            </div>
+            <div className="sim-table-wrap panel">
+              <CardStatsTable
+                db={db}
+                title={ranNames.b}
+                stats={result.cardStatsB}
+                minGamesSeen={minGamesSeen}
+                testId="sim-table-b"
+              />
+            </div>
+          </div>
 
           <div className="sim-export">
-            <button type="button" data-testid="sim-export-json" onClick={handleExportJson}>
+            <button
+              type="button"
+              className="btn--ghost"
+              data-testid="sim-export-json"
+              onClick={handleExportJson}
+            >
               Export JSON
             </button>
-            <button type="button" data-testid="sim-export-csv" onClick={handleExportCsv}>
+            <button
+              type="button"
+              className="btn--ghost"
+              data-testid="sim-export-csv"
+              onClick={handleExportCsv}
+            >
               Export CSV
             </button>
           </div>

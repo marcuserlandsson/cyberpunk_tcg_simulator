@@ -80,13 +80,23 @@ Mercs' "The Heist" — are always available, plus anything you've saved in the
 Deck Builder), optionally set a seed for a reproducible shuffle, and click
 **Start Game**. You'll get one optional full mulligan on your opening hand.
 
-**Playing your turn:** the playmat shows your area on the bottom and the
-AI's, mirrored, on top. Every affordance on screen (which cards glow as
-playable, which dice/cards are legal attack or ability targets) is derived
-directly from the engine's own legal-action list — if something isn't
-highlighted, it isn't a legal move right now, by construction. Click a card
-in hand to play it, a ready Unit to attack, or use the control bar to sell a
-card, Call a Legend, or end your turn.
+**Playing your turn:** the playmat is laid out like the physical table. The
+rival's row sits along the top (their field, Legends, and Eddies — sold
+cards rendered as small face-down backs that tap 90° when spent and ready at
+turn start, same as a Legend spent as currency); yours, larger, sits along
+the bottom. Between the two, the **street strip** faces both players' gig
+pools at each other — polyhedral dice for each fixer, unrolled ones drawn as
+dim outlined silhouettes — with the turn number, whose turn it is, and "first
+to 7 gigs wins" (or Overtime messaging, once it kicks in) centered between
+them. A hand of cards fans out along your own bottom edge, tightening its
+overlap as it grows so even a large hand stays on-screen; the right rail
+holds the turn-by-turn feed (color-coded: cyan for you, red for the rival,
+yellow for turn/system markers) above the action buttons. Every affordance on
+screen (which cards glow as playable, which dice/cards are legal attack or
+ability targets) is derived directly from the engine's own legal-action
+list — if something isn't highlighted, it isn't a legal move right now, by
+construction. Click a card in hand to play it, a ready Unit to attack, or use
+the control bar to sell a card, Call a Legend, or end your turn.
 
 **Reaction windows:** when you attack (or the AI does), a reaction bar
 appears letting the defender respond before the attack resolves — Call a
@@ -107,8 +117,13 @@ under a name you choose (in `localStorage`); reopening the Play tab's
 "Resume a saved game" list lets you pick it back up later, including after
 closing the browser.
 
-Card zoom is available by clicking any card face for a larger, always-legible
-view (falling back to the text face even when official art is toggled on).
+Hovering (or clicking, or tabbing to) any card face opens the **zoom panel**:
+a large, always-legible rendition of that exact card with its full printed
+rules text, RAM pips, and tag capsules — even when the board itself is
+showing official art rather than the HTML frame. Below the card face, a
+compact live-state strip lists whatever the printed card alone can't show:
+its current effective power (once buffed or reduced), any keywords it has
+gained, and the names of any Gear attached to it.
 
 ## Deck building
 
@@ -194,9 +209,13 @@ playable with zero images present; the HTML card frame (name, cost, power,
 RAM, rules text, keywords) is the real baseline visual, not a fallback of
 last resort. Once any images exist in `data/images/`, the header's "Use
 official card images" toggle switches to them automatically; cards without a
-locally fetched image keep showing the HTML frame either way. Re-run the
-script occasionally if you want fresher art — the database's image URLs are
-signed and expire.
+locally fetched image keep showing the HTML frame either way. Either way,
+board cards carry the same status overlays — a cyan ready ring (red for the
+rival's), a yellow pulse while a card is legally playable/attackable, a
+"LAG" banner, and a power chip when a card's effective power differs from
+its printed value — so toggling images never changes what a card's current
+state means, only how its face is drawn. Re-run the script occasionally if
+you want fresher art — the database's image URLs are signed and expire.
 
 ## Where the rules live
 

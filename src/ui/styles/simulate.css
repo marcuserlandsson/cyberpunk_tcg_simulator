@@ -1,1 +1,280 @@
-/* Simulate view styling, added in its own task. */
+/* Simulate view styling (Task 10).
+   docs/superpowers/specs/2026-08-23-visual-overhaul-design.md, "Simulate
+   view": panel chrome for the config row, a styled progress bar, results as
+   stat blocks (win-rate split as a two-color bar, average length + end
+   reasons as chips, per-card tables in mono), export buttons as ghosts.
+
+   Deck A / Deck B are seats, not "you" and "the rival" — Simulate is an
+   AI-vs-AI tool, nobody at the table is the human player. Reusing --you
+   (cyan) for Deck A and --rival (red) for Deck B is still the sanctioned
+   mapping here (per the controller ledger for this task) rather than
+   inventing a third color pair: it is the same two-color split the rest of
+   the app already uses for "left seat / right seat", just without either
+   side being *the* player. */
+
+.simulate-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9em;
+  padding: 1em;
+  max-width: 1100px;
+}
+
+.simulate-view h2 {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Banners                                                                */
+/* ---------------------------------------------------------------------- */
+
+.sim-banner {
+  padding: 0.6em 0.9em;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+
+.sim-error {
+  border-color: var(--rival);
+  padding: 0.6em 0.9em;
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Config row                                                             */
+/* ---------------------------------------------------------------------- */
+
+.sim-setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1em;
+  padding: 1em;
+}
+
+.sim-setup__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+}
+
+.sim-setup__field-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sim-setup__field select,
+.sim-setup__field input {
+  min-width: 9em;
+}
+
+.sim-setup__field input[type='number'] {
+  min-width: 6em;
+}
+
+.sim-setup__run {
+  margin-left: auto;
+}
+
+.sim-min-games {
+  align-self: flex-start;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Progress                                                               */
+/* ---------------------------------------------------------------------- */
+
+.sim-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  padding: 0.8em 1em;
+}
+
+.sim-progress__bar {
+  flex: 1 1 auto;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 10px;
+  border: 1px solid var(--line-bright);
+  background: var(--panel-2);
+}
+
+.sim-progress__bar::-webkit-progress-bar {
+  background: var(--panel-2);
+}
+
+.sim-progress__bar::-webkit-progress-value {
+  background: var(--you);
+}
+
+.sim-progress__bar::-moz-progress-bar {
+  background: var(--you);
+}
+
+.sim-progress__text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Results                                                                */
+/* ---------------------------------------------------------------------- */
+
+.sim-results {
+  padding: 1em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9em;
+}
+
+.sim-results h3 {
+  margin: 0;
+}
+
+.sim-winrates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.sim-splitbar {
+  display: flex;
+  height: 24px;
+  border: 1px solid var(--line-bright);
+  overflow: hidden;
+}
+
+.sim-splitbar__fill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sim-splitbar__fill--a {
+  background: var(--you);
+}
+
+.sim-splitbar__fill--b {
+  background: var(--rival);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sim-splitbar__fill {
+    transition: width 200ms ease;
+  }
+}
+
+.sim-splitbar__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--void);
+  white-space: nowrap;
+}
+
+.sim-winrates__row {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.sim-winrates__row--a {
+  color: var(--you);
+}
+
+.sim-winrates__row--b {
+  color: var(--rival);
+}
+
+.sim-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.sim-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.sim-reasons__label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sim-tables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+  align-items: flex-start;
+}
+
+.sim-table-wrap {
+  flex: 1 1 380px;
+  min-width: 0;
+  padding: 0.6em;
+  overflow-x: auto;
+}
+
+.sim-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.sim-table caption {
+  text-align: left;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0 0.4em;
+}
+
+.sim-table th,
+.sim-table td {
+  padding: 0.3em 0.6em;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sim-table th {
+  padding: 0.15em 0.3em;
+}
+
+/* The base `button` clip-path (chrome.css) is sized for full buttons — at
+   this compact in-cell size it eats most of the label. Squared and small,
+   matching the deck browser's own compact-toolbar override. */
+.sim-table th button {
+  font-size: 10px;
+  padding: 3px 8px;
+  clip-path: none;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.sim-table tbody tr:hover {
+  background: var(--panel-2);
+}
+
+.sim-export {
+  display: flex;
+  gap: 0.6em;
+}
