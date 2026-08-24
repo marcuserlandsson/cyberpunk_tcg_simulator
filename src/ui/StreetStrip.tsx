@@ -1,10 +1,10 @@
-import type { ReactElement } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 import { Die } from './Dice'
 import { isOvertime, GIGS_TO_WIN } from '../engine/game'
 import { streetCred } from '../engine/query'
 import { AI, HUMAN } from './useGame'
 import type { BoardAffordances, BoardHandlers } from './playAffordances'
-import type { CardDb, GameState, PlayerId } from '../engine/types'
+import type { CardDb, DieSize, GameState, PlayerId } from '../engine/types'
 
 export interface StreetStripProps {
   db: CardDb
@@ -17,6 +17,10 @@ export interface StreetStripProps {
   rivalGigStealInteractive: boolean
   /** The rival's Gig area is a legal target of the selected attack. */
   rivalGigAreaTargetable: boolean
+  /** Task 8: the Gig die whose tumble is currently playing, if any. */
+  tumble?: { player: PlayerId; size: DieSize } | null
+  /** Task 8: the Gig die whose steal flight is currently playing, if any. */
+  steal?: { from: PlayerId; size: DieSize; value: number } | null
 }
 
 // Same phase labels PlayView's control bar uses — duplicated rather than
@@ -44,6 +48,8 @@ interface GigPoolProps {
   gigAreaTargetable: boolean
   side: 'you' | 'rival'
   label: string
+  /** Task 8: this side's own Gig area holds the die whose tumble is playing. */
+  tumbling: boolean
 }
 
 /**
@@ -64,6 +70,7 @@ function GigPool(props: GigPoolProps): ReactElement {
     gigAreaTargetable,
     side,
     label,
+    tumbling,
   } = props
   const p = state.players[player]
 
@@ -84,11 +91,16 @@ function GigPool(props: GigPoolProps): ReactElement {
           {p.gigArea.length === 0 && <span className="zone__empty">empty</span>}
           {p.gigArea.map((die, index) => {
             const stealable = gigStealInteractive && affordances.stealableGigIndexes.has(index)
+            // The most recent die of this side's own Gig area — the only one
+            // a `dieRolled` event for this player could be describing
+            // (docs/rulings.md's own "reroll re-uses the just-rolled index"
+            // shape, see src/engine/reduce.ts's `chooseGigDie`/`chooseGigReroll`).
+            const tumblingHere = tumbling && index === p.gigArea.length - 1
             return (
               <button
                 type="button"
                 key={index}
-                className={`die-slot${stealable ? ' is-stealable' : ''}`}
+                className={`die-slot${stealable ? ' is-stealable' : ''}${tumblingHere ? ' is-tumbling' : ''}`}
                 data-testid="gig-die"
                 data-index={index}
                 data-size={die.size}
@@ -144,7 +156,7 @@ function GigPool(props: GigPoolProps): ReactElement {
  * old `DicePanels`).
  */
 export function StreetStrip(props: StreetStripProps): ReactElement {
-  const { state, affordances, handlers } = props
+  const { state, affordances, handlers, tumble, steal } = props
 
   return (
     <div className="street" data-testid="center-strip">
@@ -158,6 +170,7 @@ export function StreetStrip(props: StreetStripProps): ReactElement {
         gigAreaTargetable={props.rivalGigAreaTargetable}
         side="rival"
         label="Rival gigs"
+        tumbling={tumble?.player === AI}
       />
 
       <div className="street__vs">
@@ -184,7 +197,36 @@ export function StreetStrip(props: StreetStripProps): ReactElement {
         gigAreaTargetable={false}
         side="you"
         label="Your gigs"
+        tumbling={tumble?.player === HUMAN}
       />
+
+      {steal != null && (
+        // The victim's side is where the die visually WAS; the thief's side
+        // is where it just went — `.street` lays rival out on the left and
+        // the human out on the right (board.css `.street { display: flex }`),
+        // so a steal flies left-to-right or right-to-left depending on which
+        // side was robbed. Keyed by its own content (not a counter — Task 8's
+        // `AnimationState` carries none) so it remounts and replays the
+        // keyframe from scratch whenever a *different* die is stolen; two
+        // steals of the identical size/value back to back within one
+        // 600ms window is the one case this key would miss, which is cosmetic
+        // only (the flag itself still flips and reverts correctly).
+        <div
+          key={`${steal.from}-${steal.size}-${steal.value}`}
+          className={`steal-ghost ${steal.from === AI ? 'street__side--rival' : 'street__side--you'}`}
+          style={
+            {
+              left: steal.from === AI ? '6%' : '80%',
+              top: '6px',
+              '--fly-x': steal.from === AI ? '260px' : '-260px',
+              '--fly-y': '10px',
+            } as CSSProperties
+          }
+          aria-hidden="true"
+        >
+          <Die die={{ size: steal.size, value: steal.value }} rolled />
+        </div>
+      )}
     </div>
   )
 }

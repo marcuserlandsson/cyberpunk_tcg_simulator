@@ -518,6 +518,9 @@
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.015);
+  /* Anchors Task 8's `.steal-ghost` (position: absolute, motion.css), which
+     flies from one side of this strip to the other. */
+  position: relative;
 }
 
 .street__side {

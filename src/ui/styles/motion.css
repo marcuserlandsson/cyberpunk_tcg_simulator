@@ -25,4 +25,81 @@
       opacity: 1;
     }
   }
+
+  /* Task 8 — showpiece motion (src/ui/useAnimations.ts drives all four of
+     these via short-lived classes; every one reverts on its own within
+     ~600ms so no animation here can block input longer than that). */
+
+  /* Attack lunge (Field.tsx `.is-lunging`, on the attacker's own
+     `.board-card`). `--lunge-dir` is set inline per attacker: the human's own
+     attackers use this default (up); the rival's set it to a positive value
+     (down). */
+  @keyframes lunge {
+    30% {
+      transform: translateY(var(--lunge-dir, -14px)) scale(1.06);
+    }
+    60% {
+      transform: translateY(0);
+    }
+  }
+  .is-lunging {
+    animation: lunge 500ms ease-out;
+  }
+
+  /* Gig-die tumble (StreetStrip.tsx `.is-tumbling`, on the die-slot of the
+     most recently rolled die). */
+  @keyframes tumble {
+    0%,
+    60% {
+      filter: brightness(1.6);
+      transform: rotate(0turn);
+    }
+    20% {
+      transform: rotate(0.25turn);
+    }
+    40% {
+      transform: rotate(0.5turn);
+    }
+  }
+  .is-tumbling .die {
+    animation: tumble 550ms ease-out;
+  }
+
+  /* Gig-steal flight (StreetStrip.tsx `.steal-ghost`): a die-shaped ghost,
+     positioned at the victim's side, flying to the thief's side via
+     `--fly-x`/`--fly-y` set inline per steal. */
+  @keyframes steal-fly {
+    from {
+      transform: translate(0, 0);
+      opacity: 1;
+    }
+    to {
+      transform: translate(var(--fly-x, 200px), var(--fly-y, 40px));
+      opacity: 0.2;
+    }
+  }
+  .steal-ghost {
+    position: absolute;
+    pointer-events: none;
+    animation: steal-fly 600ms ease-in forwards;
+  }
+
+  /* Game-over glitch (PlayView.tsx `.is-glitching`, on the playmat root). */
+  @keyframes glitch {
+    0%,
+    100% {
+      text-shadow: none;
+      transform: none;
+    }
+    20% {
+      transform: translateX(2px);
+      filter: hue-rotate(20deg);
+    }
+    40% {
+      transform: translateX(-2px);
+    }
+  }
+  .is-glitching {
+    animation: glitch 350ms steps(4) 1;
+  }
 }

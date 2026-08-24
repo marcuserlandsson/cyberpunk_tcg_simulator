@@ -29,6 +29,7 @@ import { StreetStrip } from './StreetStrip'
 import { ZonePanels } from './ZonePanels'
 import { ZoomPanel } from './ZoomPanel'
 import { AI, HUMAN, useGame } from './useGame'
+import { useAnimations } from './useAnimations'
 import { deleteGameRecord, listDecks, listGameRecords } from './storage'
 import { deckPickerLabel, isDeckPickable } from './deckPicker'
 import {
@@ -160,6 +161,16 @@ export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> 
 export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): ReactElement {
   const game = useGame(db, aiDelayMs === undefined ? {} : { aiDelayMs })
   const { state, record, legal } = game
+
+  // Showpiece motion (Task 8) is off under `prefers-reduced-motion: reduce`
+  // and whenever `aiDelayMs === 0` — the latter is how the E2E suite always
+  // runs (`?aiDelay=0`), so those specs never race a mid-flight animation.
+  // `matchMedia` is guarded because jsdom (every vitest UI test) does not
+  // implement it.
+  const reducesMotion =
+    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
+  const animationsEnabled = aiDelayMs !== 0 && !reducesMotion
+  const anim = useAnimations(state?.events ?? [], animationsEnabled)
 
   const [pending, setPending] = useState<Pending | null>(null)
   // The uid the board/hand is currently hovering (or focused on, for
@@ -538,7 +549,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     // waiting for" — the single fact any automated driver (the E2E suite, and
     // Task 15's) needs in order to never race the AI's own timer.
     <section
-      className={`playmat${promptOpen ? ' playmat--prompting' : ''}`}
+      className={`playmat${promptOpen ? ' playmat--prompting' : ''}${anim.glitch ? ' is-glitching' : ''}`}
       aria-label="Playmat"
       data-testid="playmat"
       data-awaiting={legal.length > 0 ? 'human' : state.phase === 'gameOver' ? 'over' : 'ai'}
@@ -582,6 +593,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               affordances={affordances}
               handlers={handlers}
               useOfficialImages={useOfficialImages}
+              lungeUid={anim.lungeUid}
             />
             <HandStrip
               db={db}
@@ -602,6 +614,8 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             humanFixerInteractive={affordances.fixerSizes.size > 0}
             rivalGigStealInteractive={affordances.stealableGigIndexes.size > 0}
             rivalGigAreaTargetable={affordances.gigAreaTarget}
+            tumble={anim.tumble}
+            steal={anim.steal}
           />
 
           <div className="player-zone" data-testid="human-side">
@@ -612,6 +626,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               affordances={affordances}
               handlers={handlers}
               useOfficialImages={useOfficialImages}
+              lungeUid={anim.lungeUid}
             />
             <ZonePanels
               db={db}

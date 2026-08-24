@@ -12,7 +12,14 @@ export interface FieldProps {
   affordances: BoardAffordances
   handlers: BoardHandlers
   useOfficialImages: boolean
+  /** The attacker whose lunge (Task 8) is currently playing, if any. */
+  lungeUid?: number | null
 }
+
+// React's CSSProperties doesn't model custom properties; this is the usual
+// widening to let a component set them via `style` (mirrors CardFrame.tsx's
+// own `StyleWithVars`).
+type LungeVars = CSSProperties & { '--lunge-dir': string }
 
 /**
  * One in-play card, with every affordance class the playmat can put on it.
@@ -38,6 +45,9 @@ export function BoardCard(props: {
    *  into their overlap; a margin set one wrapper div further out would not
    *  (mirrors ZonePanels.tsx's own note on `.eddie-card` vs `.card-frame`). */
   style?: CSSProperties
+  /** Task 8's lunge: set only by `Field`'s field-zone cards (hand/legend cards
+   *  never attack, so they never pass this). */
+  lungeUid?: number | null
 }): ReactElement | null {
   const { db, state, uid, zone, affordances, handlers, useOfficialImages, style } = props
   const instance = state.cards[uid]
@@ -53,6 +63,7 @@ export function BoardCard(props: {
   const hasAbility = affordances.abilities.has(uid)
   const sellable = affordances.sellable.has(uid)
   const clickable = playable || attacker || target
+  const lunging = props.lungeUid !== undefined && props.lungeUid !== null && props.lungeUid === uid
 
   const classes = [
     'board-card',
@@ -62,6 +73,7 @@ export function BoardCard(props: {
     target && 'is-target',
     selected && 'is-selected',
     clickable && 'is-clickable',
+    lunging && 'is-lunging',
   ]
     .filter(Boolean)
     .join(' ')
@@ -76,10 +88,17 @@ export function BoardCard(props: {
   // ZonePanels already threads through for eddies/deck/trash piles.
   const owner: CardFrameOwner = instance.owner === AI ? 'rival' : 'you'
 
+  // Human attackers lunge up (the keyframe's own default, `-14px`); the
+  // rival's lunge down, which needs an explicit override.
+  const lungeStyle: LungeVars | undefined =
+    lunging && owner === 'rival' ? { '--lunge-dir': '14px' } : undefined
+  const cardStyle: CSSProperties | undefined =
+    style === undefined && lungeStyle === undefined ? undefined : { ...style, ...lungeStyle }
+
   return (
     <div
       className={classes}
-      style={style}
+      style={cardStyle}
       data-testid="board-card"
       data-uid={uid}
       data-zone={zone}
@@ -174,7 +193,7 @@ export function BoardCard(props: {
 
 /** A player's field: the Units in play, left to right in engine order. */
 export function Field(props: FieldProps): ReactElement {
-  const { db, state, player, affordances, handlers, useOfficialImages } = props
+  const { db, state, player, affordances, handlers, useOfficialImages, lungeUid } = props
   const field = state.players[player].field
 
   return (
@@ -192,6 +211,7 @@ export function Field(props: FieldProps): ReactElement {
             affordances={affordances}
             handlers={handlers}
             useOfficialImages={useOfficialImages}
+            lungeUid={lungeUid}
           />
         ))}
       </div>
