@@ -42,7 +42,7 @@ import { actingPlayer, opponentOf } from '../../src/engine/query'
 import { createRng, shuffle } from '../../src/engine/rng'
 import { createRandomAgent, type Agent } from '../../src/ai/random'
 import { createHeuristicAgent } from '../../src/ai/heuristic'
-import { evaluate, type EvalWeights } from '../../src/ai/evaluate'
+import { DEFAULT_WEIGHTS, evaluate, type EvalWeights } from '../../src/ai/evaluate'
 import type { DeckList } from '../../src/engine/deck'
 import type { Action, CardDb, GameState, PlayerId } from '../../src/engine/types'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
@@ -639,6 +639,63 @@ describe('heuristic AI: tactical spot-checks', () => {
 })
 
 // ---------------------------------------------------------------------------
+// (e2) Evaluation: blocker awareness
+// ---------------------------------------------------------------------------
+//
+// Why this term exists (2026-08-25 balance investigation): with no value on the
+// Blocker keyword, the heuristic almost never DEPLOYED 0-power blockers
+// (secondhand-bombus played at 3% of its playable decision points,
+// mandibular-upgrade at 1%) even though, once a block was legally available, it
+// took it 100% of the time. The asymmetry — Arasaka's blocker carries 2 power
+// and so gets played anyway — inflated the starter-matchup readout from ~53%
+// (random-vs-random, the decks' genuine gap) to ~91%. A ready Blocker denies
+// roughly one steal per turn, which is why it is priced in the same order of
+// magnitude as a fraction of a Gig die.
+
+describe('evaluation: blocker awareness', () => {
+  it('a ready friendly Blocker is worth more than the same body spent', () => {
+    const ready = overtimeBoard(0)
+    fieldCard(ready, 0, 'secondhand-bombus')
+    const spent = overtimeBoard(0)
+    fieldCard(spent, 0, 'secondhand-bombus', { ready: false })
+    expect(evaluate(db, ready, 0)).toBeGreaterThan(evaluate(db, spent, 0))
+  })
+
+  it('the readiness premium is Blocker-specific: a non-Blocker 0-power body gains nothing from being ready', () => {
+    // evelyn-parker: also cost 2 / power 0, but prints no Blocker — field
+    // readiness is not otherwise an evaluation feature, so these tie exactly.
+    const ready = overtimeBoard(0)
+    fieldCard(ready, 0, 'evelyn-parker-scheming-siren')
+    const spent = overtimeBoard(0)
+    fieldCard(spent, 0, 'evelyn-parker-scheming-siren', { ready: false })
+    expect(evaluate(db, ready, 0)).toBe(evaluate(db, spent, 0))
+  })
+
+  it('a rival ready Blocker costs exactly what a friendly one gains (symmetric term)', () => {
+    // secondhand-bombus has power 0, so no other field term moves: the whole
+    // difference in both directions is the blocker term itself.
+    const mine = overtimeBoard(0)
+    fieldCard(mine, 0, 'secondhand-bombus')
+    const theirs = overtimeBoard(0)
+    fieldCard(theirs, 1, 'secondhand-bombus')
+    const base = overtimeBoard(0)
+    expect(evaluate(db, mine, 0) - evaluate(db, base, 0)).toBe(
+      evaluate(db, base, 0) - evaluate(db, theirs, 0)
+    )
+    expect(evaluate(db, mine, 0)).toBeGreaterThan(evaluate(db, base, 0))
+  })
+
+  it('the term is weight-driven: readyBlocker 0 restores the old indifference', () => {
+    const ready = overtimeBoard(0)
+    fieldCard(ready, 0, 'secondhand-bombus')
+    const spent = overtimeBoard(0)
+    fieldCard(spent, 0, 'secondhand-bombus', { ready: false })
+    const blind: EvalWeights = { ...DEFAULT_WEIGHTS, readyBlocker: 0 }
+    expect(evaluate(db, ready, 0, blind)).toBe(evaluate(db, spent, 0, blind))
+  })
+})
+
+// ---------------------------------------------------------------------------
 // (f) Speed sanity
 // ---------------------------------------------------------------------------
 
@@ -690,6 +747,7 @@ const BRIEF_STARTING_WEIGHTS: EvalWeights = {
   eddie: 0,
   readyPayer: 15,
   faceUpLegend: 25,
+  readyBlocker: 0,
   deckCard: 1,
   deckoutAversion: 50,
   terminal: 1_000_000_000,
@@ -782,6 +840,47 @@ describe('heuristic AI: tuning regressions', () => {
     console.log(`[ai] weight tuning: tuned ${aWins} vs brief-set ${bWins} of 40`)
     expect(aWins).toBeGreaterThan(bWins)
   })
+
+  it('the readyBlocker term is what gets 0-power blockers DEPLOYED: Mercs block windows collapse without it', () => {
+    // The 2026-08-25 balance investigation's core measurement, pinned: with the
+    // term, heuristic-Mercs actually fields secondhand-bombus/mandibular-upgrade
+    // and so gets real block windows against Arasaka's steals; without it those
+    // cards look like pure cost and Mercs measured 0.09 block windows per game
+    // (vs Arasaka's 1.29) — the whole 91%-matchup artifact. Head-to-head
+    // winrate between the two configs is a near-coin-flip (both play both
+    // decks), so the pin is the MECHANISM, not the winrate: over the same 20
+    // seeded games, the aware config must see several times the blind config's
+    // Mercs-side block windows. Effect size measured at ~10×, asserted at 2×.
+    const mercsBlockWindows = (readyBlocker: number): number => {
+      let windows = 0
+      for (let i = 0; i < 20; i++) {
+        const seed = 85_000 + i
+        const weights = { ...DEFAULT_WEIGHTS, readyBlocker }
+        runMatch(
+          seed,
+          [
+            createHeuristicAgent(seed, { weights }),
+            createHeuristicAgent(seed + 5_000, { weights }),
+          ],
+          {
+            // `decks` fixture order is [arasaka, mercs], so seat 1 is Mercs.
+            observeSeat: 1,
+            observe: (_state, actions) => {
+              if (actions.some((a) => a.type === 'react' && a.reaction.type === 'block'))
+                windows += 1
+            },
+          }
+        )
+      }
+      return windows
+    }
+
+    const aware = mercsBlockWindows(DEFAULT_WEIGHTS.readyBlocker)
+    const blind = mercsBlockWindows(0)
+    // eslint-disable-next-line no-console
+    console.log(`[ai] Mercs block windows over 20 games: aware ${aware} vs blind ${blind}`)
+    expect(aware).toBeGreaterThanOrEqual(blind * 2 + 2)
+  }, 60_000)
 
   it('quiescence is what makes the tactical spot-checks work at all', () => {
     // The same overtime board as the spot-check above: without the layer, the

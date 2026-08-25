@@ -44,7 +44,7 @@
 // tie-break is a real tie-break rather than float noise.
 
 import { GIGS_TO_WIN, isOvertime } from '../engine/game'
-import { effectivePower, opponentOf, streetCred } from '../engine/query'
+import { effectiveKeywords, effectivePower, opponentOf, streetCred } from '../engine/query'
 import type { CardDb, GameState, PlayerId } from '../engine/types'
 
 export interface EvalWeights {
@@ -73,6 +73,17 @@ export interface EvalWeights {
   eddie: number
   readyPayer: number
   faceUpLegend: number
+  /**
+   * A READY friendly Unit with the Blocker keyword (printed or Gear-granted)
+   * denies roughly one rival steal per turn — a blocked direct attack steals
+   * nothing. Without this term a 0-power blocker looks like pure cost and the
+   * AI never deploys it, which the 2026-08-25 balance investigation measured
+   * as the entire Arasaka-vs-Mercs 91% artifact (the decks' genuine gap is
+   * ~53%): secondhand-bombus/mandibular-upgrade were played at 1–3% of their
+   * playable decision points while the 2-power corpo-security was played 4×
+   * as often. Keyword reads are hidden-info-safe: field Units are face-up.
+   */
+  readyBlocker: number
   deckCard: number
   /** Extra penalty per card below `DECKOUT_THRESHOLD` — running out is a loss. */
   deckoutAversion: number
@@ -106,6 +117,7 @@ export const DEFAULT_WEIGHTS: EvalWeights = {
   eddie: 14,
   readyPayer: 6,
   faceUpLegend: 25,
+  readyBlocker: 400,
   deckCard: 1,
   deckoutAversion: 50,
   terminal: 1_000_000_000,
@@ -133,6 +145,19 @@ function readyPayers(state: GameState, player: PlayerId): number {
 
 function faceUpLegends(state: GameState, player: PlayerId): number {
   return state.players[player].legends.filter((uid) => state.cards[uid].faceUp).length
+}
+
+/**
+ * READY field Units with the Blocker keyword, printed or granted (Gear moves
+ * with its host, so `effectiveKeywords` is the truth `legal.ts` blocks from).
+ * Field Units are face-up, so this reads no hidden information.
+ */
+function readyBlockers(db: CardDb, state: GameState, player: PlayerId): number {
+  let count = 0
+  for (const uid of state.players[player].field) {
+    if (state.cards[uid].ready && effectiveKeywords(db, state, uid).includes('blocker')) count += 1
+  }
+  return count
 }
 
 /**
@@ -180,6 +205,9 @@ export function evaluate(
   score += mine.eddies.length * weights.eddie
   score += readyPayers(state, perspective) * weights.readyPayer
   score += faceUpLegends(state, perspective) * weights.faceUpLegend
+
+  score += readyBlockers(db, state, perspective) * weights.readyBlocker
+  score -= readyBlockers(db, state, rival) * weights.readyBlocker
 
   score += mine.deck.length * weights.deckCard
   if (mine.deck.length < DECKOUT_THRESHOLD) {
