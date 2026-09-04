@@ -89,3 +89,84 @@ describe('subscription', () => {
     expect(result.current.counts['a/1']).toBe(3)
   })
 })
+
+import type { CardDb } from '../../src/engine/types'
+import type { Printing } from '../../src/ui/printings'
+import {
+  cardTotal,
+  playsetTarget,
+  playsetGaps,
+  missingPrintings,
+  completionStats,
+  buildBuyList,
+} from '../../src/ui/collection'
+
+// Minimal defs: only the fields the queries touch matter, but build full
+// CardDefs so the CardDb type is satisfied without casts scattered per test.
+const def = (id: string, type: 'legend' | 'unit') =>
+  ({
+    id, name: id, color: 'Red', type, cost: 1, power: 1,
+    ram: null, ramLimit: null, sellTag: false, keywords: [], text: '', effects: [],
+  }) as unknown as CardDb[string]
+
+const miniDb: CardDb = { alpha: def('alpha', 'unit'), boss: def('boss', 'legend') }
+
+const p = (key: string, cardId: string): Printing => ({
+  key, cardId,
+  setCode: key.split('/')[0], setName: key.split('/')[0],
+  collectorNumber: key.split('/')[1],
+  rarity: 'Common', finish: null, artist: '', sourcePrintingId: key,
+})
+
+const miniPrintings = [p('beta/1', 'alpha'), p('retail/1', 'alpha'), p('beta/2', 'boss')]
+
+describe('derived queries', () => {
+  it('cardTotal sums across printings', () => {
+    const collection = { counts: { 'beta/1': 2, 'retail/1': 1 } }
+    expect(cardTotal(miniPrintings, collection, 'alpha')).toBe(3)
+    expect(cardTotal(miniPrintings, collection, 'boss')).toBe(0)
+  })
+
+  it('playsetTarget is 1 for legends, 3 otherwise', () => {
+    expect(playsetTarget(miniDb.alpha)).toBe(3)
+    expect(playsetTarget(miniDb.boss)).toBe(1)
+  })
+
+  it('playsetGaps lists only cards below target, capped at target', () => {
+    const collection = { counts: { 'beta/1': 2 } }
+    expect(playsetGaps(miniDb, miniPrintings, collection)).toEqual([
+      { cardId: 'alpha', owned: 2, target: 3, missing: 1 },
+      { cardId: 'boss', owned: 0, target: 1, missing: 1 },
+    ])
+  })
+
+  it('missingPrintings returns printings with count 0', () => {
+    const collection = { counts: { 'beta/1': 1 } }
+    expect(missingPrintings(miniPrintings, collection).map((x) => x.key)).toEqual([
+      'retail/1', 'beta/2',
+    ])
+  })
+
+  it('completionStats: owned-toward-target over total targets; arts over printings', () => {
+    // alpha 2/3 + boss 0/1 => 2/4 = 50%; arts: 1 of 3 printings owned => 33%.
+    const collection = { counts: { 'beta/1': 2 } }
+    expect(completionStats(miniDb, miniPrintings, collection)).toEqual({
+      playsetPct: 50, artsPct: 33, totalOwned: 2,
+    })
+  })
+
+  it('overshoot does not inflate playsetPct past the target', () => {
+    const collection = { counts: { 'beta/1': 9, 'beta/2': 1 } }
+    expect(completionStats(miniDb, miniPrintings, collection).playsetPct).toBe(100)
+  })
+
+  it('buildBuyList renders playset gaps and missing arts per options', () => {
+    const collection = { counts: { 'beta/1': 2 } }
+    const both = buildBuyList(miniDb, miniPrintings, collection, { playset: true, arts: true })
+    expect(both).toContain('1x alpha')                 // playset shortfall
+    expect(both).toContain('alpha [retail/1]')        // missing art
+    expect(both).toContain('boss [beta/2]')
+    const playsetOnly = buildBuyList(miniDb, miniPrintings, collection, { playset: true, arts: false })
+    expect(playsetOnly).not.toContain('[retail/1]')
+  })
+})

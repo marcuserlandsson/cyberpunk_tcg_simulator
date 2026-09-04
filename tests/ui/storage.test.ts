@@ -4,6 +4,7 @@ import { loadCardDb } from '../../src/engine/cardDb'
 import type { DeckList } from '../../src/engine/deck'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import {
+  buildDisplayNames,
   deleteDeck,
   exportDeckText,
   getLastSimResult,
@@ -250,5 +251,14 @@ describe('corrupt localStorage', () => {
     }
     saveDeck(deck)
     expect(listDecks().find((d) => d.name === deck.name)).toEqual(deck)
+  })
+})
+
+describe('buildDisplayNames', () => {
+  it('uses the bare name when unique and Name — Subtitle when shared', () => {
+    const names = buildDisplayNames(db)
+    expect(names.get('mantis-blades')).toBe('Mantis Blades')
+    // Multiple cards named "V" exist; each must carry its subtitle.
+    expect(names.get('v-streetkid')).toMatch(/^V — /)
   })
 })

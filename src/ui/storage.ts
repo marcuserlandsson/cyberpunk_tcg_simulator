@@ -145,6 +145,19 @@ function cardDisplayName(db: CardDb, nameIndex: Map<string, string[]>, id: strin
   return def.name
 }
 
+/** Card id -> display name ("Name", or "Name — Subtitle" when the bare name
+ *  is shared) for every card in the db. The collection buy-list and text
+ *  export (src/ui/collection.ts) render names through this so they use the
+ *  same disambiguation as deck text export. */
+export function buildDisplayNames(db: CardDb): Map<string, string> {
+  const nameIndex = buildNameIndex(db)
+  const names = new Map<string, string>()
+  for (const id of Object.keys(db)) {
+    names.set(id, cardDisplayName(db, nameIndex, id))
+  }
+  return names
+}
+
 export function exportDeckText(db: CardDb, deck: DeckList): string {
   const nameIndex = buildNameIndex(db)
   const lines: string[] = []

@@ -7,6 +7,9 @@
 
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
+import type { CardDb, CardDef } from '../engine/types'
+import { printingsByCard, type Printing } from './printings'
+import { buildDisplayNames } from './storage'
 
 const COLLECTION_KEY = 'ctcg:collection:v1'
 
@@ -101,4 +104,103 @@ export function replaceCollection(collection: Collection): void {
  *  test is observed. Underscore-prefixed by convention; not for app code. */
 export function _resetCollectionCacheForTests(): void {
   cache = undefined
+}
+
+// ---------------------------------------------------------------------------
+// Derived queries — pure functions over (db, printings, collection); no
+// localStorage access, so they test without jsdom state and memoize cleanly
+// in components.
+// ---------------------------------------------------------------------------
+
+export function cardTotal(printings: Printing[], collection: Collection, cardId: string): number {
+  let total = 0
+  for (const printing of printings) {
+    if (printing.cardId === cardId) total += collection.counts[printing.key] ?? 0
+  }
+  return total
+}
+
+/** Deck rules allow 3 copies of a card but decks run single legends; a
+ *  playset of a legend is 1. */
+export function playsetTarget(def: CardDef): number {
+  return def.type === 'legend' ? 1 : 3
+}
+
+export interface PlaysetGap {
+  cardId: string
+  owned: number
+  target: number
+  missing: number
+}
+
+export function playsetGaps(db: CardDb, printings: Printing[], collection: Collection): PlaysetGap[] {
+  const byCard = printingsByCard(printings)
+  const gaps: PlaysetGap[] = []
+  for (const def of Object.values(db)) {
+    let owned = 0
+    for (const printing of byCard.get(def.id) ?? []) {
+      owned += collection.counts[printing.key] ?? 0
+    }
+    const target = playsetTarget(def)
+    if (owned < target) gaps.push({ cardId: def.id, owned, target, missing: target - owned })
+  }
+  return gaps
+}
+
+export function missingPrintings(printings: Printing[], collection: Collection): Printing[] {
+  return printings.filter((printing) => (collection.counts[printing.key] ?? 0) === 0)
+}
+
+export interface CompletionStats {
+  playsetPct: number
+  artsPct: number
+  totalOwned: number
+}
+
+export function completionStats(db: CardDb, printings: Printing[], collection: Collection): CompletionStats {
+  const byCard = printingsByCard(printings)
+  let targetSum = 0
+  let ownedTowardTarget = 0
+  for (const def of Object.values(db)) {
+    const target = playsetTarget(def)
+    let owned = 0
+    for (const printing of byCard.get(def.id) ?? []) {
+      owned += collection.counts[printing.key] ?? 0
+    }
+    targetSum += target
+    ownedTowardTarget += Math.min(owned, target)
+  }
+  const ownedPrintings = printings.filter((p) => (collection.counts[p.key] ?? 0) > 0).length
+  const totalOwned = Object.values(collection.counts).reduce((sum, n) => sum + n, 0)
+  return {
+    playsetPct: targetSum === 0 ? 0 : Math.round((ownedTowardTarget / targetSum) * 100),
+    artsPct: printings.length === 0 ? 0 : Math.round((ownedPrintings / printings.length) * 100),
+    totalOwned,
+  }
+}
+
+/** Plain-text want-list: playset shortfalls as "Nx Name", missing printings
+ *  as "Name [printingKey]". Copy-paste friendly for trades. */
+export function buildBuyList(
+  db: CardDb,
+  printings: Printing[],
+  collection: Collection,
+  options: { playset: boolean; arts: boolean }
+): string {
+  const names = buildDisplayNames(db)
+  const lines: string[] = []
+  if (options.playset) {
+    lines.push('## Missing for playset')
+    for (const gap of playsetGaps(db, printings, collection)) {
+      lines.push(`${gap.missing}x ${names.get(gap.cardId) ?? gap.cardId}`)
+    }
+  }
+  if (options.arts) {
+    if (lines.length > 0) lines.push('')
+    lines.push('## Missing printings')
+    for (const printing of missingPrintings(printings, collection)) {
+      lines.push(`${names.get(printing.cardId) ?? printing.cardId} [${printing.key}]`)
+    }
+  }
+  return lines.join('\n')
 }
