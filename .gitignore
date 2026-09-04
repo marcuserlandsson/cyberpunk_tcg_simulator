@@ -5,3 +5,4 @@ data/pnp-pages/
 test-results/
 playwright-report/
 *.tsbuildinfo
+.worktrees/
