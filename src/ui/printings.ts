@@ -4,6 +4,7 @@
 // Collection metadata lives here, never in cards.json or the engine types.
 
 import { z } from 'zod'
+import rawPrintings from '../../data/printings.json'
 
 export interface Printing {
   /** `"<setCode>/<collectorNumber>"` — the app's stable printing id. */
@@ -79,4 +80,15 @@ export function listSets(printings: Printing[]): { code: string; name: string }[
     sets.push({ code: printing.setCode, name: printing.setName })
   }
   return sets
+}
+
+let loaded: Printing[] | undefined
+
+/** The bundled dataset, parsed and validated once. Throws (with the
+ *  parsePrintings message) if data/printings.json is malformed — the
+ *  Collection tab catches this and renders an error state (Task 7); nothing
+ *  else imports this module, so the rest of the app is untouched. */
+export function loadPrintings(): Printing[] {
+  if (loaded === undefined) loaded = parsePrintings(rawPrintings)
+  return loaded
 }

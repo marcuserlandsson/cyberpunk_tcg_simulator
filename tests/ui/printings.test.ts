@@ -4,6 +4,7 @@ import {
   printingsByCard,
   getPrinting,
   listSets,
+  loadPrintings,
   type Printing,
 } from '../../src/ui/printings'
 
@@ -70,5 +71,17 @@ describe('indexes', () => {
       { code: 'welcometonightcitybeta', name: 'Welcome to Night City — Beta' },
       { code: 'welcometonightcityretail', name: 'Welcome to Night City — Retail' },
     ])
+  })
+})
+
+describe('loadPrintings', () => {
+  it('loads the bundled dataset and joins against real card ids', () => {
+    const printings = loadPrintings()
+    expect(printings.length).toBeGreaterThanOrEqual(141)
+    expect(printings.some((p) => p.cardId === 'mantis-blades')).toBe(true)
+  })
+
+  it('returns the same array on repeated calls (memoized)', () => {
+    expect(loadPrintings()).toBe(loadPrintings())
   })
 })

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildImageIndex, getOfficialImageUrl } from '../../src/ui/images'
+import { buildImageIndex, getOfficialImageUrl, buildPrintingImageIndex } from '../../src/ui/images'
 
 const IMAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../data/images')
 
@@ -79,5 +79,14 @@ describe('getOfficialImageUrl', () => {
       expect(url).toBeDefined()
       expect(url).toContain(filename)
     }
+  })
+})
+
+describe('buildPrintingImageIndex', () => {
+  it('maps glob paths back to printing keys (undoing the __ substitution)', () => {
+    const index = buildPrintingImageIndex({
+      '/data/images/printings/welcometonightcitybeta__β025.webp': '/assets/beta-mantis.webp',
+    })
+    expect(index.get('welcometonightcitybeta/β025')).toBe('/assets/beta-mantis.webp')
   })
 })
