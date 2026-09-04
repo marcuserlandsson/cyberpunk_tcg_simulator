@@ -286,6 +286,127 @@
   "sourcePrintingId": "f509ebd8-c8b7-4a22-8922-2d71c6df0b6f"
  },
  {
+  "key": "edgerunneropens1/004",
+  "cardId": "industrial-assembly",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "004",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Alexander Dudar",
+  "sourcePrintingId": "36728e75-5520-4ba8-a82d-e5d884b18170"
+ },
+ {
+  "key": "edgerunneropens1/005",
+  "cardId": "afterparty-at-lizzie-s",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "005",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Alicja Użarowska",
+  "sourcePrintingId": "c28c3d15-1e03-465c-a696-cf395a795abc"
+ },
+ {
+  "key": "edgerunneropens1/006",
+  "cardId": "peace-offering",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "006",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Mattia De Iulis",
+  "sourcePrintingId": "98fc95b4-44ec-4de0-bec3-77762792fa0f"
+ },
+ {
+  "key": "edgerunneropens1/007",
+  "cardId": "trust-no-one",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "007",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Jesús Hervás",
+  "sourcePrintingId": "a0d5fd79-b00b-408d-89c5-ff8721da568c"
+ },
+ {
+  "key": "edgerunneropens1/034",
+  "cardId": "yorinobu-arasaka-embracing-destruction",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "034",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Vincenzo Riccardi",
+  "sourcePrintingId": "ba15a39b-fc76-474b-a2f0-76e5069a69e4"
+ },
+ {
+  "key": "edgerunneropens1/040",
+  "cardId": "viktor-vektor-sit-down-and-relax",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "040",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Ito (Kirby's Comic Art)",
+  "sourcePrintingId": "23b81de3-abe3-4231-8dc3-7656de9d99db"
+ },
+ {
+  "key": "edgerunneropens1/041",
+  "cardId": "goro-takemura-hands-unclean",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "041",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Vincenzo Riccardi",
+  "sourcePrintingId": "8bdba66b-a20e-49f3-8e85-2e3d7e0c6a37"
+ },
+ {
+  "key": "edgerunneropens1/047",
+  "cardId": "saburo-arasaka-stubborn-patriarch",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "047",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Vincenzo Riccardi",
+  "sourcePrintingId": "46387af0-342b-40c7-82fa-858d08ea473f"
+ },
+ {
+  "key": "edgerunneropens1/048",
+  "cardId": "alt-cunningham-soulkiller-architect",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "048",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Pandart Studio",
+  "sourcePrintingId": "72a627db-f8a0-4559-9194-2b9e4ceca30c"
+ },
+ {
+  "key": "edgerunneropens1/050",
+  "cardId": "jackie-welles-pour-one-out-for-me",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "050",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Ito (Kirby's Comic Art)",
+  "sourcePrintingId": "3f37a0e1-e31f-4c6b-b97e-bec9f929432c"
+ },
+ {
+  "key": "edgerunneropens1/053",
+  "cardId": "v-corporate-exile",
+  "setCode": "edgerunneropens1",
+  "setName": "Edgerunner Open S 1",
+  "collectorNumber": "053",
+  "rarity": "Nova Rare",
+  "finish": null,
+  "artist": "Ito (Kirby's Comic Art)",
+  "sourcePrintingId": "848e3de6-3a3e-462e-8186-0a214ff03b79"
+ },
+ {
   "key": "embracingpowerbetastarterdeck/β001",
   "cardId": "yorinobu-arasaka-embracing-destruction",
   "setCode": "embracingpowerbetastarterdeck",
@@ -4684,5 +4805,16 @@
   "finish": null,
   "artist": "Fabrizio De Tommaso",
   "sourcePrintingId": "b21f86a3-cb77-44a3-bf94-4c5e068ac2c8"
+ },
+ {
+  "key": "welcometonightcityretail/155",
+  "cardId": "alt-cunningham-soulkiller-architect",
+  "setCode": "welcometonightcityretail",
+  "setName": "Welcome to Night City — Retail",
+  "collectorNumber": "155",
+  "rarity": "Iconic Legend",
+  "finish": null,
+  "artist": "Pandart Studio",
+  "sourcePrintingId": "1d4ce13a-20de-4f4f-8145-0c8e9892f52c"
  }
 ]
