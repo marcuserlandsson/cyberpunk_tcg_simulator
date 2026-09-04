@@ -17,7 +17,9 @@ import type { DeckList } from '../engine/deck'
 import { CardBrowser, isArtOnlyPromo } from './CardBrowser'
 import { DeckPanel } from './DeckPanel'
 import { CardFrame } from './CardFrame'
-import { deleteDeck, isReadOnlyDeck, listDecks, saveDeck } from './storage'
+import { deleteDeck, isReadOnlyDeck, listDecks, saveDeck, buildDisplayNames } from './storage'
+import { useCollection, ownedByCard } from './collection'
+import { loadPrintings } from './printings'
 
 export interface DeckBuilderViewProps {
   db: CardDb
@@ -35,6 +37,33 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
   const [zoomId, setZoomId] = useState<string | null>(null)
 
   const isReadOnly = isReadOnlyDeck(deck.name)
+
+  // Ownership is informational only (docs/rulings.md §152's "invalid decks
+  // may exist and be saved" philosophy extends to unaffordable ones too) —
+  // never blocks an add, never touches validateDeck.
+  const collection = useCollection()
+  const printings = useMemo(() => {
+    try {
+      return loadPrintings()
+    } catch {
+      return []
+    }
+  }, [])
+  // Shared with the Collection tab's tile badge (collection.ts's ownedByCard)
+  // so the two badges are the same number by construction, not by agreement.
+  const owned = useMemo(() => ownedByCard(printings, collection), [printings, collection])
+
+  const missing = useMemo(() => {
+    const shortfalls: { id: string; missing: number }[] = []
+    for (const [id, count] of Object.entries(deck.cards)) {
+      const short = Math.max(0, count - (owned[id] ?? 0))
+      if (short > 0) shortfalls.push({ id, missing: short })
+    }
+    for (const id of deck.legends) {
+      if (id !== '' && (owned[id] ?? 0) === 0) shortfalls.push({ id, missing: 1 })
+    }
+    return shortfalls
+  }, [deck, owned])
 
   function handleAdd(id: string): void {
     const def = db[id]
@@ -109,31 +138,59 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
   }
 
   const zoomDef = useMemo(() => (zoomId === null ? undefined : db[zoomId]), [db, zoomId])
+  const missingTotal = missing.reduce((sum, m) => sum + m.missing, 0)
 
+  // `.deck-builder` is strictly the two-pane row and nothing else: its flex
+  // rule predates this feature (and the two density passes that closed the
+  // 1366x768 board overflow), so the missing-cards strip gets its own row
+  // from this column wrapper rather than by teaching that row to wrap.
   return (
-    <div className="deck-builder" data-testid="deck-builder">
-      <CardBrowser
-        db={db}
-        useOfficialImages={useOfficialImages}
-        counts={deck.cards}
-        legends={deck.legends}
-        onAdd={handleAdd}
-        onRemove={handleRemove}
-        onZoom={setZoomId}
-      />
-      <DeckPanel
-        db={db}
-        deck={deck}
-        decks={decks}
-        isReadOnly={isReadOnly}
-        useOfficialImages={useOfficialImages}
-        deleteError={deleteError}
-        onChangeDeck={setDeck}
-        onSave={handleSave}
-        onLoad={handleLoad}
-        onDelete={handleDelete}
-        onNew={handleNew}
-      />
+    <div className="deck-builder-view">
+      <div className="deck-builder" data-testid="deck-builder">
+        <CardBrowser
+          db={db}
+          useOfficialImages={useOfficialImages}
+          counts={deck.cards}
+          legends={deck.legends}
+          owned={owned}
+          onAdd={handleAdd}
+          onRemove={handleRemove}
+          onZoom={setZoomId}
+        />
+        <DeckPanel
+          db={db}
+          deck={deck}
+          decks={decks}
+          isReadOnly={isReadOnly}
+          useOfficialImages={useOfficialImages}
+          deleteError={deleteError}
+          onChangeDeck={setDeck}
+          onSave={handleSave}
+          onLoad={handleLoad}
+          onDelete={handleDelete}
+          onNew={handleNew}
+        />
+      </div>
+      <div className="deck-missing" data-testid="deck-missing-summary">
+        {missing.length === 0
+          ? 'You own all cards for this deck'
+          : `Missing ${missingTotal} card${missingTotal === 1 ? '' : 's'} for this deck`}
+        {missing.length > 0 && (
+          <button
+            type="button"
+            data-testid="copy-deck-buylist"
+            onClick={() => {
+              const names = buildDisplayNames(db)
+              const text = missing.map((m) => `${m.missing}x ${names.get(m.id) ?? m.id}`).join('\n')
+              if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                navigator.clipboard.writeText(text).catch(() => {})
+              }
+            }}
+          >
+            Copy buy-list
+          </button>
+        )}
+      </div>
       {zoomDef !== undefined && (
         <div className="deck-builder__zoom" data-testid="zoom-panel">
           <button type="button" data-testid="zoom-close" onClick={() => setZoomId(null)}>

@@ -5603,3 +5603,81 @@ deck, valid or not (§152's own corollary) — filtering happens only in the
 two pickers that render it, not in storage. The Deck Builder is untouched:
 it still shows every deck's `validateDeck` errors live rather than hiding
 or disabling anything, exactly as §152 specifies.
+
+## 154 — Collection tracking: what it counts, and what it deliberately doesn't (Tasks 1-11)
+
+The collection tracker records what the player physically owns and never uses
+that to decide anything. Its policy decisions are all in that one sentence,
+but they were made at enough different layers to be worth spelling out.
+
+**A playset is 3 — except for a Legend, where it is 1.** `playsetTarget(def)`
+(`src/ui/collection.ts`) reads the deck rules rather than a constant: a deck
+may run at most 3 copies of a card, but it runs exactly 3 Legends and each
+must have a unique name (`src/engine/deck.ts`), so a *second* copy of a Legend
+can never be played. Calling the target 3 for Legends would have shown the
+whole Legend pool as permanently 1/3 and put 100+ cards on a buy-list that
+nobody should buy. This is a *playability* target, not a collector one — the
+"own every printing" goal is tracked separately as the ★ / arts %, and it does
+want the alt arts.
+
+**Ownership is informational everywhere, and blocks nothing.** This is §152's
+"an invalid deck is allowed to exist" extended one step: an *unaffordable*
+deck is allowed to exist too. The Deck Builder shows an `owned x/3` badge and
+a "missing N cards for this deck" summary, and neither touches `validateDeck`,
+disables an add, or colors itself as a warning. Building a hypothetical deck
+you cannot afford is the normal case, not an error — and §153's counterpoint
+(a deck being *chosen to play with* is a different moment) does not apply,
+because the engine does not care which cards you own.
+
+**Unknown printing keys are preserved on write; a schema-invalid blob is
+discarded whole on read.** These pull in opposite directions on purpose. A key
+that `printings.json` can no longer explain is still the player's data — it is
+kept in storage, round-trips through export, and is simply not displayed
+(`src/ui/collection.ts`'s header). But a stored blob that fails the zod schema
+is not salvaged key-by-key: `readCollection` falls back to empty, matching
+`storage.ts`'s forgiving `readJson` posture for every other blob in the app.
+
+That asymmetry is only safe because the *write* side is strict. Reads and
+writes validate against the same schema, and `writeCollection` refuses to
+persist anything the reader would reject, surfacing the reason through
+`getStorageError()`. Before that gate existed, a pasted text import with a
+20-digit count (`1e20` — an integer, but not a *safe* integer, which is what
+zod's `.int()` demands) was written happily and then made the next page load
+discard every other key in the collection, silently. An explicit import errors
+loudly instead of falling back, and imports are all-or-nothing, so a partial
+write cannot happen either. **The JSON export is the backup**, and the only
+one: counts live in `localStorage` and nowhere else.
+
+**Printing keys are stable across regeneration, so saved counts never
+migrate.** `printingKey(setCode, collectorNumber, finish)` derives the key
+from facts the upstream API already treats as identifying, not from row order
+or from the API's own uuids (`sourcePrintingId` is kept for provenance, not
+used as the key). The `finish` segment is appended only when a finish is
+present — every one of the 426 rows today has `finish: null`, so every key is
+byte-identical to the plain `setCode/collectorNumber` form the dataset shipped
+with. It was added *before* any foil exists precisely because it is free now:
+spec §1.1 makes a differing finish its own row, so the first foil sharing a
+collector number with its normal card would otherwise collide into a duplicate
+key, the generator would refuse to write, and the format would have to change
+at exactly the moment when changing it re-keys live player data.
+
+**Quick-add's session set defaults by size, not by order.** The set with the
+most printings, not `sets[0]`. First-appearance order in `printings.json`
+starts with a 14-printing demo deck while the core sets hold 160 and 131, so
+"first" would have made quick-add answer "not in this set" for most cards on
+first use — the exact opposite of what the component is for. The default is
+derived from the live dataset rather than hardcoding a set code, so a
+regenerated dataset cannot silently break it; `e2e/collection.spec.ts` pins
+the resulting choice so a change to the heuristic fails loudly.
+
+**Quick-add refuses to guess between printings, but only when it must.**
+Enter adds immediately when the session set holds exactly one printing of the
+matched card (110 of the 141 cards) — that single keystroke is the whole point
+of the bar. When the set holds two or three (31 card+set combinations, across
+30 cards: the in-set alt arts and Iconic variants the feature exists to
+track), Enter does nothing and the row offers the printings as buttons,
+labelled with collector number and rarity. Picking the first silently — as the
+original `.find()` did — credited the wrong printing with nothing on screen
+saying so, which made the buy-list wrong in *both* directions and left in-set
+alt arts unreachable. The undo toast names the collector number for the same
+reason: a mis-attribution has to be visible before Undo means anything.

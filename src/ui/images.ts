@@ -37,3 +37,31 @@ const officialImageIndex = buildImageIndex(officialImageModules)
 export function getOfficialImageUrl(defId: string): string | undefined {
   return officialImageIndex.get(defId)
 }
+
+const printingImageModules = import.meta.glob('/data/images/printings/*', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>
+
+/** Like buildImageIndex, but filenames encode printing keys with '/'
+ *  replaced by '__' (a '/' cannot appear in a filename). Exported pure for
+ *  the same test-with-synthetic-records reason as buildImageIndex. */
+export function buildPrintingImageIndex(modules: Record<string, string>): Map<string, string> {
+  const index = new Map<string, string>()
+  for (const [path, url] of Object.entries(modules)) {
+    const filename = path.split('/').pop() ?? ''
+    const stem = filename.replace(/\.(png|jpg|jpeg|webp)$/i, '')
+    index.set(stem.replace(/__/g, '/'), url)
+  }
+  return index
+}
+
+const printingImageIndex = buildPrintingImageIndex(printingImageModules)
+
+/** The art URL for a specific printing, or undefined if none is bundled —
+ *  callers then fall back to getOfficialImageUrl(cardId), then the drawn
+ *  CardFrame, exactly like base art falls back today. */
+export function getPrintingImageUrl(printingKey: string): string | undefined {
+  return printingImageIndex.get(printingKey)
+}

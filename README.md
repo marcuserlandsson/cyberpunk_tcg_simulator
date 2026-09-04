@@ -26,6 +26,7 @@ while building this simulator is recorded, with reasoning, in
 - [Setup](#setup)
 - [How to play](#how-to-play)
 - [Deck building](#deck-building)
+- [Collection tracking](#collection-tracking)
 - [Simulation](#simulation)
 - [Official card images](#official-card-images)
 - [Where the rules live](#where-the-rules-live)
@@ -68,7 +69,8 @@ Other useful scripts:
 
 ## How to play
 
-The app has three tabs: **Play**, **Deck Builder**, and **Simulate**. A
+The app has four tabs: **Play**, **Deck Builder**, **Simulate**, and
+**Collection**. A
 "Use official card images" toggle in the header switches every card face
 between the built-in HTML card frame (always available) and official card
 art (only where [image fetching](#official-card-images) has been run
@@ -172,6 +174,29 @@ Card names that are ambiguous on their own (multiple printings sharing a
 name) must be written as `Name — Subtitle`; export always disambiguates this
 way automatically when needed.
 
+## Collection tracking
+
+The **Collection** tab tracks which physical cards you own, per *printing* —
+`data/printings.json` holds 426 printings of the 141 cards across 12 sets, so
+an alt art is a separate thing to own rather than a flag on the card.
+
+- One tile per card showing `owned/target`, plus **✓** when the playset is
+  complete and **★** when you own every printing of it. The playset target is
+  3, or **1 for a Legend** (decks run one of each). Clicking a tile expands
+  per-printing rows with `+`/`−` steppers.
+- **Quick-add** for cracking packs: pick the set you are opening once, then
+  type a few letters and press Enter to add 1 — every add lands in that set,
+  with single-level undo. Where the set holds more than one printing of the
+  matched card (an Iconic variant, say), Enter deliberately does *not* guess:
+  the row lists the candidates with collector number and rarity to click.
+- Completion stats, a copy-able buy-list of what is missing, and JSON / text
+  export and import (replace or merge). **The JSON export is your backup** —
+  counts live in `localStorage` and nothing is stored anywhere else.
+
+In the Deck Builder, each card carries an `owned x/3` badge and the deck gets
+a "missing N cards for this deck" summary with its own buy-list button. That
+is **informational only** — ownership never blocks an add, a save, or a game.
+
 ## Simulation
 
 The **Simulate** tab picks two decks, runs N AI-vs-AI games in a background
@@ -247,12 +272,16 @@ src/
 │             # baseline (src/ai/random.ts) used by tests and by the AI-strength benchmark
 ├── sim/      # batch AI-vs-AI runner (src/sim/runner.ts), driven directly by the
 │             # CLI (scripts/sim.ts) and, in the browser, from a Web Worker (src/sim/worker.ts)
-└── ui/       # React components for the Play, Deck Builder, and Simulate views
+└── ui/       # React components for the Play, Deck Builder, Simulate and
+           # Collection views
 
 data/
 ├── cards.json           # all 141 cards: stats, verbatim text, effect definitions
+├── printings.json       # 426 physical printings of those 141 cards across 12 sets
+│                        # (generated — see data/printings.schema.md)
 ├── decks/                # the two bundled starter decks
 └── images/               # (gitignored) official art, populated by scripts/fetch-images.mjs
+                          # (printing art under images/printings/, from fetch-printings.ts)
 
 tests/
 ├── engine/   # rules-engine unit tests (one Vitest case per normative rule statement)

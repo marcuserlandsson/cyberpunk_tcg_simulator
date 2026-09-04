@@ -9,6 +9,7 @@
 import { useMemo, useState, type CSSProperties, type ReactElement } from 'react'
 import type { CardDb, CardDef, CardType } from '../engine/types'
 import { CardFrame, ramColorVar } from './CardFrame'
+import { playsetTarget } from './collection'
 
 export interface CardBrowserProps {
   db: CardDb
@@ -18,6 +19,11 @@ export interface CardBrowserProps {
   /** The deck's 3 legend slots (possibly `''` for an empty slot), so a
    * legend already chosen can be shown as such. */
   legends: readonly [string, string, string]
+  /** Card id -> copies owned (any printing), from `collection.ts`'s shared
+   *  `ownedByCard`. Optional so this stays a pure presentational component
+   *  usable without the collection feature at all; absent = badge hidden.
+   *  `DeckBuilderView` is its only caller today, and does pass it. */
+  owned?: Record<string, number>
   onAdd: (id: string) => void
   onRemove: (id: string) => void
   onZoom: (id: string) => void
@@ -55,7 +61,7 @@ function matchesSearch(def: CardDef, query: string): boolean {
 }
 
 export function CardBrowser(props: CardBrowserProps): ReactElement {
-  const { db, useOfficialImages, counts, legends, onAdd, onRemove, onZoom } = props
+  const { db, useOfficialImages, counts, legends, owned, onAdd, onRemove, onZoom } = props
 
   const [search, setSearch] = useState('')
   const [colors, setColors] = useState<Set<string>>(new Set())
@@ -178,6 +184,11 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
               {count > 0 && (
                 <span className="card-browser__count" data-testid={`browser-count-${def.id}`}>
                   x{count}
+                </span>
+              )}
+              {owned !== undefined && (
+                <span className="card-browser__owned" data-testid={`owned-${def.id}`}>
+                  owned {owned[def.id] ?? 0}/{playsetTarget(def)}
                 </span>
               )}
               <div className="card-browser__overlay">

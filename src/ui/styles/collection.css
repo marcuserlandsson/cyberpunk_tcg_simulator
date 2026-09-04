@@ -1,0 +1,206 @@
+/* ---------------------------------------------------------------------- */
+/* Collection tab                                                         */
+/* ---------------------------------------------------------------------- */
+
+.collection-view__storage-error {
+  color: var(--rival);
+  font-size: 0.85em;
+  font-family: var(--font-mono);
+  margin-bottom: 0.6em;
+}
+
+.collection-view__filters {
+  margin-bottom: 0.6em;
+}
+
+/* Key to the two tile badges. The badges' own `title` tooltips are dead —
+   `.collection-view__count` is `pointer-events: none` so it never steals
+   CardFrame's click target — so the glyphs are explained here instead. */
+.collection-view__legend {
+  margin: 0.4em 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Header: stats, buy-list copy, export/import (Task 9)                  */
+/* ---------------------------------------------------------------------- */
+
+.collection-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6em;
+  margin-bottom: 0.8em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.collection-header__import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+  width: 100%;
+}
+
+.collection-header__import textarea {
+  flex: 1 1 100%;
+  min-height: 4em;
+  font-family: var(--font-mono);
+}
+
+.collection-header__error {
+  flex: 1 1 100%;
+  color: var(--rival);
+  white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Quick-add bar (Task 8)                                                 */
+/* ---------------------------------------------------------------------- */
+
+.quick-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-bottom: 0.8em;
+}
+
+.quick-add input[type='text'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+}
+
+.quick-add__matches {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 2px 0 0;
+  padding: 0.3em;
+  list-style: none;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  max-height: 16em;
+  overflow-y: auto;
+}
+
+.quick-add__matches li {
+  padding: 0.2em 0.3em;
+  font-size: 0.9em;
+}
+
+/* Disambiguation row: the card has 0 — or 2+ — printings in the session set,
+   so Enter refuses to guess and the candidates are offered as buttons. They
+   wrap rather than overflow: an Iconic-variant card can list half a dozen. */
+.quick-add__choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.quick-add__choices button {
+  font-size: 10px;
+  padding: 2px 7px;
+  clip-path: none;
+  border-radius: 3px;
+}
+
+.quick-add__matches li[aria-selected='true'] {
+  background: var(--panel);
+  outline: 1px solid var(--act);
+}
+
+.quick-add__toast {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  margin-top: 0.4em;
+  padding: 0.35em 0.6em;
+  font-size: 0.85em;
+  font-family: var(--font-mono);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+/* Same responsive grid as `.card-browser__grid` (deckbuilder.css) — a
+   zoom-rendition tile per card, sized to stay legible while filling the
+   available width. */
+.collection-view__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.8em;
+  padding: 0.2em;
+}
+
+.collection-view__cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Corner owned/target badge, matching `.card-browser__count`'s placement
+   and look. */
+.collection-view__count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 7px;
+  background: var(--act);
+  color: #131200;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.collection-view__expand {
+  font-size: 10px;
+  padding: 3px 9px;
+  clip-path: none;
+  border-radius: 3px;
+  margin-top: 0.35em;
+}
+
+/* Panel of per-printing rows, under the expanded cell (the cell itself is
+   the grid's sizing unit, so this panel simply fills the cell's width
+   rather than spanning the whole grid). */
+.collection-view__printings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  margin-top: 0.4em;
+  padding: 0.4em;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.collection-view__printing-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  justify-content: space-between;
+  font-size: 0.85em;
+}
+
+.collection-view__stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.collection-view__stepper button {
+  font-size: 10px;
+  padding: 2px 7px;
+  clip-path: none;
+  border-radius: 3px;
+}
