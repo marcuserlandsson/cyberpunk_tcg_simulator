@@ -18,7 +18,7 @@ import { CardBrowser, isArtOnlyPromo } from './CardBrowser'
 import { DeckPanel } from './DeckPanel'
 import { CardFrame } from './CardFrame'
 import { deleteDeck, isReadOnlyDeck, listDecks, saveDeck, buildDisplayNames } from './storage'
-import { useCollection } from './collection'
+import { useCollection, ownedByCard } from './collection'
 import { loadPrintings } from './printings'
 
 export interface DeckBuilderViewProps {
@@ -49,26 +49,21 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
       return []
     }
   }, [])
-  const ownedByCard = useMemo(() => {
-    const owned: Record<string, number> = {}
-    for (const printing of printings) {
-      const count = collection.counts[printing.key] ?? 0
-      if (count > 0) owned[printing.cardId] = (owned[printing.cardId] ?? 0) + count
-    }
-    return owned
-  }, [printings, collection])
+  // Shared with the Collection tab's tile badge (collection.ts's ownedByCard)
+  // so the two badges are the same number by construction, not by agreement.
+  const owned = useMemo(() => ownedByCard(printings, collection), [printings, collection])
 
   const missing = useMemo(() => {
     const shortfalls: { id: string; missing: number }[] = []
     for (const [id, count] of Object.entries(deck.cards)) {
-      const short = Math.max(0, count - (ownedByCard[id] ?? 0))
+      const short = Math.max(0, count - (owned[id] ?? 0))
       if (short > 0) shortfalls.push({ id, missing: short })
     }
     for (const id of deck.legends) {
-      if (id !== '' && (ownedByCard[id] ?? 0) === 0) shortfalls.push({ id, missing: 1 })
+      if (id !== '' && (owned[id] ?? 0) === 0) shortfalls.push({ id, missing: 1 })
     }
     return shortfalls
-  }, [deck, ownedByCard])
+  }, [deck, owned])
 
   function handleAdd(id: string): void {
     const def = db[id]
@@ -143,36 +138,43 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
   }
 
   const zoomDef = useMemo(() => (zoomId === null ? undefined : db[zoomId]), [db, zoomId])
+  const missingTotal = missing.reduce((sum, m) => sum + m.missing, 0)
 
+  // `.deck-builder` is strictly the two-pane row and nothing else: its flex
+  // rule predates this feature (and the two density passes that closed the
+  // 1366x768 board overflow), so the missing-cards strip gets its own row
+  // from this column wrapper rather than by teaching that row to wrap.
   return (
-    <div className="deck-builder" data-testid="deck-builder">
-      <CardBrowser
-        db={db}
-        useOfficialImages={useOfficialImages}
-        counts={deck.cards}
-        legends={deck.legends}
-        owned={ownedByCard}
-        onAdd={handleAdd}
-        onRemove={handleRemove}
-        onZoom={setZoomId}
-      />
-      <DeckPanel
-        db={db}
-        deck={deck}
-        decks={decks}
-        isReadOnly={isReadOnly}
-        useOfficialImages={useOfficialImages}
-        deleteError={deleteError}
-        onChangeDeck={setDeck}
-        onSave={handleSave}
-        onLoad={handleLoad}
-        onDelete={handleDelete}
-        onNew={handleNew}
-      />
+    <div className="deck-builder-view">
+      <div className="deck-builder" data-testid="deck-builder">
+        <CardBrowser
+          db={db}
+          useOfficialImages={useOfficialImages}
+          counts={deck.cards}
+          legends={deck.legends}
+          owned={owned}
+          onAdd={handleAdd}
+          onRemove={handleRemove}
+          onZoom={setZoomId}
+        />
+        <DeckPanel
+          db={db}
+          deck={deck}
+          decks={decks}
+          isReadOnly={isReadOnly}
+          useOfficialImages={useOfficialImages}
+          deleteError={deleteError}
+          onChangeDeck={setDeck}
+          onSave={handleSave}
+          onLoad={handleLoad}
+          onDelete={handleDelete}
+          onNew={handleNew}
+        />
+      </div>
       <div className="deck-missing" data-testid="deck-missing-summary">
         {missing.length === 0
           ? 'You own all cards for this deck'
-          : `Missing ${missing.reduce((sum, m) => sum + m.missing, 0)} cards for this deck`}
+          : `Missing ${missingTotal} card${missingTotal === 1 ? '' : 's'} for this deck`}
         {missing.length > 0 && (
           <button
             type="button"

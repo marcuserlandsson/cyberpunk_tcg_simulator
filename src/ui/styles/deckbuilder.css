@@ -6,9 +6,21 @@
 /* Deck Builder                                                           */
 /* ---------------------------------------------------------------------- */
 
+/* Column wrapper introduced so the missing-cards strip (`.deck-missing`,
+   below) can sit on its own row WITHOUT `flex-wrap: wrap` on `.deck-builder`
+   — that would have changed how the two pre-existing panes collapse at
+   narrow widths (the deck panel dropping under the browser where it used to
+   compress), which the two density passes ahead of this feature were
+   specifically about not disturbing. */
+.deck-builder-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+
+/* Unchanged from before the collection feature: the two-pane row only. */
 .deck-builder {
   display: flex;
-  flex-wrap: wrap;
   gap: 1em;
   align-items: flex-start;
 }
@@ -492,8 +504,6 @@
    deck would still cost to build for real. Never a warning/error color —
    ownership is informational only and never blocks a save or an add. */
 .deck-missing {
-  flex: 1 1 100%;
-  order: 3;
   display: flex;
   align-items: center;
   gap: 0.6em;

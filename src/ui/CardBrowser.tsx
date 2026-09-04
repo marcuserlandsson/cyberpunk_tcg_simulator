@@ -19,8 +19,10 @@ export interface CardBrowserProps {
   /** The deck's 3 legend slots (possibly `''` for an empty slot), so a
    * legend already chosen can be shown as such. */
   legends: readonly [string, string, string]
-  /** Card id -> copies owned (any printing). Absent = collection feature not
-   *  wired in (e.g. PlayView's browser usage); badge hidden. */
+  /** Card id -> copies owned (any printing), from `collection.ts`'s shared
+   *  `ownedByCard`. Optional so this stays a pure presentational component
+   *  usable without the collection feature at all; absent = badge hidden.
+   *  `DeckBuilderView` is its only caller today, and does pass it. */
   owned?: Record<string, number>
   onAdd: (id: string) => void
   onRemove: (id: string) => void

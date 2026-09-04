@@ -378,8 +378,18 @@ describe('DeckBuilderView — collection integration (owned badge + missing summ
     fireEvent.click(container.querySelector('[data-testid="add-mantis-blades"]') as HTMLElement)
 
     const summary = container.querySelector('[data-testid="deck-missing-summary"]')
-    expect(summary?.textContent).toMatch(/Missing 1 cards for this deck/)
+    expect(summary?.textContent).toMatch(/Missing 1 card for this deck/)
     expect(container.querySelector('[data-testid="copy-deck-buylist"]')).not.toBeNull()
+  })
+
+  it('pluralizes the shortfall count', () => {
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    const add = container.querySelector('[data-testid="add-mantis-blades"]') as HTMLElement
+    fireEvent.click(add)
+    fireEvent.click(add)
+
+    const summary = container.querySelector('[data-testid="deck-missing-summary"]')
+    expect(summary?.textContent).toMatch(/Missing 2 cards for this deck/)
   })
 
   it('owning enough copies clears the shortfall for that card', () => {
