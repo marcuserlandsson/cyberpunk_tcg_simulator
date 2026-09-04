@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   parsePrintings,
+  printingKey,
   printingsByCard,
   getPrinting,
   listSets,
@@ -19,6 +20,24 @@ const row = (over: Partial<Printing> = {}): Printing => ({
   artist: 'Ricardo Padierne Silvera',
   sourcePrintingId: '84278f23-7323-47d2-b639-23edd76f87ae',
   ...over,
+})
+
+describe('printingKey', () => {
+  it('omits the finish segment entirely when finish is null', () => {
+    expect(printingKey('welcometonightcitybeta', 'β025', null)).toBe('welcometonightcitybeta/β025')
+  })
+
+  it('appends the finish segment when the printing has one', () => {
+    expect(printingKey('welcometonightcityretail', '025', 'Foil')).toBe(
+      'welcometonightcityretail/025/Foil'
+    )
+  })
+
+  it('keeps a foil and its normal card distinct on a shared collector number', () => {
+    // The whole point of the finish segment: without it these collide into a
+    // duplicate key and the generator refuses to write the dataset at all.
+    expect(printingKey('s', '1', null)).not.toBe(printingKey('s', '1', 'Foil'))
+  })
 })
 
 describe('parsePrintings', () => {
@@ -45,6 +64,22 @@ describe('parsePrintings', () => {
   it('accepts a string finish (open vocabulary, not an enum)', () => {
     const out = parsePrintings([row({ key: 'x/1', finish: 'Foil' })])
     expect(out[0].finish).toBe('Foil')
+  })
+
+  it('reports issues as readable lines, not zod\'s raw JSON message', () => {
+    // This message reaches the user verbatim in the Collection tab's error
+    // state, so it must not be a pretty-printed array of issue objects.
+    const bad = { ...row() } as Record<string, unknown>
+    bad.rarity = 42
+    let message = ''
+    try {
+      parsePrintings([bad])
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err)
+    }
+    expect(message).toContain('0.rarity:')
+    expect(message).not.toContain('"code"')
+    expect(message).not.toContain('[\n')
   })
 })
 

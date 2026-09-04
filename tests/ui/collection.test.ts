@@ -53,6 +53,52 @@ describe('counts', () => {
     expect(getCollection().counts).toEqual({})
   })
 
+  // C1: the read side is forgiving (a schema-invalid blob falls back to
+  // empty), so the write side must be strict — otherwise one bad count takes
+  // the whole collection down with it on the next load.
+  it('refuses to persist a blob its own reader would reject, and says so', () => {
+    setCount('beta/1', 2)
+    // 1e20: an integer, but not a *safe* integer — which is exactly what
+    // collectionSchema's `.int()` refuses.
+    setCount('beta/2', Number('99999999999999999999'))
+
+    expect(getStorageError()).toContain('Could not save the collection')
+    // Nothing was written: storage still holds the last readable blob…
+    expect(JSON.parse(localStorage.getItem('ctcg:collection:v1')!)).toEqual({
+      counts: { 'beta/1': 2 },
+    })
+    // …and the cache was invalidated, so the UI snaps back to that truth
+    // rather than showing the phantom count.
+    _resetCollectionCacheForTests()
+    expect(getCollection().counts).toEqual({ 'beta/1': 2 })
+  })
+
+  it('the refused blob would in fact have been unreadable (the bug this closes)', () => {
+    localStorage.setItem(
+      'ctcg:collection:v1',
+      JSON.stringify({ counts: { 'beta/1': 2, 'beta/2': 1e20 } })
+    )
+    _resetCollectionCacheForTests()
+    expect(getCollection().counts).toEqual({}) // every key gone, silently
+  })
+
+  it('a normal write still round-trips after the validation gate', () => {
+    setCount('beta/1', 2)
+    adjustCount('beta/1', 1)
+    setCount('beta/2', 1)
+    expect(getStorageError()).toBe('')
+    _resetCollectionCacheForTests()
+    expect(getCollection().counts).toEqual({ 'beta/1': 3, 'beta/2': 1 })
+  })
+
+  it('hands out frozen snapshots so a consumer cannot corrupt the cache', () => {
+    expect(Object.isFrozen(getCollection().counts)).toBe(true) // the empty fallback
+    setCount('beta/1', 1)
+    const snapshot = getCollection()
+    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(Object.isFrozen(snapshot.counts)).toBe(true)
+  })
+
   it('surfaces a storage error instead of throwing when the write fails', () => {
     const original = Storage.prototype.setItem
     Storage.prototype.setItem = () => {
@@ -80,6 +126,26 @@ describe('subscription', () => {
     expect(calls).toBe(1)
   })
 
+  // Found while testing the §5 banner: with a shared EMPTY singleton, a write
+  // that failed on an empty collection returned the identical snapshot, React
+  // bailed out of the re-render, and the storage-error banner never appeared
+  // for the FIRST failed write. Every write attempt must change the identity.
+  it('a failed write still changes the snapshot identity, even from empty', () => {
+    const before = getCollection()
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = () => {
+      throw new Error('QuotaExceededError')
+    }
+    try {
+      setCount('a/1', 1)
+    } finally {
+      Storage.prototype.setItem = original
+    }
+    expect(getStorageError()).toContain('Could not save')
+    expect(getCollection()).not.toBe(before)
+    expect(getCollection().counts).toEqual({}) // …but the data is unchanged
+  })
+
   it('useCollection re-renders with fresh counts and keeps a stable snapshot otherwise', () => {
     const { result, rerender } = renderHook(() => useCollection())
     const first = result.current
@@ -93,7 +159,7 @@ describe('subscription', () => {
 import type { CardDb } from '../../src/engine/types'
 import type { Printing } from '../../src/ui/printings'
 import {
-  cardTotal,
+  ownedByCard,
   playsetTarget,
   playsetGaps,
   missingPrintings,
@@ -125,10 +191,28 @@ const p = (key: string, cardId: string): Printing => ({
 const miniPrintings = [p('beta/1', 'alpha'), p('retail/1', 'alpha'), p('beta/2', 'boss')]
 
 describe('derived queries', () => {
-  it('cardTotal sums across printings', () => {
+  // I1/I2: the single implementation of "owned copies per card" — the
+  // Collection tile badge, the Deck Builder badge, playsetGaps and
+  // completionStats all read this one map. (Replaces `cardTotal`, which had
+  // no caller outside its own test.)
+  it('ownedByCard sums across a card\'s printings, omitting cards with none', () => {
     const collection = { counts: { 'beta/1': 2, 'retail/1': 1 } }
-    expect(cardTotal(miniPrintings, collection, 'alpha')).toBe(3)
-    expect(cardTotal(miniPrintings, collection, 'boss')).toBe(0)
+    const owned = ownedByCard(miniPrintings, collection)
+    expect(owned.alpha).toBe(3)
+    expect(owned.boss).toBeUndefined() // absent means 0; callers read with ?? 0
+  })
+
+  it('ownedByCard ignores keys that are not in the printings list', () => {
+    expect(ownedByCard(miniPrintings, { counts: { 'ghost/999': 7 } })).toEqual({})
+  })
+
+  it('ownedByCard agrees with playsetGaps and completionStats by construction', () => {
+    const collection = { counts: { 'beta/1': 2, 'retail/1': 1, 'beta/2': 1 } }
+    const owned = ownedByCard(miniPrintings, collection)
+    for (const gap of playsetGaps(miniDb, miniPrintings, collection)) {
+      expect(gap.owned).toBe(owned[gap.cardId] ?? 0)
+    }
+    expect(completionStats(miniDb, miniPrintings, collection).playsetPct).toBe(100)
   })
 
   it('playsetTarget is 1 for legends, 3 otherwise', () => {
@@ -198,6 +282,20 @@ describe('JSON export/import', () => {
     expect(getCollection().counts).toEqual({ 'beta/1': 1 })
   })
 
+  // M1: this message is rendered verbatim in a pre-wrap block in the UI, so
+  // it must be readable lines and not zod's pretty-printed issue array.
+  it('reports validation failures as readable lines, not raw zod JSON', () => {
+    let message = ''
+    try {
+      importCollectionJson('{"version":1,"counts":{"a":-2}}', 'replace')
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err)
+    }
+    expect(message).toContain('counts.a:')
+    expect(message).not.toContain('"code"')
+    expect(message).not.toContain('"path"')
+  })
+
   it('a well-formed JSON import with empty counts still performs a real replace (not a no-op guard)', () => {
     setCount('beta/1', 1)
     importCollectionJson(JSON.stringify({ version: 1, counts: {} }), 'replace')
@@ -231,6 +329,28 @@ describe('text export/import', () => {
     setCount('beta/1', 1)
     importCollectionText('\n2x alpha [beta/1]\n', 'merge')
     expect(getCollection().counts['beta/1']).toBe(3)
+  })
+
+  // C1, import side: `^(\d+)` is unbounded, so a mangled pasted line could
+  // carry a count that parses but is not a *safe* integer — and that used to
+  // be persisted, making the next page load discard the whole collection.
+  it('rejects an out-of-range count through the all-or-nothing error path', () => {
+    setCount('beta/1', 1)
+    expect(() =>
+      importCollectionText('2x alpha [beta/1]\n99999999999999999999x boss [beta/2]', 'replace')
+    ).toThrow(/count out of range/)
+    expect(getCollection().counts).toEqual({ 'beta/1': 1 })
+  })
+
+  it('an out-of-range count is reported alongside other errors, not instead of them', () => {
+    expect(() => importCollectionText('99999999999999999999x boss [beta/2]\ngarbage', 'replace'))
+      .toThrow(/count out of range[\s\S]*garbage/)
+  })
+
+  it('accepts a large but safe count', () => {
+    importCollectionText(`${Number.MAX_SAFE_INTEGER}x alpha [beta/1]`, 'replace')
+    expect(getCollection().counts['beta/1']).toBe(Number.MAX_SAFE_INTEGER)
+    expect(getStorageError()).toBe('')
   })
 
   it('rejects blank input instead of silently wiping the collection', () => {

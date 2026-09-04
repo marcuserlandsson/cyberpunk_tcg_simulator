@@ -7,7 +7,9 @@ import { z } from 'zod'
 import rawPrintings from '../../data/printings.json'
 
 export interface Printing {
-  /** `"<setCode>/<collectorNumber>"` — the app's stable printing id. */
+  /** The app's stable printing id: `"<setCode>/<collectorNumber>"`, or
+   *  `"<setCode>/<collectorNumber>/<finish>"` when `finish` is not null. See
+   *  `printingKey`. */
   key: string
   /** FK into cards.json ids (the API slug). */
   cardId: string
@@ -37,13 +39,57 @@ const printingSchema = z.object({
 
 const printingsSchema = z.array(printingSchema)
 
+/**
+ * One readable line per zod issue, instead of zod's own `error.message` —
+ * which is a pretty-printed JSON array of issue objects and reads as noise
+ * when it lands in front of a user (the Collection tab's error state, and
+ * `collection.ts`'s import errors, both render these verbatim).
+ *
+ * Lives here rather than in `collection.ts` only because this is the lowest
+ * zod-using module in the collection feature's import chain (`collection.ts`
+ * imports this one), so both sides can share one formatting rule without a
+ * cycle or a new module.
+ */
+export function formatZodIssues(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.map((segment) => String(segment)).join('.')
+      return path === '' ? issue.message : `${path}: ${issue.message}`
+    })
+    .join('\n')
+}
+
+/**
+ * The app's stable printing id. `finish` participates only when it is
+ * present, so every row in the dataset as generated today (all `finish:
+ * null`) keeps its historical `setCode/collectorNumber` key byte for byte —
+ * saved collections never need a migration. The moment upstream ships a
+ * variant finish sharing a collector number with its normal card (spec §1.1
+ * explicitly anticipates "a foil finish at retail"), the finish segment
+ * keeps the two rows distinct instead of colliding into a duplicate key that
+ * would block regenerating the dataset at all.
+ *
+ * Deliberately duplicated by hand in `scripts/fetch-printings.ts` (which must
+ * not import this module — see that file's header); `tests/data/printings.test.ts`
+ * is the drift-catcher.
+ */
+export function printingKey(
+  setCode: string,
+  collectorNumber: string,
+  finish: string | null
+): string {
+  return finish === null
+    ? `${setCode}/${collectorNumber}`
+    : `${setCode}/${collectorNumber}/${finish}`
+}
+
 /** Validates raw JSON into `Printing[]`; throws with a readable message on
  *  malformed rows or duplicate keys. Used by both the loader (Task 3) and the
  *  fetch script's self-check. */
 export function parsePrintings(raw: unknown): Printing[] {
   const result = printingsSchema.safeParse(raw)
   if (!result.success) {
-    throw new Error(`printings.json is malformed: ${result.error.message}`)
+    throw new Error(`printings.json is malformed:\n${formatZodIssues(result.error)}`)
   }
   const seen = new Set<string>()
   for (const printing of result.data) {
@@ -85,9 +131,10 @@ export function listSets(printings: Printing[]): { code: string; name: string }[
 let loaded: Printing[] | undefined
 
 /** The bundled dataset, parsed and validated once. Throws (with the
- *  parsePrintings message) if data/printings.json is malformed — the
- *  Collection tab catches this and renders an error state (Task 7); nothing
- *  else imports this module, so the rest of the app is untouched. */
+ *  parsePrintings message) if data/printings.json is malformed — its callers
+ *  (`CollectionView`, `DeckBuilderView`) each catch that and degrade to an
+ *  error state / an empty dataset respectively; only collection code imports
+ *  this module, so the Play and Simulate views are untouched. */
 export function loadPrintings(): Printing[] {
   if (loaded === undefined) loaded = parsePrintings(rawPrintings)
   return loaded

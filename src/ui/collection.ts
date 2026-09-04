@@ -4,11 +4,16 @@
 // collection). Unknown printing keys found in storage are preserved, never
 // dropped: they are the player's data even when printings.json can no longer
 // display them, and exports still round-trip them.
+//
+// Reads and writes are validated against the SAME schema on purpose: the read
+// side is forgiving (a malformed blob falls back to empty), so the write side
+// has to be strict, or one out-of-schema count could make the next page load
+// discard every other key with nothing said about it.
 
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import type { CardDb, CardDef } from '../engine/types'
-import { getPrinting, printingsByCard, type Printing } from './printings'
+import { formatZodIssues, getPrinting, type Printing } from './printings'
 import { buildDisplayNames } from './storage'
 
 const COLLECTION_KEY = 'ctcg:collection:v1'
@@ -21,7 +26,29 @@ const collectionSchema = z.object({
   counts: z.record(z.string(), z.number().int().nonnegative()),
 })
 
-const EMPTY: Collection = { counts: {} }
+/** Snapshots handed to components are frozen: `useSyncExternalStore` shares
+ *  one reference across every consumer until the next write, so a consumer
+ *  that mutated `counts` in place (bypassing setCount) would corrupt the
+ *  cache for everyone and never reach localStorage. */
+function freeze(collection: Collection): Collection {
+  Object.freeze(collection.counts)
+  return Object.freeze(collection)
+}
+
+/**
+ * A FRESH empty collection each call, deliberately not one shared `EMPTY`
+ * singleton. `useSyncExternalStore` re-renders only when `getSnapshot`'s
+ * reference changes, and the cache below guarantees the reference is stable
+ * until a write invalidates it — so identity per *read* is unnecessary, but
+ * identity per *write* is load-bearing. With a shared singleton, a write that
+ * failed while the collection was empty produced snapshot === snapshot and
+ * React bailed out of the re-render, which meant the `getStorageError()`
+ * banner (spec §5) never appeared for the very first failed write. A write
+ * attempt is a store event; the snapshot has to be able to say so.
+ */
+function emptyCollection(): Collection {
+  return freeze({ counts: {} })
+}
 
 // Snapshot cache: useSyncExternalStore requires getSnapshot to return the
 // same reference until the store actually changes, so reads go through this
@@ -32,12 +59,12 @@ let cache: Collection | undefined
 // junk) — an *explicit import* (Task 6) errors loudly instead.
 function readCollection(): Collection {
   const raw = localStorage.getItem(COLLECTION_KEY)
-  if (raw === null) return EMPTY
+  if (raw === null) return emptyCollection()
   try {
     const parsed = collectionSchema.safeParse(JSON.parse(raw))
-    return parsed.success ? parsed.data : EMPTY
+    return parsed.success ? freeze(parsed.data) : emptyCollection()
   } catch {
-    return EMPTY
+    return emptyCollection()
   }
 }
 
@@ -58,11 +85,24 @@ function writeCollection(collection: Collection): void {
   for (const [key, count] of Object.entries(collection.counts)) {
     if (count > 0) counts[key] = count
   }
-  try {
-    localStorage.setItem(COLLECTION_KEY, JSON.stringify({ counts }))
-    storageError = ''
-  } catch (err) {
-    storageError = `Could not save the collection (browser storage full or blocked): ${String(err)}`
+  // Never persist a blob `readCollection` would refuse. The reader validates
+  // against `collectionSchema` and falls back to EMPTY on failure, so a single
+  // out-of-schema count (e.g. 1e20 — an integer, but not a *safe* integer,
+  // which is what zod's `.int()` demands) written here would silently discard
+  // the player's *entire* collection on the next page load. Refuse the write
+  // and say why instead. The cache invalidation + notify below still run on
+  // this path on purpose: the UI must snap back to what is actually in
+  // storage rather than keep showing a phantom count.
+  const validated = collectionSchema.safeParse({ counts })
+  if (!validated.success) {
+    storageError = `Could not save the collection (invalid counts, nothing was written):\n${formatZodIssues(validated.error)}`
+  } else {
+    try {
+      localStorage.setItem(COLLECTION_KEY, JSON.stringify({ counts }))
+      storageError = ''
+    } catch (err) {
+      storageError = `Could not save the collection (browser storage full or blocked): ${String(err)}`
+    }
   }
   cache = undefined
   for (const listener of listeners) listener()
@@ -112,12 +152,24 @@ export function _resetCollectionCacheForTests(): void {
 // in components.
 // ---------------------------------------------------------------------------
 
-export function cardTotal(printings: Printing[], collection: Collection, cardId: string): number {
-  let total = 0
+/**
+ * Owned copies per `cardId`, summed across every printing of that card, in a
+ * single O(printings) pass. THE one implementation of "how many of this card
+ * do I own" — the Collection grid badge, the Deck Builder badge, `playsetGaps`
+ * and `completionStats` all route through it, so the two badges can never
+ * answer the same question with two different numbers. Absent key means 0
+ * (zero counts are never materialized); callers read it with `?? 0`.
+ *
+ * (Replaces the spec §2.2 `cardTotal(cardId)` single-card lookup: every real
+ * caller needs the whole map, and 141 × O(426) scans is the wrong shape.)
+ */
+export function ownedByCard(printings: Printing[], collection: Collection): Record<string, number> {
+  const owned: Record<string, number> = {}
   for (const printing of printings) {
-    if (printing.cardId === cardId) total += collection.counts[printing.key] ?? 0
+    const count = collection.counts[printing.key] ?? 0
+    if (count > 0) owned[printing.cardId] = (owned[printing.cardId] ?? 0) + count
   }
-  return total
+  return owned
 }
 
 /** Deck rules allow 3 copies of a card but decks run single legends; a
@@ -134,15 +186,12 @@ export interface PlaysetGap {
 }
 
 export function playsetGaps(db: CardDb, printings: Printing[], collection: Collection): PlaysetGap[] {
-  const byCard = printingsByCard(printings)
+  const owned = ownedByCard(printings, collection)
   const gaps: PlaysetGap[] = []
   for (const def of Object.values(db)) {
-    let owned = 0
-    for (const printing of byCard.get(def.id) ?? []) {
-      owned += collection.counts[printing.key] ?? 0
-    }
+    const have = owned[def.id] ?? 0
     const target = playsetTarget(def)
-    if (owned < target) gaps.push({ cardId: def.id, owned, target, missing: target - owned })
+    if (have < target) gaps.push({ cardId: def.id, owned: have, target, missing: target - have })
   }
   return gaps
 }
@@ -158,17 +207,13 @@ export interface CompletionStats {
 }
 
 export function completionStats(db: CardDb, printings: Printing[], collection: Collection): CompletionStats {
-  const byCard = printingsByCard(printings)
+  const owned = ownedByCard(printings, collection)
   let targetSum = 0
   let ownedTowardTarget = 0
   for (const def of Object.values(db)) {
     const target = playsetTarget(def)
-    let owned = 0
-    for (const printing of byCard.get(def.id) ?? []) {
-      owned += collection.counts[printing.key] ?? 0
-    }
     targetSum += target
-    ownedTowardTarget += Math.min(owned, target)
+    ownedTowardTarget += Math.min(owned[def.id] ?? 0, target)
   }
   const ownedPrintings = printings.filter((p) => (collection.counts[p.key] ?? 0) > 0).length
   const totalOwned = Object.values(collection.counts).reduce((sum, n) => sum + n, 0)
@@ -243,7 +288,7 @@ export function importCollectionJson(text: string, mode: 'replace' | 'merge'): v
   }
   const result = exportSchema.safeParse(raw)
   if (!result.success) {
-    throw new Error(`Could not import collection: ${result.error.message}`)
+    throw new Error(`Could not import collection:\n${formatZodIssues(result.error)}`)
   }
   applyImport(result.data.counts, mode)
 }
@@ -282,7 +327,20 @@ export function importCollectionText(text: string, mode: 'replace' | 'merge'): v
       continue
     }
     const [, count, key] = match
-    counts[key] = (counts[key] ?? 0) + Number(count)
+    // `\d+` is unbounded, so a mangled line can carry a count that survives
+    // parsing but not `collectionSchema` (`.int()` is zod 4's *safe* integer):
+    // `Number("99999999999999999999")` is 1e20. Report it here, through the
+    // same all-or-nothing error collection as a malformed line, rather than
+    // letting writeCollection refuse the write with nothing said about which
+    // line caused it.
+    const parsed = Number(count)
+    if (!Number.isSafeInteger(parsed)) {
+      errors.push(
+        `count out of range on line "${line}" (must be a whole number up to ${Number.MAX_SAFE_INTEGER})`
+      )
+      continue
+    }
+    counts[key] = (counts[key] ?? 0) + parsed
   }
   if (errors.length > 0) {
     throw new Error(`Could not import collection:\n${errors.join('\n')}`)
