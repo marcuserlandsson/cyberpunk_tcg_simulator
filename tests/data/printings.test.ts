@@ -4,7 +4,7 @@
 // regeneration cannot land.
 import { describe, expect, it } from 'vitest'
 import rawPrintings from '../../data/printings.json'
-import { parsePrintings, printingsByCard } from '../../src/ui/printings'
+import { parsePrintings, printingKey, printingsByCard } from '../../src/ui/printings'
 import { loadCardDb } from '../../src/engine/cardDb'
 
 const db = loadCardDb()
@@ -22,9 +22,21 @@ describe('data/printings.json', () => {
     expect(unknown).toEqual([])
   })
 
-  it('derives every key as setCode/collectorNumber', () => {
+  it('derives every key through printingKey (the fetch script duplicates this rule by hand)', () => {
     for (const p of printings) {
-      expect(p.key).toBe(`${p.setCode}/${p.collectorNumber}`)
+      expect(p.key).toBe(printingKey(p.setCode, p.collectorNumber, p.finish))
+    }
+  })
+
+  // The finish segment was added to the key format *before* any finish
+  // variant exists upstream, precisely so it costs nothing: while every row
+  // is finish-null the committed keys must stay byte-identical to the
+  // original `setCode/collectorNumber` form, or every saved collection would
+  // need a migration. This pins that, and stays meaningful afterwards (it
+  // then asserts the rule only for the rows it still applies to).
+  it('keeps finish-null keys byte-identical to the historical setCode/collectorNumber form', () => {
+    for (const p of printings) {
+      if (p.finish === null) expect(p.key).toBe(`${p.setCode}/${p.collectorNumber}`)
     }
   })
 

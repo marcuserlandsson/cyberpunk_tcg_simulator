@@ -28,10 +28,10 @@ this file's rows are parsed and validated against that module's zod schema.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `key` | `string` | The app's stable printing id: `` `${setCode}/${collectorNumber}` ``. Globally unique. |
+| `key` | `string` | The app's stable printing id: `` `${setCode}/${collectorNumber}` ``, plus a `` `/${finish}` `` segment when `finish` is not `null`. Globally unique. See [Key format rule](#key-format-rule). |
 | `cardId` | `string` | FK into `data/cards.json` ids (the API's card slug). |
 | `setCode` | `string` | The API's set code, e.g. `"welcometonightcitybeta"`. |
-| `setName` | `string` | Human-readable set name, e.g. `"Welcome to Night City (Beta)"`. |
+| `setName` | `string` | Human-readable set name, verbatim from the API, e.g. `"Welcome to Night City — Beta"` (an em dash, not parentheses). |
 | `collectorNumber` | `string` | Verbatim from the API, **including the `β` prefix** on beta-set numbers (e.g. `"β025"`). Never reformatted or zero-padded beyond what the API returned. |
 | `rarity` | `string` | Open string — the API's own rarity vocabulary (e.g. `"Common"`, `"Epic"`, `"Legendary"`). **Not an enum**: new values may appear in future sets without a schema change. |
 | `finish` | `string \| null` | Open string or `null` — the API's finish/foil vocabulary. **Not an enum**, and nullable (many printings have no finish variant recorded). |
@@ -40,10 +40,32 @@ this file's rows are parsed and validated against that module's zod schema.
 
 ## Key format rule
 
-`key` is always exactly `` `${setCode}/${collectorNumber}` `` — e.g.
-`"welcometonightcitybeta/β025"`. This is enforced both by the fetch script
-(refuses to write otherwise) and by `tests/data/printings.test.ts` (guards
-the committed file in CI).
+`key` is derived, conditionally on `finish`:
+
+| `finish` | `key` | Example |
+|---|---|---|
+| `null` | `` `${setCode}/${collectorNumber}` `` | `"welcometonightcitybeta/β025"` |
+| anything else | `` `${setCode}/${collectorNumber}/${finish}` `` | `"welcometonightcityretail/025/Foil"` |
+
+The finish segment exists because a printing that differs only by finish is
+its own row (see [Purpose](#purpose), and the design spec §1.1, which
+explicitly anticipates "a foil finish at retail"). Without it, the first such
+variant sharing a collector number with its normal card would collide into a
+duplicate `key`, and the generator — which refuses to write on a duplicate —
+could never regenerate the dataset again.
+
+**Every row in the file today has `finish: null`**, so every key currently in
+the file is byte-identical to the plain `` `${setCode}/${collectorNumber}` ``
+form the dataset shipped with. That is the point of making the segment
+conditional rather than unconditional: adding it costs no re-keying now, and
+collections saved against these keys never need a migration.
+
+The rule lives in `printingKey()` (`src/ui/printings.ts`), duplicated by hand
+in `scripts/fetch-printings.ts` (which must not import from `src/` — see that
+file's header). It is enforced by the fetch script (refuses to write when a
+row's key disagrees with `printingKey`) and by `tests/data/printings.test.ts`,
+which guards the committed file in CI and also pins the byte-identical
+property above.
 
 ## Sort order
 
@@ -68,12 +90,26 @@ set was added.
 ## Regeneration
 
 Re-run `npm run fetch:printings` whenever new alt arts or reprints appear
-upstream. The script only ever appends new rows for new printings — existing
-`key` values are stable across re-runs (same `setCode`/`collectorNumber` in,
-same key out), so previously saved collection data keyed by printing `key`
-needs no migration after a regeneration.
+upstream.
+
+**What is stable is the key derivation, not the row set.** The script rebuilds
+this file wholesale from whatever the API returns — it does not diff against
+the committed version and append. A printing that disappears upstream, or
+whose collector number is corrected there, therefore *removes* or *re-keys* a
+row here. That is harmless in practice because the collection store preserves
+counts under unknown keys (`src/ui/collection.ts`) and round-trips them
+through export, but the file is a snapshot, not an append-only log, and a
+regeneration diff should be read as one.
+
+What genuinely never changes is the mapping: the same
+`setCode`/`collectorNumber`/`finish` in always produces the same `key` out
+(see [Key format rule](#key-format-rule)), so a collection saved against a
+printing that is still upstream needs no migration after a regeneration.
 
 Pass `--images` to additionally download each printing's art to
-`data/images/printings/<key with '/' replaced by '__'>.webp` (gitignored via
-the existing `data/images/` entry; not run as part of this commit — the app
-falls back to drawn card faces when art is absent).
+`data/images/printings/<key with every '/' replaced by '__'>.webp` (gitignored
+via the existing `data/images/` entry; not run as part of this commit — the
+app falls back to the card's base art, then to drawn card faces, when a
+printing image is absent). `src/ui/images.ts`'s `buildPrintingImageIndex`
+decodes the same way, so a key with a finish segment (two slashes) encodes and
+decodes symmetrically.

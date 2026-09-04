@@ -1,7 +1,8 @@
 // Generates data/printings.json from the netdeck.gg API (the same primary
 // source cards.json was transcribed from — see data/transcription-report.md).
 // One row per printing of each of the 141 cards in cards.json, keyed
-// "<setCode>/<collectorNumber>". Refuses to write on any validation failure
+// "<setCode>/<collectorNumber>" (plus "/<finish>" when the API reports one —
+// see `printingKey`). Refuses to write on any validation failure
 // (missing/malformed fields, non-unique keys, missing cards, unknown cards)
 // and prints a report instead.
 //
@@ -54,6 +55,25 @@ interface Printing {
   finish: string | null
   artist: string
   sourcePrintingId: string
+}
+
+/**
+ * Hand-duplicated from `printingKey` in src/ui/printings.ts (this script must
+ * not import that module — see the file header); the assertion in
+ * `tests/data/printings.test.ts` catches drift between the two.
+ *
+ * `finish` is appended ONLY when present, so every row generated today (the
+ * API reports `finish: null` for all 426) keeps the historical
+ * `setCode/collectorNumber` key byte for byte and no saved collection needs a
+ * migration. It exists at all because spec §1.1 makes finish a printing
+ * distinction: without this segment, the first variant finish sharing a
+ * collector number with its normal card would collide into a duplicate key
+ * and this script would refuse to write forever after.
+ */
+function printingKey(setCode: string, collectorNumber: string, finish: string | null): string {
+  return finish === null
+    ? `${setCode}/${collectorNumber}`
+    : `${setCode}/${collectorNumber}/${finish}`
 }
 
 /** Shape of the API's per-card `printings[]` entries (fields we consume). */
@@ -130,7 +150,7 @@ async function main(): Promise<void> {
       continue
     }
     for (const p of apiPrintings) {
-      const key = `${p.set.code}/${p.collector_number}`
+      const key = printingKey(p.set.code, p.collector_number, p.finish)
       rows.push({
         key,
         cardId: card.id,
@@ -143,7 +163,10 @@ async function main(): Promise<void> {
         sourcePrintingId: p.id,
       })
       if (withImages) {
-        const filePath = resolve(PRINTING_IMAGES_DIR, `${key.replace('/', '__')}.webp`)
+        // Global replace, not the first '/' only: a key with a finish segment
+        // has two. `buildPrintingImageIndex` (src/ui/images.ts) already
+        // decodes with a global regex, so this is the encode side matching it.
+        const filePath = resolve(PRINTING_IMAGES_DIR, `${key.replace(/\//g, '__')}.webp`)
         try {
           await downloadImage(p.image_url, filePath)
         } catch (err) {
@@ -166,9 +189,9 @@ async function main(): Promise<void> {
   const seenKeys = new Set<string>()
   for (const row of rows) {
     validateRowShape(row, errors)
-    const expectedKey = `${row.setCode}/${row.collectorNumber}`
+    const expectedKey = printingKey(row.setCode, row.collectorNumber, row.finish)
     if (row.key !== expectedKey) {
-      errors.push(`printing "${row.key}": key does not equal "\${setCode}/\${collectorNumber}" ("${expectedKey}")`)
+      errors.push(`printing "${row.key}": key does not equal printingKey(setCode, collectorNumber, finish) ("${expectedKey}")`)
     }
     if (seenKeys.has(row.key)) {
       errors.push(`duplicate printing key: "${row.key}"`)
