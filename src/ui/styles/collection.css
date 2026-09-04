@@ -1,0 +1,90 @@
+/* ---------------------------------------------------------------------- */
+/* Collection tab                                                         */
+/* ---------------------------------------------------------------------- */
+
+.collection-view__storage-error {
+  color: var(--rival);
+  font-size: 0.85em;
+  font-family: var(--font-mono);
+  margin-bottom: 0.6em;
+}
+
+.collection-view__filters {
+  margin-bottom: 0.6em;
+}
+
+/* Same responsive grid as `.card-browser__grid` (deckbuilder.css) — a
+   zoom-rendition tile per card, sized to stay legible while filling the
+   available width. */
+.collection-view__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.8em;
+  padding: 0.2em;
+}
+
+.collection-view__cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Corner owned/target badge, matching `.card-browser__count`'s placement
+   and look. */
+.collection-view__count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 7px;
+  background: var(--act);
+  color: #131200;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.collection-view__expand {
+  font-size: 10px;
+  padding: 3px 9px;
+  clip-path: none;
+  border-radius: 3px;
+  margin-top: 0.35em;
+}
+
+/* Panel of per-printing rows, under the expanded cell (the cell itself is
+   the grid's sizing unit, so this panel simply fills the cell's width
+   rather than spanning the whole grid). */
+.collection-view__printings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  margin-top: 0.4em;
+  padding: 0.4em;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.collection-view__printing-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  justify-content: space-between;
+  font-size: 0.85em;
+}
+
+.collection-view__stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.collection-view__stepper button {
+  font-size: 10px;
+  padding: 2px 7px;
+  clip-path: none;
+  border-radius: 3px;
+}

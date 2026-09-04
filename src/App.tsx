@@ -2,15 +2,17 @@ import { useMemo, useState } from 'react'
 import { PlayView } from './ui/PlayView'
 import { DeckBuilderView } from './ui/DeckBuilderView'
 import { SimulateView } from './ui/SimulateView'
+import { CollectionView } from './ui/CollectionView'
 import { loadCardDb } from './engine/cardDb'
 import { getSettings, saveSettings } from './ui/storage'
 
-type View = 'play' | 'deckBuilder' | 'simulate'
+type View = 'play' | 'deckBuilder' | 'simulate' | 'collection'
 
 const TABS: { id: View; label: string }[] = [
   { id: 'play', label: 'Play' },
   { id: 'deckBuilder', label: 'Deck Builder' },
   { id: 'simulate', label: 'Simulate' },
+  { id: 'collection', label: 'Collection' },
 ]
 
 /**
@@ -83,6 +85,12 @@ export default function App() {
             running in the background would otherwise keep spinning
             invisibly, and SimulateView's own unmount effect terminates it. */}
         {view === 'simulate' && <SimulateView db={db} />}
+        {/* Kept mounted, only hidden: same pattern as Play/Deck Builder so
+            filter state and an in-progress quick-add session survive a
+            glance at another tab. */}
+        <div hidden={view !== 'collection'}>
+          <CollectionView db={db} useOfficialImages={useOfficialImages} />
+        </div>
       </main>
     </div>
   )
