@@ -57,6 +57,50 @@ describe('CollectionView', () => {
     expect(screen.queryAllByTestId('collection-cell')).toHaveLength(0)
   })
 
+  // I6 / spec §5: a failed write must be visible, not lost in the console.
+  // Without this, deleting the banner would leave every other test green.
+  it('shows the storage-error banner when a write fails, and clears it on the next success', async () => {
+    const user = userEvent.setup()
+    render(<CollectionView db={db} useOfficialImages={false} />)
+    const cell = screen
+      .getAllByTestId('collection-cell')
+      .find((el) => el.getAttribute('data-card-id') === multi.cardId)!
+    await user.click(within(cell).getByTestId(`expand-${multi.cardId}`))
+
+    expect(screen.queryByTestId('collection-storage-error')).toBeNull()
+
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = () => {
+      throw new Error('QuotaExceededError')
+    }
+    try {
+      await user.click(screen.getByTestId(`printing-inc-${multi.key}`))
+      expect(screen.getByTestId('collection-storage-error').textContent).toContain(
+        'Could not save the collection'
+      )
+    } finally {
+      Storage.prototype.setItem = original
+    }
+
+    await user.click(screen.getByTestId(`printing-inc-${multi.key}`))
+    expect(screen.queryByTestId('collection-storage-error')).toBeNull()
+  })
+
+  it('a rarity filter id is slug-safe even for a two-word rarity', () => {
+    render(<CollectionView db={db} useOfficialImages={false} />)
+    // "Nova Rare" is a real rarity in the shipped dataset; its test id must
+    // not carry the space through into the attribute selector.
+    expect(screen.getByTestId('rarity-filter-nova-rare')).toBeTruthy()
+    expect(screen.getByTestId('rarity-filter-nova-rare').textContent).toBe('Nova Rare')
+  })
+
+  it('spells out the ✓/★ badge glyphs, whose title tooltips can never fire', () => {
+    render(<CollectionView db={db} useOfficialImages={false} />)
+    const legend = screen.getByTestId('collection-legend').textContent ?? ''
+    expect(legend).toContain('✓')
+    expect(legend).toContain('★')
+  })
+
   it('set filter narrows the grid to cards printed in that set', async () => {
     const user = userEvent.setup()
     render(<CollectionView db={db} useOfficialImages={false} />)

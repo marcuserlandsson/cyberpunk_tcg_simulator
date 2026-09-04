@@ -14,8 +14,15 @@ import {
   listSets,
   type Printing,
 } from './printings'
-import { getPrintingImageUrl } from './images'
-import { useCollection, adjustCount, getStorageError, playsetTarget, type Collection } from './collection'
+import { getOfficialImageUrl, getPrintingImageUrl } from './images'
+import {
+  useCollection,
+  adjustCount,
+  getStorageError,
+  ownedByCard,
+  playsetTarget,
+  type Collection,
+} from './collection'
 import { QuickAddBar } from './QuickAddBar'
 import { CollectionHeader } from './CollectionHeader'
 
@@ -38,8 +45,10 @@ interface CardRollup {
   artsDone: boolean
 }
 
-function rollup(def: CardDef, prints: Printing[], collection: Collection): CardRollup {
-  const owned = prints.reduce((sum, p) => sum + (collection.counts[p.key] ?? 0), 0)
+/** `owned` is passed in from `collection.ts`'s shared `ownedByCard` map rather
+ *  than re-summed here: the Deck Builder's badge answers the same question,
+ *  and two implementations of it could show two numbers for one fact. */
+function rollup(def: CardDef, prints: Printing[], collection: Collection, owned: number): CardRollup {
   const target = playsetTarget(def)
   return {
     def,
@@ -49,6 +58,12 @@ function rollup(def: CardDef, prints: Printing[], collection: Collection): CardR
     playsetDone: owned >= target,
     artsDone: prints.every((p) => (collection.counts[p.key] ?? 0) > 0),
   }
+}
+
+/** Rarity verbatim is the human label, but a raw `"Nova Rare"` in a
+ *  `data-testid` puts a space in the attribute selectors that address it. */
+function slug(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
 }
 
 export function CollectionView({
@@ -82,9 +97,14 @@ export function CollectionView({
   )
   const sets = useMemo(() => listSets(loadResult.printings), [loadResult])
 
+  const owned = useMemo(
+    () => ownedByCard(loadResult.printings, collection),
+    [loadResult, collection]
+  )
+
   const rollups = useMemo(() => {
     return Object.values(db)
-      .map((def) => rollup(def, loadResult.byCard.get(def.id) ?? [], collection))
+      .map((def) => rollup(def, loadResult.byCard.get(def.id) ?? [], collection, owned[def.id] ?? 0))
       .filter((r) => colors.size === 0 || colors.has(r.def.color))
       .filter((r) => types.size === 0 || types.has(r.def.type))
       .filter((r) => rarities.size === 0 || r.printings.some((p) => rarities.has(p.rarity)))
@@ -96,7 +116,7 @@ export function CollectionView({
         return true
       })
       .sort((a, b) => a.def.name.localeCompare(b.def.name))
-  }, [db, loadResult, collection, colors, types, rarities, setCode, goal])
+  }, [db, loadResult, collection, owned, colors, types, rarities, setCode, goal])
 
   if (loadResult.error !== undefined) {
     return <div data-testid="collection-error">Collection unavailable: {loadResult.error}</div>
@@ -140,7 +160,7 @@ export function CollectionView({
             </button>
           ))}
           {allRarities.map((rarity) => (
-            <button type="button" key={rarity} data-testid={`rarity-filter-${rarity}`}
+            <button type="button" key={rarity} data-testid={`rarity-filter-${slug(rarity)}`}
               aria-pressed={rarities.has(rarity)} className="filter-chip"
               onClick={() => toggle(rarities, rarity, setRarities)}>
               {rarity}
@@ -161,6 +181,13 @@ export function CollectionView({
             ))}
           </select>
         </div>
+        {/* The ✓/★ tile badges carry `title` tooltips that can never fire —
+            their container is `pointer-events: none` so the badge doesn't eat
+            CardFrame's click-to-expand target underneath it. Spell the two
+            glyphs out here instead, next to the goal filters they mirror. */}
+        <p className="collection-view__legend" data-testid="collection-legend">
+          ✓ playset complete · ★ every printing owned
+        </p>
       </div>
 
       <div className="collection-view__grid" data-testid="collection-grid">
@@ -183,7 +210,10 @@ export function CollectionView({
               <div className="collection-view__printings">
                 {r.printings.map((p) => {
                   const count = collection.counts[p.key] ?? 0
-                  const imageUrl = getPrintingImageUrl(p.key)
+                  // Spec §1.3's fallback chain: this printing's own art, then
+                  // the card's base art, then nothing here at all (the drawn
+                  // CardFrame above the row is the last step).
+                  const imageUrl = getPrintingImageUrl(p.key) ?? getOfficialImageUrl(p.cardId)
                   return (
                     <div key={p.key} className="collection-view__printing-row"
                       data-testid={`printing-row-${p.key}`}>
