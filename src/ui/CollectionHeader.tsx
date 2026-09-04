@@ -17,13 +17,25 @@ import {
   importCollectionText,
 } from './collection'
 
+/**
+ * This is the player's ONLY backup path for what can be hours of manual
+ * entry, so the two easy ways to lose the file are both closed here:
+ * the anchor is appended to the document before `.click()` (a detached
+ * anchor's click is ignored outright by Firefox and by some Safari
+ * versions), and the Blob URL is revoked on a later tick rather than
+ * synchronously — revoking it in the same task can invalidate the URL
+ * before the browser has finished starting the download.
+ */
 function download(filename: string, content: string): void {
   const url = URL.createObjectURL(new Blob([content], { type: 'text/plain' }))
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = filename
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
   anchor.click()
-  URL.revokeObjectURL(url)
+  anchor.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 export function CollectionHeader({ db, printings }: { db: CardDb; printings: Printing[] }): ReactElement {
