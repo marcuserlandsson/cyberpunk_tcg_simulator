@@ -1,7 +1,15 @@
 // Pack-cracking entry: type a few letters, Enter adds 1 of the top match's
 // printing in the "session set" (the set of boosters currently being
-// opened — pick it once, every add lands there). Cards with no printing in
-// the session set show their printings inline instead. Single-level undo.
+// opened — pick it once, every add lands there). Single-level undo.
+//
+// Enter only ever fires when the session set holds EXACTLY ONE printing of
+// the matched card (110 of the 141 cards) — that unambiguous single-keystroke
+// add is the whole reason this component exists. The other two cases are
+// treated identically: no printing in the session set, and *more than one*
+// (31 card+set combinations across 30 cards hold 2-3 printings each — the
+// in-set alt arts and Iconic variants this feature exists to track). Both
+// list the card's printings inline with collector number and rarity so the
+// keystroke never guesses which art got the copy.
 
 import { useMemo, useState, type KeyboardEvent, type ReactElement } from 'react'
 import type { CardDb } from '../engine/types'
@@ -65,22 +73,32 @@ export function QuickAddBar({ db, printings }: { db: CardDb; printings: Printing
       .filter(([, name]) => name.toLowerCase().includes(needle))
       .slice(0, MAX_MATCHES)
       .map(([cardId, name]) => {
-        const inSet = (byCard.get(cardId) ?? []).find((p) => p.setCode === sessionSet)
-        return { cardId, name, inSet, all: byCard.get(cardId) ?? [] }
+        const all = byCard.get(cardId) ?? []
+        const inSet = all.filter((p) => p.setCode === sessionSet)
+        // `undefined` unless the session set resolves the printing on its
+        // own; anything else (0 or 2+) has to be disambiguated by a click.
+        const unambiguous = inSet.length === 1 ? inSet[0] : undefined
+        return { cardId, name, all, inSetCount: inSet.length, unambiguous }
       })
   }, [query, names, byCard, sessionSet])
 
   // Defensive clamp: `matches[selected]` is only ever safe to index directly
   // because `selected` is reset to 0 in the same handler that is the only
   // thing able to change `matches.length` (see the input's onChange below) —
-  // sessionSet changes flip `inSet` on existing rows but never add/remove
+  // sessionSet changes flip `unambiguous` on existing rows but never add/remove
   // rows. This clamp costs nothing and guards that invariant rather than
   // relying on the coupling never changing under future edits.
   const clampedSelected = matches.length === 0 ? 0 : Math.min(selected, matches.length - 1)
 
   function add(printing: Printing, name: string): void {
     adjustCount(printing.key, 1)
-    setLastAdd({ key: printing.key, label: `Added 1x ${name} [${printing.setName}]` })
+    // Collector number included on purpose: the set name alone cannot tell
+    // β001 from β141, so a mis-credited copy would be invisible (and the
+    // Undo button beside it pointless) without it.
+    setLastAdd({
+      key: printing.key,
+      label: `Added 1x ${name} [${printing.setName} ${printing.collectorNumber}]`,
+    })
     setQuery('')
     setSelected(0)
   }
@@ -94,7 +112,7 @@ export function QuickAddBar({ db, printings }: { db: CardDb; printings: Printing
       setSelected(Math.max(clampedSelected - 1, 0))
     } else if (event.key === 'Enter') {
       const match = matches[clampedSelected]
-      if (match?.inSet) add(match.inSet, match.name)
+      if (match?.unambiguous !== undefined) add(match.unambiguous, match.name)
     }
   }
 
@@ -130,13 +148,16 @@ export function QuickAddBar({ db, printings }: { db: CardDb; printings: Printing
               aria-selected={index === clampedSelected}
               data-testid={`quick-add-match-${match.cardId}`}
             >
-              {match.inSet ? (
-                <button type="button" onClick={() => add(match.inSet!, match.name)}>
+              {match.unambiguous !== undefined ? (
+                <button type="button" onClick={() => add(match.unambiguous!, match.name)}>
                   {match.name}
                 </button>
               ) : (
-                <span>
-                  {match.name} — not in this set:
+                <span className="quick-add__choices">
+                  {match.name} —{' '}
+                  {match.inSetCount === 0
+                    ? 'not in this set; pick a printing:'
+                    : `${match.inSetCount} printings in this set; pick one:`}
                   {match.all.map((p) => (
                     <button
                       type="button"
@@ -144,7 +165,7 @@ export function QuickAddBar({ db, printings }: { db: CardDb; printings: Printing
                       data-testid={`quick-add-printing-${p.key}`}
                       onClick={() => add(p, match.name)}
                     >
-                      {p.setName} {p.collectorNumber}
+                      {p.setName} {p.collectorNumber} · {p.rarity}
                     </button>
                   ))}
                 </span>

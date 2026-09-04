@@ -13,6 +13,16 @@
   margin-bottom: 0.6em;
 }
 
+/* Key to the two tile badges. The badges' own `title` tooltips are dead —
+   `.collection-view__count` is `pointer-events: none` so it never steals
+   CardFrame's click target — so the glyphs are explained here instead. */
+.collection-view__legend {
+  margin: 0.4em 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
 /* ---------------------------------------------------------------------- */
 /* Header: stats, buy-list copy, export/import (Task 9)                  */
 /* ---------------------------------------------------------------------- */
@@ -83,6 +93,23 @@
 .quick-add__matches li {
   padding: 0.2em 0.3em;
   font-size: 0.9em;
+}
+
+/* Disambiguation row: the card has 0 — or 2+ — printings in the session set,
+   so Enter refuses to guess and the candidates are offered as buttons. They
+   wrap rather than overflow: an Iconic-variant card can list half a dozen. */
+.quick-add__choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.quick-add__choices button {
+  font-size: 10px;
+  padding: 2px 7px;
+  clip-path: none;
+  border-radius: 3px;
 }
 
 .quick-add__matches li[aria-selected='true'] {
