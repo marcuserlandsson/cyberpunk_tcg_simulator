@@ -70,7 +70,12 @@ export function QuickAddBar({ db, printings }: { db: CardDb; printings: Printing
       })
   }, [query, names, byCard, sessionSet])
 
-  // Keep the selection in range as the match list shrinks while typing.
+  // Defensive clamp: `matches[selected]` is only ever safe to index directly
+  // because `selected` is reset to 0 in the same handler that is the only
+  // thing able to change `matches.length` (see the input's onChange below) —
+  // sessionSet changes flip `inSet` on existing rows but never add/remove
+  // rows. This clamp costs nothing and guards that invariant rather than
+  // relying on the coupling never changing under future edits.
   const clampedSelected = matches.length === 0 ? 0 : Math.min(selected, matches.length - 1)
 
   function add(printing: Printing, name: string): void {
@@ -83,10 +88,6 @@ export function QuickAddBar({ db, printings }: { db: CardDb; printings: Printing
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      // Based on clampedSelected (not the raw `selected` state): if typing
-      // narrowed the match list, `selected` can be stale-high, and moving
-      // relative to it would leave the visible selection stuck until it
-      // drifts back into range.
       setSelected(Math.min(clampedSelected + 1, matches.length - 1))
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
