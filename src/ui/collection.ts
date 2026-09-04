@@ -8,7 +8,7 @@
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import type { CardDb, CardDef } from '../engine/types'
-import { printingsByCard, type Printing } from './printings'
+import { getPrinting, printingsByCard, type Printing } from './printings'
 import { buildDisplayNames } from './storage'
 
 const COLLECTION_KEY = 'ctcg:collection:v1'
@@ -203,4 +203,82 @@ export function buildBuyList(
     }
   }
   return lines.join('\n')
+}
+
+// ---------------------------------------------------------------------------
+// Export / import. JSON is the backup format (full fidelity, includes unknown
+// keys); text is the human/trade format ("2x Name [printingKey]" — the
+// bracketed key is authoritative on import, the name decorative). Imports are
+// all-or-nothing: every error is collected and thrown together, and nothing
+// is written unless the whole input parses (importDeckText's posture).
+// ---------------------------------------------------------------------------
+
+const exportSchema = z.object({
+  version: z.literal(1),
+  counts: z.record(z.string(), z.number().int().nonnegative()),
+})
+
+export function exportCollectionJson(collection: Collection): string {
+  return JSON.stringify({ version: 1, counts: collection.counts }, null, 1)
+}
+
+function applyImport(counts: Record<string, number>, mode: 'replace' | 'merge'): void {
+  if (mode === 'replace') {
+    replaceCollection({ counts })
+    return
+  }
+  const merged = { ...getCollection().counts }
+  for (const [key, count] of Object.entries(counts)) {
+    merged[key] = (merged[key] ?? 0) + count
+  }
+  replaceCollection({ counts: merged })
+}
+
+export function importCollectionJson(text: string, mode: 'replace' | 'merge'): void {
+  let raw: unknown
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    throw new Error('Could not import collection: not valid JSON.')
+  }
+  const result = exportSchema.safeParse(raw)
+  if (!result.success) {
+    throw new Error(`Could not import collection: ${result.error.message}`)
+  }
+  applyImport(result.data.counts, mode)
+}
+
+export function exportCollectionText(
+  db: CardDb,
+  printings: Printing[],
+  collection: Collection
+): string {
+  const names = buildDisplayNames(db)
+  const lines: string[] = []
+  for (const [key, count] of Object.entries(collection.counts)) {
+    const printing = getPrinting(printings, key)
+    const name = printing ? names.get(printing.cardId) ?? printing.cardId : '???'
+    lines.push(`${count}x ${name} [${key}]`)
+  }
+  return lines.join('\n')
+}
+
+export function importCollectionText(text: string, mode: 'replace' | 'merge'): void {
+  const counts: Record<string, number> = {}
+  const errors: string[] = []
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (line === '') continue
+    const match = line.match(/^(\d+)\s*x\s+.*\[(.+)\]$/i)
+    if (!match) {
+      errors.push(`malformed line "${line}" (expected "Nx Name [printingKey]")`)
+      continue
+    }
+    const [, count, key] = match
+    counts[key] = (counts[key] ?? 0) + Number(count)
+  }
+  if (errors.length > 0) {
+    throw new Error(`Could not import collection:\n${errors.join('\n')}`)
+  }
+  applyImport(counts, mode)
 }

@@ -99,6 +99,10 @@ import {
   missingPrintings,
   completionStats,
   buildBuyList,
+  exportCollectionJson,
+  importCollectionJson,
+  exportCollectionText,
+  importCollectionText,
 } from '../../src/ui/collection'
 
 // Minimal defs: only the fields the queries touch matter, but build full
@@ -168,5 +172,58 @@ describe('derived queries', () => {
     expect(both).toContain('boss [beta/2]')
     const playsetOnly = buildBuyList(miniDb, miniPrintings, collection, { playset: true, arts: false })
     expect(playsetOnly).not.toContain('[retail/1]')
+  })
+})
+
+describe('JSON export/import', () => {
+  it('round-trips through export -> import replace', () => {
+    setCount('beta/1', 2)
+    const json = exportCollectionJson(getCollection())
+    setCount('beta/1', 0)
+    setCount('retail/1', 5)
+    importCollectionJson(json, 'replace')
+    expect(getCollection().counts).toEqual({ 'beta/1': 2 })
+  })
+
+  it('merge sums counts', () => {
+    setCount('beta/1', 1)
+    importCollectionJson(JSON.stringify({ version: 1, counts: { 'beta/1': 2, 'beta/2': 1 } }), 'merge')
+    expect(getCollection().counts).toEqual({ 'beta/1': 3, 'beta/2': 1 })
+  })
+
+  it('throws loudly on malformed JSON and writes nothing', () => {
+    setCount('beta/1', 1)
+    expect(() => importCollectionJson('{"version":1,"counts":{"a":-2}}', 'replace')).toThrow()
+    expect(() => importCollectionJson('not json', 'replace')).toThrow()
+    expect(getCollection().counts).toEqual({ 'beta/1': 1 })
+  })
+})
+
+describe('text export/import', () => {
+  it('exports one line per owned printing with the bracketed key', () => {
+    const collection = { counts: { 'beta/1': 2 } }
+    const text = exportCollectionText(miniDb, miniPrintings, collection)
+    expect(text).toBe('2x alpha [beta/1]')
+  })
+
+  it('round-trips unknown keys with a ??? name', () => {
+    const collection = { counts: { 'ghost/999': 4 } }
+    const text = exportCollectionText(miniDb, miniPrintings, collection)
+    expect(text).toBe('4x ??? [ghost/999]')
+    importCollectionText(text, 'replace')
+    expect(getCollection().counts).toEqual({ 'ghost/999': 4 })
+  })
+
+  it('collects all malformed lines into one error and writes nothing', () => {
+    setCount('beta/1', 1)
+    expect(() => importCollectionText('2x alpha [beta/1]\ngarbage line\nalso bad', 'replace'))
+      .toThrow(/garbage line[\s\S]*also bad/)
+    expect(getCollection().counts).toEqual({ 'beta/1': 1 })
+  })
+
+  it('merge adds text counts onto existing ones, ignoring blank lines', () => {
+    setCount('beta/1', 1)
+    importCollectionText('\n2x alpha [beta/1]\n', 'merge')
+    expect(getCollection().counts['beta/1']).toBe(3)
   })
 })
