@@ -16,6 +16,7 @@ import {
 } from './printings'
 import { getPrintingImageUrl } from './images'
 import { useCollection, adjustCount, getStorageError, playsetTarget, type Collection } from './collection'
+import { QuickAddBar } from './QuickAddBar'
 
 const COLORS = ['Red', 'Yellow', 'Green', 'Blue'] as const
 const TYPES: CardType[] = ['legend', 'unit', 'program', 'gear']
@@ -116,6 +117,8 @@ export function CollectionView({
           {getStorageError()}
         </div>
       )}
+      <QuickAddBar db={db} printings={loadResult.printings} />
+
       <div className="collection-view__filters">
         <div className="card-browser__chips">
           {COLORS.map((color) => (

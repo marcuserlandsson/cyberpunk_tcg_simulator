@@ -13,6 +13,61 @@
   margin-bottom: 0.6em;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Quick-add bar (Task 8)                                                 */
+/* ---------------------------------------------------------------------- */
+
+.quick-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-bottom: 0.8em;
+}
+
+.quick-add input[type='text'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+}
+
+.quick-add__matches {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 2px 0 0;
+  padding: 0.3em;
+  list-style: none;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  max-height: 16em;
+  overflow-y: auto;
+}
+
+.quick-add__matches li {
+  padding: 0.2em 0.3em;
+  font-size: 0.9em;
+}
+
+.quick-add__matches li[aria-selected='true'] {
+  background: var(--panel);
+  outline: 1px solid var(--act);
+}
+
+.quick-add__toast {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  margin-top: 0.4em;
+  padding: 0.35em 0.6em;
+  font-size: 0.85em;
+  font-family: var(--font-mono);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
 /* Same responsive grid as `.card-browser__grid` (deckbuilder.css) — a
    zoom-rendition tile per card, sized to stay legible while filling the
    available width. */
