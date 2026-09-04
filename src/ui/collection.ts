@@ -266,9 +266,16 @@ export function exportCollectionText(
 export function importCollectionText(text: string, mode: 'replace' | 'merge'): void {
   const counts: Record<string, number> = {}
   const errors: string[] = []
+  // Distinct from "counts stayed empty": a well-formed text export can only
+  // ever describe owned printings (there is no way to write "counts: {}" in
+  // this format, unlike JSON), so blank/whitespace-only input is ambiguous
+  // between "the user meant an empty collection" and "nothing was pasted" —
+  // treat it as the latter and refuse rather than silently wipe.
+  let sawLine = false
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim()
     if (line === '') continue
+    sawLine = true
     const match = line.match(/^(\d+)\s*x\s+.*\[(.+)\]$/i)
     if (!match) {
       errors.push(`malformed line "${line}" (expected "Nx Name [printingKey]")`)
@@ -279,6 +286,9 @@ export function importCollectionText(text: string, mode: 'replace' | 'merge'): v
   }
   if (errors.length > 0) {
     throw new Error(`Could not import collection:\n${errors.join('\n')}`)
+  }
+  if (!sawLine) {
+    throw new Error('Could not import collection: no card lines found.')
   }
   applyImport(counts, mode)
 }

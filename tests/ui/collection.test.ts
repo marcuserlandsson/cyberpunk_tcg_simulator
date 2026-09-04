@@ -197,6 +197,12 @@ describe('JSON export/import', () => {
     expect(() => importCollectionJson('not json', 'replace')).toThrow()
     expect(getCollection().counts).toEqual({ 'beta/1': 1 })
   })
+
+  it('a well-formed JSON import with empty counts still performs a real replace (not a no-op guard)', () => {
+    setCount('beta/1', 1)
+    importCollectionJson(JSON.stringify({ version: 1, counts: {} }), 'replace')
+    expect(getCollection().counts).toEqual({})
+  })
 })
 
 describe('text export/import', () => {
@@ -225,5 +231,17 @@ describe('text export/import', () => {
     setCount('beta/1', 1)
     importCollectionText('\n2x alpha [beta/1]\n', 'merge')
     expect(getCollection().counts['beta/1']).toBe(3)
+  })
+
+  it('rejects blank input instead of silently wiping the collection', () => {
+    setCount('beta/1', 1)
+    expect(() => importCollectionText('', 'replace')).toThrow(/no card lines found/)
+    expect(getCollection().counts).toEqual({ 'beta/1': 1 })
+  })
+
+  it('rejects whitespace-only input instead of silently wiping the collection', () => {
+    setCount('beta/1', 1)
+    expect(() => importCollectionText('   \n\t\n  ', 'replace')).toThrow(/no card lines found/)
+    expect(getCollection().counts).toEqual({ 'beta/1': 1 })
   })
 })

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { loadPrintings } from '../../src/ui/printings'
 import { _resetCollectionCacheForTests, getCollection, setCount } from '../../src/ui/collection'
@@ -49,5 +49,27 @@ describe('CollectionHeader', () => {
     fireEvent.click(screen.getByTestId('import-submit'))
     expect(screen.getByTestId('import-error').textContent).toContain('Could not import')
     expect(getCollection().counts[printings[0].key]).toBe(1)
+  })
+
+  it('disables import-submit while the textarea is blank or whitespace-only', () => {
+    render(<CollectionHeader db={db} printings={printings} />)
+    const submit = screen.getByTestId('import-submit') as HTMLButtonElement
+    expect(submit.disabled).toBe(true)
+    fireEvent.change(screen.getByTestId('import-input'), { target: { value: '   \n  ' } })
+    expect(submit.disabled).toBe(true)
+    fireEvent.change(screen.getByTestId('import-input'), {
+      target: { value: `1x whatever [${printings[0].key}]` },
+    })
+    expect(submit.disabled).toBe(false)
+  })
+
+  it('surfaces a rejected clipboard write as a visible error', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'))
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    render(<CollectionHeader db={db} printings={printings} />)
+    fireEvent.click(screen.getByTestId('copy-buylist'))
+    await waitFor(() => {
+      expect(screen.getByTestId('import-error').textContent).toContain('Could not copy to clipboard')
+    })
   })
 })

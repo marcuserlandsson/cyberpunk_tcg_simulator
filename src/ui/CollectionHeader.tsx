@@ -56,9 +56,11 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
         type="button"
         data-testid="copy-buylist"
         onClick={() =>
-          navigator.clipboard.writeText(
-            buildBuyList(db, printings, collection, { playset: true, arts: true })
-          )
+          navigator.clipboard
+            .writeText(buildBuyList(db, printings, collection, { playset: true, arts: true }))
+            .catch((err: unknown) =>
+              setError(`Could not copy to clipboard: ${err instanceof Error ? err.message : String(err)}`)
+            )
         }
       >
         Copy buy-list
@@ -105,7 +107,12 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
           />
           Merge (add counts)
         </label>
-        <button type="button" data-testid="import-submit" onClick={runImport}>
+        <button
+          type="button"
+          data-testid="import-submit"
+          disabled={importText.trim() === ''}
+          onClick={runImport}
+        >
           Import
         </button>
         {error !== '' && (
