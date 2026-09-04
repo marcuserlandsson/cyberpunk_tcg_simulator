@@ -14,6 +14,40 @@
 }
 
 /* ---------------------------------------------------------------------- */
+/* Header: stats, buy-list copy, export/import (Task 9)                  */
+/* ---------------------------------------------------------------------- */
+
+.collection-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6em;
+  margin-bottom: 0.8em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.collection-header__import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+  width: 100%;
+}
+
+.collection-header__import textarea {
+  flex: 1 1 100%;
+  min-height: 4em;
+  font-family: var(--font-mono);
+}
+
+.collection-header__error {
+  flex: 1 1 100%;
+  color: var(--rival);
+  white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------------------- */
 /* Quick-add bar (Task 8)                                                 */
 /* ---------------------------------------------------------------------- */
 

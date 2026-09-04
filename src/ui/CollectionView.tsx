@@ -17,6 +17,7 @@ import {
 import { getPrintingImageUrl } from './images'
 import { useCollection, adjustCount, getStorageError, playsetTarget, type Collection } from './collection'
 import { QuickAddBar } from './QuickAddBar'
+import { CollectionHeader } from './CollectionHeader'
 
 const COLORS = ['Red', 'Yellow', 'Green', 'Blue'] as const
 const TYPES: CardType[] = ['legend', 'unit', 'program', 'gear']
@@ -117,6 +118,7 @@ export function CollectionView({
           {getStorageError()}
         </div>
       )}
+      <CollectionHeader db={db} printings={loadResult.printings} />
       <QuickAddBar db={db} printings={loadResult.printings} />
 
       <div className="collection-view__filters">
