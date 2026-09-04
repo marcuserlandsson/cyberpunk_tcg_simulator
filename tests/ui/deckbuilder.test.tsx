@@ -5,6 +5,8 @@ import { DeckBuilderView } from '../../src/ui/DeckBuilderView'
 import { DeckPanel } from '../../src/ui/DeckPanel'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { isReadOnlyDeck, listDecks, saveDeck } from '../../src/ui/storage'
+import { _resetCollectionCacheForTests, setCount } from '../../src/ui/collection'
+import { loadPrintings } from '../../src/ui/printings'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import type { DeckList } from '../../src/engine/deck'
 
@@ -33,6 +35,7 @@ if (GREEN_RAM_3_CARD === undefined) throw new Error('fixture assumption failed: 
 
 beforeEach(() => {
   localStorage.clear()
+  _resetCollectionCacheForTests()
 })
 
 afterEach(cleanup)
@@ -341,5 +344,53 @@ describe('DeckBuilderView — bundled demo deck fork-on-save', () => {
     expect(container.querySelector('[data-testid="readonly-badge"]')).toBeNull()
     const saved = listDecks().find((d) => d.name === ARASAKA.name)
     expect(saved?.cards['mantis-blades']).toBe(4)
+  })
+})
+
+describe('DeckBuilderView — collection integration (owned badge + missing summary)', () => {
+  it('shows an owned badge on browser cards once you own copies', () => {
+    const printing = loadPrintings().find((p) => p.cardId === 'mantis-blades')
+    if (printing === undefined) throw new Error('fixture assumption failed: no mantis-blades printing')
+    setCount(printing.key, 2)
+
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    expect(container.querySelector('[data-testid="owned-mantis-blades"]')?.textContent).toBe(
+      'owned 2/3'
+    )
+  })
+
+  it('shows an owned badge of owned 0/T for a card with no copies', () => {
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    expect(container.querySelector('[data-testid="owned-mantis-blades"]')?.textContent).toBe(
+      'owned 0/3'
+    )
+  })
+
+  it('a blank deck (nothing added yet) reports that you own everything for it', () => {
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    const summary = container.querySelector('[data-testid="deck-missing-summary"]')
+    expect(summary?.textContent).toContain('You own all cards for this deck')
+    expect(container.querySelector('[data-testid="copy-deck-buylist"]')).toBeNull()
+  })
+
+  it('summarizes the shortfall once an unowned card is added to the deck', () => {
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    fireEvent.click(container.querySelector('[data-testid="add-mantis-blades"]') as HTMLElement)
+
+    const summary = container.querySelector('[data-testid="deck-missing-summary"]')
+    expect(summary?.textContent).toMatch(/Missing 1 cards for this deck/)
+    expect(container.querySelector('[data-testid="copy-deck-buylist"]')).not.toBeNull()
+  })
+
+  it('owning enough copies clears the shortfall for that card', () => {
+    const printing = loadPrintings().find((p) => p.cardId === 'mantis-blades')
+    if (printing === undefined) throw new Error('fixture assumption failed: no mantis-blades printing')
+    setCount(printing.key, 1)
+
+    const { container } = render(<DeckBuilderView db={db} useOfficialImages={false} />)
+    fireEvent.click(container.querySelector('[data-testid="add-mantis-blades"]') as HTMLElement)
+
+    const summary = container.querySelector('[data-testid="deck-missing-summary"]')
+    expect(summary?.textContent).toContain('You own all cards for this deck')
   })
 })

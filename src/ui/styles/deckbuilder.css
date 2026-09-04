@@ -8,6 +8,7 @@
 
 .deck-builder {
   display: flex;
+  flex-wrap: wrap;
   gap: 1em;
   align-items: flex-start;
 }
@@ -153,6 +154,26 @@
   padding: 2px 7px;
   background: var(--act);
   color: #131200;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* Second corner badge: how many copies of this card (any printing) you own,
+   independent of the deck-count badge above — offset to the opposite
+   (top-left) corner so the two never collide. Informational only, per the
+   "ownership never blocks anything" rule (docs/rulings.md §152's philosophy
+   extended to the collection). */
+.card-browser__owned {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
   border-radius: 3px;
   pointer-events: none;
 }
@@ -465,6 +486,23 @@
   color: var(--rival);
   font-size: 0.8em;
   font-family: var(--font-mono);
+}
+
+/* Missing-cards strip: a small informational summary of what the current
+   deck would still cost to build for real. Never a warning/error color —
+   ownership is informational only and never blocks a save or an add. */
+.deck-missing {
+  flex: 1 1 100%;
+  order: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 0.5em 0.8em;
 }
 
 .deck-builder__zoom {

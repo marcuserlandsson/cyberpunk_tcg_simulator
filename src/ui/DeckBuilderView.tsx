@@ -17,7 +17,9 @@ import type { DeckList } from '../engine/deck'
 import { CardBrowser, isArtOnlyPromo } from './CardBrowser'
 import { DeckPanel } from './DeckPanel'
 import { CardFrame } from './CardFrame'
-import { deleteDeck, isReadOnlyDeck, listDecks, saveDeck } from './storage'
+import { deleteDeck, isReadOnlyDeck, listDecks, saveDeck, buildDisplayNames } from './storage'
+import { useCollection } from './collection'
+import { loadPrintings } from './printings'
 
 export interface DeckBuilderViewProps {
   db: CardDb
@@ -35,6 +37,38 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
   const [zoomId, setZoomId] = useState<string | null>(null)
 
   const isReadOnly = isReadOnlyDeck(deck.name)
+
+  // Ownership is informational only (docs/rulings.md §152's "invalid decks
+  // may exist and be saved" philosophy extends to unaffordable ones too) —
+  // never blocks an add, never touches validateDeck.
+  const collection = useCollection()
+  const printings = useMemo(() => {
+    try {
+      return loadPrintings()
+    } catch {
+      return []
+    }
+  }, [])
+  const ownedByCard = useMemo(() => {
+    const owned: Record<string, number> = {}
+    for (const printing of printings) {
+      const count = collection.counts[printing.key] ?? 0
+      if (count > 0) owned[printing.cardId] = (owned[printing.cardId] ?? 0) + count
+    }
+    return owned
+  }, [printings, collection])
+
+  const missing = useMemo(() => {
+    const shortfalls: { id: string; missing: number }[] = []
+    for (const [id, count] of Object.entries(deck.cards)) {
+      const short = Math.max(0, count - (ownedByCard[id] ?? 0))
+      if (short > 0) shortfalls.push({ id, missing: short })
+    }
+    for (const id of deck.legends) {
+      if (id !== '' && (ownedByCard[id] ?? 0) === 0) shortfalls.push({ id, missing: 1 })
+    }
+    return shortfalls
+  }, [deck, ownedByCard])
 
   function handleAdd(id: string): void {
     const def = db[id]
@@ -117,6 +151,7 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
         useOfficialImages={useOfficialImages}
         counts={deck.cards}
         legends={deck.legends}
+        owned={ownedByCard}
         onAdd={handleAdd}
         onRemove={handleRemove}
         onZoom={setZoomId}
@@ -134,6 +169,26 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
         onDelete={handleDelete}
         onNew={handleNew}
       />
+      <div className="deck-missing" data-testid="deck-missing-summary">
+        {missing.length === 0
+          ? 'You own all cards for this deck'
+          : `Missing ${missing.reduce((sum, m) => sum + m.missing, 0)} cards for this deck`}
+        {missing.length > 0 && (
+          <button
+            type="button"
+            data-testid="copy-deck-buylist"
+            onClick={() => {
+              const names = buildDisplayNames(db)
+              const text = missing.map((m) => `${m.missing}x ${names.get(m.id) ?? m.id}`).join('\n')
+              if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                navigator.clipboard.writeText(text).catch(() => {})
+              }
+            }}
+          >
+            Copy buy-list
+          </button>
+        )}
+      </div>
       {zoomDef !== undefined && (
         <div className="deck-builder__zoom" data-testid="zoom-panel">
           <button type="button" data-testid="zoom-close" onClick={() => setZoomId(null)}>
