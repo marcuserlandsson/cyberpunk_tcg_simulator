@@ -63,13 +63,34 @@ describe('CollectionHeader', () => {
     expect(submit.disabled).toBe(false)
   })
 
-  it('surfaces a rejected clipboard write as a visible error', async () => {
+  it('surfaces a rejected clipboard write as a visible error outside the Import panel', async () => {
     const writeText = vi.fn().mockRejectedValue(new Error('denied'))
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     render(<CollectionHeader db={db} printings={printings} />)
     fireEvent.click(screen.getByTestId('copy-buylist'))
     await waitFor(() => {
-      expect(screen.getByTestId('import-error').textContent).toContain('Could not copy to clipboard')
+      expect(screen.getByTestId('copy-error').textContent).toContain('Could not copy to clipboard')
+    })
+    // The whole point of this test: a plain getByTestId presence check
+    // passes even for a node buried in a closed <details> (the round-1
+    // regression), so pin visibility by asserting the error node is NOT a
+    // descendant of the collapsed Import panel.
+    const importPanel = screen.getByTestId('import-panel')
+    const copyError = screen.getByTestId('copy-error')
+    expect(importPanel.contains(copyError)).toBe(false)
+  })
+
+  it('clears a prior copy error on a subsequent successful copy', async () => {
+    const writeText = vi.fn().mockRejectedValueOnce(new Error('denied')).mockResolvedValueOnce(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    render(<CollectionHeader db={db} printings={printings} />)
+    fireEvent.click(screen.getByTestId('copy-buylist'))
+    await waitFor(() => {
+      expect(screen.getByTestId('copy-error')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('copy-buylist'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('copy-error')).toBeNull()
     })
   })
 })

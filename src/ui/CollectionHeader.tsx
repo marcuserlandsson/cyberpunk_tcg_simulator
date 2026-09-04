@@ -35,6 +35,7 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
   const [importText, setImportText] = useState('')
   const [mode, setMode] = useState<'replace' | 'merge'>('replace')
   const [error, setError] = useState('')
+  const [copyError, setCopyError] = useState('')
 
   function runImport(): void {
     try {
@@ -58,13 +59,19 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
         onClick={() =>
           navigator.clipboard
             .writeText(buildBuyList(db, printings, collection, { playset: true, arts: true }))
+            .then(() => setCopyError(''))
             .catch((err: unknown) =>
-              setError(`Could not copy to clipboard: ${err instanceof Error ? err.message : String(err)}`)
+              setCopyError(`Could not copy to clipboard: ${err instanceof Error ? err.message : String(err)}`)
             )
         }
       >
         Copy buy-list
       </button>
+      {copyError !== '' && (
+        <div data-testid="copy-error" className="collection-header__error">
+          {copyError}
+        </div>
+      )}
       <button
         type="button"
         data-testid="export-json"
@@ -79,7 +86,7 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
       >
         Export text
       </button>
-      <details className="collection-header__import">
+      <details className="collection-header__import" data-testid="import-panel">
         <summary>Import</summary>
         <textarea
           data-testid="import-input"
