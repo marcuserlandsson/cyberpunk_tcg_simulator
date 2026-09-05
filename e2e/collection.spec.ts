@@ -20,7 +20,10 @@ const SCRATCH = 'test-results/e2e-collection.json'
 
 test.beforeEach(async () => {
   await rm(SCRATCH, { force: true })
-  await rm(SCRATCH.replace(/\.json$/, '.backup.json'), { force: true })
+  // `recursive` because e2e/collection-file.spec.ts turns the backup path
+  // into a directory to force a server-side write failure; a plain rm on a
+  // directory is an EISDIR error, not a no-op.
+  await rm(SCRATCH.replace(/\.json$/, '.backup.json'), { recursive: true, force: true })
 })
 
 test('quick-add persists across reload and shows in the deck builder', async ({ page }) => {
