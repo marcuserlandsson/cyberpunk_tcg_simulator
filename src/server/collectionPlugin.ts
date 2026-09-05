@@ -21,8 +21,8 @@ import {
   readCollectionFile,
   resolveCollectionPath,
   writeCollectionFile,
-} from './collectionFile'
-import { scheduleCommit, type GitResult } from './collectionGit'
+} from './collectionFile.ts'
+import { scheduleCommit, type GitResult } from './collectionGit.ts'
 
 export const COLLECTION_ROUTE = '/__collection'
 
@@ -72,10 +72,13 @@ async function handlePut(
 }
 
 // Serializes PUTs across overlapping requests. Chaining onto the queue with
-// both a success and a failure handler means a rejected predecessor (which
-// should not happen -- handlePut/handleCollectionRequest do not throw -- but
-// would otherwise wedge every subsequent PUT behind a permanently-rejected
-// promise) still lets the queue proceed.
+// both a success and a failure handler means a rejected predecessor still
+// lets the queue proceed -- and handlePut genuinely CAN reject:
+// writeCollectionFile propagates a non-ENOENT backup failure by design (an
+// EPERM/EBUSY on collection.backup.json from a sync client or antivirus, say)
+// rather than overwriting the collection without having backed it up. Without
+// both handlers here, one such failure would wedge every subsequent PUT of
+// the session behind a permanently-rejected promise.
 let queue: Promise<unknown> = Promise.resolve()
 
 function enqueuePut(filePath: string, body: unknown): Promise<{ status: number; body: unknown }> {
@@ -83,9 +86,9 @@ function enqueuePut(filePath: string, body: unknown): Promise<{ status: number; 
     () => handlePut(filePath, body),
     () => handlePut(filePath, body)
   )
-  // Swallow only for the queue's own bookkeeping -- the real result (and any
-  // rejection from handlePut, which does not happen today but should not
-  // wedge the queue if it ever did) is still returned to the caller below.
+  // Swallow only for the queue's own bookkeeping -- the real result, and any
+  // rejection from handlePut, is still returned to the caller below (where
+  // handleCollectionRequest's try/catch turns it into a 500).
   queue = result.catch(() => undefined)
   return result
 }
@@ -106,7 +109,8 @@ export async function handleCollectionRequest(
 
     return { status: 405, body: { reason: 'invalid', message: `${method} is not supported.` } }
   } catch (err) {
-    // A corrupt or unreadable file lands here. Reporting it is the whole
+    // A corrupt or unreadable file lands here, and so does a propagated
+    // backup failure from writeCollectionFile. Reporting it is the whole
     // point: the alternative is treating it as empty and overwriting it.
     return { status: 500, body: { reason: 'invalid', message: String(err) } }
   }
@@ -130,12 +134,31 @@ export function collectionPlugin(): Plugin {
       server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
         const url = (req.url ?? '').split('?')[0]
         if (url !== COLLECTION_ROUTE) return next()
-        const filePath = resolveCollectionPath()
-        const body = req.method === 'PUT' ? await readBody(req) : undefined
-        const result = await handleCollectionRequest(filePath, req.method ?? 'GET', body)
-        res.statusCode = result.status
-        res.setHeader('Content-Type', 'application/json')
-        res.end(JSON.stringify(result.body))
+        // Connect does not catch async middleware rejections, so anything
+        // that throws in here becomes an unhandled rejection -- fatal by
+        // default in modern Node, i.e. the dev server dies mid-entry-session.
+        // `readBody`'s `for await (const chunk of req)` rejects whenever a
+        // request aborts (tab closed mid-PUT, a navigation), which is an
+        // entirely ordinary event. No data is lost when it happens (the
+        // browser-side buffer still holds the work), but the server must
+        // survive it.
+        try {
+          const filePath = resolveCollectionPath()
+          const body = req.method === 'PUT' ? await readBody(req) : undefined
+          const result = await handleCollectionRequest(filePath, req.method ?? 'GET', body)
+          res.statusCode = result.status
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify(result.body))
+        } catch (err) {
+          console.error('[collection] request handling failed:', err)
+          if (res.headersSent) {
+            res.end()
+            return
+          }
+          res.statusCode = 500
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ reason: 'invalid', message: String(err) }))
+        }
       })
     },
   }

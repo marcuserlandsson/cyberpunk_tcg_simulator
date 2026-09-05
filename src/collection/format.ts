@@ -33,13 +33,18 @@ export const collectionFileSchema = z.object({
 })
 
 /** The state of a collection that has never been written: revision 0 is what
- *  a client sends as `baseRevision` when it has never seen a file. */
-export const EMPTY_FILE: CollectionFile = {
+ *  a client sends as `baseRevision` when it has never seen a file.
+ *
+ *  Frozen (counts included) because `readCollectionFile` hands this exact
+ *  object back to every caller that asks about a missing file, rather than a
+ *  copy: one caller mutating `EMPTY_FILE.counts` would poison what every
+ *  later "no file yet" read reports, process-wide. */
+export const EMPTY_FILE: CollectionFile = Object.freeze({
   version: 1,
   revision: 0,
   savedAt: '1970-01-01T00:00:00.000Z',
-  counts: {},
-}
+  counts: Object.freeze({}) as Record<string, number>,
+})
 
 /** Zod's own `error.message` is a JSON dump of issue objects; these messages
  *  reach the user, so render them as readable lines instead. */

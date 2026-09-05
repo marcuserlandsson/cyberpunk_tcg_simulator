@@ -103,7 +103,26 @@ export function scheduleCommit(
   if (timer !== undefined) clearTimeout(timer)
   timer = setTimeout(() => {
     timer = undefined
-    inFlight = commitCollection(filePath, summary).then(onResult)
+    inFlight = commitCollection(filePath, summary)
+      .then((result) => {
+        // The spec promises a non-ok git outcome is LOGGED. `onResult` only
+        // reaches the browser on the *next* PUT's response, so the last save
+        // of a session would otherwise report its git outcome to nobody at
+        // all. The dev-server console is the one place that is always there.
+        if (result.status !== 'ok') {
+          console.warn(`[collection] git ${result.status}: ${result.detail}`)
+        }
+        onResult(result)
+      })
+      .catch((err: unknown) => {
+        // commitCollection is written not to throw, but an unhandled
+        // rejection here is fatal by default in modern Node — it would take
+        // the dev server down mid-entry-session over a background commit.
+        // Nothing about the save is at risk (the file is already durable);
+        // report it and carry on.
+        console.warn(`[collection] git automation threw: ${String(err)}`)
+        onResult({ status: 'failed', detail: String(err) })
+      })
   }, DEBOUNCE_MS)
 }
 

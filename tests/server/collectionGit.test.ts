@@ -167,6 +167,59 @@ describe('scheduleCommit', () => {
     expect(results).toHaveLength(1)
   })
 
+  // I2. The spec's error table promises "Git commit/push fails -> LOGGED,
+  // soft status", but the only consumer was `lastGitResult`, which rides on
+  // the NEXT PUT's response -- so the last save of a session reported its git
+  // outcome to nobody at all. The dev-server console is the one place that is
+  // always there. Against the pre-fix code this fails: nothing was logged.
+  it('logs a non-ok git outcome instead of only reporting it on the next save', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const hookPath = join(dir, '.git', 'hooks', 'pre-commit')
+      await writeFile(hookPath, '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+      await writeFile(file, '{}', 'utf8')
+
+      const results: GitResult[] = []
+      scheduleCommit(file, 'doomed', (r) => results.push(r))
+      await vi.advanceTimersByTimeAsync(5000)
+      await _flushCommitTimerForTests()
+
+      expect(results[0]?.status).toBe('failed')
+      expect(warn).toHaveBeenCalled()
+      const logged = warn.mock.calls.map((c) => c.join(' ')).join('\n')
+      expect(logged).toContain('git failed')
+      expect(logged).toContain('commit failed')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  // An unhandled rejection out of this promise chain is fatal by default in
+  // modern Node -- it would take the dev server down mid-entry-session over a
+  // background commit. Against the pre-fix `.then(onResult)` with no `.catch`,
+  // the onResult callback below throws into an unhandled rejection and
+  // `_flushCommitTimerForTests()` rejects, failing this test.
+  it('survives a callback that throws rather than becoming an unhandled rejection', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      await writeFile(file, '{}', 'utf8')
+      let secondCall: GitResult | undefined
+      let calls = 0
+      scheduleCommit(file, 'throwing callback', (r) => {
+        calls += 1
+        if (calls === 1) throw new Error('consumer blew up')
+        secondCall = r
+      })
+      await vi.advanceTimersByTimeAsync(5000)
+      await expect(_flushCommitTimerForTests()).resolves.toBeUndefined()
+      // The failure is reported back through the same channel, not swallowed.
+      expect(secondCall?.status).toBe('failed')
+      expect(warn).toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   it('_flushCommitTimerForTests genuinely awaits the in-flight commit', async () => {
     await writeFile(file, '{}', 'utf8')
     scheduleCommit(file, 'flushed', () => {})

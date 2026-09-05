@@ -14,6 +14,15 @@
 //
 // Handlers take an explicit path so they can be tested against a temp
 // directory without a running server.
+//
+// CONCURRENCY SEAM: `writeCollectionFile` is read-then-write and is NOT
+// concurrency-safe on its own. Two overlapping calls can both read the same
+// `current.revision` before either renames its temp file into place, so the
+// revision check catches a *stale* write but not a *concurrent* one — the
+// second write silently wins and the first one's data is gone. Callers must
+// serialize their writes; today's only caller, src/server/collectionPlugin.ts,
+// does that with a module-level promise queue. A second caller added without
+// its own serialization would reintroduce the race with nothing to warn it.
 
 import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -23,7 +32,7 @@ import {
   collectionSchema,
   formatZodIssues,
   type CollectionFile,
-} from '../collection/format'
+} from '../collection/format.ts'
 
 /** `CTCG_COLLECTION_FILE` overrides the target — the lever that keeps tests
  *  and the e2e suite away from the real collection. */

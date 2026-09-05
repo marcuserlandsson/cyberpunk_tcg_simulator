@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { handleCollectionRequest } from '../../src/server/collectionPlugin'
+import { COLLECTION_ROUTE, collectionPlugin, handleCollectionRequest } from '../../src/server/collectionPlugin'
 
 let dir = ''
 let file = ''
@@ -103,5 +104,86 @@ describe('handleCollectionRequest', () => {
     const isSecondPayload = JSON.stringify(onDisk.counts) === JSON.stringify({ 'b/2': 3 })
     expect(isFirstPayload || isSecondPayload).toBe(true)
     expect(onDisk.revision).toBe(2)
+  })
+})
+
+// I5. Connect does not catch async middleware rejections, so anything the
+// handler throws becomes an unhandled rejection -- fatal by default in modern
+// Node, i.e. the dev server dies. `readBody`'s `for await (const chunk of
+// req)` rejects on an ordinary aborted request (tab closed mid-PUT), so this
+// is not a hypothetical path.
+describe('the Vite middleware', () => {
+  type Middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => unknown
+
+  function mountMiddleware(): Middleware {
+    const plugin = collectionPlugin()
+    const registered: Middleware[] = []
+    const fakeServer = { middlewares: { use: (handler: Middleware) => registered.push(handler) } }
+    const configure = plugin.configureServer as unknown as (server: unknown) => void
+    configure(fakeServer)
+    expect(registered).toHaveLength(1)
+    return registered[0]
+  }
+
+  function fakeResponse() {
+    const res = {
+      statusCode: 0,
+      headersSent: false,
+      headers: {} as Record<string, string>,
+      body: '',
+      setHeader(name: string, value: string) {
+        this.headers[name] = value
+      },
+      end(chunk?: string) {
+        if (chunk !== undefined) this.body = chunk
+        this.headersSent = true
+      },
+    }
+    return res
+  }
+
+  it('answers 500 instead of rejecting when reading the request body fails', async () => {
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const middleware = mountMiddleware()
+      // An aborted request: iterating the stream rejects.
+      const req = {
+        url: COLLECTION_ROUTE,
+        method: 'PUT',
+        async *[Symbol.asyncIterator]() {
+          throw new Error('aborted')
+          // eslint-disable-next-line no-unreachable
+          yield Buffer.from('')
+        },
+      } as unknown as IncomingMessage
+      const res = fakeResponse()
+
+      // The assertion that matters: this settles rather than rejecting. An
+      // unhandled rejection here takes the dev server down.
+      await expect(
+        middleware(req, res as unknown as ServerResponse, () => {
+          throw new Error('next() must not be called for the collection route')
+        })
+      ).resolves.not.toThrow()
+
+      expect(res.statusCode).toBe(500)
+      expect(JSON.parse(res.body)).toMatchObject({ reason: 'invalid' })
+      expect(warn).toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('passes unrelated URLs straight through to next()', async () => {
+    const middleware = mountMiddleware()
+    let nexted = false
+    await middleware(
+      { url: '/index.html', method: 'GET' } as IncomingMessage,
+      fakeResponse() as unknown as ServerResponse,
+      () => {
+        nexted = true
+      }
+    )
+    expect(nexted).toBe(true)
   })
 })

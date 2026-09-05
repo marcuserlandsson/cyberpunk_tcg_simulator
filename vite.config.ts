@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { collectionPlugin } from './src/server/collectionPlugin'
+import { collectionPlugin } from './src/server/collectionPlugin.ts'
 
 // NOTE: Installed Vitest is v4.1.11, which dropped the `environmentMatchGlobs`
 // config option present in Vitest 0.x/1.x. Per-directory jsdom environments

@@ -12,6 +12,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    // The Vite-config module chain (vite.config.ts -> src/server/**) must use
+    // explicit .ts extensions, or Vite's `configLoader: 'native'` prints a
+    // deprecation banner on every `vite`/`vitest` invocation. Safe here
+    // because nothing is emitted: TypeScript only ever resolves these paths.
+    "allowImportingTsExtensions": true,
     "types": ["node"]
   },
   "include": ["src", "tests", "scripts", "e2e", "playwright.config.ts"]
