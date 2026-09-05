@@ -117,11 +117,67 @@ describe('sync status', () => {
   })
 
   it('shows the unsaved count and a retry button', () => {
-    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'unsaved', pendingCount: 300 })
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'unsaved', pendingCount: 300, retrying: true })
     render(<CollectionHeader db={db} printings={printings} />)
     expect(screen.getByTestId('sync-status').textContent).toContain('300')
+    expect(screen.getByTestId('sync-status').textContent).toMatch(/retrying/i)
     expect(screen.getByTestId('sync-retry')).toBeTruthy()
     expect(screen.getByTestId('sync-download')).toBeTruthy()
+  })
+
+  // I3. "— retrying…" used to be unconditional on `unsaved`, so a 400/405/500
+  // (or a 409 whose body failed validation) — none of which armed a retry —
+  // showed a banner insisting a save was on its way while nothing was
+  // scheduled. Against the pre-fix markup this fails: the text always
+  // contained "retrying".
+  it('does NOT claim to be retrying when no retry is armed', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({
+      state: 'unsaved',
+      pendingCount: 12,
+      retrying: false,
+      message: 'Refusing to save invalid counts',
+    })
+    render(<CollectionHeader db={db} printings={printings} />)
+    const text = screen.getByTestId('sync-status').textContent ?? ''
+    expect(text).toContain('12 changes not yet saved to disk')
+    expect(text).not.toMatch(/retrying/i)
+    // The Retry button stays: the owner can still force one by hand, which is
+    // the only thing that moves a terminal refusal along.
+    expect(screen.getByTestId('sync-retry')).toBeTruthy()
+  })
+
+  it('does not say "0 changes not yet saved" when there is no pending work', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({
+      state: 'unsaved',
+      pendingCount: 0,
+      retrying: false,
+      message: 'Cannot reach the dev server',
+    })
+    render(<CollectionHeader db={db} printings={printings} />)
+    const text = screen.getByTestId('sync-status').textContent ?? ''
+    expect(text).not.toContain('0 changes')
+    expect(text).toContain('Not yet saved to disk')
+  })
+
+  // I4. With a corrupt collection file the store falls through to empty, so
+  // rendering the derived figures printed "Playset 0% · Arts 0% · 0 cards
+  // owned" and offered a buy-list demanding every card in the game — beside a
+  // banner saying the collection could not be read. Against the pre-fix
+  // markup this fails: both nodes were rendered unconditionally.
+  it('suppresses the stats strip and buy-list in the `error` state rather than showing zeros', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({
+      state: 'error',
+      pendingCount: 0,
+      message: 'data/collection.json is not valid JSON.',
+    })
+    render(<CollectionHeader db={db} printings={printings} />)
+    expect(screen.queryByTestId('collection-stats')).toBeNull()
+    expect(screen.queryByTestId('copy-buylist')).toBeNull()
+    const text = screen.getByTestId('sync-status').textContent ?? ''
+    expect(text).toMatch(/could not be read/i)
+    expect(text).toContain('data/collection.json is not valid JSON.')
+    // And it must not read as unsaved work: there is none.
+    expect(text).not.toMatch(/not yet saved/i)
   })
 
   it('surfaces the server-provided message on unsaved (e.g. a corrupt collection file)', () => {
@@ -179,6 +235,29 @@ describe('sync status', () => {
     expect(resolve).toHaveBeenCalledWith('mine')
     fireEvent.click(screen.getByTestId('sync-take-disk'))
     expect(resolve).toHaveBeenCalledWith('disk')
+  })
+
+  // The escape hatch used to be `unsaved`-only, but `conflict` is the one
+  // state where a button ("Take disk") deliberately destroys local work — the
+  // moment the owner most needs a file copy of what they are about to lose.
+  // Against the pre-fix markup this fails: sync-download was not rendered.
+  it('offers Download JSON in the conflict state, where a choice can discard local work', () => {
+    setCount(printings[0].key, 3)
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({
+      state: 'conflict',
+      pendingCount: 4,
+      conflictDisk: { counts: { [printings[0].key]: 10 }, revision: 5 },
+    })
+    const blobSpy = vi.spyOn(globalThis, 'Blob')
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-collection')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    render(<CollectionHeader db={db} printings={printings} />)
+    fireEvent.click(screen.getByTestId('sync-download'))
+    const [parts] = blobSpy.mock.calls[0] as [BlobPart[]]
+    // What it downloads is the LOCAL copy — the one "Take disk" would discard.
+    expect(String(parts[0])).toContain(printings[0].key)
+    expect(String(parts[0])).toContain('3')
   })
 
   it('notes a failed git push without claiming the save failed', () => {

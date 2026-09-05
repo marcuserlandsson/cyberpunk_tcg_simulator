@@ -30,8 +30,11 @@ export interface PendingBuffer {
   baseRevision: number
 }
 
+// `counts` is taken from collectionSchema rather than restated: two copies of
+// the counts shape is exactly the drift format.ts's header warns about, and
+// the buffer holds the same data the file does.
 const pendingSchema = z.object({
-  counts: z.record(z.string(), z.number().int().nonnegative()),
+  counts: collectionSchema.shape.counts,
   baseRevision: z.number().int().nonnegative(),
 })
 

@@ -42,6 +42,7 @@
 //     second PUT.
 
 import { useSyncExternalStore } from 'react'
+import { collectionFileSchema } from '../collection/format'
 import {
   getBaseRevision,
   readLegacyCollection,
@@ -57,11 +58,25 @@ const DEBOUNCE_MS = 1000
 const BACKOFF_MS = [1000, 2000, 5000, 15000, 30000]
 
 export interface SyncStatus {
-  state: 'idle' | 'saving' | 'unsaved' | 'conflict' | 'would-empty'
+  /** `error` is deliberately distinct from `unsaved`: the server answered but
+   *  we could not read a collection out of it (a corrupt file, a malformed
+   *  body) and there is no pending buffer to fall back on, so the app does
+   *  NOT know what the player owns. Rendering the empty in-memory fallback as
+   *  fact there would print "0 cards owned" and a buy-list demanding every
+   *  card in the game — numbers the owner might act on that nothing measured.
+   *  Consumers must suppress derived figures in this state, not show zeros. */
+  state: 'idle' | 'saving' | 'unsaved' | 'conflict' | 'would-empty' | 'error'
   pendingCount: number
   lastSavedAt?: string
   message?: string
   git?: 'ok' | 'skipped' | 'failed'
+  /** True only when a flush or backoff retry is actually armed. The banner
+   *  says "retrying…" from this flag rather than from `state === 'unsaved'`,
+   *  because several terminal refusals (400 invalid, 405, a 409 whose body
+   *  did not validate) leave the buffer unsaved with nothing scheduled — and
+   *  a banner that claims to be retrying when it is not is how a stalled save
+   *  goes unnoticed for a whole entry session. */
+  retrying?: boolean
   /** Populated only in the `conflict` state: what the server actually holds,
    *  so a chooser UI can show what "keep mine" would overwrite and what
    *  "take theirs" would adopt, without a second round trip. */
@@ -177,7 +192,7 @@ async function performFlush(confirmEmpty: boolean): Promise<void> {
     })
   } catch (err) {
     scheduleRetry()
-    setStatus({ state: 'unsaved', pendingCount: countPending(), message: String(err) })
+    setStatus({ state: 'unsaved', pendingCount: countPending(), message: String(err), retrying: true })
     return
   }
 
@@ -211,6 +226,7 @@ async function performFlush(confirmEmpty: boolean): Promise<void> {
         lastSavedAt: body.savedAt,
         message: undefined,
         git: body.git?.status,
+        retrying: false,
       })
     } else {
       // The buffer moved on while this PUT was in flight. The sent counts
@@ -230,6 +246,7 @@ async function performFlush(confirmEmpty: boolean): Promise<void> {
         lastSavedAt: body.savedAt,
         message: undefined,
         git: body.git?.status,
+        retrying: true,
       })
       scheduleFlush()
     }
@@ -238,24 +255,39 @@ async function performFlush(confirmEmpty: boolean): Promise<void> {
 
   if (response.status === 409 && body.reason === 'conflict' && isCurrentPayload(body.current)) {
     diskVersion = body.current
-    setStatus({ state: 'conflict', pendingCount: countPending(), message: body.message, conflictDisk: diskVersion })
+    setStatus({
+      state: 'conflict',
+      pendingCount: countPending(),
+      message: body.message,
+      conflictDisk: diskVersion,
+      retrying: false,
+    })
     return
   }
 
   if (response.status === 409 && body.reason === 'would-empty') {
-    setStatus({ state: 'would-empty', pendingCount: countPending(), message: body.message })
+    setStatus({ state: 'would-empty', pendingCount: countPending(), message: body.message, retrying: false })
     return
   }
 
-  // 400 invalid, a 409 whose body didn't validate as a real conflict, 500
-  // corrupt, etc.: retrying unchanged data will not help, but the buffer is
-  // still the player's work — keep it and say so. No automatic retry is
-  // scheduled here on purpose (see BACKOFF_MS usage in scheduleRetry, which
-  // only fires for network-level failures).
+  // A 5xx is the server failing to do something it was willing to try — the
+  // most likely cause on the owner's machine is a transient EPERM/EBUSY on
+  // the backup copy (OneDrive or antivirus holding collection.backup.json
+  // open), which `writeCollectionFile` deliberately propagates. That clears
+  // on its own, so it IS worth retrying; without a retry here the save is
+  // silently stalled until someone happens to press Retry.
+  const retryable = response.status >= 500
+  if (retryable) scheduleRetry()
+
+  // 400 invalid, 405, a 409 whose body didn't validate as a real conflict:
+  // retrying unchanged data will not help, but the buffer is still the
+  // player's work — keep it, say so, and (via `retrying: false`) do not let
+  // the banner claim a retry is coming when none is armed.
   setStatus({
     state: 'unsaved',
     pendingCount: countPending(),
     message: body.message ?? 'The collection endpoint returned an unexpected response.',
+    retrying: retryable,
   })
 }
 
@@ -307,18 +339,70 @@ export async function resolveConflict(choice: 'mine' | 'disk'): Promise<void> {
     setCollectionFromFile(diskVersion.counts, diskVersion.revision)
     lastConfirmed = { ...diskVersion.counts }
     diskVersion = undefined
-    setStatus({ state: 'idle', pendingCount: 0, message: undefined, conflictDisk: undefined })
+    setStatus({
+      state: 'idle',
+      pendingCount: 0,
+      message: undefined,
+      conflictDisk: undefined,
+      retrying: false,
+    })
     return
   }
   // Keep mine: re-base onto the disk revision and flush again.
-  setBaseRevision(diskVersion.revision)
+  const revision = diskVersion.revision
+  setBaseRevision(revision)
   diskVersion = undefined
-  setStatus({ state: 'unsaved', pendingCount: countPending(), message: undefined, conflictDisk: undefined })
+  setStatus({
+    state: 'unsaved',
+    pendingCount: countPending(),
+    message: undefined,
+    conflictDisk: undefined,
+    retrying: true,
+  })
+  // Re-stamp the DURABLE buffer at the chosen revision too, not just the
+  // module-level baseRevision. The buffer still carries the base it was
+  // written against, and `initCollectionSync` now compares that field to the
+  // file's revision — so without this, a "keep mine" whose flush does not
+  // land (server down) would come back as the same conflict banner on the
+  // next reload, asking the player to make a decision they already made.
+  const buffer = readPendingBuffer()
+  if (buffer !== undefined) replaceCollection({ counts: buffer.counts })
   await flushNow()
 }
 
 export async function initCollectionSync(): Promise<void> {
-  const buffer = readPendingBuffer()
+  // Registered SYNCHRONOUSLY, before the GET is even issued. Two reasons,
+  // both about the await window below:
+  //
+  //  * a mutation that lands while the GET is in flight would otherwise be
+  //    neither noticed nor scheduled — no listener exists yet — so it would
+  //    sit in the buffer with nothing arranged to send it;
+  //  * anything that throws before the registration (a malformed response, a
+  //    schema change, a future edit to this function) would leave the session
+  //    with NO auto-save at all while the status line still reads "Saved to
+  //    disk". Registration first makes that impossible.
+  //
+  // The listener is safe to have running during init: it acts only when a
+  // pending buffer exists, and `scheduleFlush` is a debounce, so at worst it
+  // arms a timer that the code below re-evaluates a few milliseconds later.
+  if (!started) {
+    started = true
+    unsubscribeCollection = subscribeCollection(() => {
+      if (readPendingBuffer() !== undefined) {
+        const next = status.state === 'conflict' ? 'conflict' : 'unsaved'
+        setStatus({ state: next, pendingCount: countPending(), retrying: next === 'unsaved' })
+        scheduleFlush()
+      }
+    })
+    if (typeof window !== 'undefined') {
+      onVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') void flushNow()
+      }
+      onBeforeUnload = () => void flushNow()
+      window.addEventListener('visibilitychange', onVisibilityChange)
+      window.addEventListener('beforeunload', onBeforeUnload)
+    }
+  }
 
   let file: { counts: Record<string, number>; revision: number } | undefined
   let unreachable = false
@@ -326,7 +410,14 @@ export async function initCollectionSync(): Promise<void> {
   try {
     const response = await fetch(ROUTE)
     if (response.ok) {
-      file = (await response.json()) as { counts: Record<string, number>; revision: number }
+      // Parsed with the SHARED schema rather than cast. An unvalidated cast
+      // means a 200 that happens to lack `counts` throws at the first
+      // `Object.keys(file.counts)` below — inside init, before anything has
+      // been decided — which is precisely the "session with no auto-save"
+      // hole the synchronous registration above closes from the other side.
+      const parsed = collectionFileSchema.safeParse(await response.json().catch(() => undefined))
+      if (parsed.success) file = parsed.data
+      else serverMessage = 'The collection endpoint returned something that is not a collection file.'
     } else {
       // Responded, just not with 2xx — e.g. a 500 for a corrupt collection
       // file. This is NOT "unreachable": the server is there and told us
@@ -339,13 +430,28 @@ export async function initCollectionSync(): Promise<void> {
     unreachable = true
   }
 
+  // Read AFTER the response: a mutation made during the GET is real unsaved
+  // work and must be seen here, not missed because the buffer was sampled
+  // before the await.
+  const buffer = readPendingBuffer()
+
   if (file !== undefined) {
     lastConfirmed = { ...file.counts }
     if (buffer === undefined) {
       setCollectionFromFile(file.counts, file.revision)
-      // Migration: an empty file plus a legacy key means a pre-file collection.
+      // Migration: a never-written file (revision 0) with empty counts plus a
+      // legacy key means a pre-file collection. The `revision === 0` half is
+      // load-bearing: a collection the owner deliberately emptied lives on
+      // disk at some high revision with empty counts, and re-seeding THAT
+      // from a stale legacy key would resurrect cards they removed on
+      // purpose, on every load.
       const legacy = readLegacyCollection()
-      if (Object.keys(file.counts).length === 0 && legacy !== undefined && Object.keys(legacy.counts).length > 0) {
+      if (
+        file.revision === 0 &&
+        Object.keys(file.counts).length === 0 &&
+        legacy !== undefined &&
+        Object.keys(legacy.counts).length > 0
+      ) {
         // Ruling: write through replaceCollection, not a raw
         // localStorage.setItem(PENDING_KEY, ...) — a raw write bypasses the
         // store's cache invalidation and listener notification, so the UI
@@ -356,17 +462,56 @@ export async function initCollectionSync(): Promise<void> {
         // file.revision here — setCollectionFromFile just above set it —
         // so there is no separate setBaseRevision call to sequence.)
         replaceCollection({ counts: legacy.counts })
-        setStatus({ state: 'unsaved', pendingCount: countPending() })
+        setStatus({ state: 'unsaved', pendingCount: countPending(), retrying: true })
         scheduleFlush()
       } else {
-        setStatus({ state: 'idle', pendingCount: 0 })
+        setStatus({ state: 'idle', pendingCount: 0, retrying: false })
       }
-    } else {
-      // The buffer is unsaved work and therefore newer than the file.
+    } else if (buffer.baseRevision === file.revision) {
+      // The ordinary single-tab case: the buffer was derived from exactly
+      // the state that is on disk, so it is a descendant of the file and
+      // flushing it loses nothing. (`writeCollection` stamps every mutation
+      // with the module-level baseRevision, which tracks the last confirmed
+      // file revision, so this is the normal path — no false conflicts.)
       setBaseRevision(file.revision)
-      setStatus({ state: 'unsaved', pendingCount: countPending() })
+      setStatus({ state: 'unsaved', pendingCount: countPending(), retrying: true })
       scheduleFlush()
+    } else if (sameCounts(buffer.counts, file.counts)) {
+      // Diverged bases, but identical contents: whatever happened, there is
+      // nothing in the buffer the file does not already hold. Adopt the file
+      // and clear the buffer rather than bothering the player about a
+      // difference that does not exist.
+      setCollectionFromFile(file.counts, file.revision)
+      setStatus({ state: 'idle', pendingCount: 0, retrying: false })
+    } else {
+      // The buffer is NEWER IN TIME but not a descendant of what is on disk:
+      // it was derived from revision `buffer.baseRevision`, and the file has
+      // since moved to `file.revision`. Flushing it would silently overwrite
+      // whatever produced that newer revision (another tab's save; a file
+      // that arrived while a startup GET was failing). The spec reserves
+      // exactly this for the player — "Revision conflict → user chooses;
+      // nothing overwritten automatically" — so hand it to the same chooser
+      // a 409 uses, which already shows both totals.
+      diskVersion = { counts: file.counts, revision: file.revision }
+      setStatus({
+        state: 'conflict',
+        pendingCount: countPending(),
+        message: `Unsaved changes in this browser were made against revision ${buffer.baseRevision}, but the file on disk is at revision ${file.revision}.`,
+        conflictDisk: diskVersion,
+        retrying: false,
+      })
     }
+  } else if (buffer === undefined && !unreachable) {
+    // The server answered and could not give us a collection (a corrupt file
+    // on disk, a malformed body), and there is no buffer either — so nothing
+    // in this tab knows what the player owns. Refuse the tab rather than
+    // presenting the empty fallback as fact; see SyncStatus.state.
+    setStatus({
+      state: 'error',
+      pendingCount: 0,
+      message: serverMessage ?? 'The collection endpoint returned an unexpected response.',
+      retrying: false,
+    })
   } else {
     setStatus({
       state: 'unsaved',
@@ -374,26 +519,9 @@ export async function initCollectionSync(): Promise<void> {
       message: unreachable
         ? 'Cannot reach the dev server — changes are kept in this browser until it returns.'
         : (serverMessage ?? 'The collection endpoint returned an unexpected response.'),
+      retrying: buffer !== undefined,
     })
     if (buffer !== undefined) scheduleRetry()
-  }
-
-  if (!started) {
-    started = true
-    unsubscribeCollection = subscribeCollection(() => {
-      if (readPendingBuffer() !== undefined) {
-        setStatus({ state: status.state === 'conflict' ? 'conflict' : 'unsaved', pendingCount: countPending() })
-        scheduleFlush()
-      }
-    })
-    if (typeof window !== 'undefined') {
-      onVisibilityChange = () => {
-        if (document.visibilityState === 'hidden') void flushNow()
-      }
-      onBeforeUnload = () => void flushNow()
-      window.addEventListener('visibilitychange', onVisibilityChange)
-      window.addEventListener('beforeunload', onBeforeUnload)
-    }
   }
 }
 

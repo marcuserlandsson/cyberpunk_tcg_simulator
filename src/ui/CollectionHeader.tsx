@@ -58,6 +58,7 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
   const [mode, setMode] = useState<'replace' | 'merge'>('replace')
   const [error, setError] = useState('')
   const [copyError, setCopyError] = useState('')
+  const derivedUnavailable = syncStatus.state === 'error'
 
   function runImport(): void {
     try {
@@ -93,7 +94,29 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
         {syncStatus.state === 'saving' && <>Saving…</>}
         {syncStatus.state === 'unsaved' && (
           <>
-            <strong>{syncStatus.pendingCount} changes not yet saved to disk</strong> — retrying…
+            {/* Two things this must not lie about. The count: with no pending
+                buffer there are no changes, and "0 changes not yet saved"
+                reads like a bug. And the retry: several refusals (400, 405, a
+                409 whose body did not validate) arm nothing, so "retrying…"
+                is gated on the flusher actually having scheduled one — a
+                banner that claims a retry that is not coming is how a stalled
+                save goes unnoticed through a whole entry session. */}
+            <strong>
+              {syncStatus.pendingCount > 0
+                ? `${syncStatus.pendingCount} changes not yet saved to disk`
+                : 'Not yet saved to disk'}
+            </strong>
+            {syncStatus.retrying === true ? ' — retrying…' : ''}
+            {syncStatus.message !== undefined && (
+              <span className="collection-header__sync-note"> · {syncStatus.message}</span>
+            )}
+          </>
+        )}
+        {syncStatus.state === 'error' && (
+          <>
+            <strong>The collection could not be read from disk.</strong> Nothing has been
+            overwritten, and no totals are shown below because this tab does not know what you
+            own.
             {syncStatus.message !== undefined && (
               <span className="collection-header__sync-note"> · {syncStatus.message}</span>
             )}
@@ -115,18 +138,21 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
         )}
       </span>
       {syncStatus.state === 'unsaved' && (
-        <>
-          <button type="button" data-testid="sync-retry" onClick={() => void flushNow()}>
-            Retry now
-          </button>
-          <button
-            type="button"
-            data-testid="sync-download"
-            onClick={() => download('collection.json', exportCollectionJson(collection))}
-          >
-            Download JSON
-          </button>
-        </>
+        <button type="button" data-testid="sync-retry" onClick={() => void flushNow()}>
+          Retry now
+        </button>
+      )}
+      {/* The escape hatch belongs in `conflict` as much as in `unsaved`:
+          "Take disk" deliberately discards local work, so this is the moment
+          the owner most needs a file copy of what they are about to lose. */}
+      {(syncStatus.state === 'unsaved' || syncStatus.state === 'conflict') && (
+        <button
+          type="button"
+          data-testid="sync-download"
+          onClick={() => download('collection.json', exportCollectionJson(collection))}
+        >
+          Download JSON
+        </button>
       )}
       {syncStatus.state === 'conflict' && (
         <span className="collection-header__conflict" data-testid="sync-conflict">
@@ -150,23 +176,33 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
           Yes, save an empty collection
         </button>
       )}
-      <span data-testid="collection-stats">
-        Playset {stats.playsetPct}% · Arts {stats.artsPct}% · {stats.totalOwned} cards owned
-      </span>
-      <button
-        type="button"
-        data-testid="copy-buylist"
-        onClick={() =>
-          navigator.clipboard
-            .writeText(buildBuyList(db, printings, collection, { playset: true, arts: true }))
-            .then(() => setCopyError(''))
-            .catch((err: unknown) =>
-              setCopyError(`Could not copy to clipboard: ${err instanceof Error ? err.message : String(err)}`)
-            )
-        }
-      >
-        Copy buy-list
-      </button>
+      {/* Both of these are derived from `collection`, which in the `error`
+          state is the empty in-memory fallback rather than anything measured.
+          Rendering them would print "Playset 0% · 0 cards owned" and a
+          buy-list demanding every card in the game, next to a banner saying
+          the collection could not be read — numbers the owner might act on
+          that nothing measured. Suppress them instead of inventing them. */}
+      {!derivedUnavailable && (
+        <>
+          <span data-testid="collection-stats">
+            Playset {stats.playsetPct}% · Arts {stats.artsPct}% · {stats.totalOwned} cards owned
+          </span>
+          <button
+            type="button"
+            data-testid="copy-buylist"
+            onClick={() =>
+              navigator.clipboard
+                .writeText(buildBuyList(db, printings, collection, { playset: true, arts: true }))
+                .then(() => setCopyError(''))
+                .catch((err: unknown) =>
+                  setCopyError(`Could not copy to clipboard: ${err instanceof Error ? err.message : String(err)}`)
+                )
+            }
+          >
+            Copy buy-list
+          </button>
+        </>
+      )}
       {copyError !== '' && (
         <div data-testid="copy-error" className="collection-header__error">
           {copyError}
