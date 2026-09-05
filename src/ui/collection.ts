@@ -94,6 +94,14 @@ export function readPendingBuffer(): PendingBuffer | undefined {
   }
 }
 
+/** Removes the durable copy of unsaved work — nothing else. It does NOT
+ *  touch the snapshot cache or notify listeners, so calling it bare leaves
+ *  the visible collection stale until the next cache miss, at which point
+ *  `readCollection` falls through to the legacy key or empty — i.e. the
+ *  in-memory view can go blank right after the buffer holding the only
+ *  durable copy of that data was deleted. Callers must pair this with
+ *  something that repopulates the cache in the same breath; in practice
+ *  that is always `setCollectionFromFile`, never this function alone. */
 export function clearPendingBuffer(): void {
   localStorage.removeItem(PENDING_KEY)
 }

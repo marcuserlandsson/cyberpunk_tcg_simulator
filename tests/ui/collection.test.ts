@@ -155,12 +155,20 @@ describe('subscription', () => {
   })
 
   it('useCollection re-renders with fresh counts and keeps a stable snapshot otherwise', () => {
-    const { result, rerender } = renderHook(() => useCollection())
+    const { result, rerender, unmount } = renderHook(() => useCollection())
     const first = result.current
     rerender()
     expect(result.current).toBe(first) // stable reference, no write between
     act(() => setCount('a/1', 3))
     expect(result.current.counts['a/1']).toBe(3)
+    // Without this, the subscriber this hook registers via
+    // subscribeCollection outlives the test (this repo has no global
+    // testing-library auto-cleanup) and keeps calling getCollection() on
+    // every later write for the rest of the file — silently repopulating
+    // the module cache and turning later tests into order-dependent false
+    // positives (see the 'clearPendingBuffer' test in the pending-buffer
+    // describe below, which failed in isolation until this was added).
+    unmount()
   })
 })
 
@@ -179,6 +187,13 @@ describe('pending buffer', () => {
 
   it('clearPendingBuffer removes it without touching the collection', () => {
     setCount('a/1', 1)
+    // Read the snapshot into cache BEFORE clearing, so this test pins the
+    // real, isolation-safe claim: clearing the buffer does not invalidate an
+    // already-read snapshot. Without this explicit read, the assertion below
+    // only happened to pass by relying on some other test's subscriber
+    // leaking a getCollection() call into this one via the module-level
+    // listeners set — a false positive, not this behavior.
+    getCollection()
     clearPendingBuffer()
     expect(readPendingBuffer()).toBeUndefined()
     expect(getCollection().counts).toEqual({ 'a/1': 1 })
