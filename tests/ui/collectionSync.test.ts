@@ -64,18 +64,26 @@ describe('initCollectionSync', () => {
   it('migrates the legacy key when the file is empty', async () => {
     localStorage.setItem('ctcg:collection:v1', JSON.stringify({ counts: { 'legacy/1': 2 } }))
     _resetCollectionCacheForTests()
-    // revision 5 (not 0, the module's own default) so a reversal of ruling 2's
-    // ordering — replaceCollection before setBaseRevision — is distinguishable:
-    // it would stamp the buffer with the stale default (0) instead of 5.
     stubFetch((_url, init) =>
       (init?.method ?? 'GET') === 'GET'
         ? { status: 200, body: { version: 1, revision: 5, savedAt: 'x', counts: {} } }
         : { status: 200, body: { revision: 6, savedAt: 'now', git: { status: 'ok' } } }
     )
     await initCollectionSync()
-    // Ruling 2 regression: setBaseRevision(file.revision) must run BEFORE
-    // replaceCollection, so the migrated buffer records the file's actual
-    // revision as its base.
+    // Ruling 2 regression: migration must write through replaceCollection
+    // (which invalidates the snapshot cache and notifies subscribers), not a
+    // raw localStorage.setItem(PENDING_KEY, ...). A raw write leaves the
+    // in-memory cache holding the EMPTY file state that setCollectionFromFile
+    // adopted just before the migration check ran, so getCollection() would
+    // still read back {} right here — a live-until-the-next-unrelated-
+    // cache-miss "collection looks empty after migrating" bug. This
+    // assertion must run BEFORE flushNow(): a successful flush repaints the
+    // cache regardless of which write path migration used, so a post-flush
+    // assertion can't tell the two apart (see fix-report round 2).
+    expect(getCollection().counts).toEqual({ 'legacy/1': 2 })
+    // Documented resulting value, not a guard on ordering: baseRevision is
+    // already file.revision (5) by the time migration runs, because
+    // setCollectionFromFile set it moments earlier.
     expect(readPendingBuffer()?.baseRevision).toBe(5)
     await flushNow()
     expect(getCollection().counts).toEqual({ 'legacy/1': 2 })

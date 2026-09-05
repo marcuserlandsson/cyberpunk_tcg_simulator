@@ -346,13 +346,15 @@ export async function initCollectionSync(): Promise<void> {
       // Migration: an empty file plus a legacy key means a pre-file collection.
       const legacy = readLegacyCollection()
       if (Object.keys(file.counts).length === 0 && legacy !== undefined && Object.keys(legacy.counts).length > 0) {
-        // Ruling: setBaseRevision must run BEFORE replaceCollection, so the
-        // buffer it writes records the correct base revision.
-        setBaseRevision(file.revision)
         // Ruling: write through replaceCollection, not a raw
         // localStorage.setItem(PENDING_KEY, ...) — a raw write bypasses the
         // store's cache invalidation and listener notification, so the UI
-        // would keep showing an empty collection after migrating.
+        // would keep showing an empty (just-adopted-from-file) collection
+        // after migrating, until some unrelated cache miss happened to
+        // repaint it. replaceCollection invalidates the cache and notifies
+        // subscribers in the same call. (baseRevision is already
+        // file.revision here — setCollectionFromFile just above set it —
+        // so there is no separate setBaseRevision call to sequence.)
         replaceCollection({ counts: legacy.counts })
         setStatus({ state: 'unsaved', pendingCount: countPending() })
         scheduleFlush()
