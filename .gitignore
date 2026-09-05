@@ -6,3 +6,4 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 .worktrees/
+data/collection.backup.json
