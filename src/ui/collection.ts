@@ -19,6 +19,22 @@ import { buildDisplayNames } from './storage'
 
 const COLLECTION_KEY = 'ctcg:collection:v1'
 
+/** The browser-side durable copy of unsaved work. Written synchronously on
+ *  every mutation and cleared ONLY by a confirmed write to disk, so a whole
+ *  booster box entered while the dev server was down survives a reload, a
+ *  crash, and closing the tab. */
+export const PENDING_KEY = 'ctcg:collection:pending:v1'
+
+export interface PendingBuffer {
+  counts: Record<string, number>
+  baseRevision: number
+}
+
+const pendingSchema = z.object({
+  counts: z.record(z.string(), z.number().int().nonnegative()),
+  baseRevision: z.number().int().nonnegative(),
+})
+
 export type { Collection }
 
 /** Snapshots handed to components are frozen: `useSyncExternalStore` shares
@@ -50,17 +66,58 @@ function emptyCollection(): Collection {
 // cache and every write invalidates it.
 let cache: Collection | undefined
 
-// Mirrors storage.ts's private readJson posture (forgiving read, fallback on
-// junk) — an *explicit import* (Task 6) errors loudly instead.
-function readCollection(): Collection {
+// The revision the pending buffer (or the last confirmed file read) is based
+// on. Not persisted itself — it travels inside the pending buffer once one
+// exists, and is otherwise reset to what the last confirmed load reported.
+let baseRevision = 0
+
+export function getBaseRevision(): number {
+  return baseRevision
+}
+
+export function setBaseRevision(revision: number): void {
+  baseRevision = revision
+}
+
+/** Forgiving read of the pending buffer, mirroring readCollection's posture:
+ *  a malformed buffer must never throw and block the app from loading, it is
+ *  simply treated as "no unsaved work recorded" — the legacy key or empty
+ *  collection then takes over as the read fallback. */
+export function readPendingBuffer(): PendingBuffer | undefined {
+  const raw = localStorage.getItem(PENDING_KEY)
+  if (raw === null) return undefined
+  try {
+    const parsed = pendingSchema.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function clearPendingBuffer(): void {
+  localStorage.removeItem(PENDING_KEY)
+}
+
+/** The pre-file-storage key. Read-only from now on: a migration source for a
+ *  browser that has old data but no pending buffer yet, never written to. */
+export function readLegacyCollection(): Collection | undefined {
   const raw = localStorage.getItem(COLLECTION_KEY)
-  if (raw === null) return emptyCollection()
+  if (raw === null) return undefined
   try {
     const parsed = collectionSchema.safeParse(JSON.parse(raw))
-    return parsed.success ? freeze(parsed.data) : emptyCollection()
+    return parsed.success ? freeze(parsed.data) : undefined
   } catch {
-    return emptyCollection()
+    return undefined
   }
+}
+
+// The pending buffer is the browser-side source of truth once one exists
+// (it is the only copy of unsaved work); the legacy key is a one-time
+// migration fallback for a browser that predates the buffer.
+function readCollection(): Collection {
+  const pending = readPendingBuffer()
+  if (pending !== undefined) return freeze({ counts: pending.counts })
+  return readLegacyCollection() ?? emptyCollection()
 }
 
 const listeners = new Set<() => void>()
@@ -93,7 +150,7 @@ function writeCollection(collection: Collection): void {
     storageError = `Could not save the collection (invalid counts, nothing was written):\n${formatZodIssues(validated.error)}`
   } else {
     try {
-      localStorage.setItem(COLLECTION_KEY, JSON.stringify({ counts }))
+      localStorage.setItem(PENDING_KEY, JSON.stringify({ counts, baseRevision }))
       storageError = ''
     } catch (err) {
       storageError = `Could not save the collection (browser storage full or blocked): ${String(err)}`
@@ -135,10 +192,23 @@ export function replaceCollection(collection: Collection): void {
   writeCollection(collection)
 }
 
+/** Adopt state that is already on disk: updates the snapshot and notifies
+ *  subscribers, but creates NO pending buffer, because there is nothing
+ *  unsaved. Used on load and after a confirmed write — the counts just
+ *  handed back by the server become the new baseline, not a pending edit. */
+export function setCollectionFromFile(counts: Record<string, number>, revision: number): void {
+  baseRevision = revision
+  clearPendingBuffer()
+  cache = freeze({ counts: { ...counts } })
+  storageError = ''
+  for (const listener of listeners) listener()
+}
+
 /** Test-only: drops the snapshot cache so localStorage seeding/clearing in a
  *  test is observed. Underscore-prefixed by convention; not for app code. */
 export function _resetCollectionCacheForTests(): void {
   cache = undefined
+  baseRevision = 0
 }
 
 // ---------------------------------------------------------------------------

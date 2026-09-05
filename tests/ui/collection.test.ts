@@ -9,6 +9,13 @@ import {
   subscribeCollection,
   useCollection,
   _resetCollectionCacheForTests,
+  PENDING_KEY,
+  readPendingBuffer,
+  clearPendingBuffer,
+  setBaseRevision,
+  getBaseRevision,
+  setCollectionFromFile,
+  readLegacyCollection,
 } from '../../src/ui/collection'
 
 beforeEach(() => {
@@ -30,7 +37,7 @@ describe('counts', () => {
     setCount('a/1', 2)
     setCount('a/1', -5)
     expect(getCollection().counts).toEqual({})
-    expect(JSON.parse(localStorage.getItem('ctcg:collection:v1')!)).toEqual({ counts: {} })
+    expect(JSON.parse(localStorage.getItem(PENDING_KEY)!)).toEqual({ counts: {}, baseRevision: 0 })
   })
 
   it('adjustCount adds and subtracts with a floor of 0', () => {
@@ -64,8 +71,9 @@ describe('counts', () => {
 
     expect(getStorageError()).toContain('Could not save the collection')
     // Nothing was written: storage still holds the last readable blob…
-    expect(JSON.parse(localStorage.getItem('ctcg:collection:v1')!)).toEqual({
+    expect(JSON.parse(localStorage.getItem(PENDING_KEY)!)).toEqual({
       counts: { 'beta/1': 2 },
+      baseRevision: 0,
     })
     // …and the cache was invalidated, so the UI snaps back to that truth
     // rather than showing the phantom count.
@@ -153,6 +161,68 @@ describe('subscription', () => {
     expect(result.current).toBe(first) // stable reference, no write between
     act(() => setCount('a/1', 3))
     expect(result.current.counts['a/1']).toBe(3)
+  })
+})
+
+describe('pending buffer', () => {
+  it('records every mutation with the current base revision', () => {
+    setBaseRevision(7)
+    setCount('a/1', 2)
+    expect(readPendingBuffer()).toEqual({ counts: { 'a/1': 2 }, baseRevision: 7 })
+  })
+
+  it('survives a reload (it is real localStorage, not memory)', () => {
+    setCount('a/1', 3)
+    _resetCollectionCacheForTests()
+    expect(readPendingBuffer()?.counts).toEqual({ 'a/1': 3 })
+  })
+
+  it('clearPendingBuffer removes it without touching the collection', () => {
+    setCount('a/1', 1)
+    clearPendingBuffer()
+    expect(readPendingBuffer()).toBeUndefined()
+    expect(getCollection().counts).toEqual({ 'a/1': 1 })
+  })
+
+  it('setCollectionFromFile adopts server state WITHOUT creating a buffer', () => {
+    setCollectionFromFile({ 'b/2': 4 }, 9)
+    expect(getCollection().counts).toEqual({ 'b/2': 4 })
+    expect(getBaseRevision()).toBe(9)
+    expect(readPendingBuffer()).toBeUndefined()
+  })
+
+  it('setCollectionFromFile still notifies subscribers', () => {
+    let calls = 0
+    const unsubscribe = subscribeCollection(() => calls++)
+    setCollectionFromFile({ 'b/2': 1 }, 2)
+    expect(calls).toBe(1)
+    unsubscribe()
+  })
+
+  it('does not write the legacy key any more, but still reads it', () => {
+    localStorage.setItem('ctcg:collection:v1', JSON.stringify({ counts: { 'legacy/1': 5 } }))
+    expect(readLegacyCollection()?.counts).toEqual({ 'legacy/1': 5 })
+    setCount('a/1', 1)
+    expect(JSON.parse(localStorage.getItem('ctcg:collection:v1')!).counts).toEqual({ 'legacy/1': 5 })
+    // The buffer is the FULL intended collection, not a diff, and readCollection
+    // falls back to the legacy key only until a buffer exists — so the first
+    // mutation must fold the legacy counts in. If it only captured 'a/1', the
+    // legacy/1 count would be silently and permanently lost the moment this
+    // buffer is written, since every read from here on sees the buffer and
+    // never looks at the legacy key again.
+    expect(readPendingBuffer()?.counts).toEqual({ 'legacy/1': 5, 'a/1': 1 })
+  })
+
+  it('a malformed buffer is ignored rather than throwing', () => {
+    localStorage.setItem(PENDING_KEY, '{ not json')
+    expect(readPendingBuffer()).toBeUndefined()
+  })
+
+  it('refuses to buffer counts the reader would reject, and says so', () => {
+    setCount('a/1', 1)
+    setCount('b/2', 1e20)
+    expect(getStorageError()).toContain('Could not save')
+    expect(readPendingBuffer()?.counts).toEqual({ 'a/1': 1 })
   })
 })
 
