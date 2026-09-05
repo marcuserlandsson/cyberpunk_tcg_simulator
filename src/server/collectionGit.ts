@@ -47,8 +47,21 @@ export async function commitCollection(filePath: string, summary: string): Promi
     const status = await git(cwd, ['status', '--porcelain', '--', filePath])
     if (status === '') return { status: 'skipped', detail: 'collection file unchanged' }
 
-    await git(cwd, ['add', '--', filePath])
-    await git(cwd, ['commit', '-m', `chore(collection): ${summary}`, '--', filePath])
+    try {
+      await git(cwd, ['add', '--', filePath])
+      await git(cwd, ['commit', '-m', `chore(collection): ${summary}`, '--', filePath])
+    } catch (err) {
+      // A failed commit (a rejecting hook, a GPG-signing timeout, disk
+      // pressure...) must not leave the collection file staged: until our
+      // next successful attempt, any unrelated `git commit` the user runs by
+      // hand would otherwise silently sweep our staged change in with it —
+      // exactly the leak the explicit pathspec exists to prevent, just
+      // inverted. Reset the index for this path only. Swallowing the
+      // reset's own failure is correct here: we are already on a failure
+      // path and must still return a GitResult rather than throw.
+      await git(cwd, ['reset', '--', filePath]).catch(() => {})
+      return { status: 'failed', detail: `commit failed: ${String(err)}` }
+    }
 
     try {
       await git(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'])
