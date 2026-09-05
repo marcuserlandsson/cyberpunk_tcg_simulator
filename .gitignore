@@ -6,3 +6,8 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 .worktrees/
+data/collection.backup.json
+# The atomic-write temp file (collectionFile.ts writes <file>.tmp then renames
+# over the target). It should never outlive a write, but an orphan left by a
+# crash must not show up as untracked work the owner might mistake for data.
+data/*.tmp
