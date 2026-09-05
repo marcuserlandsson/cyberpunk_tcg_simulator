@@ -13,18 +13,13 @@
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import type { CardDb, CardDef } from '../engine/types'
+import { collectionSchema, type Collection } from '../collection/format'
 import { formatZodIssues, getPrinting, type Printing } from './printings'
 import { buildDisplayNames } from './storage'
 
 const COLLECTION_KEY = 'ctcg:collection:v1'
 
-export interface Collection {
-  counts: Record<string, number>
-}
-
-const collectionSchema = z.object({
-  counts: z.record(z.string(), z.number().int().nonnegative()),
-})
+export type { Collection }
 
 /** Snapshots handed to components are frozen: `useSyncExternalStore` shares
  *  one reference across every consumer until the next write, so a consumer

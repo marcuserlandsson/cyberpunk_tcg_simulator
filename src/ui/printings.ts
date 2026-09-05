@@ -5,6 +5,7 @@
 
 import { z } from 'zod'
 import rawPrintings from '../../data/printings.json'
+import { formatZodIssues } from '../collection/format'
 
 export interface Printing {
   /** The app's stable printing id: `"<setCode>/<collectorNumber>"`, or
@@ -39,25 +40,7 @@ const printingSchema = z.object({
 
 const printingsSchema = z.array(printingSchema)
 
-/**
- * One readable line per zod issue, instead of zod's own `error.message` —
- * which is a pretty-printed JSON array of issue objects and reads as noise
- * when it lands in front of a user (the Collection tab's error state, and
- * `collection.ts`'s import errors, both render these verbatim).
- *
- * Lives here rather than in `collection.ts` only because this is the lowest
- * zod-using module in the collection feature's import chain (`collection.ts`
- * imports this one), so both sides can share one formatting rule without a
- * cycle or a new module.
- */
-export function formatZodIssues(error: z.ZodError): string {
-  return error.issues
-    .map((issue) => {
-      const path = issue.path.map((segment) => String(segment)).join('.')
-      return path === '' ? issue.message : `${path}: ${issue.message}`
-    })
-    .join('\n')
-}
+export { formatZodIssues } from '../collection/format'
 
 /**
  * The app's stable printing id. `finish` participates only when it is
