@@ -5,6 +5,7 @@ import { loadCardDb } from '../../src/engine/cardDb'
 import { loadPrintings } from '../../src/ui/printings'
 import { _resetCollectionCacheForTests, getCollection, setCount } from '../../src/ui/collection'
 import { CollectionHeader } from '../../src/ui/CollectionHeader'
+import * as sync from '../../src/ui/collectionSync'
 
 const db = loadCardDb()
 const printings = loadPrintings()
@@ -14,7 +15,10 @@ beforeEach(() => {
   _resetCollectionCacheForTests()
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('CollectionHeader', () => {
   it('renders live stats', () => {
@@ -92,5 +96,111 @@ describe('CollectionHeader', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('copy-error')).toBeNull()
     })
+  })
+})
+
+describe('sync status', () => {
+  it('shows a saved state when idle, with the last-saved time', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({
+      state: 'idle',
+      pendingCount: 0,
+      lastSavedAt: '2026-09-05T00:00:00.000Z',
+    })
+    render(<CollectionHeader db={db} printings={printings} />)
+    expect(screen.getByTestId('sync-status').textContent).toMatch(/saved/i)
+  })
+
+  it('shows an in-progress state while saving', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'saving', pendingCount: 1 })
+    render(<CollectionHeader db={db} printings={printings} />)
+    expect(screen.getByTestId('sync-status').textContent).toMatch(/saving/i)
+  })
+
+  it('shows the unsaved count and a retry button', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'unsaved', pendingCount: 300 })
+    render(<CollectionHeader db={db} printings={printings} />)
+    expect(screen.getByTestId('sync-status').textContent).toContain('300')
+    expect(screen.getByTestId('sync-retry')).toBeTruthy()
+    expect(screen.getByTestId('sync-download')).toBeTruthy()
+  })
+
+  it('surfaces the server-provided message on unsaved (e.g. a corrupt collection file)', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({
+      state: 'unsaved',
+      pendingCount: 2,
+      message: 'The collection file on disk is corrupt.',
+    })
+    render(<CollectionHeader db={db} printings={printings} />)
+    expect(screen.getByTestId('sync-status').textContent).toContain('The collection file on disk is corrupt.')
+  })
+
+  it('retry calls flushNow', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'unsaved', pendingCount: 2 })
+    const flush = vi.spyOn(sync, 'flushNow').mockResolvedValue(undefined)
+    render(<CollectionHeader db={db} printings={printings} />)
+    fireEvent.click(screen.getByTestId('sync-retry'))
+    expect(flush).toHaveBeenCalledOnce()
+  })
+
+  it('download escape hatch downloads the current collection as JSON, via a Blob download', () => {
+    setCount(printings[0].key, 3)
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'unsaved', pendingCount: 3 })
+    const blobSpy = vi.spyOn(globalThis, 'Blob')
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-collection')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    render(<CollectionHeader db={db} printings={printings} />)
+    fireEvent.click(screen.getByTestId('sync-download'))
+    expect(clickSpy).toHaveBeenCalledOnce()
+    const [parts] = blobSpy.mock.calls[0] as [BlobPart[]]
+    expect(String(parts[0])).toContain(printings[0].key)
+  })
+
+  it('offers both choices on a conflict, shows what each side holds, and never resolves it automatically', () => {
+    setCount(printings[0].key, 3)
+    const resolve = vi.spyOn(sync, 'resolveConflict').mockResolvedValue(undefined)
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({
+      state: 'conflict',
+      pendingCount: 4,
+      message: 'moved',
+      conflictDisk: { counts: { [printings[0].key]: 10 }, revision: 5 },
+    })
+    render(<CollectionHeader db={db} printings={printings} />)
+    const conflictBox = screen.getByTestId('sync-conflict')
+    expect(conflictBox).toBeTruthy()
+    // The owner must be able to tell what each choice means before picking —
+    // at minimum, the disk total versus the local total.
+    expect(conflictBox.textContent).toContain('10')
+    expect(conflictBox.textContent).toContain('3')
+    // The server's explanation of the conflict is surfaced too, not swallowed.
+    expect(screen.getByTestId('sync-status').textContent).toContain('moved')
+    expect(resolve).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('sync-keep-mine'))
+    expect(resolve).toHaveBeenCalledWith('mine')
+    fireEvent.click(screen.getByTestId('sync-take-disk'))
+    expect(resolve).toHaveBeenCalledWith('disk')
+  })
+
+  it('notes a failed git push without claiming the save failed', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'idle', pendingCount: 0, git: 'failed' })
+    render(<CollectionHeader db={db} printings={printings} />)
+    expect(screen.getByTestId('sync-status').textContent).toMatch(/saved/i)
+    expect(screen.getByTestId('sync-status').textContent).toMatch(/push/i)
+    // The failed-push note must never read as a failed save.
+    expect(screen.getByTestId('sync-status').textContent).not.toMatch(/save failed|not saved/i)
+  })
+
+  it('explains a would-empty refusal and requires an explicit confirmation to proceed', () => {
+    const confirm = vi.spyOn(sync, 'confirmEmptySave').mockResolvedValue(undefined)
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({
+      state: 'would-empty',
+      pendingCount: 0,
+      message: 'This save would empty a non-empty collection.',
+    })
+    render(<CollectionHeader db={db} printings={printings} />)
+    expect(screen.getByTestId('sync-status').textContent).toMatch(/empty/i)
+    expect(confirm).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('sync-confirm-empty'))
+    expect(confirm).toHaveBeenCalledOnce()
   })
 })

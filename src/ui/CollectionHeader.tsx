@@ -16,6 +16,15 @@ import {
   importCollectionJson,
   importCollectionText,
 } from './collection'
+import { useSyncStatus, flushNow, resolveConflict, confirmEmptySave } from './collectionSync'
+
+/** Sum of raw per-printing counts — the same arithmetic `completionStats`
+ *  uses for `totalOwned`, applied to the disk-side counts a conflict hands
+ *  back, so the two numbers shown side by side in the conflict chooser are
+ *  actually comparable. */
+function totalCount(counts: Record<string, number>): number {
+  return Object.values(counts).reduce((sum, n) => sum + n, 0)
+}
 
 /**
  * This is the player's ONLY backup path for what can be hours of manual
@@ -40,6 +49,7 @@ function download(filename: string, content: string): void {
 
 export function CollectionHeader({ db, printings }: { db: CardDb; printings: Printing[] }): ReactElement {
   const collection = useCollection()
+  const syncStatus = useSyncStatus()
   const stats = useMemo(
     () => completionStats(db, printings, collection),
     [db, printings, collection]
@@ -62,6 +72,84 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
 
   return (
     <div className="collection-header">
+      <span
+        className={`collection-header__sync collection-header__sync--${syncStatus.state}`}
+        data-testid="sync-status"
+      >
+        {syncStatus.state === 'idle' && (
+          <>
+            Saved to disk
+            {syncStatus.lastSavedAt !== undefined
+              ? ` · ${new Date(syncStatus.lastSavedAt).toLocaleTimeString()}`
+              : ''}
+            {syncStatus.git === 'failed' && (
+              <span className="collection-header__sync-note">
+                {' '}
+                · git push failed — your data is safe on disk
+              </span>
+            )}
+          </>
+        )}
+        {syncStatus.state === 'saving' && <>Saving…</>}
+        {syncStatus.state === 'unsaved' && (
+          <>
+            <strong>{syncStatus.pendingCount} changes not yet saved to disk</strong> — retrying…
+            {syncStatus.message !== undefined && (
+              <span className="collection-header__sync-note"> · {syncStatus.message}</span>
+            )}
+          </>
+        )}
+        {syncStatus.state === 'conflict' && (
+          <>
+            The collection on disk changed while you were editing.
+            {syncStatus.message !== undefined && (
+              <span className="collection-header__sync-note"> · {syncStatus.message}</span>
+            )}
+          </>
+        )}
+        {syncStatus.state === 'would-empty' && (
+          <>
+            Refused to save: this would empty a collection that still has cards on disk. Nothing is
+            saved until you confirm.
+          </>
+        )}
+      </span>
+      {syncStatus.state === 'unsaved' && (
+        <>
+          <button type="button" data-testid="sync-retry" onClick={() => void flushNow()}>
+            Retry now
+          </button>
+          <button
+            type="button"
+            data-testid="sync-download"
+            onClick={() => download('collection.json', exportCollectionJson(collection))}
+          >
+            Download JSON
+          </button>
+        </>
+      )}
+      {syncStatus.state === 'conflict' && (
+        <span className="collection-header__conflict" data-testid="sync-conflict">
+          {syncStatus.conflictDisk !== undefined && (
+            <>
+              Disk has {totalCount(syncStatus.conflictDisk.counts)} cards total; yours has{' '}
+              {stats.totalOwned}.{' '}
+            </>
+          )}
+          Choose which copy to keep — this cannot be undone.
+          <button type="button" data-testid="sync-keep-mine" onClick={() => void resolveConflict('mine')}>
+            Keep mine
+          </button>
+          <button type="button" data-testid="sync-take-disk" onClick={() => void resolveConflict('disk')}>
+            Take disk
+          </button>
+        </span>
+      )}
+      {syncStatus.state === 'would-empty' && (
+        <button type="button" data-testid="sync-confirm-empty" onClick={() => void confirmEmptySave()}>
+          Yes, save an empty collection
+        </button>
+      )}
       <span data-testid="collection-stats">
         Playset {stats.playsetPct}% · Arts {stats.artsPct}% · {stats.totalOwned} cards owned
       </span>

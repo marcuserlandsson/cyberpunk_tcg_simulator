@@ -58,6 +58,44 @@
 }
 
 /* ---------------------------------------------------------------------- */
+/* Header: sync status, retry, conflict resolution (Task 7)              */
+/* ---------------------------------------------------------------------- */
+
+.collection-header__sync {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.collection-header__sync--saving {
+  color: var(--muted);
+}
+
+/* Auto-retrying, but actionable now (a Retry button sits right next to
+   it) — yellow per the color-token semantics, not red: nothing has failed
+   permanently yet. */
+.collection-header__sync--unsaved {
+  color: var(--act);
+}
+
+/* Both require a human decision the retry loop cannot make on its own. */
+.collection-header__sync--conflict,
+.collection-header__sync--would-empty {
+  color: var(--rival);
+}
+
+.collection-header__sync-note {
+  color: var(--muted);
+}
+
+.collection-header__conflict {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------- */
 /* Quick-add bar (Task 8)                                                 */
 /* ---------------------------------------------------------------------- */
 
