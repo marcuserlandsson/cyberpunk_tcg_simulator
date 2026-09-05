@@ -190,12 +190,32 @@ an alt art is a separate thing to own rather than a flag on the card.
   matched card (an Iconic variant, say), Enter deliberately does *not* guess:
   the row lists the candidates with collector number and rarity to click.
 - Completion stats, a copy-able buy-list of what is missing, and JSON / text
-  export and import (replace or merge). **The JSON export is your backup** —
-  counts live in `localStorage` and nothing is stored anywhere else.
+  export and import (replace or merge).
 
 In the Deck Builder, each card carries an `owned x/3` badge and the deck gets
 a "missing N cards for this deck" summary with its own buy-list button. That
 is **informational only** — ownership never blocks an add, a save, or a game.
+
+### Where the collection is stored
+
+`data/collection.json` is the source of truth and is **committed to the
+repo** — it's not local-only state. Saves go through a dev-server endpoint,
+so `npm run dev` has to be running for edits to persist; the app talks to it
+automatically, there's nothing to start by hand beyond the dev server itself.
+
+Edits are batched: after you stop editing for a few seconds, the change is
+written to `data/collection.json` and, a few seconds after that, auto-committed
+and pushed. If the dev server is unreachable or a save fails, your edits stay
+in the browser and are retried automatically — the header shows a "N changes
+not yet saved to disk" banner with a manual Retry button, and nothing is ever
+silently dropped.
+
+`CTCG_COLLECTION_FILE` (an environment variable) overrides the file path and,
+when set, disables the auto-commit/push entirely — this is how the test
+suites point the endpoint at a scratch file instead of the real collection.
+`data/collection.backup.json` always holds the previous contents of the file
+from before the last write; it's gitignored and exists purely as a local
+safety net, not a second source of truth.
 
 ## Simulation
 

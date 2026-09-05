@@ -8,6 +8,20 @@
 // test exercises. The set is then selected explicitly before typing, so the
 // add itself is deterministic regardless of the default.
 import { test, expect } from '@playwright/test'
+import { rm } from 'node:fs/promises'
+
+// Now that initCollectionSync (Task 8) is wired in, this test's count reaches
+// the same scratch file (playwright.config.ts's webServer.env) as every other
+// e2e spec's collection state, so a card left on disk by an earlier spec
+// (e.g. e2e/collection-file.spec.ts) would otherwise make this test's "add
+// one, expect 1/3" assertion see 2/3 instead. Reset it first, same as that
+// spec's own beforeEach.
+const SCRATCH = 'test-results/e2e-collection.json'
+
+test.beforeEach(async () => {
+  await rm(SCRATCH, { force: true })
+  await rm(SCRATCH.replace(/\.json$/, '.backup.json'), { force: true })
+})
 
 test('quick-add persists across reload and shows in the deck builder', async ({ page }) => {
   await page.goto('/?aiDelay=0')

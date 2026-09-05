@@ -35,5 +35,14 @@ export default defineConfig({
     timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',
+    // The whole e2e suite must never touch the real data/collection.json or
+    // produce a real git commit. Pointing the endpoint at a scratch file
+    // (gitignored under test-results/) also disables git automation entirely
+    // (see src/server/collectionGit.ts's gitAutomationDisabled) — the same
+    // lever closes both risks at once.
+    env: {
+      ...process.env,
+      CTCG_COLLECTION_FILE: 'test-results/e2e-collection.json',
+    },
   },
 })
