@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   _resetCollectionCacheForTests,
+  getBaseRevision,
   getCollection,
   readPendingBuffer,
   setCount,
@@ -216,6 +217,96 @@ describe('initCollectionSync', () => {
     expect(getCollection().counts).toEqual({ 'typed/while-loading': 4 })
     expect(readPendingBuffer()?.counts).toEqual({ 'typed/while-loading': 4 })
     expect(getSyncStatus().state).toBe('unsaved')
+  })
+
+  // The follow-on to I1's reordering. Registering the listeners before the
+  // GET makes it reachable for a mid-init flush to SUCCEED before the GET
+  // resolves — and that response still describes the file as it was before
+  // the write. Adopting it rolls the just-saved card off the screen and
+  // regresses baseRevision behind what disk holds, while the banner reads
+  // "Saved to disk"; the next flush then 409s, and "Keep mine" there would
+  // discard the card. Against the pre-fix code this fails on both the counts
+  // and the revision: setCollectionFromFile({}, 0) had already run.
+  it('a GET that resolves after a mid-init flush succeeded is ignored as stale', async () => {
+    let releaseGet: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => {
+      releaseGet = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'GET') {
+        await gate
+        // The PRE-write state of the file: this request was issued before the
+        // PUT below ever happened.
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ version: 1, revision: 0, savedAt: 'x', counts: {} }),
+        } as Response
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ revision: 1, savedAt: '2026-09-05T02:00:00.000Z', git: { status: 'ok' } }),
+      } as Response
+    }))
+
+    const init = initCollectionSync()
+
+    // The player enters a card and it is flushed — successfully — while the
+    // GET is still in flight.
+    setCount('saved/1', 1)
+    await flushNow()
+    expect(getSyncStatus().state).toBe('idle')
+    expect(getBaseRevision()).toBe(1)
+    expect(readPendingBuffer()).toBeUndefined()
+
+    releaseGet!()
+    await init
+
+    // The stale response must change nothing.
+    expect(getCollection().counts).toEqual({ 'saved/1': 1 })
+    expect(getBaseRevision()).toBe(1)
+    expect(getSyncStatus().state).toBe('idle')
+    expect(getSyncStatus().lastSavedAt).toBe('2026-09-05T02:00:00.000Z')
+  })
+
+  // The same staleness, but with a buffer present — a second edit made after
+  // the mid-init flush landed. Adopting the stale file here would not merely
+  // blank the screen: buffer.baseRevision (1) vs file.revision (0) trips C1's
+  // divergence check and raises a conflict chooser over a file that is
+  // strictly OLDER than what this client already saved.
+  it('a stale GET does not raise a false conflict against a newer confirmed revision', async () => {
+    let releaseGet: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => {
+      releaseGet = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'GET') {
+        await gate
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ version: 1, revision: 0, savedAt: 'x', counts: {} }),
+        } as Response
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ revision: 1, savedAt: 'now', git: { status: 'ok' } }),
+      } as Response
+    }))
+
+    const init = initCollectionSync()
+    setCount('saved/1', 1)
+    await flushNow() // lands: baseRevision 1, buffer cleared
+    setCount('saved/2', 2) // a second edit, buffer now stamped at base 1
+
+    releaseGet!()
+    await init
+
+    expect(getSyncStatus().state).not.toBe('conflict')
+    expect(getCollection().counts).toEqual({ 'saved/1': 1, 'saved/2': 2 })
+    expect(readPendingBuffer()?.baseRevision).toBe(1)
   })
 })
 

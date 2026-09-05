@@ -435,6 +435,25 @@ export async function initCollectionSync(): Promise<void> {
   // before the await.
   const buffer = readPendingBuffer()
 
+  // A GET issued before a flush can resolve AFTER it. Registering the
+  // listeners synchronously (above) made that reachable: the player can edit
+  // during a slow GET, the debounce — or a visibilitychange/beforeunload
+  // flush — can PUT and succeed, and only then does this response arrive,
+  // still describing the file as it was BEFORE that write. Adopting it would
+  // roll the just-saved card off the screen and regress `baseRevision` behind
+  // what disk actually holds, with the banner reading "Saved to disk"; the
+  // next flush would then 409, and a "Keep mine" there would discard the card.
+  //
+  // `getBaseRevision()` is the revision this client last CONFIRMED (a
+  // successful PUT, or an earlier adopted file), so a response older than it
+  // is describing a past we have already moved beyond. Comparing against our
+  // own confirmed revision — rather than a timestamp or a request sequence —
+  // cannot skip a legitimately newer file, because a newer file always has a
+  // revision >= the one we confirmed.
+  if (file !== undefined && file.revision < getBaseRevision()) {
+    return
+  }
+
   if (file !== undefined) {
     lastConfirmed = { ...file.counts }
     if (buffer === undefined) {
