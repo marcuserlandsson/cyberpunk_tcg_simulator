@@ -119,13 +119,16 @@ export async function writeCollectionFile(
   }
 
   await mkdir(dirname(filePath), { recursive: true })
-  if (current.revision > 0) {
-    // Best-effort: a missing previous file is not a reason to refuse a write.
-    try {
-      await copyFile(filePath, backupPathFor(filePath))
-    } catch {
-      /* ignore */
-    }
+  // Preserve whatever is currently on disk before we overwrite it. A missing
+  // previous file (ENOENT) is fine — there is nothing to back up, whether
+  // this is the very first write or `current` came back as EMPTY_FILE. Any
+  // other failure (permissions, disk full, the backup path itself unusable)
+  // means we could not honor the "back up before every overwrite" guarantee,
+  // so it must propagate and abort the write rather than proceed silently.
+  try {
+    await copyFile(filePath, backupPathFor(filePath))
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
   }
 
   const tmp = `${filePath}.tmp`

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, writeFile, rm, readdir } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile, rm, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -101,5 +101,31 @@ describe('writeCollectionFile', () => {
   it('leaves no .tmp file behind', async () => {
     await writeCollectionFile(file, { baseRevision: 0, counts: { 'a/1': 1 } })
     expect((await readdir(dir)).filter((n) => n.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('backs up a hand-edited file that is still at revision 0', async () => {
+    // A file can exist on disk at revision 0 (e.g. hand-edited or written by
+    // an external tool) without ever having gone through writeCollectionFile.
+    // The old `current.revision > 0` gate skipped the backup for exactly
+    // this case; it must not be skipped.
+    await writeFile(
+      file,
+      JSON.stringify({ version: 1, revision: 0, savedAt: new Date().toISOString(), counts: { 'a/1': 1 } }),
+      'utf8'
+    )
+    const result = await writeCollectionFile(file, { baseRevision: 0, counts: { 'a/1': 2 } })
+    expect(result.ok).toBe(true)
+    const backup = JSON.parse(await readFile(backupPathFor(file), 'utf8'))
+    expect(backup.counts).toEqual({ 'a/1': 1 })
+  })
+
+  it('propagates a non-ENOENT backup failure and leaves the target untouched', async () => {
+    await writeCollectionFile(file, { baseRevision: 0, counts: { 'a/1': 1 } })
+    const before = await readFile(file, 'utf8')
+    // Force copyFile to fail with something other than ENOENT by making the
+    // backup destination a directory instead of a missing path.
+    await mkdir(backupPathFor(file))
+    await expect(writeCollectionFile(file, { baseRevision: 1, counts: { 'a/1': 2 } })).rejects.toThrow()
+    expect(await readFile(file, 'utf8')).toBe(before)
   })
 })
