@@ -418,11 +418,11 @@ describe('dexter-deshawn-off-the-grid', () => {
     const dexter = mintInto(state, 0, 'legends', 'dexter-deshawn-off-the-grid')
     setGigs(state, 0, [{ size: 10, value: 5 }, { size: 4, value: 4 }])
 
-    const next = activate(db, state, dexter, 1, { targets: [0] })
+    const next = activate(db, state, dexter, 1, { targets: [0, 0] })
     expect(gigValues(next, 0)).toEqual([7, 4])
     expect(next.cards[dexter].ready).toBe(false)
     // A d4 already showing 4 cannot go higher.
-    const capped = activate(db, state, dexter, 1, { targets: [1] })
+    const capped = activate(db, state, dexter, 1, { targets: [1, 0] })
     expect(gigValues(capped, 0)).toEqual([5, 4])
   })
 })
@@ -559,7 +559,7 @@ describe('industrial-assembly', () => {
     setGigs(state, 0, [{ size: 10, value: 5 }, { size: 10, value: 1 }])
     const handBefore = state.players[0].hand.length
 
-    const next = playCardByDef(db, state, 0, 'industrial-assembly', { targets: [0] })
+    const next = playCardByDef(db, state, 0, 'industrial-assembly', { targets: [0, 0] })
     expect(gigValues(next, 0)).toEqual([9, 1])
     expect(next.players[0].hand).toHaveLength(handBefore - 1 + 1) // played one, drew one
   })
@@ -569,7 +569,7 @@ describe('industrial-assembly', () => {
     setGigs(state, 0, [{ size: 10, value: 2 }])
     const handBefore = state.players[0].hand.length
 
-    const next = playCardByDef(db, state, 0, 'industrial-assembly', { targets: [0] })
+    const next = playCardByDef(db, state, 0, 'industrial-assembly', { targets: [0, 0] })
     expect(gigValues(next, 0)).toEqual([6])
     expect(next.players[0].hand).toHaveLength(handBefore - 1)
   })
@@ -810,7 +810,7 @@ describe('meredith-stout-stone-cold-corpo', () => {
     const dexter = mintInto(state, 1, 'legends', 'dexter-deshawn-off-the-grid')
 
     // anyGigDie with player 1's own area empty: index 0 is player 0's die.
-    const next = activate(db, state, dexter, 1, { targets: [0] })
+    const next = activate(db, state, dexter, 1, { targets: [0, 0] })
     expect(gigValues(next, 0)).toEqual([5])
     expect(next.players[0].hand).toContain(trashed)
     expect(next.players[0].trash).not.toContain(trashed)

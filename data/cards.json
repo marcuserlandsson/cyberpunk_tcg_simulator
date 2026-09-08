@@ -26,7 +26,8 @@
         "effect": {
           "kind": "changeGig",
           "amount": 6,
-          "target": "anyGigDie"
+          "target": "anyGigDie",
+          "upTo": true
         }
       }
     ],
@@ -155,7 +156,8 @@
               "kind": "changeGig",
               "amount": 1,
               "target": "anyGigDie",
-              "adjust": true
+              "adjust": true,
+              "upTo": true
             },
             {
               "kind": "conditionalEffect",
@@ -931,7 +933,8 @@
         "effect": {
           "kind": "changeGig",
           "amount": 2,
-          "target": "anyGigDie"
+          "target": "anyGigDie",
+          "upTo": true
         }
       }
     ],
@@ -962,7 +965,8 @@
           "kind": "changeGig",
           "amount": 1,
           "target": "anyGigDie",
-          "adjust": true
+          "adjust": true,
+          "upTo": true
         }
       },
       {
@@ -971,7 +975,8 @@
           "kind": "changeGig",
           "amount": 1,
           "target": "anyGigDie",
-          "adjust": true
+          "adjust": true,
+          "upTo": true
         }
       },
       {
@@ -1089,7 +1094,8 @@
         "effect": {
           "kind": "changeGig",
           "amount": -2,
-          "target": "anyGigDie"
+          "target": "anyGigDie",
+          "upTo": true
         }
       },
       {
@@ -1761,7 +1767,8 @@
             {
               "kind": "changeGig",
               "amount": 4,
-              "target": "anyGigDie"
+              "target": "anyGigDie",
+              "upTo": true
             },
             {
               "kind": "conditionalEffect",
@@ -2291,7 +2298,8 @@
         "effect": {
           "kind": "changeGig",
           "amount": 3,
-          "target": "anyGigDie"
+          "target": "anyGigDie",
+          "upTo": true
         }
       }
     ],
@@ -4662,7 +4670,8 @@
             {
               "kind": "changeGig",
               "amount": -3,
-              "target": "anyGigDie"
+              "target": "anyGigDie",
+              "upTo": true
             },
             {
               "kind": "conditionalEffect",
@@ -5077,7 +5086,8 @@
         "effect": {
           "kind": "changeGig",
           "amount": -2,
-          "target": "anyGigDie"
+          "target": "anyGigDie",
+          "upTo": true
         }
       }
     ],
@@ -5367,7 +5377,8 @@
               "kind": "changeGig",
               "amount": 1,
               "target": "anyGigDie",
-              "adjust": true
+              "adjust": true,
+              "upTo": true
             },
             {
               "kind": "conditionalEffect",

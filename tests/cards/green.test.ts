@@ -569,7 +569,7 @@ describe('padre-man-of-the-cross', () => {
     setGigs(state, 0, [{ size: 6, value: 2 }])
     setGigs(state, 1, [{ size: 10, value: 9 }])
     const next = activate(db, state, padre, 1, { targets: [0, 1] })
-    expect(gigValues(next, 0)).toEqual([6]) // min(6, 9) clamped to the d6's own size
+    expect(gigValues(next, 0)).toEqual([2]) // 9 is not a face on d6, so setting it fails
     expect(gigValues(next, 1)).toEqual([9])
   })
 })

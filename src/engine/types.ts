@@ -279,10 +279,10 @@ export type EffectNode =
   // misty-olszewski-...). Only meaningful with `trigger: 'static'`.
   | { kind: 'cantAttack' }
   // "Increase/decrease a Gig by up to N": moves one Gig die's top face by
-  // `amount` (negative decreases), clamped to [1, die size]
+  // `amount` (negative decreases). Invalid faces fail; upTo offers zero.
   // (docs/rulings.md §39). With `adjust: true` ("Adjust a Gig by up to N") the
   // sign *and* the magnitude are the player's decision, enumerated as a slot.
-  | { kind: 'changeGig'; amount: number; target: GigDieSpec; adjust?: boolean }
+  | { kind: 'changeGig'; amount: number; target: GigDieSpec; adjust?: boolean; upTo?: boolean }
   // "Give a friendly Unit these effects": one target slot, shared by every
   // child that names `target: 'chosen'` (docs/rulings.md §53).
   | {
@@ -411,7 +411,7 @@ export type EffectNode =
   // "Set a Gig's value to the value of another Gig" (peace-offering,
   // padre-man-of-the-cross) — two `anyGigDie` slots (the die being set, then
   // the die being read from), copying the second die's value onto the first,
-  // clamped to [1, size] exactly like `changeGig` (docs/rulings.md §39).
+  // failing if the value is not a face or already matches (CR 6.4.4–5).
   // Fires `onRivalAdjustFriendlyGig` on the SET die's owner, mirroring
   // `changeGig`/`swapGig`.
   | { kind: 'matchGig' }

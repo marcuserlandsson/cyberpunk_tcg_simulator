@@ -35,6 +35,7 @@ import {
   opponentOf,
   valuePairCount,
 } from '../../engine/query'
+import { chooseEffectOption } from '../../engine/choices'
 import { nextInt, shuffle } from '../../engine/rng'
 import type { CardDb, GameState, PlayerId } from '../../engine/types'
 import { fireTriggerOnDraft, readyFriendlyEddies, spendOnDraft, type EffectCtx } from '../effects'
@@ -193,21 +194,15 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     return state
   },
 
-  /**
-   * `v-roamer-of-the-badlands` — "When this Unit steals a Gig, increase it by
-   * up to 5." Attached to `onFriendlyStealDie` with `condition.selfIsStealer`
-   * (docs/rulings.md §55 ff.), so this only runs when V itself did the
-   * stealing. Unlike a general `changeGig` node (any Gig, a real choice of
-   * die), here BOTH the target (the die that was just stolen — always the
-   * last one pushed onto the thief's own Gig area, per docs/rulings.md §42)
-   * and the amount (a fixed-sign "by up to N" always takes the full clamped
-   * N, docs/rulings.md §39) are forced, so there is no real decision left to
-   * route through the slot machinery.
-   */
+  /** The stolen die is identified in the trigger, including multi-die steals. */
   'v-roamer-of-the-badlands': (_db, state, ctx) => {
     const p = state.players[ctx.player]
-    const die = p.gigArea[p.gigArea.length - 1]
-    if (die !== undefined) die.value = Math.min(die.size, die.value + 5)
+    const die = p.gigArea[ctx.context?.stolenDieIndex ?? p.gigArea.length - 1]
+    if (die === undefined) return state
+    const options = Array.from({ length: Math.min(5, die.size - die.value) + 1 }, (_, i) => Math.min(5, die.size - die.value) - i)
+    const amount = chooseEffectOption(state, ctx.player, ctx.sourceUid, 'Increase the stolen Gig by up to 5', options,
+      Object.fromEntries(options.map(n => [n, String(n)])))
+    if (amount !== null) die.value += amount
     return state
   },
 
@@ -1031,7 +1026,11 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const p = state.players[ctx.player]
     const die = p.gigArea[index]
     if (die === undefined) return state
-    die.value = Math.max(1, Math.min(die.size, die.value - 2))
+    const options = Array.from({ length: Math.min(2, die.value - 1) + 1 }, (_, i) => Math.min(2, die.value - 1) - i)
+    const amount = chooseEffectOption(state, ctx.player, ctx.sourceUid, 'Decrease this Gig by up to 2 (0 declines)', options,
+      Object.fromEntries(options.map(n => [n, String(n)])))
+    if (amount === null || amount === 0) return state
+    die.value -= amount
     if (die.value === 1) {
       if (!drawCards(state, ctx.player, 1)) {
         endGame(state, opponentOf(ctx.player), 'deckout')

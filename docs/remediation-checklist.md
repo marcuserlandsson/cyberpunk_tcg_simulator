@@ -75,3 +75,7 @@ Missing target/mode/amount choices now pause gameplay and ask the effect's contr
 ### 08e — simultaneous stealing
 
 Steals now select the complete batch before prevention, transfer accepted dice together, and let triggers see the completed transfer. Effect-driven steals finish before later instructions; an overtime-winning transfer ends the game before a following draw. Attack selection excludes already selected original indexes and shows the pending batch. Verified 1,067 engine/card/AI/fuzz tests (including 300 random games), TypeScript, and a complete Chromium game. Step 8 remains open for the remaining numbered audit findings.
+
+### 08f — Gig adjustment semantics
+
+Exact changes and set effects now fail outside the die's faces or when unchanged, without firing adjustment watchers. Printed up-to changes expose partial and zero amounts; exact bidirectional adjustments retain their two directions. V and Jackie scripts now offer amounts and Jackie only draws when the selected Gig actually becomes minimum. Stolen-die trigger context identifies each member of a batch. Return/reroll instructions ask for a die. Verified 658 engine/card tests and TypeScript, including six focused comprehensive-rules cases. Remaining source-lifetime/identity edge cases belong to the pending-resolution audit still open in step 8.

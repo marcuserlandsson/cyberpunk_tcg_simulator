@@ -1773,7 +1773,7 @@ describe('kiroshi-optics official equip errata', () => {
 // ---------------------------------------------------------------------------
 
 describe('EffectNode: changeGig (docs/rulings.md §39)', () => {
-  it('takes the full "up to" amount, clamped to the faces the die has', () => {
+  it('applies an exact change only when the result is a face', () => {
     const db = makeDb([
       def('boost', 'program', {
         effects: [onPlay({ kind: 'changeGig', amount: 4, target: 'friendlyGigDie' })],
@@ -1785,9 +1785,9 @@ describe('EffectNode: changeGig (docs/rulings.md §39)', () => {
 
     const first = fire(db, s, src, [0])
     expect(first.players[0].gigArea.map((d) => d.value)).toEqual([5, 5])
-    // 5 + 4 on a d6 stops at 6, never 9.
+    // 5 + 4 on a d6 fails: 9 is not a face.
     const second = fire(db, s, src, [1])
-    expect(second.players[0].gigArea.map((d) => d.value)).toEqual([1, 6])
+    expect(second.players[0].gigArea.map((d) => d.value)).toEqual([1, 5])
   })
 
   it('a negative amount decreases a rival gig, never below 1', () => {
@@ -1801,7 +1801,7 @@ describe('EffectNode: changeGig (docs/rulings.md §39)', () => {
     gigs(s, 1, [6, 2])
 
     expect(fire(db, s, src, [0]).players[1].gigArea.map((d) => d.value)).toEqual([4, 2])
-    expect(fire(db, s, src, [1]).players[1].gigArea.map((d) => d.value)).toEqual([6, 1])
+    expect(fire(db, s, src, [1]).players[1].gigArea.map((d) => d.value)).toEqual([6, 2])
   })
 
   it('enumerates one playCard entry per gig die (the die is a real choice)', () => {
@@ -2725,7 +2725,7 @@ describe('changeGig with adjust: sign and magnitude are the player choice', () =
     expect(applyAction(db, s, actions[1]).players[0].gigArea[0].value).toBe(4)
   })
 
-  it('picks an amount off the rng when a trigger supplies none, and clamps it', () => {
+  it('asks for an amount when a trigger supplies none', () => {
     const triggered = makeDb([
       def('adjuster', 'unit', {
         power: 2,
@@ -2741,7 +2741,7 @@ describe('changeGig with adjust: sign and magnitude are the player choice', () =
     const s = scenario()
     const attacker = mint(s, 0, 'field', 'adjuster')
     const victim = mint(s, 1, 'field', 'grunt', { ready: false })
-    gigs(s, 0, [1]) // a d6 showing 1: -1 clamps to 1, +1 gives 2
+    gigs(s, 0, [1]) // a d6 showing 1: -1 fails, +1 gives 2
 
     const next = applyAction(triggered, s, { type: 'attack', attacker, target: victim })
     expect([1, 2]).toContain(next.players[0].gigArea[0].value)

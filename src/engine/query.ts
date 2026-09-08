@@ -107,6 +107,8 @@ export interface ConditionContext {
   // Batch 4 additions (docs/rulings.md §81 ff.):
   /** `onFriendlyStealDie` only: the rolled value of the die that was just stolen (not its size). */
   stolenDieValue?: number
+  /** Index of this die after its simultaneous transfer. */
+  stolenDieIndex?: number
   /** `onFriendlyStealDie` only: was the stealing card's own type a Legend? */
   stealerIsLegend?: boolean
   /** `onUnitDefeated` only: the PlayerId that owned the defeated Unit. */

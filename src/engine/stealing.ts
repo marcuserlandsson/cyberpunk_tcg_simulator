@@ -45,8 +45,9 @@ export function transferStolenGigs(db: CardDb, draft: GameState, sourceUid: numb
   checkOvertimeWin(draft)
   if (draft.winner !== null) return stolen.length
   const def = db[draft.cards[sourceUid]?.defId]
-  for (const die of stolen) fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
+  for (const [offset, die] of stolen.entries()) fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
     stolenDieSize: die.size, stolenDieValue: die.value, stealerUid: sourceUid,
+    stolenDieIndex: draft.players[thief].gigArea.length - stolen.length + offset,
     stealerIsLegend: def?.type === 'legend',
   })
   fireWatcherTrigger(db, draft, 'onFriendlyStealComplete', thief, {

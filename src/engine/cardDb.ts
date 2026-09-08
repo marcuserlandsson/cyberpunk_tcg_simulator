@@ -269,6 +269,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       amount: z.number(),
       target: gigDieSpecSchema,
       adjust: z.boolean().optional(),
+      upTo: z.boolean().optional(),
     }),
     z.strictObject({
       kind: z.literal('sameTarget'),

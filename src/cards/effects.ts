@@ -183,7 +183,7 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
     case 'changeGig':
       return [
         { kind: 'target', spec: node.target },
-        ...(node.adjust === true ? [{ kind: 'amount' as const, options: adjustOptions(node.amount) }] : []),
+        ...(gigChangeOptions(node) ? [{ kind: 'amount' as const, options: gigChangeOptions(node)! }] : []),
       ]
     // "Swap a friendly Gig with a rival Gig": two fixed-role die slots
     // (docs/rulings.md §92 ff.).
@@ -286,6 +286,13 @@ function adjustOptions(amount: number): number[] {
   for (let i = magnitude; i >= 1; i--) options.push(-i)
   for (let i = 1; i <= magnitude; i++) options.push(i)
   return options
+}
+
+/** Exact changes fail outside the faces; up-to instructions also offer zero. */
+function gigChangeOptions(node: Extract<EffectNode, { kind: 'changeGig' }>): number[] | null {
+  if (node.adjust) return [...adjustOptions(node.amount), ...(node.upTo ? [0] : [])]
+  if (!node.upTo) return null
+  return Array.from({ length: Math.abs(node.amount) + 1 }, (_, i) => Math.sign(node.amount) * (Math.abs(node.amount) - i))
 }
 
 /** "If you have less ☆ (Street Cred) than a Rival" (docs/rulings.md §45). */
@@ -608,7 +615,7 @@ function applyNode(
       // "Adjust ..." carries a second slot for the signed amount; it must be
       // consumed whether or not the die slot was filled, or the nodes after
       // this one would read the wrong slots (docs/rulings.md §39).
-      const options = node.adjust === true ? adjustOptions(node.amount) : null
+      const options = gigChangeOptions(node)
       if (index === null) {
         if (options !== null) slots.next += 1
         return
@@ -617,11 +624,11 @@ function applyNode(
       const die = gigDieAt(draft, node.target, index, ctx.player)
       if (die === null) return
       const amount =
-        options === null ? node.amount : options[pick ?? randomIndex(draft, options.length)]
-      // "by up to N": the amount, clamped to the faces the die actually has
-      // (docs/rulings.md §39).
+        options === null ? node.amount : pick === null ? 0 : options[pick]
       const before = die.value
-      die.value = Math.max(1, Math.min(die.size, die.value + amount))
+      const after = before + amount
+      if (after < 1 || after > die.size || after === before) return
+      die.value = after
       note(draft, ctx.sourceUid, `gig ${before} -> ${die.value}`)
       // "When a Rival adjusts ... friendly Gigs" — fired on the AFFECTED
       // player, from their own point of view, whenever the die touched
@@ -665,7 +672,8 @@ function applyNode(
       const sourceDie = gigDieAt(draft, 'anyGigDie', sourceIndex, ctx.player)
       if (targetDie === null || sourceDie === null) return
       const before = targetDie.value
-      targetDie.value = Math.max(1, Math.min(targetDie.size, sourceDie.value))
+      if (sourceDie.value < 1 || sourceDie.value > targetDie.size || sourceDie.value === before) return
+      targetDie.value = sourceDie.value
       note(draft, ctx.sourceUid, `gig ${before} -> ${targetDie.value} (matched)`)
       const dieOwner = gigDieOwner(draft, 'anyGigDie', targetIndex, ctx.player)
       if (dieOwner !== ctx.player) {
@@ -852,7 +860,11 @@ function applyNode(
       const p = draft.players[ctx.player]
       for (let i = 0; i < node.count; i++) {
         if (p.gigArea.length === 0) break
-        const [die] = p.gigArea.splice(randomIndex(draft, p.gigArea.length), 1)
+        const options = p.gigArea.map((_die, index) => index)
+        const index = chooseEffectOption(draft, ctx.player, ctx.sourceUid, 'Choose a Gig to return to the fixer', options,
+          Object.fromEntries(options.map(index => [index, `d${p.gigArea[index].size}: ${p.gigArea[index].value}`])))
+        if (index === null) break
+        const [die] = p.gigArea.splice(index, 1)
         p.fixer.push({ size: die.size, value: 0 })
       }
       note(draft, ctx.sourceUid, `return ${node.count} gig(s) to the fixer`)
@@ -863,7 +875,11 @@ function applyNode(
       const player = playerFor(ctx, node.whose)
       const area = draft.players[player].gigArea
       if (area.length === 0) return
-      const die = area[randomIndex(draft, area.length)]
+      const options = area.map((_die, index) => index)
+      const index = chooseEffectOption(draft, ctx.player, ctx.sourceUid, 'Choose a Gig to reroll', options,
+        Object.fromEntries(options.map(index => [index, `d${area[index].size}: ${area[index].value}`])))
+      if (index === null) return
+      const die = area[index]
       const [value, rng] = rollDie(draft.rng, die.size)
       draft.rng = rng
       die.value = value

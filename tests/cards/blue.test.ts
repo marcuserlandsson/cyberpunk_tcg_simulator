@@ -530,7 +530,7 @@ describe('jackie-welles-pour-one-out-for-me', () => {
     const action = actionsOfType(db, state, 'playCard').find(a => db[state.cards[a.card].defId].id === 'jacked-in-voodoo-boy')!
     const pending = applyAction(db, state, action)
     expect(pending.pendingIntercept?.kind).toBe('effectChoice')
-    const s = applyAction(db, pending, { type: 'answerIntercept', answer: 1 })
+    const s = resolveEffectChoices(db, applyAction(db, pending, { type: 'answerIntercept', answer: 1 }))
 
     expect(gigValues(s, 0)).toEqual([1, 3])
     expect(s.players[0].deck.length).toBe(deckBefore) // no draw
@@ -1225,14 +1225,14 @@ describe('tetratronic-rippler', () => {
 // ---------------------------------------------------------------------------
 
 describe('trust-no-one', () => {
-  it('decreases a Gig by up to 3, clamped to 1, and draws when it becomes a min Gig', () => {
+  it('chooses a decrease of 2 and draws when the Gig becomes a min Gig', () => {
     const { state } = fixtureWithHand(0, ['trust-no-one'])
     setGigs(state, 0, [{ size: 6, value: 3 }])
     const deckBefore = state.players[0].deck.length
 
-    const s = playCardByDef(db, state, 0, 'trust-no-one')
+    const s = playCardByDef(db, state, 0, 'trust-no-one', { targets: [0, 1] })
 
-    expect(gigValues(s, 0)).toEqual([1]) // 3 - 3, clamped to the floor of 1
+    expect(gigValues(s, 0)).toEqual([1]) // selected -2
     expect(s.players[0].deck.length).toBe(deckBefore - 1)
   })
 
@@ -1260,7 +1260,7 @@ describe('trust-no-one', () => {
     ])
     const deckBefore = state.players[0].deck.length
 
-    const s = playCardByDef(db, state, 0, 'trust-no-one', { targets: [1] }) // decrease the d8, not the d6
+    const s = playCardByDef(db, state, 0, 'trust-no-one', { targets: [1, 0] }) // decrease the d8, not the d6
 
     expect(gigValues(s, 0)).toEqual([1, 3])
     expect(s.players[0].deck.length).toBe(deckBefore - 1)
@@ -1359,7 +1359,7 @@ describe('wakako-okada-peace-and-harmony', () => {
     const wakako = mintInto(state, 0, 'legends', 'wakako-okada-peace-and-harmony')
     setGigs(state, 0, [{ size: 6, value: 5 }])
 
-    const s = activate(db, state, wakako, 1, { targets: [0] })
+    const s = activate(db, state, wakako, 1, { targets: [0, 0] })
 
     expect(gigValues(s, 0)).toEqual([3])
     expect(s.cards[wakako].ready).toBe(false)
