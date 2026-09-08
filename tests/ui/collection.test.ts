@@ -282,13 +282,13 @@ import {
 const def = (id: string, type: 'legend' | 'unit') =>
   ({
     id, name: id, color: 'Red', type, cost: 1, power: 1,
-    ram: null, ramLimit: null, sellTag: false, keywords: [], text: '', effects: [],
+    ram: null, ramLimit: null, sellTag: false, keywords: [], text: 'Playable card.', effects: [],
   }) as unknown as CardDb[string]
 
 const miniDb: CardDb = { alpha: def('alpha', 'unit'), boss: def('boss', 'legend') }
 
 const p = (key: string, cardId: string): Printing => ({
-  key, cardId,
+  key, cardId, artworkId: key,
   setCode: key.split('/')[0], setName: key.split('/')[0],
   collectorNumber: key.split('/')[1],
   rarity: 'Common', finish: null, artist: '', sourcePrintingId: key,
@@ -345,7 +345,7 @@ describe('derived queries', () => {
     // alpha 2/3 + boss 0/1 => 2/4 = 50%; arts: 1 of 3 printings owned => 33%.
     const collection = { counts: { 'beta/1': 2 } }
     expect(completionStats(miniDb, miniPrintings, collection)).toEqual({
-      playsetPct: 50, artsPct: 33, totalOwned: 2,
+      playsetPct: 50, artsPct: 33, totalOwned: 2, playsetOwned: 2, playsetTarget: 4, artsOwned: 1, artsTarget: 3, unreviewedPrintings: 0,
     })
   })
 

@@ -23,7 +23,7 @@ afterEach(() => {
 describe('CollectionHeader', () => {
   it('renders live stats', () => {
     render(<CollectionHeader db={db} printings={printings} />)
-    expect(screen.getByTestId('collection-stats').textContent).toContain('0 cards owned')
+    expect(screen.getByTestId('collection-stats').textContent).toContain('0 physical cards owned')
   })
 
   it('copies the buy-list to the clipboard', async () => {

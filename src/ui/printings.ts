@@ -11,6 +11,10 @@ export interface Printing {
   /** The app's stable printing id: `"<setCode>/<collectorNumber>"`, or
    *  `"<setCode>/<collectorNumber>/<finish>"` when `finish` is not null. See
    *  `printingKey`. */
+  sourceImageUrl?: string
+  artworkId?: string
+  /** Art-only promotional objects cannot supply gameplay copies. */
+  playable?: boolean
   key: string
   /** FK into cards.json ids (the API slug). */
   cardId: string
@@ -27,6 +31,9 @@ export interface Printing {
 }
 
 const printingSchema = z.object({
+  sourceImageUrl: z.url().optional(),
+  artworkId: z.string().min(1).optional(),
+  playable: z.boolean().optional(),
   key: z.string().min(1),
   cardId: z.string().min(1),
   setCode: z.string().min(1),

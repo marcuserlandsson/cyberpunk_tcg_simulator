@@ -188,7 +188,10 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
       {!derivedUnavailable && (
         <>
           <span data-testid="collection-stats">
-            Playset {stats.playsetPct}% · Arts {stats.artsPct}% · {stats.totalOwned} cards owned
+            <span data-testid="playset-progress">Playset {stats.playsetOwned}/{stats.playsetTarget} copies ({stats.playsetPct}%)</span>
+            {' · '}<span data-testid="artwork-progress">Artwork {stats.artsOwned}/{stats.artsTarget} ({stats.artsPct}%)</span>
+            {' · '}{stats.totalOwned} physical cards owned
+            {stats.unreviewedPrintings > 0 && <strong> · {stats.unreviewedPrintings} printings await artwork review; artwork goal is incomplete.</strong>}
           </span>
           <button
             type="button"
@@ -202,8 +205,14 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
                 )
             }
           >
-            Copy buy-list
+            Copy both goal lists
           </button>
+          {(['playset', 'artwork'] as const).map(goal => <button type="button" key={goal} data-testid={'copy-' + goal + '-list'}
+            onClick={() => navigator.clipboard.writeText(buildBuyList(db, printings, collection, { playset: goal === 'playset', arts: goal === 'artwork' }))
+              .then(() => setCopyError('')).catch(error => setCopyError('Could not copy to clipboard: ' + String(error)))}>
+            Copy {goal} list
+          </button>)}
+          <small>Goals are separate. One purchase can fill both a playset gap and a missing artwork.</small>
         </>
       )}
       {copyError !== '' && (

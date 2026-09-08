@@ -12,7 +12,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 06. Obtain/version comprehensive rules and errata; audit each rules section against implementation and record discrepancies.
 - [x] 07. Discover/import current cards and printings, track data freshness and implementation coverage, and correct errata.
 - [x] 08. Implement rules-audit corrections, explicit effect/player choices, private knowledge, and payment choices, with card/engine regressions.
-- [ ] 09. Model unique artwork independently of printings; separate playset/artwork targets, filters, progress, and buy-lists.
+- [x] 09. Model unique artwork independently of printings; separate playset/artwork targets, filters, progress, and buy-lists.
 - [ ] 10. Persist complete simulation runs and deck snapshots; retain runs during navigation and support history/reopening/exports.
 - [ ] 11. Clarify simulation identities/metrics, add uncertainty and controlled matchup comparisons.
 - [ ] 12. Add explicit deck formats, deck versions/notes, and direct Play this deck.
@@ -145,4 +145,9 @@ Choice prompts now display the current resolution board while replay retains its
 ### 08v — audit closure: control, trigger facts and deck identity
 
 Fight protection, delayed consequences, Block watchers and UI ownership cues now follow control while exit destinations retain ownership. Legend exits record the intermediate public movement before removal. Pending event qualifiers are fixed at trigger time; resolution conditions still recheck the relevant host. Deck counts must be safe positive integers and duplicate internal IDs share the name/subtitle copy limit. Reconciled the audit and current-rules guide; the three official ambiguities remain explicit interpretations. Core gameplay correction step 8 is complete; format/pool requirements remain assigned to steps 12/17. Verified 1,044 engine/card/UI checks, 415 AI/fuzz checks, TypeScript/build, four production-preview browser workflows, plus the final card/control/resolution regression run.
+
+
+### 09 — independent playable-card and artwork goals
+
+Reviewed all 460 printing images and mapped them to 192 illustrations, including four manually checked Edgerunner crop variants. Stable artwork IDs and image provenance/hashes are independent of printing keys and finishes. Playset totals group distinct card identities, exclude collection-only promos, and show owned/target counts separately from artwork totals. Filters, row labels and independent/combined buy-lists use those same goals; duplicate reprints cannot inflate artwork completion and incomplete percentages never round to 100. Printing refreshers preserve reviewed mappings and flag changed/unknown images for review. Downloaded the printing thumbnails locally; exact inventory counts and keys are unchanged. Verified 88 focused checks, all 319 UI/data tests, TypeScript/build, a catalog reimport preserving metadata, and three production-preview browser checks for goal arithmetic, persistence and phone/desktop layout.
 

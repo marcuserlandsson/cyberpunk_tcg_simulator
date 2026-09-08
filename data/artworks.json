@@ -1,0 +1,2848 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-09-08",
+  "source": "catalog-source.json",
+  "method": "Illustration crop comparison followed by visual review of all 17 contact sheets. Four changed-crop Edgerunner reprints were manually joined to their original illustrations. Artist names and finishes do not define identity.",
+  "artworks": [
+    {
+      "id": "art:aaad5db8-fcd4-42f0-8ced-e7527dbccf79",
+      "cardId": "yorinobu-arasaka-embracing-destruction",
+      "representativePrintingKey": "arasakademodeck/001",
+      "printingKeys": [
+        "arasakademodeck/001",
+        "embracingpowerbetastarterdeck/β001",
+        "embracingpowerretailstarterdeck/001"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/001": "7e0ef663e3c1c8f8b58abb2807f8a80a2d28870a328d227da9645c93860aca7c",
+        "embracingpowerbetastarterdeck/β001": "ed729bbd8ea04c76cd7bfe4944ef5e024137a477feaaf7c6eedcba1efa9d8aaa",
+        "embracingpowerretailstarterdeck/001": "a0e29ecf24eb0750c2a5411846b915dd7f53df76ccb73940a363f146ac7ede37"
+      }
+    },
+    {
+      "id": "art:6e023192-0834-4d6f-935a-e5d6d4d6eff0",
+      "cardId": "minotaur",
+      "representativePrintingKey": "arasakademodeck/002",
+      "printingKeys": [
+        "arasakademodeck/002",
+        "embracingpowerbetastarterdeck/β003",
+        "embracingpowerretailstarterdeck/003"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/002": "65448b5908ffdd521f35515608b40a712687052edcd722c70b481a5ef5933318",
+        "embracingpowerbetastarterdeck/β003": "d9b3eebc77129434e86b10b77329411d6a74588b24e87af1727598af6a9b7715",
+        "embracingpowerretailstarterdeck/003": "d99a02ae7500dd40fe3e49dd3c5847c81f5a2061c03e973ff3b024bbed236383"
+      }
+    },
+    {
+      "id": "art:39ef1f5d-50e0-405c-bd25-6961fd93d2a1",
+      "cardId": "swordwise-huscle",
+      "representativePrintingKey": "arasakademodeck/003",
+      "printingKeys": [
+        "arasakademodeck/003",
+        "embracingpowerbetastarterdeck/β005",
+        "embracingpowerretailstarterdeck/005",
+        "welcometonightcitybeta/β019",
+        "welcometonightcityretail/019"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/003": "c795e361249a22d140290cf619ebdec1101b6dc9dc5b738e0c3fa87a6f812a6d",
+        "embracingpowerbetastarterdeck/β005": "66588b04b22cccc4bad622d596b640865b7e2e139d2d2f8878bcbbd8b6bc9451",
+        "embracingpowerretailstarterdeck/005": "8171046fea84e7c7facb3f5aac52ca507dc469a26ebb7500ca9ecfee68282595",
+        "welcometonightcitybeta/β019": "a5242410eacc941927a52d8d79b6ad3d48281262bf07b3547b01d3b6d57a000e",
+        "welcometonightcityretail/019": "56e2d08f209c45bbdb65d722f4fb079159f15df247638adba667fb806fc678b0"
+      }
+    },
+    {
+      "id": "art:4ad21be4-1406-4631-bfe7-ad2effde7af2",
+      "cardId": "mantis-blades",
+      "representativePrintingKey": "arasakademodeck/004",
+      "printingKeys": [
+        "arasakademodeck/004",
+        "embracingpowerbetastarterdeck/β007",
+        "embracingpowerretailstarterdeck/007",
+        "prereleasebeta/011",
+        "welcometonightcitybeta/β025",
+        "welcometonightcityretail/025"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/004": "679d5dcce1ed0dcd5206ef7e5c1e466d150e1ef5306a541a439d3100fc12b178",
+        "embracingpowerbetastarterdeck/β007": "1b8c80ae089bce23c8dd3d0e722a8ec245f39d726930a4120aa162269b944df1",
+        "embracingpowerretailstarterdeck/007": "84ccff2ff127c6c804674fa236b3716ef707200e471ebe02140fed98873f3333",
+        "prereleasebeta/011": "cd2f3fb726cd5c6bb8ca7714cc3ef7ae8c4c2fab01e3648e60179f701f406fc0",
+        "welcometonightcitybeta/β025": "34a3e456b5c5d501a4d25def15969e960478622573c46de6a76d456ad14e0d6b",
+        "welcometonightcityretail/025": "6a0e07e766855b331e92ef68d3f766efa50254f6bc4b321f3deca8f043c31456"
+      }
+    },
+    {
+      "id": "art:3b656cec-684d-440b-9c76-0aa9a4a98b81",
+      "cardId": "satori-sword-of-saburo",
+      "representativePrintingKey": "arasakademodeck/005",
+      "printingKeys": [
+        "arasakademodeck/005",
+        "embracingpowerbetastarterdeck/β008",
+        "embracingpowerretailstarterdeck/008",
+        "welcometonightcitybeta/β026",
+        "welcometonightcityretail/026"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/005": "91a95b15daa2afb755f51aee87d95719cac20fc690ebbf1c4462293c90d3a31b",
+        "embracingpowerbetastarterdeck/β008": "8e29f7e1c18bbeb3f4b813bc8b92d842c192907d6355a50d608a969fa4aa6e83",
+        "embracingpowerretailstarterdeck/008": "0bcf0480f71e4a097ea5f90e14d1e0e49df9d143accc21f086650448bf01b972",
+        "welcometonightcitybeta/β026": "751988326c1625ea2aba615119dfcbfb38b7b31af786efef547607e90340dda7",
+        "welcometonightcityretail/026": "291832f42ed8c58ac1dfed9e6fe7869a26b3bb3713062518afc2a68371d016c4"
+      }
+    },
+    {
+      "id": "art:7f0ad31f-3b16-4c7a-88bb-90dd07e55a9b",
+      "cardId": "industrial-assembly",
+      "representativePrintingKey": "arasakademodeck/006",
+      "printingKeys": [
+        "arasakademodeck/006",
+        "embracingpowerbetastarterdeck/β009",
+        "embracingpowerretailstarterdeck/009",
+        "welcometonightcitybeta/β033",
+        "welcometonightcityretail/033",
+        "edgerunneropens1/004"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/006": "ba572d89826f93c541215320b12ab05875c1edeeed64d217302200046b637768",
+        "embracingpowerbetastarterdeck/β009": "a2e10f2e831d27c61c3b62d8c10bd09de1809206df434d21f6f3b3b5490f537e",
+        "embracingpowerretailstarterdeck/009": "028184474d3268aa751f6d83b6909f7e899fad9883c7c75d9ddc69fe98052ccd",
+        "welcometonightcitybeta/β033": "a01fb02fe6ef92b2bfa4f72c64dfd2c0d97db1b7a29a8f671bb791d4e344928d",
+        "welcometonightcityretail/033": "3a12515bfac996b0477121d7ced29d647426100adf8ebab25ca7a99c710aeb43",
+        "edgerunneropens1/004": "0001e4cabae3cf403eb36e47bd3f287c1078acdc828f68a1d980f09371885e2e"
+      }
+    },
+    {
+      "id": "art:cf48d5e6-21d2-4d17-a731-5dc9091c6cd1",
+      "cardId": "over-the-edge",
+      "representativePrintingKey": "arasakademodeck/007",
+      "printingKeys": [
+        "arasakademodeck/007",
+        "embracingpowerbetastarterdeck/β010",
+        "embracingpowerretailstarterdeck/10",
+        "welcometonightcitybeta/β034",
+        "welcometonightcityretail/034"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/007": "6a05903ded6be21b957834bd1e8c54d705bacfde4aab8118a279e3183752f8da",
+        "embracingpowerbetastarterdeck/β010": "762094fc114d32b4da3532ccd68498c4a6a09f3a721e80fe50b610fc512f9cb6",
+        "embracingpowerretailstarterdeck/10": "9f1e9da0c92066c0520f56fb07c132940b8052b8ee3c9d92c373278ce8b6f702",
+        "welcometonightcitybeta/β034": "8891c16767fdcc5e52830a839d885e28c4d8ebc689ac035caf4c6cff31e073f5",
+        "welcometonightcityretail/034": "cb769ffd9e7c16443d534ffc03b825bd701cfe606d19fa9f21be7569dea99e34"
+      }
+    },
+    {
+      "id": "art:fd889659-8291-41fd-9197-9cdf7cbf6810",
+      "cardId": "goro-takemura-hands-unclean",
+      "representativePrintingKey": "arasakademodeck/008",
+      "printingKeys": [
+        "arasakademodeck/008",
+        "embracingpowerbetastarterdeck/β012",
+        "embracingpowerretailstarterdeck/012"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/008": "088ef562d589be11fa0f1f01198ba1238bbcfa83ccf373a112ba4a99ab5f27c0",
+        "embracingpowerbetastarterdeck/β012": "316c8f2bb557816111fc5c8a3a7dbe7e573626f4d784fd58c662c8eb224745da",
+        "embracingpowerretailstarterdeck/012": "4b998bfefbeb71ef176137eb2db28624355896c13445126e7d732600d8943136"
+      }
+    },
+    {
+      "id": "art:13ba5cd2-5000-4cf8-bcfc-6f1b8afe44ca",
+      "cardId": "saburo-arasaka-stubborn-patriarch",
+      "representativePrintingKey": "arasakademodeck/009",
+      "printingKeys": [
+        "arasakademodeck/009",
+        "embracingpowerbetastarterdeck/β013",
+        "embracingpowerretailstarterdeck/013"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/009": "dc3f7e33431ee00dee9cd33f9a7b69989fcb224fa54e5c8c8475db17df6520dc",
+        "embracingpowerbetastarterdeck/β013": "bbaa7ce8c12f0b9220855f618dcf1bd256609c0cd54835620569501497f305bc",
+        "embracingpowerretailstarterdeck/013": "ea1b81963ca6f19bd026c728644e3073f102abf5eaae99369199aab8f8260469"
+      }
+    },
+    {
+      "id": "art:c165a5eb-3338-4a80-8fb9-b7e39b412e5b",
+      "cardId": "corpo-security",
+      "representativePrintingKey": "arasakademodeck/010",
+      "printingKeys": [
+        "arasakademodeck/010",
+        "embracingpowerbetastarterdeck/β014",
+        "embracingpowerretailstarterdeck/014",
+        "welcometonightcitybeta/β076",
+        "welcometonightcityretail/076"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/010": "62fc021116853ff221d997f76d7e4d88d7b9742b3c81402f3dba0aa048dba8fd",
+        "embracingpowerbetastarterdeck/β014": "adb465ab9d1dfff69e9609ac7f5a4d57e551ab861875ef6329bc401af1304e57",
+        "embracingpowerretailstarterdeck/014": "b9babb9b4e5bf7f69cac3a3e606408ef156d20db051ba507950ec0b4890f0c5f",
+        "welcometonightcitybeta/β076": "9167cb818af44e7ddfcaea6bbb84b8ba9d7e18a1ada76760d4eb1c3c683792ae",
+        "welcometonightcityretail/076": "c4809896ce704266dcb8266d2bc9190b95f84103f9b90d562e3f7ff2cb6f20c1"
+      }
+    },
+    {
+      "id": "art:45dd3b11-7bd8-4239-a404-ab0c9b24fcdb",
+      "cardId": "emergency-atlus",
+      "representativePrintingKey": "arasakademodeck/011",
+      "printingKeys": [
+        "arasakademodeck/011",
+        "embracingpowerbetastarterdeck/β015",
+        "embracingpowerretailstarterdeck/015",
+        "welcometonightcitybeta/β077",
+        "welcometonightcityretail/077"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/011": "25a1404dbff22741bff751d071081ec8893155793babfeca24fbd85963cf1e8c",
+        "embracingpowerbetastarterdeck/β015": "2395013ecb13ed17b547b87dd707e7f558cd8ef9f393437eb27c9c37128f08e1",
+        "embracingpowerretailstarterdeck/015": "72a534a0f070df078b34e2811fa0af29c0541d10501b81c39bd1530404621a13",
+        "welcometonightcitybeta/β077": "a16f16bdcef1df3d8b65247235a873976b622db5d6ecb1e2f731332ab6d3850c",
+        "welcometonightcityretail/077": "5cb0421a2c11cb52c3a4922a47bf822930109936c80bae284e9099c5be7cb522"
+      }
+    },
+    {
+      "id": "art:45ae40b9-f0f3-4fd9-901a-cd1bed292133",
+      "cardId": "field-operator",
+      "representativePrintingKey": "arasakademodeck/012",
+      "printingKeys": [
+        "arasakademodeck/012",
+        "embracingpowerbetastarterdeck/β016",
+        "embracingpowerretailstarterdeck/016",
+        "welcometonightcitybeta/β078",
+        "welcometonightcityretail/078"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/012": "da2861e0b37e4dfb48cca7d0748f3700fbbd3bb752f895fba15ba57cac233f06",
+        "embracingpowerbetastarterdeck/β016": "548e96637e269063e064d1fdb4740b3a57bfade32839a6531a530077f32574b4",
+        "embracingpowerretailstarterdeck/016": "15afba4f10698006df2512c2598537bf9297b8c1f757b6b28f57a5ad8b76c534",
+        "welcometonightcitybeta/β078": "b9a196147f285bf681823d845f022a4c26751de314fddf47f0c63e0a7a462c3f",
+        "welcometonightcityretail/078": "9adf192d6b4183216160216b478c8ead1262eb0caf5ce9f11f48e1f8af1472c3"
+      }
+    },
+    {
+      "id": "art:384b716d-fe9c-4a09-86b3-fe9b25928c51",
+      "cardId": "goro-takemura-losing-his-way",
+      "representativePrintingKey": "arasakademodeck/013",
+      "printingKeys": [
+        "arasakademodeck/013",
+        "embracingpowerbetastarterdeck/β017",
+        "embracingpowerretailstarterdeck/017"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/013": "2a54e343a460375306bb39286cd15ec7167d818d7022f863db766d4aebb6e33a",
+        "embracingpowerbetastarterdeck/β017": "3562283395cbec0319f1061686a4791e153b4677fe2585ad742d4e24f3037247",
+        "embracingpowerretailstarterdeck/017": "7c4710f120cf4aac3afe6a9cc4b3988c7616e6aa8240217bd4bbd7a729964f29"
+      }
+    },
+    {
+      "id": "art:af658f81-5214-4f56-ba8a-782a4419e366",
+      "cardId": "corporate-surveillance",
+      "representativePrintingKey": "arasakademodeck/014",
+      "printingKeys": [
+        "arasakademodeck/014",
+        "embracingpowerbetastarterdeck/β020",
+        "embracingpowerretailstarterdeck/020",
+        "welcometonightcitybeta/β097",
+        "welcometonightcityretail/097"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "arasakademodeck/014": "dd5f1be8c9b40f1f03537fd8c931b2c6ee7890272e24a76ec5c0fb9eb8c6992f",
+        "embracingpowerbetastarterdeck/β020": "20d08dcaf44fa9d68d8f44720e508d7f99d578d8cee2ea975d9c10f30ae49a0a",
+        "embracingpowerretailstarterdeck/020": "2aa5ddc26f428f9da816166707424e81d00c13811cc1db855bd58f28263dba4e",
+        "welcometonightcitybeta/β097": "6419502920f99cac21fa16f8ab4ec057a185b4c3d980b08f736bfc2442149ac5",
+        "welcometonightcityretail/097": "ee14fdea9b0329db5e83102d3e9f847657e13ca44784dc44dab7c0e220da86e4"
+      }
+    },
+    {
+      "id": "art:12337d92-713c-4c7c-8a16-595a7b4717f1",
+      "cardId": "yorinobu-arasaka-embracing-destruction",
+      "representativePrintingKey": "boxtoppersbeta/β001",
+      "printingKeys": [
+        "boxtoppersbeta/β001",
+        "boxtoppersretail/001",
+        "edgerunneropens1/034"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "boxtoppersbeta/β001": "d6e41788baaab1ce7afeccac7cf6115eada19592c2699e6a2f858a12c16ecadb",
+        "boxtoppersretail/001": "81fc9dd5699295979a129808155350dc015b3179045ff337639042a0915d98d7",
+        "edgerunneropens1/034": "d568c8fa751047901f06b7e0dfb814dd4b69516bd384c9a3b6d0e46cb6873739"
+      }
+    },
+    {
+      "id": "art:a33c6299-f1ee-404e-9197-cad5f7e84fce",
+      "cardId": "viktor-vektor-sit-down-and-relax",
+      "representativePrintingKey": "boxtoppersbeta/β002",
+      "printingKeys": [
+        "boxtoppersbeta/β002",
+        "boxtoppersretail/002",
+        "edgerunneropens1/040"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "boxtoppersbeta/β002": "d6760e73290a15403eaf73f3edfac582478376e0e2692e8b0ced66e62ebac9bc",
+        "boxtoppersretail/002": "43fd0afc97d08c6262622c5077343d93c84e31298f7ff3912d51012a6be862a7",
+        "edgerunneropens1/040": "f4f3b8e0c38d5f4fab90095b74f320097e311150fbcfac3c78c55988e96c9d55"
+      }
+    },
+    {
+      "id": "art:15430373-fafd-479c-84d4-5737c71d0850",
+      "cardId": "goro-takemura-hands-unclean",
+      "representativePrintingKey": "boxtoppersbeta/β003",
+      "printingKeys": [
+        "boxtoppersbeta/β003",
+        "boxtoppersretail/003",
+        "edgerunneropens1/041"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "boxtoppersbeta/β003": "d0b4236021e0bb8de5b4a2b21d51712b5f8131bbe786bca4d145a61a50a9a881",
+        "boxtoppersretail/003": "9e147e77893c4a63478eabac71e704b4c137b7699335323e7fc37f3cfb0e3a1c",
+        "edgerunneropens1/041": "79ec93bbf297d195919174e1a7b89e696703939d7b94e051f4c99deb5ac1be38"
+      }
+    },
+    {
+      "id": "art:0cb4ae83-a7ca-4ca6-9c83-6c0581baae57",
+      "cardId": "saburo-arasaka-stubborn-patriarch",
+      "representativePrintingKey": "boxtoppersbeta/β004",
+      "printingKeys": [
+        "boxtoppersbeta/β004",
+        "boxtoppersretail/004",
+        "edgerunneropens1/047"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "boxtoppersbeta/β004": "1ef6c2e5cab556b59fb729fe6867b82af2acf91d78c9b371c3fe0e22e3eb90f5",
+        "boxtoppersretail/004": "63e49c69a8f64e9311344c33cf572c4f837b79cda584597be23807c07e4178a7",
+        "edgerunneropens1/047": "e01be4284d804053a10804eaae568efc4ff7602314ece7bc584f3711fad03b03"
+      }
+    },
+    {
+      "id": "art:328cd3e4-4177-4d6a-86c0-00d1a5a12b38",
+      "cardId": "jackie-welles-pour-one-out-for-me",
+      "representativePrintingKey": "boxtoppersbeta/β005",
+      "printingKeys": [
+        "boxtoppersbeta/β005",
+        "boxtoppersretail/005",
+        "edgerunneropens1/050"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "boxtoppersbeta/β005": "9014ecaa59501c4bb0be26fd26e88c7e166a8039e8344404f0449a4bd1130265",
+        "boxtoppersretail/005": "76f456f4076d102e3974d2af40b060249be4fae8f269ea2a4f13ea8e8e30f912",
+        "edgerunneropens1/050": "7db309ec472e13595328ef8c5111c31233d7642390b31e4523051b7db468e311"
+      }
+    },
+    {
+      "id": "art:e44580df-d78d-4b09-bb53-edb1ee32ac96",
+      "cardId": "v-corporate-exile",
+      "representativePrintingKey": "boxtoppersbeta/β006",
+      "printingKeys": [
+        "boxtoppersbeta/β006",
+        "boxtoppersretail/006",
+        "edgerunneropens1/053"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "boxtoppersbeta/β006": "a9bbfbd1ae91d59d6017a7c115ddaad6d01edf27b2dcbcbb7c16d031cc8e1e58",
+        "boxtoppersretail/006": "c05ccd3012f178b02646be96e2d75cf1404eb0c39a988b8a47d950d80db0e765",
+        "edgerunneropens1/053": "05bc0910c92f0a4511fae2d9ba071c7fb081db4baae3646d76026d7755f499ef"
+      }
+    },
+    {
+      "id": "art:72a627db-f8a0-4559-9194-2b9e4ceca30c",
+      "cardId": "alt-cunningham-soulkiller-architect",
+      "representativePrintingKey": "edgerunneropens1/048",
+      "printingKeys": [
+        "edgerunneropens1/048",
+        "welcometonightcityretail/155"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "edgerunneropens1/048": "daddd026d64a53938585c3e504bb4bce47d154091cddaf59e43b7916e2f63257",
+        "welcometonightcityretail/155": "cf7d33fe9dc6328419bbfe04730e89622848f2ce1e6edd2fe20dff0a627d30f7"
+      }
+    },
+    {
+      "id": "art:1e80ecfb-a3f2-421d-ac71-c05547366fb6",
+      "cardId": "chrome-fang",
+      "representativePrintingKey": "embracingpowerbetastarterdeck/β002",
+      "printingKeys": [
+        "embracingpowerbetastarterdeck/β002",
+        "embracingpowerretailstarterdeck/002",
+        "welcometonightcitybeta/β008",
+        "welcometonightcityretail/008"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "embracingpowerbetastarterdeck/β002": "54008eba40c623819c014ac78800b6cf3bf23b1eb7bc0c0be6556d026b94dd5b",
+        "embracingpowerretailstarterdeck/002": "f258cd02149d75bc5761fe3f6a82d728407bee00eab8eaef0b804348cf47e2bc",
+        "welcometonightcitybeta/β008": "0acccba5556f92ee1df4be00649d5995a9ac3bf6b3406ad70827b980cb2b1c51",
+        "welcometonightcityretail/008": "0692431f6faa7c75f53287c3238cbb6318e56386330098e7269943db63d74339"
+      }
+    },
+    {
+      "id": "art:9c59c8d2-586a-4845-b969-43be1fd3b388",
+      "cardId": "ruthless-lowlife",
+      "representativePrintingKey": "embracingpowerbetastarterdeck/β004",
+      "printingKeys": [
+        "embracingpowerbetastarterdeck/β004",
+        "embracingpowerretailstarterdeck/004",
+        "welcometonightcitybeta/β017",
+        "welcometonightcityretail/017"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "embracingpowerbetastarterdeck/β004": "9fde24ad2bb05cdfe29d51ccd44259333fe4ea48907d9836351e315752492658",
+        "embracingpowerretailstarterdeck/004": "7c93ba620ff4d46942f4459122ae960544b50001fb5272012efbf4d20ae29f92",
+        "welcometonightcitybeta/β017": "fa484cd728542c044c4bf9b923560d493116e611ba5cae175a368ffa2cb1ff03",
+        "welcometonightcityretail/017": "11c95f6e90e9659ad5381b866ff88c53d256a9d2d82f4bf06e68a9d56cd11ab9"
+      }
+    },
+    {
+      "id": "art:be0d995d-84fc-41c3-bed6-1875caf85fc7",
+      "cardId": "arasaka-emergency-radioport",
+      "representativePrintingKey": "embracingpowerbetastarterdeck/β006",
+      "printingKeys": [
+        "embracingpowerbetastarterdeck/β006",
+        "embracingpowerretailstarterdeck/006",
+        "welcometonightcitybeta/β023",
+        "welcometonightcityretail/023"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "embracingpowerbetastarterdeck/β006": "6aff095ee49610b74c4fe34b21606ae118b7d35fa292a8308480fae3c5215233",
+        "embracingpowerretailstarterdeck/006": "19345c0cb0c125eac8adb38777c7b67532c722f3f72e8f9efb2939491b0b16de",
+        "welcometonightcitybeta/β023": "2c17edab36490d2ee986e85a32c08200fd972d355455aaf9ac15b5972c19354b",
+        "welcometonightcityretail/023": "ac37e1f12931dbd051be7c937a92009c3e444a4cd0a678fadc80452899f1d739"
+      }
+    },
+    {
+      "id": "art:4adda471-e0c8-4628-aba1-d1ed11eae0af",
+      "cardId": "shattered-memories",
+      "representativePrintingKey": "embracingpowerbetastarterdeck/β011",
+      "printingKeys": [
+        "embracingpowerbetastarterdeck/β011",
+        "embracingpowerretailstarterdeck/011",
+        "welcometonightcitybeta/β035",
+        "welcometonightcityretail/035"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "embracingpowerbetastarterdeck/β011": "510623690d51204f8cdd73c99693a18f930a992617ee7475e89dc408aaca921d",
+        "embracingpowerretailstarterdeck/011": "3ce10b6e5230b19ac2970a0c1375c59eef594bf502809f47cdefb69d994e5175",
+        "welcometonightcitybeta/β035": "111d3eaa056b6ed72d6533bdc0762dba70363b3fb6797910123da5dd2953123e",
+        "welcometonightcityretail/035": "d7635220903294c7c35a6cca1a74d918aaba2c8a8bab78c588d4f3429a82febe"
+      }
+    },
+    {
+      "id": "art:5a28466e-e4e1-408d-9d84-2ce48e95d89d",
+      "cardId": "maxtac-av",
+      "representativePrintingKey": "embracingpowerbetastarterdeck/β018",
+      "printingKeys": [
+        "embracingpowerbetastarterdeck/β018",
+        "embracingpowerretailstarterdeck/018",
+        "welcometonightcitybeta/β080",
+        "welcometonightcityretail/080"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "embracingpowerbetastarterdeck/β018": "ca2670506ba09cddf8df5a44011293da912f8ca60aa4cfbcba76043c145efc7e",
+        "embracingpowerretailstarterdeck/018": "4509e0d723f937c0122526e464aac37e4c87da82c6746273a45e9b3da3e5b146",
+        "welcometonightcitybeta/β080": "fd5f568fbd6d0f8257a44bf391fd2fd7241d1bd75106515075c03e17f66f2a06",
+        "welcometonightcityretail/080": "30a352601e125f92cc9d8a1c344b4cef5a3406a0b874f884ce7d75ee705ba16f"
+      }
+    },
+    {
+      "id": "art:e1a14bfa-cd87-4fa9-bfe8-207abb4545c4",
+      "cardId": "sandevistan",
+      "representativePrintingKey": "embracingpowerbetastarterdeck/β019",
+      "printingKeys": [
+        "embracingpowerbetastarterdeck/β019",
+        "embracingpowerretailstarterdeck/019",
+        "welcometonightcitybeta/β095",
+        "welcometonightcityretail/095"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "embracingpowerbetastarterdeck/β019": "7fc25dc3d9405dadd1138e25530042f2bf36a23a35e2272112530b385d706c10",
+        "embracingpowerretailstarterdeck/019": "82df461d94fdf2c2fa1d79fa79a726923d279a0e1990050707e54f4a628f1dcf",
+        "welcometonightcitybeta/β095": "ba3546cfb246b6758f5f89ba6692b30254ee50a141decbb9c6b2f2dbdb51b8cf",
+        "welcometonightcityretail/095": "5db768955b6ecd1952e3feee637915cf7c57a8998990bd553b1b9c0a7d718caa"
+      }
+    },
+    {
+      "id": "art:2344e8d6-3aed-415b-ab6e-f1d634b5ba18",
+      "cardId": "viktor-vektor-sit-down-and-relax",
+      "representativePrintingKey": "mercdemodeck/001",
+      "printingKeys": [
+        "mercdemodeck/001",
+        "theheistbetastarterdeck/β001",
+        "theheistretailstarterdeck/001"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/001": "22d4e0a7040ea8242ed769c7096151bf1c0a0ae12e2e5d55aec27bd672b0d650",
+        "theheistbetastarterdeck/β001": "772d635fb6197bc7c522ef3fbdfc4fb0df73800a7599d8a0bc9af23cd9490eb0",
+        "theheistretailstarterdeck/001": "14c33b51a1922caea8540a0cfb9e1acc67e850422af8053f949c664f4edf45e0"
+      }
+    },
+    {
+      "id": "art:daabe14b-dc95-413f-b91a-d3e32937bfd2",
+      "cardId": "dexter-deshawn-one-last-chance",
+      "representativePrintingKey": "mercdemodeck/002",
+      "printingKeys": [
+        "mercdemodeck/002",
+        "theheistbetastarterdeck/β002",
+        "theheistretailstarterdeck/002"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/002": "8fb6f43de4446a1777d4a7e730c89f52f735c5549de24734b71b84ff71a657ba",
+        "theheistbetastarterdeck/β002": "1ed84f9a7553bdeb85a19f811dd94eabd322cc116840a340a4ea2de048a1ac04",
+        "theheistretailstarterdeck/002": "dc3cc292ac36d54ef2a654cd745adf1bdef2b35d6982ccd73af2f16260954652"
+      }
+    },
+    {
+      "id": "art:62d6b51a-ceaf-498b-8a04-27c3d3e21feb",
+      "cardId": "secondhand-bombus",
+      "representativePrintingKey": "mercdemodeck/003",
+      "printingKeys": [
+        "mercdemodeck/003",
+        "theheistbetastarterdeck/β005",
+        "theheistretailstarterdeck/005",
+        "welcometonightcitybeta/β053",
+        "welcometonightcityretail/053"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/003": "2ddb215e5715786e1988d0d401597c578e9534aa936ba62d78d47949807554c8",
+        "theheistbetastarterdeck/β005": "327fe1e17687e2a7afda20f8c3d81ccce009a6492531d9ccdca4b3e8d9693a73",
+        "theheistretailstarterdeck/005": "19f626649aba836c8f8b96abc3a22d8b34a38960505f7478b495f62c6309e7c0",
+        "welcometonightcitybeta/β053": "1a3714ad7cbd20266f2a978417aa76de33a09f784fb9edd7e8c69d322197e56d",
+        "welcometonightcityretail/053": "330f622d862d5729b1730740ae5843fe96111f95993fd7807a907c986491d526"
+      }
+    },
+    {
+      "id": "art:57e1d9b6-0f2b-497b-acaf-49c20a68cd19",
+      "cardId": "kiroshi-optics",
+      "representativePrintingKey": "mercdemodeck/004",
+      "printingKeys": [
+        "mercdemodeck/004",
+        "theheistbetastarterdeck/β007",
+        "theheistretailstarterdeck/007",
+        "welcometonightcitybeta/β061",
+        "welcometonightcityretail/061"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/004": "5b61d369513e697ff7199c1eb7da531f029cd16f5bc76de4aba93a44e74bc6a6",
+        "theheistbetastarterdeck/β007": "2511e138b61030473e2330bd3e29cc557c4a1ba4f2eb04acbbe988eb1ece2c4e",
+        "theheistretailstarterdeck/007": "8b4613f6be752c67e846c1b35644bbe75e4151ffe208758fd6a895b89fceb124",
+        "welcometonightcitybeta/β061": "c99d8fcb2ee6da8c4e39b751355eb1188427b97368894fb0b15e65dd703b88e2",
+        "welcometonightcityretail/061": "75e23a6cd2f5625fe45696657924391a704a84620b8776aea97bb2239b32c98b"
+      }
+    },
+    {
+      "id": "art:49fc6d6e-8e86-4a05-bcd5-bd8a50edf5dc",
+      "cardId": "mandibular-upgrade",
+      "representativePrintingKey": "mercdemodeck/005",
+      "printingKeys": [
+        "mercdemodeck/005",
+        "theheistbetastarterdeck/β008",
+        "theheistretailstarterdeck/008",
+        "welcometonightcitybeta/β062",
+        "welcometonightcityretail/062"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/005": "f1214b2b864cacc371b53c377d1eb20080b802a621576a5a93359bb6968d532c",
+        "theheistbetastarterdeck/β008": "3312562fd7cf1eb8a60c6c7f7b8d5891c5528f5f6e3fcc718360d98bcf2e820e",
+        "theheistretailstarterdeck/008": "2299270e5921b0d7e596ef7e69c83b616546f4059c81d7e46a4d6bfe31c4e828",
+        "welcometonightcitybeta/β062": "61f96a196f8ce2b119e951b14ad4a56931d4d1301562459c1d9adf363634b3c9",
+        "welcometonightcityretail/062": "4738ec9ef7a3dc7eeeb8ac819d49c54550ce3b957bedd9d64f0698abc39038a2"
+      }
+    },
+    {
+      "id": "art:eb272131-add5-4dda-b426-4166041af144",
+      "cardId": "afterparty-at-lizzie-s",
+      "representativePrintingKey": "mercdemodeck/006",
+      "printingKeys": [
+        "mercdemodeck/006",
+        "theheistbetastarterdeck/β010",
+        "theheistretailstarterdeck/010",
+        "welcometonightcitybeta/β065",
+        "welcometonightcityretail/065",
+        "edgerunneropens1/005"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/006": "9d761b557e379a45bb2cd4f7aabed8fc3ac38ef1fc9c21d91d1f9cc6fac26968",
+        "theheistbetastarterdeck/β010": "773a26a392fc12b971aba67eacffd56ca6b9fef6d81a29cba76cd77406c2d3ed",
+        "theheistretailstarterdeck/010": "515c03fc6c05eadc5326c5c4fd2ecd310f3c2f515bdd40536b9e03f4ba0a9284",
+        "welcometonightcitybeta/β065": "1a0aed42824a6840b64299373219459168e008f531c34002a421995a31e9b3b4",
+        "welcometonightcityretail/065": "b5a66edce5b7f3017b0d44da633194ae041fdd25a1f588547a04b994038972ca",
+        "edgerunneropens1/005": "c3345a02d824225338b582b4bd85442926f88370b3b8f4927c4b3d34905e7696"
+      }
+    },
+    {
+      "id": "art:762951bd-7bcf-42cd-a44e-b5b127cf00d2",
+      "cardId": "jackie-welles-pour-one-out-for-me",
+      "representativePrintingKey": "mercdemodeck/007",
+      "printingKeys": [
+        "mercdemodeck/007",
+        "theheistbetastarterdeck/β011",
+        "theheistretailstarterdeck/011"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/007": "ff4e4904ca187f319eae80d03a3d5b532f282a39f342e0b39febf2b4c196b4ba",
+        "theheistbetastarterdeck/β011": "a600843be474b7583b504b6f5ab1dbcc58402e91b1484e497204e2bfff29064e",
+        "theheistretailstarterdeck/011": "29202684c4942f70f3a1d2d3fd55a2b4b4059ca54f54950c4d922466aac7966c"
+      }
+    },
+    {
+      "id": "art:20bd1c78-1773-486e-bf45-4075fd4f2a3f",
+      "cardId": "v-corporate-exile",
+      "representativePrintingKey": "mercdemodeck/008",
+      "printingKeys": [
+        "mercdemodeck/008",
+        "theheistbetastarterdeck/β012",
+        "theheistretailstarterdeck/012"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/008": "336f0e61d55b5bfda8efc9dc9702ddebf96a4a66cefcf44492e04f68632a16b6",
+        "theheistbetastarterdeck/β012": "f7b5cc5896b6b197f92b805297eee87e2dab2042e0f3c24dd8439dd68e07062d",
+        "theheistretailstarterdeck/012": "28ca9c119f18909ea26dc36452ed422fbf7d378a0360a4cd3e3f24301a821a9d"
+      }
+    },
+    {
+      "id": "art:e15c07b6-f563-4825-aad4-6b3068c1ab85",
+      "cardId": "delamain-cab",
+      "representativePrintingKey": "mercdemodeck/009",
+      "printingKeys": [
+        "mercdemodeck/009",
+        "theheistbetastarterdeck/β013",
+        "theheistretailstarterdeck/013",
+        "welcometonightcitybeta/β112",
+        "welcometonightcityretail/112"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/009": "7ba7a0619828d09e5330f2d0eea61ba9ad27ee02a72f37a683a8706fd7f4756a",
+        "theheistbetastarterdeck/β013": "33a510c3ff62784e6445307f22561d106fd459d4a4a97f995bee89e9156f03c2",
+        "theheistretailstarterdeck/013": "a32cbb53110855bd5a36552cf34b1bdecd6aa251bb43eba29596a7905b5b719b",
+        "welcometonightcitybeta/β112": "a0e03dcd9586946989a3854bf10e106d9f2e61afa79f84c46b3a8b2f4e0c7603",
+        "welcometonightcityretail/112": "c9550e1979396237870ff1753b5df075e23a9eef5b2cf9f2b61805d8dce669e6"
+      }
+    },
+    {
+      "id": "art:3757f0f3-32d0-41c2-89dc-515271d2b758",
+      "cardId": "evelyn-parker-scheming-siren",
+      "representativePrintingKey": "mercdemodeck/010",
+      "printingKeys": [
+        "mercdemodeck/010",
+        "theheistbetastarterdeck/β014",
+        "theheistretailstarterdeck/014",
+        "welcometonightcitybeta/β113",
+        "welcometonightcityretail/113"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/010": "54314d553ca57c3c22b3327c7db7c35970bfcfec9785ceaa2e7f4c9af45654ca",
+        "theheistbetastarterdeck/β014": "2c61cd2b1fee09d2a53bac6b039874e858314df29538b9b61a597dde54de1655",
+        "theheistretailstarterdeck/014": "cf16da76b3860177b024645873c4637499cd190085a359323ba39a5ab18c3e4f",
+        "welcometonightcitybeta/β113": "ca272d046651f950ee31b2d88c7a0bf78d0838cdf491d9d7d0bb41de659b85a5",
+        "welcometonightcityretail/113": "67a8e1d8262e264dd1e67ee7217cc243a7c846ff277302bfb57fcdbc884c8db9"
+      }
+    },
+    {
+      "id": "art:f7742fc7-0abe-45ee-a6ce-22caf159e06d",
+      "cardId": "mt0d12-flathead",
+      "representativePrintingKey": "mercdemodeck/011",
+      "printingKeys": [
+        "mercdemodeck/011",
+        "theheistbetastarterdeck/β015",
+        "theheistretailstarterdeck/015"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/011": "26952aa433b864874c4385e33535630fe164784260e94ff630437f19e3b240cc",
+        "theheistbetastarterdeck/β015": "ee5581901e6892fcbb991b5261744346d347a2c8a6889a4ebbe9fa286b657cd5",
+        "theheistretailstarterdeck/015": "2ebadb412057b7b401878ca6c6fb089057bc74f45378f6a4c5e3b3e258e9dbac"
+      }
+    },
+    {
+      "id": "art:c45d93f9-bc2d-4e35-9d77-ba62d9d4e4d9",
+      "cardId": "psycho-squad",
+      "representativePrintingKey": "mercdemodeck/012",
+      "printingKeys": [
+        "mercdemodeck/012",
+        "theheistbetastarterdeck/β016",
+        "theheistretailstarterdeck/016",
+        "welcometonightcitybeta/β124",
+        "welcometonightcityretail/124"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/012": "49226c178b40255e52893ad869b786d4076d985d10ad9f06d959af7f378aac68",
+        "theheistbetastarterdeck/β016": "351445856c6404e50477dfde487522664ad885ec6b895df716e434a7ac9eed0c",
+        "theheistretailstarterdeck/016": "a320c13a559a9bcd8a386b0b2873e199d0266fcc02d44c73a8ca5ca50e7219bc",
+        "welcometonightcitybeta/β124": "1b0eddbadb8546a207ed3e49c0dcd5ea3089f12c2f123c00c852e678ef7a9df7",
+        "welcometonightcityretail/124": "61fbdd94e8df902f7b8bb29adc2c9e83781acaf9b3973a7d81f5bd72e5d3208c"
+      }
+    },
+    {
+      "id": "art:dd423c67-68f4-4da8-884c-cbeb91554c0d",
+      "cardId": "dying-night-v-s-pistol",
+      "representativePrintingKey": "mercdemodeck/013",
+      "printingKeys": [
+        "mercdemodeck/013",
+        "theheistbetastarterdeck/β017",
+        "theheistretailstarterdeck/017",
+        "welcometonightcitybeta/β128",
+        "welcometonightcityretail/128"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/013": "416a9c9c49bec4e666f4bd6e93c9f6f749d8ce8aa8809dc044fdf5abb1ea0e86",
+        "theheistbetastarterdeck/β017": "0716be6ff883fca0b94e6b565631e51ee1a77aa707c4d380feeb994dd8f163b7",
+        "theheistretailstarterdeck/017": "8c5697fe9afaca6fcae73c2b2d01511d3221aa322e4030a17cb6bcce4d26d9f5",
+        "welcometonightcitybeta/β128": "9701e51d6a201263f8b796f0a085bab12e19f8f80566ba0356ef12e0f4717b4e",
+        "welcometonightcityretail/128": "f91b454fa07ee8621d1a40c302744aada685e89923940a19dbf1aba8b123616e"
+      }
+    },
+    {
+      "id": "art:9d62921e-382e-4e93-85d8-aa628566ccd7",
+      "cardId": "floor-it",
+      "representativePrintingKey": "mercdemodeck/014",
+      "printingKeys": [
+        "mercdemodeck/014",
+        "theheistbetastarterdeck/β019",
+        "theheistretailstarterdeck/019",
+        "welcometonightcitybeta/β132",
+        "welcometonightcityretail/132"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/014": "867f957c83a2b18560b3cdde1dab158f6ff2f737d7b1fdcc860777c89887025d",
+        "theheistbetastarterdeck/β019": "f0c7e1825af26847769aa9d9511dde57bb7bbe7bc4f134e5fe0c72d367f6e435",
+        "theheistretailstarterdeck/019": "f9d89fcb046d84d486ae749f141d81810bf2b4990c9800c6502bf3c3ef3aa355",
+        "welcometonightcitybeta/β132": "954b7e6b51f8b484030a0d8637b0d91e033a4242245753cd4dfac716ee15b40a",
+        "welcometonightcityretail/132": "2cdcff3f8c986afccc3348bace6725853a56e7f7073bdeba6ab114439718d9bb"
+      }
+    },
+    {
+      "id": "art:7a8acee6-f460-4d2d-aaa3-3d057ef7c36c",
+      "cardId": "reboot-optics",
+      "representativePrintingKey": "mercdemodeck/015",
+      "printingKeys": [
+        "mercdemodeck/015",
+        "theheistbetastarterdeck/β020",
+        "theheistretailstarterdeck/020",
+        "welcometonightcitybeta/β136",
+        "welcometonightcityretail/136"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "mercdemodeck/015": "a8812097d40a57e7632149bcb3f8a8fd12119142a948d2b0e89e7886b7e61caf",
+        "theheistbetastarterdeck/β020": "79361f99985634f605053cea42c5e2892cb4fce24ecc8de8cc96382f7f042a29",
+        "theheistretailstarterdeck/020": "e4dcac09e9bd59ec062f38c42479fa61166dce93d76845078d8245e05f974b6f",
+        "welcometonightcitybeta/β136": "9e76f27e5730abdf588b84250566c1791d433342739933c52d18a0e40045a008",
+        "welcometonightcityretail/136": "cdb5a01cb50091c0a3968d0862e30a089c18bc48fdcc848a7cddc3387c1d9ac4"
+      }
+    },
+    {
+      "id": "art:10ca370b-deb7-4c58-a9f9-faf4f9708f6d",
+      "cardId": "adam-smasher-ender-of-legends",
+      "representativePrintingKey": "prereleasebeta/001",
+      "printingKeys": [
+        "prereleasebeta/001",
+        "welcometonightcitybeta/β001",
+        "welcometonightcityretail/001"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/001": "d88defe0b7a6b8fe999b4231d69b5f33eb850044a0b4122f8d486f681ce6fcc5",
+        "welcometonightcitybeta/β001": "f638bc47fe087c3e228dad28470d74a00aaa9d6753c3f770a7198c4199b6b2c3",
+        "welcometonightcityretail/001": "557393b5a85f265ed7579dcedc167b0f51e30c8fdad1a8821281ee427d1d4c81"
+      }
+    },
+    {
+      "id": "art:cbbe5954-ce33-47aa-83c1-bdda4c7b907f",
+      "cardId": "royce-psycho-on-the-edge",
+      "representativePrintingKey": "prereleasebeta/002",
+      "printingKeys": [
+        "prereleasebeta/002",
+        "welcometonightcitybeta/β004",
+        "welcometonightcityretail/004"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/002": "dc5daa9b255e1058a40fe99adae664fbadbbf6c988dd435ddbdf6798cf5a6c61",
+        "welcometonightcitybeta/β004": "62b884f2315630a0e96bfa84d34b1e7e525052adcea6329a09923e268486815e",
+        "welcometonightcityretail/004": "4964c603b1808a83af8f8829157f83c836375963d2dc2fcca7bad58ba7ca71d4"
+      }
+    },
+    {
+      "id": "art:c44fbb15-edf6-466c-95d4-2e718fb100e5",
+      "cardId": "dum-dum-maelstrom-triggerman",
+      "representativePrintingKey": "prereleasebeta/003",
+      "printingKeys": [
+        "prereleasebeta/003",
+        "welcometonightcitybeta/β036",
+        "welcometonightcityretail/036"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/003": "f64258b29152c40ba06717c44c560f224e5cd1470afec607e2ec7b50701b6137",
+        "welcometonightcitybeta/β036": "41f4d8f783f8e90cd4d921b48948e8771e38403e1a69ec165fa22d80967c6084",
+        "welcometonightcityretail/036": "97986650ebea5904117aa127aae51410e34200dc24dff71ae11510b0ffbf6f7d"
+      }
+    },
+    {
+      "id": "art:f6e85d48-0d0b-4cfa-9cdf-1b66f8104328",
+      "cardId": "river-ward-detective-on-the-hunt",
+      "representativePrintingKey": "prereleasebeta/004",
+      "printingKeys": [
+        "prereleasebeta/004",
+        "welcometonightcitybeta/β039",
+        "welcometonightcityretail/039"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/004": "2948ff0d1915563e4de10700763fdf087ee275d6a3556ad81d783a03a3b4eb6a",
+        "welcometonightcitybeta/β039": "28b17d856c8110c4f4000c4b6a1d5abe61090682207297f585f294db6e825460",
+        "welcometonightcityretail/039": "221ac17b55a54a5ac10d60dc4b8c8c5d5f9c4437fb2f96e3a8086e78efd2a8d8"
+      }
+    },
+    {
+      "id": "art:254975e9-0381-4a1c-96c7-19186a855e48",
+      "cardId": "rogue-amendiares-preem-solo",
+      "representativePrintingKey": "prereleasebeta/005",
+      "printingKeys": [
+        "prereleasebeta/005",
+        "welcometonightcitybeta/β040",
+        "welcometonightcityretail/040"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/005": "968ff6b6024decf451eb3bb89e9d27edf1c4b0b5ccff79572f09859a2da42739",
+        "welcometonightcitybeta/β040": "3ba8e44f04f87121966692b6d9966a0a3e77e60f5b4e738aef53619dfbf4f839",
+        "welcometonightcityretail/040": "1b9a47dd8fb25b5459549717c6a0c157a7454fbcb110fb48e60fa5b82ff4180e"
+      }
+    },
+    {
+      "id": "art:ff7b01fc-d9fd-4ae7-b141-01f514dee280",
+      "cardId": "goro-takemura-vengeful-bodyguard",
+      "representativePrintingKey": "prereleasebeta/006",
+      "printingKeys": [
+        "prereleasebeta/006",
+        "welcometonightcitybeta/β071",
+        "welcometonightcityretail/071"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/006": "9606f56a90114346917bec284d63a8162f1455cf470efd0e0d21c7d2ba82cc10",
+        "welcometonightcitybeta/β071": "5f876d7c47cdda5f10001567ba39747fcb884bf5f4064963a9613b906c9494fc",
+        "welcometonightcityretail/071": "f6a182599e2c5a72064064dc5ac2b5510b0bdf4b6e5a37922aa44a85d81c7130"
+      }
+    },
+    {
+      "id": "art:5620aa1a-94e9-43c4-b89e-fea304e4257c",
+      "cardId": "jackie-welles-mama-s-favorite",
+      "representativePrintingKey": "prereleasebeta/007",
+      "printingKeys": [
+        "prereleasebeta/007",
+        "welcometonightcitybeta/β073",
+        "welcometonightcityretail/073"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/007": "51b6e96df9b960c83dc96fcb79a71c45d1b28273819d458af5cc20e2baac73cd",
+        "welcometonightcitybeta/β073": "5c5290fddcbdb4c7f9b0e3e3f5f224a79a4f0c668805d8b60c63d597bdc29d31",
+        "welcometonightcityretail/073": "c879e8b45e36ce24597c185f04222c6e1ab4379775663065f9be6309de2d4b0d"
+      }
+    },
+    {
+      "id": "art:c7c6c4fa-eb19-43d6-904c-129cf062a8aa",
+      "cardId": "panam-palmer-nomad-cavalry",
+      "representativePrintingKey": "prereleasebeta/008",
+      "printingKeys": [
+        "prereleasebeta/008",
+        "welcometonightcitybeta/β075",
+        "welcometonightcityretail/075"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/008": "4287a460952f33cfffca94ad64fc2e1e478f11e04f29d2df54e026b03238b6f1",
+        "welcometonightcitybeta/β075": "452a3cfdffa73ab093aa9244d3eab00cdc8b6a8d99e28ee7a4c948f33a078471",
+        "welcometonightcityretail/075": "cd95d6cdbdbb32ed6d797d21a045e7bd7e1ff69ed2147798b177ff8c7252d528"
+      }
+    },
+    {
+      "id": "art:32d12432-acad-4a11-b8eb-1dd8fb2297f3",
+      "cardId": "alt-cunningham-soulkiller-architect",
+      "representativePrintingKey": "prereleasebeta/009",
+      "printingKeys": [
+        "prereleasebeta/009",
+        "welcometonightcitybeta/β106",
+        "welcometonightcityretail/106"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/009": "0f5f2402f67a8c669263fcc9347bea2e94604846379e5de280d6953a3701b032",
+        "welcometonightcitybeta/β106": "052e1ac8981f506f8e9cc95058bde85e3886e75607e24a78688f940bbd0e0365",
+        "welcometonightcityretail/106": "0758b167ba2905177d716aa64d6f9141c2aa132b14f562ce6fe56a9d8e6425e5"
+      }
+    },
+    {
+      "id": "art:e902c6ed-7f60-42e1-b3e1-e3804181222f",
+      "cardId": "judy-a-lvarez-braindance-maestro",
+      "representativePrintingKey": "prereleasebeta/010",
+      "printingKeys": [
+        "prereleasebeta/010",
+        "welcometonightcitybeta/β108",
+        "welcometonightcityretail/108"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "prereleasebeta/010": "5c2beb1b43528258397a4b8e1c9e23bfa851a0f2fbcffb2a1f42d58ef189b64b",
+        "welcometonightcitybeta/β108": "c437b0b63fd70a2bb8c5eca5f46b7f2882f3d319e81a4fcd071509de78b53213",
+        "welcometonightcityretail/108": "0ad677c937b09a2b51cdf921e638cbfe99e17c0ae933c08666a13f7a5cdb1500"
+      }
+    },
+    {
+      "id": "art:71a35836-e604-4d98-ab56-58bfb4581033",
+      "cardId": "rebecca-having-a-moment",
+      "representativePrintingKey": "PRM01/005",
+      "printingKeys": [
+        "PRM01/005"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "PRM01/005": "0c9770d90d9c8b5ec8a1c4edfe4fd9eaeba8162c002e66acca03990f09ddf1e8"
+      }
+    },
+    {
+      "id": "art:f625d2ac-3007-48f4-82b3-b521fc11a172",
+      "cardId": "rebecca-having-a-moment",
+      "representativePrintingKey": "PRM01/007",
+      "printingKeys": [
+        "PRM01/007"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "PRM01/007": "90b9383f5ec89de575134c5e8d538c5f10458e24b76518f561bb66c05678e48f"
+      }
+    },
+    {
+      "id": "art:aedbd6fe-19d2-4185-b708-b6393e21da20",
+      "cardId": "adam-smasher-ender-of-legends",
+      "representativePrintingKey": "PRM01/008",
+      "printingKeys": [
+        "PRM01/008"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "PRM01/008": "edad99e5db474796f1c4bfd34a8d111f722c7f0263aff8abaabd72e53e242487"
+      }
+    },
+    {
+      "id": "art:aebf807a-2fbb-4b60-ae4b-36783314871f",
+      "cardId": "heywood-ripperdoc",
+      "representativePrintingKey": "theheistbetastarterdeck/β003",
+      "printingKeys": [
+        "theheistbetastarterdeck/β003",
+        "theheistretailstarterdeck/003",
+        "welcometonightcitybeta/β047",
+        "welcometonightcityretail/047"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "theheistbetastarterdeck/β003": "5a71211bb721f13c1f2bb68a856cdb0d4ab3e8d0d5d4d23b625fced18c94ad38",
+        "theheistretailstarterdeck/003": "173587c2282d0653b7553ff21c13c5c45a2fe7a60d47f9c48ca0698e7917eef4",
+        "welcometonightcitybeta/β047": "d29dcf3a014366e0a700ad6258557f07f9abdf5d2ab4f1035216246d02bd748a",
+        "welcometonightcityretail/047": "fb9c222a36b930930bb00c83f5761f0b0a4055e0c8e35cc69877a3979516b31f"
+      }
+    },
+    {
+      "id": "art:e7ef78a6-72d3-42a4-ba98-14facb194eb9",
+      "cardId": "offduty-malfini",
+      "representativePrintingKey": "theheistbetastarterdeck/β004",
+      "printingKeys": [
+        "theheistbetastarterdeck/β004",
+        "theheistretailstarterdeck/004",
+        "welcometonightcitybeta/β051",
+        "welcometonightcityretail/051"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "theheistbetastarterdeck/β004": "82aa085b0447a003fa1f249bfd8d72cce81930f81a35d5243890828edcb6d762",
+        "theheistretailstarterdeck/004": "2af3c416644c86ce6cad7e182cb5740e4de2d7c71d05fd35d471a62e93d1ddef",
+        "welcometonightcitybeta/β051": "a55ea9f984a524e8c31a77dccabf6a46d01b85dc8d4628bcf2b39cc0d09326b6",
+        "welcometonightcityretail/051": "be44a5594dee2c4764363be1eb38c1a7c9d31fd8bbaedd81dc4fa854b93f2407"
+      }
+    },
+    {
+      "id": "art:646dde1d-a112-4c7b-aecc-f63e130d4df0",
+      "cardId": "t-bug-amateur-philosopher",
+      "representativePrintingKey": "theheistbetastarterdeck/β006",
+      "printingKeys": [
+        "theheistbetastarterdeck/β006",
+        "theheistretailstarterdeck/006",
+        "welcometonightcitybeta/β055",
+        "welcometonightcityretail/055"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "theheistbetastarterdeck/β006": "a979a074cab6fe78874c082a43ac93602afaefa97a4b2f269c05fec4b1c10e69",
+        "theheistretailstarterdeck/006": "db427e09887c3f0e9be68ad711b956a183c4bd8f30720cf1e84b42268ff277bc",
+        "welcometonightcitybeta/β055": "9f56a96400cd732e7a2d68686af953bb78d222a0bb098192b1c9b8e1ddc37553",
+        "welcometonightcityretail/055": "7239f7b861d72d68bd935884546179d1a3a6ec140fbd52c01d93e1030982fe8b"
+      }
+    },
+    {
+      "id": "art:e38dee5b-9f4a-4323-a18f-aff42256b158",
+      "cardId": "zetatech-faceplate",
+      "representativePrintingKey": "theheistbetastarterdeck/β009",
+      "printingKeys": [
+        "theheistbetastarterdeck/β009",
+        "theheistretailstarterdeck/009",
+        "welcometonightcitybeta/β064",
+        "welcometonightcityretail/064"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "theheistbetastarterdeck/β009": "89d23c903258afeff7fdde558f2e5c659517c419d12c6e4693c87fc12a3fcf63",
+        "theheistretailstarterdeck/009": "02a5a4d565869670821fdd549854740c334c5c040666360e6cb163addc1e9b41",
+        "welcometonightcitybeta/β064": "8ad59c1eb626b56eeeb4ff3066bb6ad62fb49bdaf65a2e5eefb3473b41393446",
+        "welcometonightcityretail/064": "88026670e190165039cf92baf240ce485a4fe335a8b8a2fd47bc65163113ffce"
+      }
+    },
+    {
+      "id": "art:7ef4d862-b97f-47be-ba0f-071c8e8354b0",
+      "cardId": "tetratronic-rippler",
+      "representativePrintingKey": "theheistbetastarterdeck/β018",
+      "printingKeys": [
+        "theheistbetastarterdeck/β018",
+        "theheistretailstarterdeck/018",
+        "welcometonightcitybeta/β130",
+        "welcometonightcityretail/130"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "theheistbetastarterdeck/β018": "a2fe5bf11aeca7eb11a4b9acd8e6900b35196d2fe9d0fc1ad57a698d282d8392",
+        "theheistretailstarterdeck/018": "1e553e022c76407bf86d15413c3e3552ff28b29a43777d63912387be8d0369a9",
+        "welcometonightcitybeta/β130": "24bdae1ac2511c2d560c65dba13d07c7071075b7e6a068e75cfe6cee371c73f8",
+        "welcometonightcityretail/130": "56850d8ce2660a1716c146e9f0cc719b6740e5a5209c16e3f58babddd68d6b94"
+      }
+    },
+    {
+      "id": "art:f4ff466c-22ad-4c50-9f4c-29933e51f739",
+      "cardId": "dexter-deshawn-off-the-grid",
+      "representativePrintingKey": "welcometonightcitybeta/β002",
+      "printingKeys": [
+        "welcometonightcitybeta/β002",
+        "welcometonightcityretail/002"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β002": "b9b828bf6fa54aa52eabc827d4e0a6a1298beb5bd33f3144b68e0c6ac6e0f208",
+        "welcometonightcityretail/002": "23c309c6f192e478b8eac24eef96cb5560ac5704a75fa9cfd8e63e384261874b"
+      }
+    },
+    {
+      "id": "art:1159e69c-614f-4a8e-be76-d69ee734bd22",
+      "cardId": "johnny-silverhand-rocking-renegade",
+      "representativePrintingKey": "welcometonightcitybeta/β003",
+      "printingKeys": [
+        "welcometonightcitybeta/β003",
+        "welcometonightcityretail/003"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β003": "2f640273973df3a650ef68b7f2b7676efa33ca93daa1758512660431090d1f2e",
+        "welcometonightcityretail/003": "e31d0c7f3407ff254da0093e36ff5cc2259219603181801ed3766b8941092a3e"
+      }
+    },
+    {
+      "id": "art:79119e83-b50b-4a79-8a6c-f496d9ed7ef6",
+      "cardId": "v-streetkid",
+      "representativePrintingKey": "welcometonightcitybeta/β005a",
+      "printingKeys": [
+        "welcometonightcitybeta/β005a",
+        "welcometonightcityretail/005a"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β005a": "29789f08249818f4b388270bac7184449c636dec136ff95ff5c273d7e70cc58b",
+        "welcometonightcityretail/005a": "ee37fcc0cd458e9ba14dd593c602a24001bc3eed83f9de40acd3bcdcf70406ff"
+      }
+    },
+    {
+      "id": "art:e6dbfd52-85c5-4fd4-a77c-ca829e827d8a",
+      "cardId": "v-streetkid",
+      "representativePrintingKey": "welcometonightcitybeta/β005b",
+      "printingKeys": [
+        "welcometonightcitybeta/β005b",
+        "welcometonightcityretail/005b"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β005b": "61e7d6390044a32fc84dd29adda64f196abb301ea1646977417884f8957fd94c",
+        "welcometonightcityretail/005b": "37314d24cdd388d6bbaa9552cee81d206765e416f1c0a5cc54edb472bd5dd213"
+      }
+    },
+    {
+      "id": "art:14e20948-a74b-4a27-a156-d34d8cfb98cc",
+      "cardId": "6th-street-recruits",
+      "representativePrintingKey": "welcometonightcitybeta/β006",
+      "printingKeys": [
+        "welcometonightcitybeta/β006",
+        "welcometonightcityretail/006"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β006": "ad93721118007eb5ed0bf55c41df92ab07d62af634f9b7787aeb41d25f478cd3",
+        "welcometonightcityretail/006": "008cd40ccaec7a3e1c046affe18ded966ecf5208051be9de9e8971dee67da552"
+      }
+    },
+    {
+      "id": "art:81364914-7121-43fc-9610-f2f9736866d1",
+      "cardId": "animals-wrecker",
+      "representativePrintingKey": "welcometonightcitybeta/β007",
+      "printingKeys": [
+        "welcometonightcitybeta/β007",
+        "welcometonightcityretail/007"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β007": "ff9449f726ae37e211c00fca9344487859702be409e2d1a2d19e46d82295556c",
+        "welcometonightcityretail/007": "09925df4901027ee54e7671c8c17701dc8e6bae204760519b444e431243785ff"
+      }
+    },
+    {
+      "id": "art:c180e174-f1b6-4b9c-b2c8-db0551ae49d2",
+      "cardId": "el-sombrero-n-la-venganza-lenta",
+      "representativePrintingKey": "welcometonightcitybeta/β009",
+      "printingKeys": [
+        "welcometonightcitybeta/β009",
+        "welcometonightcityretail/009"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β009": "deece71a0f606e2ff8f40dd2368b21497e274cc342b1fa1057e7a65177d4a132",
+        "welcometonightcityretail/009": "6440933b8d6cec0212fc3c242dc7ea39b8d719e18c2cc12919f263264d0e58a5"
+      }
+    },
+    {
+      "id": "art:fa9d3c0c-5634-42a1-a665-9173c045fa30",
+      "cardId": "japantown-jonin",
+      "representativePrintingKey": "welcometonightcitybeta/β010",
+      "printingKeys": [
+        "welcometonightcitybeta/β010",
+        "welcometonightcityretail/010"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β010": "08e8244659af9d1b3d4d3a2bbca700defc13a776677c6ec8dd79967b26fccd5f",
+        "welcometonightcityretail/010": "57fd904d0d4c09137bcee5c45dcc49784d9ca164a743941a2a3ec1ccc11dc5c1"
+      }
+    },
+    {
+      "id": "art:975957a0-9c72-4a67-8260-f86c1c70bfb5",
+      "cardId": "johnny-silverhand-never-stop-fighting",
+      "representativePrintingKey": "welcometonightcitybeta/β011",
+      "printingKeys": [
+        "welcometonightcitybeta/β011",
+        "welcometonightcityretail/011"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β011": "853bc4be931299137be5c7b8ced2da2a08b353f8b486b912ec314f4b76c06e3b",
+        "welcometonightcityretail/011": "53837fd88622addc266c7ac361a25ff531a7855e045ef1b72f3d961a474e54b6"
+      }
+    },
+    {
+      "id": "art:1a986e5a-fe97-408c-81e9-b675c64bdcf9",
+      "cardId": "kerry-eurodyne-the-last-rockerboy",
+      "representativePrintingKey": "welcometonightcitybeta/β012",
+      "printingKeys": [
+        "welcometonightcitybeta/β012",
+        "welcometonightcityretail/012"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β012": "5918c50b55db2355df4e149a88737139e1e7847e2c84b727cfb3b16363d06a67",
+        "welcometonightcityretail/012": "2e5932d85deba6adb88109abe58568e7763cd0caa2ea8ffc7aec722407bcb337"
+      }
+    },
+    {
+      "id": "art:91e553d4-ac26-4135-bcd9-9fc2661d3e90",
+      "cardId": "la-llorona-ghost-of-the-past",
+      "representativePrintingKey": "welcometonightcitybeta/β013",
+      "printingKeys": [
+        "welcometonightcitybeta/β013",
+        "welcometonightcityretail/013"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β013": "c2f474b31d8090f7e857705eea79f5cb14f6d749069ba64bd7d9067aade2158a",
+        "welcometonightcityretail/013": "8f03cfd646b0a7c7993d2da55d70318fb9ff53f94724b939c879e290eebd30fd"
+      }
+    },
+    {
+      "id": "art:96e76b12-4e53-4e2c-aca3-3fedf6f21e18",
+      "cardId": "meredith-stout-stone-cold-corpo",
+      "representativePrintingKey": "welcometonightcitybeta/β014",
+      "printingKeys": [
+        "welcometonightcitybeta/β014",
+        "welcometonightcityretail/014"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β014": "4df9c326e8cd36e3653d6bdf0cde311d913a356e07821e602dc9944b53236e96",
+        "welcometonightcityretail/014": "fbf90c91b430f05c50a30406180890e43349b0c35ea123976aa6d800a2b9c4b0"
+      }
+    },
+    {
+      "id": "art:3b8c035e-161d-4a84-bdc8-f76899e8244f",
+      "cardId": "octant",
+      "representativePrintingKey": "welcometonightcitybeta/β015",
+      "printingKeys": [
+        "welcometonightcitybeta/β015",
+        "welcometonightcityretail/015"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β015": "2975d6bc49ffcfa15b7e7e3869059f7a451357aeae12ea673d4a6302c6652186",
+        "welcometonightcityretail/015": "364c230fc8b35c6608bc698c39479390c68a85fe616fae59e288c42085aaf3bc"
+      }
+    },
+    {
+      "id": "art:a4276d5e-cdf1-42cb-a6c3-8722d8c7c595",
+      "cardId": "royce-don-t-call-me-simon",
+      "representativePrintingKey": "welcometonightcitybeta/β016",
+      "printingKeys": [
+        "welcometonightcitybeta/β016",
+        "welcometonightcityretail/016"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β016": "3cbc1a6a43d43eef449f752a5296455b09b17dbfc5467233a7dc6a5a007248aa",
+        "welcometonightcityretail/016": "8fb9c78fbd849346811159d9061f34a0632379f3fa7fb0c81ffccef64d15077c"
+      }
+    },
+    {
+      "id": "art:c614fc55-c071-456f-a5c3-7274e0073b0c",
+      "cardId": "screw-lovelorn-fool",
+      "representativePrintingKey": "welcometonightcitybeta/β018",
+      "printingKeys": [
+        "welcometonightcitybeta/β018",
+        "welcometonightcityretail/018"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β018": "21d9b746371cc5f0cdd8e373bf4d13273b86a817333fe9027bb65feb41e20518",
+        "welcometonightcityretail/018": "63346430d216d68117c60e06437dc34635967e3653f137dfaa8e91132043897e"
+      }
+    },
+    {
+      "id": "art:b460b92c-c0fd-43ed-84db-8615032e47f4",
+      "cardId": "v-roamer-of-the-badlands",
+      "representativePrintingKey": "welcometonightcitybeta/β020",
+      "printingKeys": [
+        "welcometonightcitybeta/β020",
+        "welcometonightcityretail/020"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β020": "e299c1465638c5a4ac41b6ee6db5e283d22ece76acbeadfc6ff7194fe9ef4824",
+        "welcometonightcityretail/020": "2188430f93841be5bce26aa52c552aeaf0fa29118380831ff8c908d73d16ba18"
+      }
+    },
+    {
+      "id": "art:8d236321-e94e-41b1-8cb9-c2a533afc112",
+      "cardId": "valentino-guerrera",
+      "representativePrintingKey": "welcometonightcitybeta/β021",
+      "printingKeys": [
+        "welcometonightcitybeta/β021",
+        "welcometonightcityretail/021"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β021": "e5af144b76d029ac3874a7eb5a31bb761f89ea0474d1ddda76c79cbb456b6038",
+        "welcometonightcityretail/021": "4a269c1eebb8be0b0d0ba6d5e5f3dc03f920561f7c6abd5e3fb833d7bce4f385"
+      }
+    },
+    {
+      "id": "art:19ef8a11-606b-44f3-b20e-08800c9d6cc2",
+      "cardId": "yorinobu-arasaka-steel-dragon",
+      "representativePrintingKey": "welcometonightcitybeta/β022",
+      "printingKeys": [
+        "welcometonightcitybeta/β022",
+        "welcometonightcityretail/022"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β022": "bdc7809810321d8875156491c310c088540a9732b2594371dac3677081e9e4dd",
+        "welcometonightcityretail/022": "4ce701ceba2804285dd28495c5e7dfa71178156ef1544ddb823bda9c69bc2416"
+      }
+    },
+    {
+      "id": "art:e53bdb8b-5b1f-4f31-ad74-a43a4925c2d1",
+      "cardId": "deadman-transmitter",
+      "representativePrintingKey": "welcometonightcitybeta/β024",
+      "printingKeys": [
+        "welcometonightcitybeta/β024",
+        "welcometonightcityretail/024"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β024": "030d2b19f534006d2e7c44ed7792da5332878621d5294e3b4e24d1c7cbddfec3",
+        "welcometonightcityretail/024": "441afa96a7df87b821930c29ed78f3ca9af1ee595c42cb1fad0195c49d53dcc7"
+      }
+    },
+    {
+      "id": "art:27a2fceb-5c37-4cfa-8efb-1e4618d22401",
+      "cardId": "all-is-lost",
+      "representativePrintingKey": "welcometonightcitybeta/β027",
+      "printingKeys": [
+        "welcometonightcitybeta/β027",
+        "welcometonightcityretail/027"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β027": "af522e32733b809c012b9407296867cf24abac74d1e8ef83620b6a721575e48a",
+        "welcometonightcityretail/027": "62977a269ac2a8a46028160fd1eb6d37929ecefbde119d295d14c22f1837aad6"
+      }
+    },
+    {
+      "id": "art:d2aed299-7c88-484a-aa8a-e2e2f09bf8a8",
+      "cardId": "appetite-for-destruction",
+      "representativePrintingKey": "welcometonightcitybeta/β028",
+      "printingKeys": [
+        "welcometonightcitybeta/β028",
+        "welcometonightcityretail/028"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β028": "461def716750c78b3a49f6cd4353403422b65cbd8870972c2afff20acdc754d3",
+        "welcometonightcityretail/028": "b249a6f9b3159aadb2d9471ef9f196aa6f02ebaf6d2572121da39934284eed82"
+      }
+    },
+    {
+      "id": "art:2ca6ae1f-b10c-439d-a929-cd82c3b1158c",
+      "cardId": "bonnie-and-clyde",
+      "representativePrintingKey": "welcometonightcitybeta/β029",
+      "printingKeys": [
+        "welcometonightcitybeta/β029",
+        "welcometonightcityretail/029"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β029": "6cc906b42f2b520080b326c3e3c1671c13caec1c0acf096ac198c66cfe07d4e1",
+        "welcometonightcityretail/029": "281ab8e46b297cbb4bfac4319f2a5ebed625ca4d5efc239f90a33b9ecdd7f3b7"
+      }
+    },
+    {
+      "id": "art:171b21b1-90d0-4d3b-a060-740c413b7bf2",
+      "cardId": "carnage-at-the-colosseum",
+      "representativePrintingKey": "welcometonightcitybeta/β030",
+      "printingKeys": [
+        "welcometonightcitybeta/β030",
+        "welcometonightcityretail/030"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β030": "80dbf7ff363af273020a63578bd994f20ee02341804de21fffeb0b1e6ae108cd",
+        "welcometonightcityretail/030": "b6ef9d755a2f338c9092d8fed3d19ec5891004c0565bc8571aca23e39a0fb8e2"
+      }
+    },
+    {
+      "id": "art:0ecf513b-64fd-4932-a004-b02b43b21e88",
+      "cardId": "detonate",
+      "representativePrintingKey": "welcometonightcitybeta/β031",
+      "printingKeys": [
+        "welcometonightcitybeta/β031",
+        "welcometonightcityretail/031"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β031": "830e72f47b8e4534be10ea1688a87d43890c6ea0ac6a395a4094a8cb1bc0d55e",
+        "welcometonightcityretail/031": "93b40ec24fee0bc7c857c7c82330f79f154e5f5413c03ecc3028bed0e55dea58"
+      }
+    },
+    {
+      "id": "art:e3d061b0-fb02-481d-8afa-f4b5bce4ed39",
+      "cardId": "gunpoint-diplomacy",
+      "representativePrintingKey": "welcometonightcitybeta/β032",
+      "printingKeys": [
+        "welcometonightcitybeta/β032",
+        "welcometonightcityretail/032"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β032": "0af65aaff5043d4f89ec6f3e7a22dfbbc0f1f69242a78a283d8af031b97110e5",
+        "welcometonightcityretail/032": "173ddbb4ac47939b4553599852bfc3708fb36e42ad514f4833d14c299b3e735f"
+      }
+    },
+    {
+      "id": "art:0557c333-1700-439d-bb85-dfec8d578ded",
+      "cardId": "kerry-eurodyne-axe-attitude-audience",
+      "representativePrintingKey": "welcometonightcitybeta/β037",
+      "printingKeys": [
+        "welcometonightcitybeta/β037",
+        "welcometonightcityretail/037"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β037": "f103b4af3d48e6e7c0f80b4b2eec8b625552222bc1ca2db86cf027e51ae0b7d3",
+        "welcometonightcityretail/037": "32f5b850d3e784e614ad96cb468ca3a6886469d70e231072afc149e5ca0be0e8"
+      }
+    },
+    {
+      "id": "art:3d1e6590-5cdc-4605-8b61-915f21f5514d",
+      "cardId": "muamar-reyes-el-capita-n",
+      "representativePrintingKey": "welcometonightcitybeta/β038",
+      "printingKeys": [
+        "welcometonightcitybeta/β038",
+        "welcometonightcityretail/038"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β038": "3d975fb66e4532a6fab56afaca66c64e3aa267a2340e71122bbd0d839edc8679",
+        "welcometonightcityretail/038": "ee18cec3d73cb66e967d80a057c85f34485375d62d5eded34d360f660f99ba89"
+      }
+    },
+    {
+      "id": "art:fdb7a7c3-350e-49ea-8a9e-8477ce6c657a",
+      "cardId": "adam-smasher-metal-over-meat",
+      "representativePrintingKey": "welcometonightcitybeta/β041",
+      "printingKeys": [
+        "welcometonightcitybeta/β041",
+        "welcometonightcityretail/041"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β041": "8e497fe3d321a852cd869d5e42f19bfe2f730321e4c39d412f0fdaa1829a5f73",
+        "welcometonightcityretail/041": "48aa00ef7ce5335d20ec9d3464dbdb8f2691aac769cfa5741ca307d9ad96230f"
+      }
+    },
+    {
+      "id": "art:3d3e0e55-fa7a-40ba-bf30-0204cca88612",
+      "cardId": "alt-cunningham-mother-of-daemons",
+      "representativePrintingKey": "welcometonightcitybeta/β042",
+      "printingKeys": [
+        "welcometonightcitybeta/β042",
+        "welcometonightcityretail/042"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β042": "e153710062b195bbba80ef77c8d4ff72e982b0afb69162f4027b06bc636c21d3",
+        "welcometonightcityretail/042": "4364d72e60240c641947ca5efdb12a6664d2004c7ade2ae55c29936d3313300c"
+      }
+    },
+    {
+      "id": "art:28973c43-529c-487e-aa05-ac99280d66c3",
+      "cardId": "augmented-negotiators",
+      "representativePrintingKey": "welcometonightcitybeta/β043",
+      "printingKeys": [
+        "welcometonightcitybeta/β043",
+        "welcometonightcityretail/043"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β043": "d3fb20ac3d8f4ab70aa83038b6914ed081960afc7b5a8407ed1b54d97da30147",
+        "welcometonightcityretail/043": "3eb60b79bbbefd6f35f18acc5cddaabe115f342216f67b682c5e92a99ea21d8f"
+      }
+    },
+    {
+      "id": "art:20cd09ad-b0c6-4ffe-9036-04ff24d8fe59",
+      "cardId": "caliber-totentanz-s-top-dog",
+      "representativePrintingKey": "welcometonightcitybeta/β044",
+      "printingKeys": [
+        "welcometonightcitybeta/β044",
+        "welcometonightcityretail/044"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β044": "db813f3ff3af642f15352d8c05e59be692843eb3aec887b2d7e4689f4e1887df",
+        "welcometonightcityretail/044": "20b8c5b01950a8c7e85f062e0bc8891d12f159cbc980662a58587c34fa55aba0"
+      }
+    },
+    {
+      "id": "art:cbbcb49e-6c6f-436c-91cf-e9716f6a30af",
+      "cardId": "gilded-mato-n",
+      "representativePrintingKey": "welcometonightcitybeta/β045",
+      "printingKeys": [
+        "welcometonightcitybeta/β045",
+        "welcometonightcityretail/045"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β045": "b4eff6f11da2133a38aefb454a72ff8be8b686c1827f398c8bc607c289d84f8f",
+        "welcometonightcityretail/045": "c77e17972cc122434c8c8ab9d01b3b61baf6f465d079bb6a94fda3ce2a72f76a"
+      }
+    },
+    {
+      "id": "art:ab6fab2a-8101-4bc7-8f5d-b55adf09bc4c",
+      "cardId": "hanako-arasaka-in-a-gilded-cage",
+      "representativePrintingKey": "welcometonightcitybeta/β046",
+      "printingKeys": [
+        "welcometonightcitybeta/β046",
+        "welcometonightcityretail/046"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β046": "b60112660deba00ff4688ddf33a4c3e4a6fabacc245e503525722adff7fa7956",
+        "welcometonightcityretail/046": "799ef5247ce8fbd103476757add820855a00b537962569665c8d3af4127f07e2"
+      }
+    },
+    {
+      "id": "art:93f68b18-e15c-44be-883b-8db7990646f1",
+      "cardId": "jackie-welles-ride-or-die-choom",
+      "representativePrintingKey": "welcometonightcitybeta/β048",
+      "printingKeys": [
+        "welcometonightcitybeta/β048",
+        "welcometonightcityretail/048"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β048": "6c1273fd109f0bc01341f34bf78c72f88ad059345ce0839494c9fd692f404750",
+        "welcometonightcityretail/048": "8cf3b4f6c95b88e5340d4714ed828822765bcad35bc127b7b7b8e81719f1daa5"
+      }
+    },
+    {
+      "id": "art:42236397-716c-422c-8868-9f33dd33b089",
+      "cardId": "maelstrom-goons",
+      "representativePrintingKey": "welcometonightcitybeta/β049",
+      "printingKeys": [
+        "welcometonightcitybeta/β049",
+        "welcometonightcityretail/049"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β049": "969b2fef95b5b6955a7cc419856b813184da80d798110960ff82ad0c7d40c75c",
+        "welcometonightcityretail/049": "cc8c7b9a0470ac533124302b1dae3786fb9cb8141f3770a5b571a4212adb5d59"
+      }
+    },
+    {
+      "id": "art:03849cd8-c3d8-4741-ae9e-d85cd9bb488d",
+      "cardId": "maxtac-suppression-team",
+      "representativePrintingKey": "welcometonightcitybeta/β050",
+      "printingKeys": [
+        "welcometonightcitybeta/β050",
+        "welcometonightcityretail/050"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β050": "c3834d83e2e47e236cd8c17725b3d61d6d5751716379abd8066e1ab0e6d646e5",
+        "welcometonightcityretail/050": "1e9c35739351786c5efe65de5bd2591d0752ab2040d2d3be67ec858b2e8f1609"
+      }
+    },
+    {
+      "id": "art:58cffb40-0914-4c6b-81cf-cdd8b2b83f17",
+      "cardId": "rockn-rockerboy",
+      "representativePrintingKey": "welcometonightcitybeta/β052",
+      "printingKeys": [
+        "welcometonightcitybeta/β052",
+        "welcometonightcityretail/052"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β052": "7e0b10964cbb48b5449f25af008865a8fb4d0a574261fb30e3e665ea71f4ee63",
+        "welcometonightcityretail/052": "a416d7734ed33b5eb7b01dcf5e98bf29f26d09e8ef8c6e9277395abd007cdea0"
+      }
+    },
+    {
+      "id": "art:78b601e2-3dd5-4802-b0e2-5258a4a63363",
+      "cardId": "sketchy-ripper",
+      "representativePrintingKey": "welcometonightcitybeta/β054",
+      "printingKeys": [
+        "welcometonightcitybeta/β054",
+        "welcometonightcityretail/054"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β054": "a3876eb8034a73f71520bf691455fd3d3d796b002d8a8f629be17b0a1a477ed8",
+        "welcometonightcityretail/054": "9476ca11e85ad01513857537d9e21682ee251a22ae96979bb26d9d647768dd72"
+      }
+    },
+    {
+      "id": "art:df879b77-ca97-4e3d-8879-ecd73ceebf21",
+      "cardId": "trauma-team-operatives",
+      "representativePrintingKey": "welcometonightcitybeta/β056",
+      "printingKeys": [
+        "welcometonightcitybeta/β056",
+        "welcometonightcityretail/056"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β056": "50b578d16b0ec1070ce444497b961b39fc1c6bf1f49f7d3bba313d819d52e36e",
+        "welcometonightcityretail/056": "c37ff430f8cda5779261d127d2db23a160b948d6ef489da869dad7771d029282"
+      }
+    },
+    {
+      "id": "art:ade4a2d5-df74-44fe-ab5f-222dc6e2ce27",
+      "cardId": "viktor-vektor-drop-your-illusions",
+      "representativePrintingKey": "welcometonightcitybeta/β057",
+      "printingKeys": [
+        "welcometonightcitybeta/β057",
+        "welcometonightcityretail/057"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β057": "adfb756cf7f87a2e0e3c0357011a8e6042c3fa836b1872f172b7151b34756169",
+        "welcometonightcityretail/057": "24991bd3305b873e57355000605e6571d47fd6c3da8fdac3f5c75936c6779e31"
+      }
+    },
+    {
+      "id": "art:e3005cf1-4dbc-4f4e-922b-af81d6086015",
+      "cardId": "viktor-vektor-you-might-feel-a-little-pinch",
+      "representativePrintingKey": "welcometonightcitybeta/β058",
+      "printingKeys": [
+        "welcometonightcitybeta/β058",
+        "welcometonightcityretail/058"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β058": "2a2892d6e8e8bedb6c59467482914db658abafa383ac98f50f83b1f23c633c52",
+        "welcometonightcityretail/058": "751e94f07b8fdf72d74fabbd04f3d03893ccafb5727e3dd18ae2d6dc38dc36e8"
+      }
+    },
+    {
+      "id": "art:ccb79cf1-fc2d-4b52-bea5-b427583bfe1b",
+      "cardId": "adrenaline-converter",
+      "representativePrintingKey": "welcometonightcitybeta/β059",
+      "printingKeys": [
+        "welcometonightcitybeta/β059",
+        "welcometonightcityretail/059"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β059": "ef8a2a54dbd3208202fdbb1f213cad3ee58d17896550a075c5c838107603c2d6",
+        "welcometonightcityretail/059": "e9d74b3ae76cea60cdb48faea9fa9899862a9fc71539661e02a95848240ab9ec"
+      }
+    },
+    {
+      "id": "art:73b6b3d3-6a7f-44ed-a267-add6ae389b5a",
+      "cardId": "gorilla-arms",
+      "representativePrintingKey": "welcometonightcitybeta/β060",
+      "printingKeys": [
+        "welcometonightcitybeta/β060",
+        "welcometonightcityretail/060"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β060": "24ae08c890fc7302593c841cc9c612610a8bcbfb3349a5929217111dcb99d527",
+        "welcometonightcityretail/060": "1a786ce69db47be96401f3e3f59582f206c743cb8d837fcb6bcb8e8b4988d800"
+      }
+    },
+    {
+      "id": "art:a55809aa-170d-42b4-8768-f0b873fd0dc4",
+      "cardId": "the-relic-experimental-biochip",
+      "representativePrintingKey": "welcometonightcitybeta/β063",
+      "printingKeys": [
+        "welcometonightcitybeta/β063",
+        "welcometonightcityretail/063"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β063": "ff2cc123ecacbbb586e80e185490746ccebb76996266065a5d9e0f4162de0681",
+        "welcometonightcityretail/063": "fa91c11b9d41fa21d436a8a4db77bb9b11dd94f39fcd30fdf9d5571e4aba4f28"
+      }
+    },
+    {
+      "id": "art:20c23b0f-187d-41d8-9670-b8e603049b3d",
+      "cardId": "bootleg-black-sapphire-show",
+      "representativePrintingKey": "welcometonightcitybeta/β066",
+      "printingKeys": [
+        "welcometonightcitybeta/β066",
+        "welcometonightcityretail/066"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β066": "527f67e949b21a8f2a3ca406770e6e8d6abc7c0f007d295800a7553876b58d2b",
+        "welcometonightcityretail/066": "b2f3140399fa41bcf920bb576b6689c84a39218ab4706184b3531aae396592fd"
+      }
+    },
+    {
+      "id": "art:b3329aae-77de-4c61-b400-114f51bbae5a",
+      "cardId": "cyberpsychosis",
+      "representativePrintingKey": "welcometonightcitybeta/β067",
+      "printingKeys": [
+        "welcometonightcitybeta/β067",
+        "welcometonightcityretail/067"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β067": "96f4b17feca0c4d1eea10ba858b2300189e2534284c049b5fd076909c0bada14",
+        "welcometonightcityretail/067": "b76ceb91d6b6349e66035a250d0007627495a35fe77daeed20d90ab8372438ff"
+      }
+    },
+    {
+      "id": "art:b2d6aeff-8fa3-4151-9e67-a83188a78197",
+      "cardId": "live-with-the-aftermath",
+      "representativePrintingKey": "welcometonightcitybeta/β068",
+      "printingKeys": [
+        "welcometonightcitybeta/β068",
+        "welcometonightcityretail/068"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β068": "95887c28c83af991f3297e00d9f101cb57e54eb4df84673592ceb529070c8a2c",
+        "welcometonightcityretail/068": "e2d92b29d522c6f7b10ccf03bc86aa6c45c9e945378591c087c39069bbcdea63"
+      }
+    },
+    {
+      "id": "art:af696a54-97bf-475b-b721-9a8bb86227a0",
+      "cardId": "safety-override",
+      "representativePrintingKey": "welcometonightcitybeta/β069",
+      "printingKeys": [
+        "welcometonightcitybeta/β069",
+        "welcometonightcityretail/069"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β069": "2b1139d1269138c4ff3854a6b7a1552cb4a896ffc131f9a66d4765b4c0180f25",
+        "welcometonightcityretail/069": "dfcd7c6360db58a03d7bc54e89c45a55fcb25defb9eecf4303257996ccaccf51"
+      }
+    },
+    {
+      "id": "art:709ec425-eda5-4621-b907-94a507a20351",
+      "cardId": "the-heist",
+      "representativePrintingKey": "welcometonightcitybeta/β070",
+      "printingKeys": [
+        "welcometonightcitybeta/β070",
+        "welcometonightcityretail/070"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β070": "6d22ba5e487603ef25e38e8718194a5dd1e74a1d2a3d2d208c7c8727c44662a5",
+        "welcometonightcityretail/070": "5fe6d06313404189fd422855b277a515c8d49fb8af2771ac830dfb1d03b71004"
+      }
+    },
+    {
+      "id": "art:1435b785-967e-48a7-8ef7-f7fecbb27aaf",
+      "cardId": "hanako-arasaka-daughter-of-the-emperor",
+      "representativePrintingKey": "welcometonightcitybeta/β072",
+      "printingKeys": [
+        "welcometonightcitybeta/β072",
+        "welcometonightcityretail/072"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β072": "37da1662271aea5a7ee5d1c5c36eb7e920df48eb114d4ee88ded4f006efc2bca",
+        "welcometonightcityretail/072": "5e7834d575597758f6a2b75c4b1e92d739282098883a840ad4b3378b5ec98b1a"
+      }
+    },
+    {
+      "id": "art:e1f5dc01-9e96-4102-af3f-07ad31f5db15",
+      "cardId": "padre-man-of-the-cross",
+      "representativePrintingKey": "welcometonightcitybeta/β074",
+      "printingKeys": [
+        "welcometonightcitybeta/β074",
+        "welcometonightcityretail/074"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β074": "53f5149df69f776975a4b94f3eb168f905b788af93d827b415811b818e3d1c83",
+        "welcometonightcityretail/074": "d384b6ea0772adaa876f74718c377781e94933e9bf8971ccd0bac893875ea469"
+      }
+    },
+    {
+      "id": "art:ce3770f6-0fa7-41f4-af5f-eacce5846c98",
+      "cardId": "maelstrom-zealots",
+      "representativePrintingKey": "welcometonightcitybeta/β079",
+      "printingKeys": [
+        "welcometonightcitybeta/β079",
+        "welcometonightcityretail/079"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β079": "266a380d477e665956fb514f84b17257dfe40b8fef435c1b1cb4bba2cce50c8b",
+        "welcometonightcityretail/079": "fb67db5a03e35e3bc6bb7abbb17ef0a61054175edc227c577ce7c80e6182d36c"
+      }
+    },
+    {
+      "id": "art:0f60c84e-e84f-49a3-b913-0039d8262371",
+      "cardId": "maxtac-heavy",
+      "representativePrintingKey": "welcometonightcitybeta/β081",
+      "printingKeys": [
+        "welcometonightcitybeta/β081",
+        "welcometonightcityretail/081"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β081": "d2bca754507c40282680a1674851722183dbc6334c06c4b6c8cd7fbbb93cde9a",
+        "welcometonightcityretail/081": "7182d1f14b0ca9ac0a2e1233af823e4ad89c982dd72d532617e36f92d65616da"
+      }
+    },
+    {
+      "id": "art:f52caed9-3415-4027-a448-2c38b045553b",
+      "cardId": "maxtac-squadron",
+      "representativePrintingKey": "welcometonightcitybeta/β082",
+      "printingKeys": [
+        "welcometonightcitybeta/β082",
+        "welcometonightcityretail/082"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β082": "3ce907c913c0543a2e8ba8d9b9219e5edb211bc763f055f4488241fdc919825f",
+        "welcometonightcityretail/082": "8854e1842e83cd5d16ef0ea369dc2149bb82b2c04c8526481a5fb5d372172426"
+      }
+    },
+    {
+      "id": "art:8cb7b93c-e281-4d94-a4b0-bb0cb5d0fa16",
+      "cardId": "nadia-fighting-through-grief",
+      "representativePrintingKey": "welcometonightcitybeta/β083",
+      "printingKeys": [
+        "welcometonightcitybeta/β083",
+        "welcometonightcityretail/083"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β083": "98d0ab267b2863a2c07fcf33e8a47fe18353bdd3efec33f8006753fe1b27bc53",
+        "welcometonightcityretail/083": "cf7d4afdaf80d39aaf2e9cea138d604b4f6e9221901e9a41df8d59202a9e26d5"
+      }
+    },
+    {
+      "id": "art:5131f2e5-fe1b-4a49-b0ba-b85d04c9cd1b",
+      "cardId": "pacifica-netrunner",
+      "representativePrintingKey": "welcometonightcitybeta/β084",
+      "printingKeys": [
+        "welcometonightcitybeta/β084",
+        "welcometonightcityretail/084"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β084": "2de497c2db90685b052f2b8335568b8c3dd0e1d3f62db68b41740503efb71525",
+        "welcometonightcityretail/084": "e36f178ea403f93b65b4200a2a958c3742b5c943f2e536d83cb414ec97f7accc"
+      }
+    },
+    {
+      "id": "art:544f8db8-02af-44e5-992e-170f51ffca37",
+      "cardId": "panam-palmer-strength-through-family",
+      "representativePrintingKey": "welcometonightcitybeta/β085",
+      "printingKeys": [
+        "welcometonightcitybeta/β085",
+        "welcometonightcityretail/085"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β085": "447dee1032e667f6e1ca11b749fad171623665e1c91fceaa9763679843919580",
+        "welcometonightcityretail/085": "4e375fbe4b8bcac7827f36686f355744f8a924ab4c442238386e75bf5a90bfd8"
+      }
+    },
+    {
+      "id": "art:786d5ce2-bfc0-4648-9c7d-323e939a1d34",
+      "cardId": "pepe-najarro-working-doubles",
+      "representativePrintingKey": "welcometonightcitybeta/β086",
+      "printingKeys": [
+        "welcometonightcitybeta/β086",
+        "welcometonightcityretail/086"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β086": "948f539c6388e1d20579d688f29073f78471736dcaa56b6850417d2d30887109",
+        "welcometonightcityretail/086": "8bae333dd70cca45c6ace82f99ece50bc4623cf261912e127d1f18253925f5a9"
+      }
+    },
+    {
+      "id": "art:29b3036d-306a-485f-af6c-b08fb5b912ac",
+      "cardId": "riding-nomad",
+      "representativePrintingKey": "welcometonightcitybeta/β087",
+      "printingKeys": [
+        "welcometonightcitybeta/β087",
+        "welcometonightcityretail/087"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β087": "b8c20c70e01cb63a231f1636bdd36a31d9416912cd5cde343d35ddcf2af1f4a0",
+        "welcometonightcityretail/087": "31e1ba8876537928ea63cdedefade2aa4858671f178f513dada626c0a5b1c9da"
+      }
+    },
+    {
+      "id": "art:28cf40e2-f83a-47f4-9c4d-c0b5157e84e6",
+      "cardId": "sandayu-oda-hanako-s-guardian",
+      "representativePrintingKey": "welcometonightcitybeta/β088",
+      "printingKeys": [
+        "welcometonightcitybeta/β088",
+        "welcometonightcityretail/088"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β088": "c5f7ea4ed24809febaf44089d164543089743c82cdb02d85e957b34dcc3e3384",
+        "welcometonightcityretail/088": "687e55238f128c659198e2ae0143f6e71fa9730243909f385810f8d988c4fbdb"
+      }
+    },
+    {
+      "id": "art:ce429abf-a099-48bf-a158-e32adc73b42e",
+      "cardId": "saul-bright-stormrider",
+      "representativePrintingKey": "welcometonightcitybeta/β089",
+      "printingKeys": [
+        "welcometonightcitybeta/β089",
+        "welcometonightcityretail/089"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β089": "99a6fbf0a4da40039f947004ed7564a23459a2ed807ae2058d8c5e51c78487ee",
+        "welcometonightcityretail/089": "1ef1a485c3af584544369b29fb8876ddc3a5f208714c3086621a88c59b7b8052"
+      }
+    },
+    {
+      "id": "art:4b7d734b-5cc2-4c57-9bcf-7e3b5a0f1f9f",
+      "cardId": "tyger-s-whisper",
+      "representativePrintingKey": "welcometonightcitybeta/β090",
+      "printingKeys": [
+        "welcometonightcitybeta/β090",
+        "welcometonightcityretail/090"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β090": "e19f924fd0ea99ac0e483ccef0591f2b9c816516e3415e9ea79d443430a477b7",
+        "welcometonightcityretail/090": "d96b61d88fbdd27e6629057b56981375b091ba2898a22c1c3094276a97078dd3"
+      }
+    },
+    {
+      "id": "art:c828bc68-23a3-41ef-878b-00b13ccf0cdc",
+      "cardId": "valentino-street-racer",
+      "representativePrintingKey": "welcometonightcitybeta/β091",
+      "printingKeys": [
+        "welcometonightcitybeta/β091",
+        "welcometonightcityretail/091"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β091": "b6626c6bd883999c338c2321edc1903da010029194d3808250d604ae23e6c3ab",
+        "welcometonightcityretail/091": "feec233c020904704dcde3b04ccb4a1fa6d17db2c228f5e845237e92489086d8"
+      }
+    },
+    {
+      "id": "art:89c5ec5e-dcc1-4ce4-970d-28b0226272b1",
+      "cardId": "wraith-marauders",
+      "representativePrintingKey": "welcometonightcitybeta/β092",
+      "printingKeys": [
+        "welcometonightcitybeta/β092",
+        "welcometonightcityretail/092"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β092": "19d5a5b92ddc72ee22d3dd80185d797ecb64e8a11efee318b7d29abcde01b6d0",
+        "welcometonightcityretail/092": "1a2889395c920b36b778bf27aabe3c6a325b82c42255423871f9db6db8250085"
+      }
+    },
+    {
+      "id": "art:0f825d0d-be91-4f42-9e97-5d87488ee2fc",
+      "cardId": "overwatch-panam-s-gift",
+      "representativePrintingKey": "welcometonightcitybeta/β093",
+      "printingKeys": [
+        "welcometonightcitybeta/β093",
+        "welcometonightcityretail/093"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β093": "bf36107ca048e4d51b00cc1df6870db52955be75f69d5592e3e379d9ac2d6759",
+        "welcometonightcityretail/093": "5c0dd02cb208ac868db6809b3263049c8da7e0b82640a23c1bc06df4c9a0c4fc"
+      }
+    },
+    {
+      "id": "art:fa711a0e-06bb-429b-a43a-89c50fb9d590",
+      "cardId": "riot-shield",
+      "representativePrintingKey": "welcometonightcitybeta/β094",
+      "printingKeys": [
+        "welcometonightcitybeta/β094",
+        "welcometonightcityretail/094"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β094": "3554ea64a0b0c63d2b5d9c6897a4666b6fdd3967e853947a5d1632996a0bc399",
+        "welcometonightcityretail/094": "bd9bb684889fa76ce4e597a1468fb24da57a8223741933fd9a0a00cef4afd01a"
+      }
+    },
+    {
+      "id": "art:36735ea2-1489-4e7a-810f-20dab24d503b",
+      "cardId": "zetatech-berserk",
+      "representativePrintingKey": "welcometonightcitybeta/β096",
+      "printingKeys": [
+        "welcometonightcitybeta/β096",
+        "welcometonightcityretail/096"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β096": "1d9bfe875461d2d19b06d93a6c6c3052d284a0cee7fc4386fd97f114d05ee93a",
+        "welcometonightcityretail/096": "b999e245d36a3209ac539f0286b3922cefa477621997b8a77305d1a0125dd295"
+      }
+    },
+    {
+      "id": "art:1f173d96-9ca1-4298-b479-71f06ee1f558",
+      "cardId": "don-t-fear-the-reaper",
+      "representativePrintingKey": "welcometonightcitybeta/β098",
+      "printingKeys": [
+        "welcometonightcitybeta/β098",
+        "welcometonightcityretail/098"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β098": "687f186ababfb9e1e17e097e525101aeba6482b941d272735a778be47b11756c",
+        "welcometonightcityretail/098": "be264d092973dbed93e71172513a2334a2faea6d0f989e7b6dc367377eccf9c0"
+      }
+    },
+    {
+      "id": "art:04511c2f-c766-4d1a-9176-66f913789667",
+      "cardId": "fool-on-the-hill",
+      "representativePrintingKey": "welcometonightcitybeta/β099",
+      "printingKeys": [
+        "welcometonightcitybeta/β099",
+        "welcometonightcityretail/099"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β099": "53238d404c125dae8be37a5c7a22d8b9cba40fca7d938888b9b4aad268b28564",
+        "welcometonightcityretail/099": "fa1078e0d94cba7420fc44041fdfbbca47d0cb68058005ca0e49804ccb5fecd1"
+      }
+    },
+    {
+      "id": "art:7a8c2032-e753-43ab-9c3b-adefb4281241",
+      "cardId": "memory-relapse",
+      "representativePrintingKey": "welcometonightcitybeta/β100",
+      "printingKeys": [
+        "welcometonightcitybeta/β100",
+        "welcometonightcityretail/100"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β100": "a5d22a21d5f5bf670e457242d7c51abb95a200410531936793bdd6f0539e00ee",
+        "welcometonightcityretail/100": "3d18a49646a9be020019bfb11bcbb13d750014ea650414b0938daf96c5131fdd"
+      }
+    },
+    {
+      "id": "art:2cff513f-6a75-40f0-8e70-e1491d340472",
+      "cardId": "peace-offering",
+      "representativePrintingKey": "welcometonightcitybeta/β101",
+      "printingKeys": [
+        "welcometonightcitybeta/β101",
+        "welcometonightcityretail/101",
+        "edgerunneropens1/006"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β101": "269f5684ddb6cb19acfb1ccd7208f4c7b0e90379ce8378e8ee7185bf62c961cd",
+        "welcometonightcityretail/101": "5e16b554906b589845ff9d71181aa8907a1481d74670221e19b8bc3d2c02fbea",
+        "edgerunneropens1/006": "8c3b718525f4f62e1f58f8e3082d8501aa4805098f1605fe857eedea3c018402"
+      }
+    },
+    {
+      "id": "art:535cec6e-269d-4c2d-860c-5c8eff999c21",
+      "cardId": "synapse-burnout",
+      "representativePrintingKey": "welcometonightcitybeta/β102",
+      "printingKeys": [
+        "welcometonightcitybeta/β102",
+        "welcometonightcityretail/102"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β102": "8ee98dcb34b7beab533c57b76710ab1c1814a12792cd9a4bf167986944c3f002",
+        "welcometonightcityretail/102": "a89dd82c0d4b76712261da4bbf21ab2f76b51018266cec46ea77b36fb1f28a50"
+      }
+    },
+    {
+      "id": "art:a7a49ccf-4b85-4997-b08c-16e8e80d9aa8",
+      "cardId": "take-control",
+      "representativePrintingKey": "welcometonightcitybeta/β103",
+      "printingKeys": [
+        "welcometonightcitybeta/β103",
+        "welcometonightcityretail/103"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β103": "08a6c182b0bcb299652a646d8dad87200af5a8200d1cf10c2d7331de6f8c01e2",
+        "welcometonightcityretail/103": "f485158e507b7914f2add2da6dd6f03ff04e3be1d35ea8d4530a94072593a575"
+      }
+    },
+    {
+      "id": "art:3488c7f7-c797-4c3a-8d49-e5cdcf0e8d74",
+      "cardId": "we-gotta-live-together",
+      "representativePrintingKey": "welcometonightcitybeta/β104",
+      "printingKeys": [
+        "welcometonightcitybeta/β104",
+        "welcometonightcityretail/104"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β104": "c283be09a235780fd598df9e3785babb22673998f2349947e2f9d582e74f3d60",
+        "welcometonightcityretail/104": "fe1254fbe37bba58bfd0a155619e6f40aef1fbbea68052690c05630266cbd61d"
+      }
+    },
+    {
+      "id": "art:bc78db9f-337e-437e-b247-f1aa798c48d0",
+      "cardId": "wild-in-the-streets",
+      "representativePrintingKey": "welcometonightcitybeta/β105",
+      "printingKeys": [
+        "welcometonightcitybeta/β105",
+        "welcometonightcityretail/105"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β105": "abcb844d238b81bf4e6cb89ff560c6dc1ef77f763af39b183b6d1209bfd62d2d",
+        "welcometonightcityretail/105": "6e88c416eea4cfe321b85edf0d3cd7ba0305835e1d01c30833500baee627fde4"
+      }
+    },
+    {
+      "id": "art:080b22ac-9c3d-48ee-ad4f-4e9579f22adc",
+      "cardId": "evelyn-parker-beautiful-enigma",
+      "representativePrintingKey": "welcometonightcitybeta/β107",
+      "printingKeys": [
+        "welcometonightcitybeta/β107",
+        "welcometonightcityretail/107"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β107": "ee262ea3a92e2f7acffa5dc032f6e40346b7ac597506bb0f20add73ec0dbe245",
+        "welcometonightcityretail/107": "a8942dc5aeb5ccc5c6b085cd4bb580694fd34b92b8e645f5cf68988fd650d76a"
+      }
+    },
+    {
+      "id": "art:fa80313c-9aeb-4ae8-ad81-35b3f45fcbfe",
+      "cardId": "sasha-yakovleva-won-t-let-you-down",
+      "representativePrintingKey": "welcometonightcitybeta/β109",
+      "printingKeys": [
+        "welcometonightcitybeta/β109",
+        "welcometonightcityretail/109"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β109": "333f0e21ecc335147ab7f0e7dc545a98a2475e36bbfc25948f6ae0b1827f2733",
+        "welcometonightcityretail/109": "66c6aeb0b33758d89d837ae7d1f2511ea993786ed556054da4b010e161345d61"
+      }
+    },
+    {
+      "id": "art:33ee09a3-4591-4302-9052-6dd5130861c6",
+      "cardId": "wakako-okada-peace-and-harmony",
+      "representativePrintingKey": "welcometonightcitybeta/β110",
+      "printingKeys": [
+        "welcometonightcitybeta/β110",
+        "welcometonightcityretail/110"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β110": "2d2479b8b477dee00091a2b7ab76b848949ac1ac7c2070469c87490463dd38a3",
+        "welcometonightcityretail/110": "5876d37713265e2e6a5747a7269dbc6518ee50aec2041ad1472774be8699b2e0"
+      }
+    },
+    {
+      "id": "art:32f8d89a-1e4b-46b8-9323-77c297c5b5ae",
+      "cardId": "delamain-rideshare-ai",
+      "representativePrintingKey": "welcometonightcitybeta/β111",
+      "printingKeys": [
+        "welcometonightcitybeta/β111",
+        "welcometonightcityretail/111"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β111": "a51a2875d66a9be8c503cfe56cfb2a8f1d8a50cc62302bdb8b0f7f6dd692eec2",
+        "welcometonightcityretail/111": "8c03d08aeeb674d929445f2a184188e8b497c6e9f54af718a3c45fc382904287"
+      }
+    },
+    {
+      "id": "art:a105464f-997f-4f2b-97dd-3a4f461f0a59",
+      "cardId": "hacked-corpo",
+      "representativePrintingKey": "welcometonightcitybeta/β114",
+      "printingKeys": [
+        "welcometonightcitybeta/β114",
+        "welcometonightcityretail/114"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β114": "0c91fdd554cb7e17cdc00b2be1f4a2d1a76c0e45cf8e68741d57d18dc4d4eb3b",
+        "welcometonightcityretail/114": "7ebf9bb105de36fbd0f4c4330d89bc1281cbe75e956b36ab2b452a06dcad0790"
+      }
+    },
+    {
+      "id": "art:f18a73a9-fa29-4351-ad96-8e7c1dd0e8a1",
+      "cardId": "jacked-in-voodoo-boy",
+      "representativePrintingKey": "welcometonightcitybeta/β115",
+      "printingKeys": [
+        "welcometonightcitybeta/β115",
+        "welcometonightcityretail/115"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β115": "6eaba7f72f3c7e37206ad70d45a537a96c69f6c2a3f628fec794fe073cc5f3a5",
+        "welcometonightcityretail/115": "fed0a695607da58b4c48db9b694b9d4694dd83b06ad60e82e9334b6515c8faed"
+      }
+    },
+    {
+      "id": "art:98b18e2d-a955-43c7-880c-6233166c673a",
+      "cardId": "judy-a-lvarez-nothing-to-doubt",
+      "representativePrintingKey": "welcometonightcitybeta/β116",
+      "printingKeys": [
+        "welcometonightcitybeta/β116",
+        "welcometonightcityretail/116"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β116": "df55feaed3594daaf9b252e3e8940fa56fbb635bffc0ba14247a665cf2296232",
+        "welcometonightcityretail/116": "e1cbaf4ef61a50cfdb88db9d68a44af5936d65eff6890999f22ea20821364808"
+      }
+    },
+    {
+      "id": "art:929b5e98-ab82-4e36-bb72-a00a223ded77",
+      "cardId": "lizzy-wizzy-delicate-weapon",
+      "representativePrintingKey": "welcometonightcitybeta/β117",
+      "printingKeys": [
+        "welcometonightcitybeta/β117",
+        "welcometonightcityretail/117"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β117": "01c424908b24edde2cb54b3e9d18c436fe950ec86f3fabcfdb4f2986e19b026b",
+        "welcometonightcityretail/117": "4b09cc00067bbd9737814b5b5636518ad2fab857e9c529505aed69cbbf78e3a9"
+      }
+    },
+    {
+      "id": "art:220bef49-2e98-4bc6-b023-5bb8f492b29b",
+      "cardId": "maman-brigitte-spirit-of-death",
+      "representativePrintingKey": "welcometonightcitybeta/β118",
+      "printingKeys": [
+        "welcometonightcitybeta/β118",
+        "welcometonightcityretail/118"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β118": "95d69e4029758c5291f5b6f72f4b78d303329ab5ea39189bd02d5fa602664a94",
+        "welcometonightcityretail/118": "550422df6c73c0bb683d9158582f2101cc59ae91ba2eafb1361e78d4a398f84b"
+      }
+    },
+    {
+      "id": "art:e4a8b8fc-fbc7-41ce-9f89-7538690b9c62",
+      "cardId": "misty-olszewski-mender-of-broken-spirits",
+      "representativePrintingKey": "welcometonightcitybeta/β119",
+      "printingKeys": [
+        "welcometonightcitybeta/β119",
+        "welcometonightcityretail/119"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β119": "38366c49414cad2651435c9c5fd70557b0456e526144ce51ebd4c2371ca98ca0",
+        "welcometonightcityretail/119": "8614a4fce3e6f8b152d72506c9f46976ca8750effdb1cd04412d04b90e2ac402"
+      }
+    },
+    {
+      "id": "art:ee22b73e-8b14-4225-9c86-428cfada892f",
+      "cardId": "modded-kusanagi",
+      "representativePrintingKey": "welcometonightcitybeta/β120",
+      "printingKeys": [
+        "welcometonightcitybeta/β120",
+        "welcometonightcityretail/120"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β120": "b86ccc069177bdec40d9b7978d6abe720e9943cb0b0df2f8ac9bcb912fd8ca0a",
+        "welcometonightcityretail/120": "e17c013c6cdbe85d11fa9c8060b53210da717f249c3ca484ec443a39c0ad5892"
+      }
+    },
+    {
+      "id": "art:2b247956-465f-4b39-8091-a95c90bc8b70",
+      "cardId": "modded-muramasa",
+      "representativePrintingKey": "welcometonightcitybeta/β121",
+      "printingKeys": [
+        "welcometonightcitybeta/β121",
+        "welcometonightcityretail/121"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β121": "108f329ff8107dc657a3dd0f505f92ff77d1f121d41990bca6ff79d74115b25a",
+        "welcometonightcityretail/121": "e210cb7e4c4338971fbfc5b9412245d24e21e5f4415e8694759a423eb7741e51"
+      }
+    },
+    {
+      "id": "art:859345fa-c791-49dc-9258-505982b5adea",
+      "cardId": "mox-inciters",
+      "representativePrintingKey": "welcometonightcitybeta/β122",
+      "printingKeys": [
+        "welcometonightcitybeta/β122",
+        "welcometonightcityretail/122"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β122": "2814aa039f4806f1f9c61c032927a9867ff1d55cdbd81dd7efd5d8c7a14dcdec",
+        "welcometonightcityretail/122": "21c05a79f7795a3ea433c5bdaef493844c5ac98758259c2aa422123e76f10e16"
+      }
+    },
+    {
+      "id": "art:0ff059f8-90c3-47ef-ba3b-cd380f30f14e",
+      "cardId": "placide-voodoo-sentinel",
+      "representativePrintingKey": "welcometonightcitybeta/β123",
+      "printingKeys": [
+        "welcometonightcitybeta/β123",
+        "welcometonightcityretail/123"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β123": "aa4065a22aa7fbbce39008304ccafa1d68f8d425d092f9fb1052b6533fcb980d",
+        "welcometonightcityretail/123": "b2937b8a7d153325ca6f9bf2a94d9bc4f4355d61feb4f754b0a7b2f9677b22a2"
+      }
+    },
+    {
+      "id": "art:6b5606c9-12a2-46d6-b13f-a672c6bd5f07",
+      "cardId": "rita-wheeler-no-stupid-questions",
+      "representativePrintingKey": "welcometonightcitybeta/β125",
+      "printingKeys": [
+        "welcometonightcitybeta/β125",
+        "welcometonightcityretail/125"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β125": "e89a5240e69e7aa3d114408837d686aa7fe1693308c8ef9442783a0f452e2735",
+        "welcometonightcityretail/125": "ce7130a0586b1f4c4b4090d4efadebd7e85a33dbc23cdbad98976b32366c2f80"
+      }
+    },
+    {
+      "id": "art:4abedde2-f9db-4451-a2ab-fc7f594ea132",
+      "cardId": "rogue-amendiares-queen-of-the-afterlife",
+      "representativePrintingKey": "welcometonightcitybeta/β126",
+      "printingKeys": [
+        "welcometonightcitybeta/β126",
+        "welcometonightcityretail/126"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β126": "97b47c668d9434fe13c92325e716785706988defc5094739e3f789521f9d4980",
+        "welcometonightcityretail/126": "a125064f871beffd36c0b504bc999a6766e0074136936918ba920c0889c77874"
+      }
+    },
+    {
+      "id": "art:1e2413a0-aa80-4883-806a-d8e9ed32bbca",
+      "cardId": "westbrook-netrunner",
+      "representativePrintingKey": "welcometonightcitybeta/β127",
+      "printingKeys": [
+        "welcometonightcitybeta/β127",
+        "welcometonightcityretail/127"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β127": "c3527d5441eeb593199802778482766492fb978ff4e3a42c4c3532ba7f8b3d52",
+        "welcometonightcityretail/127": "e32f50a30c8895d9647cfdbb7fdc043ee4d77bf5a7ba7ccc520e956fb92a0135"
+      }
+    },
+    {
+      "id": "art:e2a34251-d2d9-46e0-9840-ca69a358a6ae",
+      "cardId": "netwatch-netdriver",
+      "representativePrintingKey": "welcometonightcitybeta/β129",
+      "printingKeys": [
+        "welcometonightcitybeta/β129",
+        "welcometonightcityretail/129"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β129": "7486a64b61932dd663ca7564b8361262174b873f6d954ee289f495dc556c696e",
+        "welcometonightcityretail/129": "0c61ab83d7314139812eb87319fa30ce6630a84f07d32ce199560a905d1f55aa"
+      }
+    },
+    {
+      "id": "art:0be394e3-ce41-4f16-a95b-33ec951bf43c",
+      "cardId": "chrome-reverie",
+      "representativePrintingKey": "welcometonightcitybeta/β131",
+      "printingKeys": [
+        "welcometonightcitybeta/β131",
+        "welcometonightcityretail/131"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β131": "8312db02d04bedfe997dd6489117d8d6a1d67bf8c6ea337f61a239419dd3c50f",
+        "welcometonightcityretail/131": "c3dd3e5e73c881fa53b47c0ae5160c8d16104aa071fb18266e7db024819b4f3a"
+      }
+    },
+    {
+      "id": "art:7e86c639-5225-4a91-be33-6ab86c9adfe2",
+      "cardId": "les-e-le-mens",
+      "representativePrintingKey": "welcometonightcitybeta/β133",
+      "printingKeys": [
+        "welcometonightcitybeta/β133",
+        "welcometonightcityretail/133"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β133": "98b10d48ae02c8d00e7efb651023a80738b174c68b9eddc7603a55bfa1668bd0",
+        "welcometonightcityretail/133": "7b93460322de0778b3c44f4234107e9c96aebba1f84debdabbe769bd0e24b3f6"
+      }
+    },
+    {
+      "id": "art:dfd5d1df-2b47-4ddd-9d6a-35430a892cfc",
+      "cardId": "nocturne-op55-n1",
+      "representativePrintingKey": "welcometonightcitybeta/β134",
+      "printingKeys": [
+        "welcometonightcitybeta/β134",
+        "welcometonightcityretail/134"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β134": "c19fb633c38f855fb69e0947a23be68f235433f02817c4b7cc940cb03cd9b5b2",
+        "welcometonightcityretail/134": "928e291e877b5609fadd2c3f475d06d03b516e82aa0c69ca46a13a992238da9d"
+      }
+    },
+    {
+      "id": "art:bab79ef1-57fb-4b24-b50a-e08899699862",
+      "cardId": "pyramid-song",
+      "representativePrintingKey": "welcometonightcitybeta/β135",
+      "printingKeys": [
+        "welcometonightcitybeta/β135",
+        "welcometonightcityretail/135"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β135": "cc006ad9292cf789c0dffc568ec53661ae5f1248b32b20bfea805e22c981c798",
+        "welcometonightcityretail/135": "7764244436a6487d21f9ca9e76c14982210924249c11d0c79c36bdabd310dd45"
+      }
+    },
+    {
+      "id": "art:0449bc78-983b-4681-b062-0738de3c487b",
+      "cardId": "three-mouths-one-desire",
+      "representativePrintingKey": "welcometonightcitybeta/β137",
+      "printingKeys": [
+        "welcometonightcitybeta/β137",
+        "welcometonightcityretail/137"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β137": "0a8ac4402515eaff99c8ebf8e90743cd59bb15360428d08eda156a104a4bfa70",
+        "welcometonightcityretail/137": "7974b44acc8cfb2d107a8c18435662fa9b936b3baa8f5d588bd0800316bcae5b"
+      }
+    },
+    {
+      "id": "art:25508f49-7256-47be-bc95-c420c7105c62",
+      "cardId": "towerfall",
+      "representativePrintingKey": "welcometonightcitybeta/β138",
+      "printingKeys": [
+        "welcometonightcitybeta/β138",
+        "welcometonightcityretail/138"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β138": "56934cd2d31017db6e7e4559f385311533590105dee5fa78f6fcf4c4a7c1ddd9",
+        "welcometonightcityretail/138": "3b5e6d963be7c9f5459858c8aa27795af331404884628907cce6f03be2e8fa77"
+      }
+    },
+    {
+      "id": "art:f9a81013-9c64-4e48-8d1d-cd1b41b72ee0",
+      "cardId": "trust-no-one",
+      "representativePrintingKey": "welcometonightcitybeta/β139",
+      "printingKeys": [
+        "welcometonightcitybeta/β139",
+        "welcometonightcityretail/139",
+        "edgerunneropens1/007"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β139": "e868c9419b965904a887e873edc7bb85ba612059508c2b43be89ce57232ed84f",
+        "welcometonightcityretail/139": "c7c6d2fd005a3a50164fb9b3c2b64b2e89008eeea652b76c695abcaddcb8b4b7",
+        "edgerunneropens1/007": "387205f729ec3e59134c02b26d88db6f9c01944ce269efaa8e200235b40668ba"
+      }
+    },
+    {
+      "id": "art:54575eba-9d21-43fe-b6df-7cd2564dd37b",
+      "cardId": "unlikely-bond",
+      "representativePrintingKey": "welcometonightcitybeta/β140",
+      "printingKeys": [
+        "welcometonightcitybeta/β140",
+        "welcometonightcityretail/140"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β140": "8fbc2b179abfcb7bbc713df5e0b51d552db58cfe197fe53e61783ab21e0f582b",
+        "welcometonightcityretail/140": "8d942300eeda52ec523d7bc89cf52d6e588be71456789ab5f5cd178d090e92f6"
+      }
+    },
+    {
+      "id": "art:74c794ed-2ca7-4318-bcdd-8e3fe5a11f4e",
+      "cardId": "adam-smasher-ender-of-legends",
+      "representativePrintingKey": "welcometonightcitybeta/β141",
+      "printingKeys": [
+        "welcometonightcitybeta/β141"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β141": "8b03bd7551858816dd1267ebc623205f25b38d594aa11f5c86e37e217befb3d6"
+      }
+    },
+    {
+      "id": "art:9d04877f-050d-485d-9447-1bef7ee6ed40",
+      "cardId": "dexter-deshawn-off-the-grid",
+      "representativePrintingKey": "welcometonightcitybeta/β142",
+      "printingKeys": [
+        "welcometonightcitybeta/β142"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β142": "5ffa4eb78646b81418ea1d59b97df33cdf5da86d7cd7d19e51f298341f39df49"
+      }
+    },
+    {
+      "id": "art:f712b214-b109-4e69-bc74-4991905024f7",
+      "cardId": "royce-psycho-on-the-edge",
+      "representativePrintingKey": "welcometonightcitybeta/β143",
+      "printingKeys": [
+        "welcometonightcitybeta/β143"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β143": "e7dadbe1a28a8f94588ef2d5a57be3638c3d873948fcd2fea2c81a42f7ee9049"
+      }
+    },
+    {
+      "id": "art:20debd66-ff1c-42c3-9869-928cba33ccb5",
+      "cardId": "v-streetkid",
+      "representativePrintingKey": "welcometonightcitybeta/β144",
+      "printingKeys": [
+        "welcometonightcitybeta/β144"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β144": "39cf67eb6dddaf7450697cbd9a65dbcba2de43dce14ec822da8ae306a93e5324"
+      }
+    },
+    {
+      "id": "art:b3b78f89-424e-41b6-9fa9-aea256568dcc",
+      "cardId": "dum-dum-maelstrom-triggerman",
+      "representativePrintingKey": "welcometonightcitybeta/β145",
+      "printingKeys": [
+        "welcometonightcitybeta/β145"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β145": "d3f45a6ed4a8f9e09876d066b3542ffe4bd76209eb69d64a9427bfe1707770cb"
+      }
+    },
+    {
+      "id": "art:5ade304e-8e0e-4484-944a-18d8d08caf9f",
+      "cardId": "kerry-eurodyne-axe-attitude-audience",
+      "representativePrintingKey": "welcometonightcitybeta/β146",
+      "printingKeys": [
+        "welcometonightcitybeta/β146"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β146": "d663cca449b94c5ff796788aeef9a4df8230e389ffa9ac9a782ce2d4ebb7d929"
+      }
+    },
+    {
+      "id": "art:2e06439f-fab6-4a65-a1fc-e5f4afc84eb0",
+      "cardId": "muamar-reyes-el-capita-n",
+      "representativePrintingKey": "welcometonightcitybeta/β147",
+      "printingKeys": [
+        "welcometonightcitybeta/β147"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β147": "677633b688caa3944a8972851ce84e95e0a3d2c3c561c53dca9b9a2310d02e30"
+      }
+    },
+    {
+      "id": "art:e59b67b3-a388-4228-94a3-84ee12e68937",
+      "cardId": "river-ward-detective-on-the-hunt",
+      "representativePrintingKey": "welcometonightcitybeta/β148",
+      "printingKeys": [
+        "welcometonightcitybeta/β148"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β148": "e5dd70bb00f23fb75e365daa1f1635688dd4806779b9e6270779240f3abf5329"
+      }
+    },
+    {
+      "id": "art:6b75ec33-da55-46c7-a88c-f0fb89263253",
+      "cardId": "rogue-amendiares-preem-solo",
+      "representativePrintingKey": "welcometonightcitybeta/β149",
+      "printingKeys": [
+        "welcometonightcitybeta/β149"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β149": "e4d7579d3ac2d5cbe56d4e9c03a013f90abd87537bbc78748d25f56c5732a451"
+      }
+    },
+    {
+      "id": "art:af82881d-9e19-46b3-a723-a2ef224687d8",
+      "cardId": "goro-takemura-vengeful-bodyguard",
+      "representativePrintingKey": "welcometonightcitybeta/β150",
+      "printingKeys": [
+        "welcometonightcitybeta/β150"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β150": "cf4e052b8e018bb0489dd0268c9fb4d64699422fd3a6296603cd705f3fb61cc6"
+      }
+    },
+    {
+      "id": "art:cc3ed2c4-6e6d-47aa-b358-152c56b24bad",
+      "cardId": "hanako-arasaka-daughter-of-the-emperor",
+      "representativePrintingKey": "welcometonightcitybeta/β151",
+      "printingKeys": [
+        "welcometonightcitybeta/β151"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β151": "9780753411b1a0b6baf1f41d50a1d0bd123594c3e9946b22739e743866a5b7ba"
+      }
+    },
+    {
+      "id": "art:aadd8dc4-bb37-4901-8200-39b8904268a8",
+      "cardId": "jackie-welles-mama-s-favorite",
+      "representativePrintingKey": "welcometonightcitybeta/β152",
+      "printingKeys": [
+        "welcometonightcitybeta/β152"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β152": "3f14b01ef1473249bca178db6b0ddfd65d9673d25cee6fed5a5e7ecae459b3a6"
+      }
+    },
+    {
+      "id": "art:abd75b6c-0205-4909-a990-237b4bed70e5",
+      "cardId": "padre-man-of-the-cross",
+      "representativePrintingKey": "welcometonightcitybeta/β153",
+      "printingKeys": [
+        "welcometonightcitybeta/β153"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β153": "8258a1a280d7f37fc3e51741cd8dc8d4bbc2bb32efa44cf08b31285cee1ded71"
+      }
+    },
+    {
+      "id": "art:20c0d91e-76d5-4904-82e8-53907537aee3",
+      "cardId": "panam-palmer-nomad-cavalry",
+      "representativePrintingKey": "welcometonightcitybeta/β154",
+      "printingKeys": [
+        "welcometonightcitybeta/β154"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β154": "853b33e5750755e67564a3dd115579dfea4c37395e2cf56e507261d75b947123"
+      }
+    },
+    {
+      "id": "art:7a6a5336-2b6c-4d8a-b1f0-595a787255ce",
+      "cardId": "alt-cunningham-soulkiller-architect",
+      "representativePrintingKey": "welcometonightcitybeta/β155",
+      "printingKeys": [
+        "welcometonightcitybeta/β155"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β155": "91d8813ab0e1f26b3eb2ada110dfdd48bff978278133accb5edf9e711622eaed"
+      }
+    },
+    {
+      "id": "art:22fe9365-6f33-4aeb-b3a4-a78ab563cbe9",
+      "cardId": "evelyn-parker-beautiful-enigma",
+      "representativePrintingKey": "welcometonightcitybeta/β156",
+      "printingKeys": [
+        "welcometonightcitybeta/β156"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β156": "1bfee9c64b5515637a09af4ec2825d33750e6987b7a6ecd4dbe6a44067dd2d4f"
+      }
+    },
+    {
+      "id": "art:0324e335-2f17-496c-9789-59f93ed6d31e",
+      "cardId": "judy-a-lvarez-braindance-maestro",
+      "representativePrintingKey": "welcometonightcitybeta/β157",
+      "printingKeys": [
+        "welcometonightcitybeta/β157"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β157": "67d75ada14ebc133d113e331639c024f6cbec53260587d461a7eeb875475a72a"
+      }
+    },
+    {
+      "id": "art:16e04a94-086a-4c20-b788-88ac016ec59b",
+      "cardId": "wakako-okada-peace-and-harmony",
+      "representativePrintingKey": "welcometonightcitybeta/β158",
+      "printingKeys": [
+        "welcometonightcitybeta/β158"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β158": "eb46236004adef086befccf66bf0aa28d1c3b668f9281a0d38bed73569e7c72c"
+      }
+    },
+    {
+      "id": "art:7b113940-7325-4304-b07a-61719b47a49c",
+      "cardId": "johnny-silverhand-never-stop-fighting",
+      "representativePrintingKey": "welcometonightcitybeta/β159",
+      "printingKeys": [
+        "welcometonightcitybeta/β159"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β159": "bb7e79f86bc7a9887d32e4e5404f2be1747ad6f30d6e7785085cf2fe72199b89"
+      }
+    },
+    {
+      "id": "art:59d1ce5c-d616-45d5-9816-576f5f1509f3",
+      "cardId": "adam-smasher-metal-over-meat",
+      "representativePrintingKey": "welcometonightcitybeta/β160",
+      "printingKeys": [
+        "welcometonightcitybeta/β160"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β160": "f44e7315537b1a713c9ffc5381f8620169c44fafc06302953eacc700f124305e"
+      }
+    },
+    {
+      "id": "art:2e2c4d9d-516d-4fb2-a6ba-bee8dede71d3",
+      "cardId": "alt-cunningham-mother-of-daemons",
+      "representativePrintingKey": "welcometonightcitybeta/β161",
+      "printingKeys": [
+        "welcometonightcitybeta/β161"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β161": "b07b7690aed2311ee810904c8eb37633bcbc7f996d4a022f5e15e17efc0b67e9"
+      }
+    },
+    {
+      "id": "art:005dfb9e-7bdd-4cc1-ade2-08dd28ed5998",
+      "cardId": "hanako-arasaka-in-a-gilded-cage",
+      "representativePrintingKey": "welcometonightcitybeta/β162",
+      "printingKeys": [
+        "welcometonightcitybeta/β162"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β162": "3da00739f3bf1f8f95057fe533aae31bb965e3ad998ac331393e3667b6b1da02"
+      }
+    },
+    {
+      "id": "art:9a4fafb2-b27b-4b3e-9f57-502040898b0f",
+      "cardId": "the-relic-experimental-biochip",
+      "representativePrintingKey": "welcometonightcitybeta/β163",
+      "printingKeys": [
+        "welcometonightcitybeta/β163"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β163": "611a278fa2a70a359ce88d525443683516cd039202312487d1f320fe9014635b"
+      }
+    },
+    {
+      "id": "art:b1db8654-6197-4e80-9555-8917dcba6dc7",
+      "cardId": "sandayu-oda-hanako-s-guardian",
+      "representativePrintingKey": "welcometonightcitybeta/β164",
+      "printingKeys": [
+        "welcometonightcitybeta/β164"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β164": "eb9e56ebbcc6f5f4de7f566e34d6eac51ea5f4c2bf9d9ae2b81d3fffb5f12053"
+      }
+    },
+    {
+      "id": "art:775e7d6b-b9d9-48cf-a34d-00ba2b1c0a43",
+      "cardId": "overwatch-panam-s-gift",
+      "representativePrintingKey": "welcometonightcitybeta/β165",
+      "printingKeys": [
+        "welcometonightcitybeta/β165"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β165": "c8d382dcc19bbf57a07842c5202e6c1e73ccc39d0c2ee50835a54866f3321844"
+      }
+    },
+    {
+      "id": "art:807c871c-bebe-4343-9b68-1f89af5ed0da",
+      "cardId": "rogue-amendiares-queen-of-the-afterlife",
+      "representativePrintingKey": "welcometonightcitybeta/β166",
+      "printingKeys": [
+        "welcometonightcitybeta/β166"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β166": "6e16d655250337ab5b051628049660cebcd0075dac3e40f5a4c8883ef85a6a74"
+      }
+    },
+    {
+      "id": "art:4d8a1ccb-6d46-45b1-839a-fd3b7fa84b72",
+      "cardId": "towerfall",
+      "representativePrintingKey": "welcometonightcitybeta/β167",
+      "printingKeys": [
+        "welcometonightcitybeta/β167"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β167": "74834a147c9379eac16a75ed6a5d310a9f71838dbdfde2751600b238f10adf84"
+      }
+    },
+    {
+      "id": "art:4f8fbab4-7aad-4271-8dd6-8cdf68654c5e",
+      "cardId": "johnny-silverhand-rocking-renegade",
+      "representativePrintingKey": "welcometonightcitybeta/β168",
+      "printingKeys": [
+        "welcometonightcitybeta/β168"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β168": "81e0351b54817945b206405ecaea843fed115847250810fbb8d17cc1d3106726"
+      }
+    },
+    {
+      "id": "art:146d6391-3b35-4e74-b270-cef69d8f2a91",
+      "cardId": "sasha-yakovleva-won-t-let-you-down",
+      "representativePrintingKey": "welcometonightcitybeta/β169",
+      "printingKeys": [
+        "welcometonightcitybeta/β169"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β169": "b194fd0fbc4749238033dc14a5374879c10528cc3f57626f30e1558fa9d2a27c"
+      }
+    },
+    {
+      "id": "art:7d71aedf-dbb6-435f-bece-e522834db122",
+      "cardId": "panam-palmer-strength-through-family",
+      "representativePrintingKey": "welcometonightcitybeta/β170",
+      "printingKeys": [
+        "welcometonightcitybeta/β170"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β170": "3ae6913966eea79f1bbc4ad0ff5793b220700e947cde51a88c036aa022adbd01"
+      }
+    },
+    {
+      "id": "art:2c0d6f48-0804-4d5f-83c2-f28367ce26d5",
+      "cardId": "judy-a-lvarez-nothing-to-doubt",
+      "representativePrintingKey": "welcometonightcitybeta/β171",
+      "printingKeys": [
+        "welcometonightcitybeta/β171"
+      ],
+      "review": "illustration comparison",
+      "imageHashes": {
+        "welcometonightcitybeta/β171": "d0f33ca1a9f80463f0876c540af7feb98c2c76f07ec08a596c6999acb588410c"
+      }
+    }
+  ]
+}

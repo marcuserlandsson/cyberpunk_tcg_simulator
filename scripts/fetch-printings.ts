@@ -85,6 +85,7 @@ interface ApiPrinting {
   finish: string | null
   artist: string
   image_url: string
+  source_image_url?: string
 }
 
 async function fetchCardPrintings(slug: string): Promise<ApiPrinting[]> {
@@ -154,6 +155,8 @@ async function main(): Promise<void> {
   if (missing.length) throw new Error(`New cards discovered: ${missing.join(', ')}. Run npm run fetch:catalog and review/import the snapshot before refreshing printings.`)
   if (withImages) await mkdir(PRINTING_IMAGES_DIR, { recursive: true })
 
+  const existing = JSON.parse(await readFile(PRINTINGS_JSON_PATH, 'utf8')) as (Printing & { artworkId?: string; playable?: boolean; sourceImageUrl?: string })[]
+  const previous = new Map(existing.map(p => [p.key, p]))
   const rows: Printing[] = []
   const errors: string[] = []
 
@@ -170,6 +173,7 @@ async function main(): Promise<void> {
     for (const p of apiPrintings) {
       const key = printingKey(p.set.code, p.collector_number, p.finish)
       rows.push({
+        ...(previous.get(key)?.sourcePrintingId === p.id && (!previous.get(key)?.sourceImageUrl || previous.get(key)?.sourceImageUrl === p.source_image_url) ? previous.get(key) : {}),
         key,
         cardId: card.id,
         setCode: p.set.code,
@@ -179,6 +183,7 @@ async function main(): Promise<void> {
         finish: p.finish,
         artist: card.id === 'nocturne-op55-n1' ? 'Daniel Valaisis' : p.artist ?? '',
         sourcePrintingId: p.id,
+        ...(p.source_image_url ? { sourceImageUrl: p.source_image_url } : {}),
       })
       if (withImages) {
         // Global replace, not the first '/' only: a key with a finish segment

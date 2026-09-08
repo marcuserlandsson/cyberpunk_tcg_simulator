@@ -1,3 +1,5 @@
+import { cardIdentity } from '../engine/deck'
+import { artworkGroups, ownedArtworkIds, missingArtworks, completionPercentage } from './artworks'
 // The player's owned-cards collection: a flat printingKey -> count map in
 // localStorage. Counts are the only stored state; everything else (playset
 // gaps, missing arts, buy-lists — Task 5) derives from (db, printings,
@@ -264,6 +266,7 @@ export function setReadOnlyCollection(counts: Record<string, number>): void {
 export function ownedByCard(printings: Printing[], collection: Collection): Record<string, number> {
   const owned: Record<string, number> = {}
   for (const printing of printings) {
+    if (printing.playable === false) continue
     const count = collection.counts[printing.key] ?? 0
     if (count > 0) owned[printing.cardId] = (owned[printing.cardId] ?? 0) + count
   }
@@ -273,6 +276,7 @@ export function ownedByCard(printings: Printing[], collection: Collection): Reco
 /** Deck rules allow 3 copies of a card but decks run single legends; a
  *  playset of a legend is 1. */
 export function playsetTarget(def: CardDef): number {
+  if (def.type === 'legend' && def.ramLimit === null && def.text.trim() === '') return 0
   return def.type === 'legend' ? 1 : 3
 }
 
@@ -283,15 +287,23 @@ export interface PlaysetGap {
   missing: number
 }
 
-export function playsetGaps(db: CardDb, printings: Printing[], collection: Collection): PlaysetGap[] {
-  const owned = ownedByCard(printings, collection)
-  const gaps: PlaysetGap[] = []
+export function playsetGoals(db: CardDb, printings: Printing[], collection: Collection): PlaysetGap[] {
+  const owned = ownedByCard(printings.filter(p => p.playable !== false), collection)
+  const goals = new Map<string, PlaysetGap>()
   for (const def of Object.values(db)) {
-    const have = owned[def.id] ?? 0
     const target = playsetTarget(def)
-    if (have < target) gaps.push({ cardId: def.id, owned: have, target, missing: target - have })
+    if (!target) continue
+    const identity = cardIdentity(def)
+    const goal = goals.get(identity) ?? { cardId: def.id, owned: 0, target, missing: target }
+    goal.owned += owned[def.id] ?? 0
+    goal.missing = Math.max(0, target - goal.owned)
+    goals.set(identity, goal)
   }
-  return gaps
+  return [...goals.values()]
+}
+
+export function playsetGaps(db: CardDb, printings: Printing[], collection: Collection): PlaysetGap[] {
+  return playsetGoals(db, printings, collection).filter(goal => goal.missing > 0)
 }
 
 export function missingPrintings(printings: Printing[], collection: Collection): Printing[] {
@@ -301,25 +313,25 @@ export function missingPrintings(printings: Printing[], collection: Collection):
 export interface CompletionStats {
   playsetPct: number
   artsPct: number
+  playsetOwned: number
+  playsetTarget: number
+  artsOwned: number
+  artsTarget: number
+  unreviewedPrintings: number
   totalOwned: number
 }
 
 export function completionStats(db: CardDb, printings: Printing[], collection: Collection): CompletionStats {
-  const owned = ownedByCard(printings, collection)
-  let targetSum = 0
-  let ownedTowardTarget = 0
-  for (const def of Object.values(db)) {
-    const target = playsetTarget(def)
-    targetSum += target
-    ownedTowardTarget += Math.min(owned[def.id] ?? 0, target)
-  }
-  const ownedPrintings = printings.filter((p) => (collection.counts[p.key] ?? 0) > 0).length
-  const totalOwned = Object.values(collection.counts).reduce((sum, n) => sum + n, 0)
-  return {
-    playsetPct: targetSum === 0 ? 0 : Math.round((ownedTowardTarget / targetSum) * 100),
-    artsPct: printings.length === 0 ? 0 : Math.round((ownedPrintings / printings.length) * 100),
-    totalOwned,
-  }
+  const goals = playsetGoals(db, printings, collection)
+  const playsetTarget = goals.reduce((n,g) => n + g.target, 0)
+  const playsetOwned = goals.reduce((n,g) => n + Math.min(g.owned, g.target), 0)
+  const artsTarget = artworkGroups(printings).length
+  const artsOwned = ownedArtworkIds(printings, collection.counts).size
+  const unreviewedPrintings = printings.filter(p => !p.artworkId).length
+  return { playsetPct: completionPercentage(playsetOwned, playsetTarget),
+    artsPct: unreviewedPrintings ? Math.min(99, completionPercentage(artsOwned, artsTarget)) : completionPercentage(artsOwned, artsTarget),
+    playsetOwned, playsetTarget, artsOwned, artsTarget, unreviewedPrintings,
+    totalOwned: Object.values(collection.counts).reduce((sum,n) => sum+n, 0) }
 }
 
 /** Plain-text want-list: playset shortfalls as "Nx Name", missing printings
@@ -340,10 +352,12 @@ export function buildBuyList(
   }
   if (options.arts) {
     if (lines.length > 0) lines.push('')
-    lines.push('## Missing printings')
-    for (const printing of missingPrintings(printings, collection)) {
-      lines.push(`${names.get(printing.cardId) ?? printing.cardId} [${printing.key}]`)
+    lines.push('## Missing artwork — one copy from any listed printing')
+    for (const artwork of missingArtworks(printings, collection.counts)) {
+      lines.push('1x ' + (names.get(artwork.cardId) ?? artwork.cardId) + ' [' + artwork.printings.map(p => p.key).join(' OR ') + ']')
     }
+    const unreviewed = printings.filter(p => !p.artworkId).length
+    if (unreviewed) lines.push(unreviewed + ' printings await artwork identification; list is incomplete.')
   }
   return lines.join('\n')
 }

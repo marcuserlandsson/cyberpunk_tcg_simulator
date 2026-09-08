@@ -42,9 +42,9 @@ for (const source of snapshot.cards) for (const printing of source.printings) {
   const previousPrinting = printingRows.get(key)
   if (previousPrinting && previousPrinting.cardId !== source.slug) throw new Error(`Printing identity changed: ${key}`)
   printingRows.set(key, {
-    ...previousPrinting, key, cardId: source.slug, setCode: printing.set.code, setName: printing.set.name,
+    ...(previousPrinting?.sourcePrintingId === printing.id && (!previousPrinting?.sourceImageUrl || previousPrinting.sourceImageUrl === printing.source_image_url) ? previousPrinting : {}), key, cardId: source.slug, setCode: printing.set.code, setName: printing.set.name,
     collectorNumber: printing.collector_number, rarity: printing.rarity, finish: printing.finish,
-    artist: source.slug === 'nocturne-op55-n1' ? 'Daniel Valaisis' : printing.artist ?? '', sourcePrintingId: printing.id,
+    artist: source.slug === 'nocturne-op55-n1' ? 'Daniel Valaisis' : printing.artist ?? '', sourcePrintingId: printing.id, sourceImageUrl: printing.source_image_url,
   })
 }
 const printings = [...printingRows.values()].sort((a,b) => a.key.localeCompare(b.key))

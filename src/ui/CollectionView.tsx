@@ -1,3 +1,4 @@
+import { artworkGroups, ownedArtworkIds } from './artworks'
 // The Collection tab: every card in the pool as a tile (CardFrame + owned/
 // target badge), expandable into per-printing rows with +/− steppers.
 // Filters mirror CardBrowser's chip pattern, plus rarity/set/goal filters
@@ -14,7 +15,7 @@ import {
   listSets,
   type Printing,
 } from './printings'
-import { getOfficialImageUrl, getPrintingImageUrl } from './images'
+import { getPrintingImageUrl } from './images'
 import {
   useCollection,
   adjustCount,
@@ -34,7 +35,7 @@ type GoalFilter = 'all' | 'missing-playset' | 'missing-arts' | 'complete'
 const GOALS: { id: GoalFilter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'missing-playset', label: 'Missing for playset' },
-  { id: 'missing-arts', label: 'Missing arts' },
+  { id: 'missing-arts', label: 'Missing artwork' },
   { id: 'complete', label: 'Complete' },
 ]
 
@@ -45,6 +46,8 @@ interface CardRollup {
   target: number
   playsetDone: boolean
   artsDone: boolean
+  artOwned: number
+  artTarget: number
 }
 
 /** `owned` is passed in from `collection.ts`'s shared `ownedByCard` map rather
@@ -52,13 +55,16 @@ interface CardRollup {
  *  and two implementations of it could show two numbers for one fact. */
 function rollup(def: CardDef, prints: Printing[], collection: Collection, owned: number): CardRollup {
   const target = playsetTarget(def)
+  const artTarget = artworkGroups(prints).length
+  const artOwned = ownedArtworkIds(prints, collection.counts).size
   return {
     def,
     printings: prints,
     owned,
     target,
     playsetDone: owned >= target,
-    artsDone: prints.every((p) => (collection.counts[p.key] ?? 0) > 0),
+    artTarget, artOwned,
+    artsDone: prints.every(p => !!p.artworkId) && artOwned === artTarget,
   }
 }
 
@@ -198,7 +204,7 @@ export function CollectionView({
             CardFrame's click-to-expand target underneath it. Spell the two
             glyphs out here instead, next to the goal filters they mirror. */}
         <p className="collection-view__legend" data-testid="collection-legend">
-          ✓ playset complete · ★ every printing owned
+          ✓ playset complete · ★ every artwork owned (any printing)
         </p>
       </div>
 
@@ -209,8 +215,8 @@ export function CollectionView({
             <CardFrame def={r.def} size="zoom" useOfficialImages={useOfficialImages}
               onClick={() => setExpanded(expanded === r.def.id ? null : r.def.id)} />
             <span className="collection-view__count" data-testid={`collection-count-${r.def.id}`}>
-              {known ? r.owned : '?'}/{r.target}
-              {known && r.playsetDone && <span title="Playset complete"> ✓</span>}
+              {r.target === 0 ? 'Collection only' : `${known ? r.owned : '?'}/${r.target}`} · Art {known ? r.artOwned : '?'}/{r.artTarget}
+              {known && r.target > 0 && r.playsetDone && <span title="Playset complete"> ✓</span>}
               {known && r.artsDone && <span title="All arts owned"> ★</span>}
             </span>
             <button type="button" className="collection-view__expand"
@@ -222,15 +228,15 @@ export function CollectionView({
               <div className="collection-view__printings">
                 {r.printings.map((p) => {
                   const count = collection.counts[p.key] ?? 0
-                  // Spec §1.3's fallback chain: this printing's own art, then
-                  // the card's base art, then nothing here at all (the drawn
-                  // CardFrame above the row is the last step).
-                  const imageUrl = getPrintingImageUrl(p.key) ?? getOfficialImageUrl(p.cardId)
+                  // Only show this exact printing: substituting base art misidentifies alternate illustrations.
+                  const imageUrl = getPrintingImageUrl(p.key)
+                  const artIndex = artworkGroups(r.printings).findIndex(a => a.id === p.artworkId) + 1
+                  const artOwned = p.artworkId && ownedArtworkIds(r.printings, collection.counts).has(p.artworkId)
                   return (
                     <div key={p.key} className="collection-view__printing-row"
                       data-testid={`printing-row-${p.key}`}>
-                      {imageUrl !== undefined && <img src={imageUrl} alt="" width={40} />}
-                      <span>{p.setName} · {p.collectorNumber} · {p.rarity}{p.finish ? ` · ${p.finish}` : ''}</span>
+                      {imageUrl !== undefined && <a href={imageUrl} target="_blank" rel="noreferrer" title="View this printing"><img src={imageUrl} alt={`${p.setName} ${p.collectorNumber}`} width={40} loading="lazy" /></a>}
+                      <span>{p.setName} · {p.collectorNumber} · {p.rarity}{p.finish ? ` · ${p.finish}` : ''}<br />{artIndex > 0 ? `Artwork ${artIndex}${known ? artOwned ? ' · owned' : ' · missing' : ''}` : 'Artwork identity awaiting review'}{p.playable === false ? ' · collection only' : ''}</span>
                       <span className="collection-view__stepper">
                         <button type="button" data-testid={`printing-dec-${p.key}`}
                           disabled={!known || count === 0}

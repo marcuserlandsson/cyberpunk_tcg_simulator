@@ -187,19 +187,21 @@ way automatically when needed.
 
 The **Collection** tab tracks which physical cards you own, per *printing* —
 `data/printings.json` currently holds 460 printings of the 151 cards across 13 sets, so
-an alt art is a separate thing to own rather than a flag on the card.
+grouped into 192 reviewed unique illustrations. Exact printing counts are preserved.
 
 - One tile per card showing `owned/target`, plus **✓** when the playset is
-  complete and **★** when you own every printing of it. The playset target is
-  3, or **1 for a Legend** (decks run one of each). Clicking a tile expands
+  complete and **★** when you own each artwork in any printing. The playset target is
+  3, or **1 for a Legend**; art-only promos contribute to collection goals only. Clicking a tile expands
   per-printing rows with `+`/`−` steppers.
 - **Quick-add** for cracking packs: pick the set you are opening once, then
   type a few letters and press Enter to add 1 — every add lands in that set,
   with single-level undo. Where the set holds more than one printing of the
   matched card (an Iconic variant, say), Enter deliberately does *not* guess:
   the row lists the candidates with collector number and rarity to click.
-- Completion stats, a copy-able buy-list of what is missing, and JSON / text
-  export and import (replace or merge).
+- Separate playset and artwork owned/target totals, missing-only filters and
+  copyable goal lists. Artwork lists offer alternative printings of each missing
+  illustration. JSON/text inventory exports retain exact physical counts.
+- See [artwork identity](docs/artwork-identity.md) for review evidence and refresh steps.
 
 In the Deck Builder, each card carries an `owned x/3` badge and the deck gets
 a "missing N cards for this deck" summary with its own buy-list button. That
