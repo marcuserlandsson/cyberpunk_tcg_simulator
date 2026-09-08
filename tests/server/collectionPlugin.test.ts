@@ -115,11 +115,11 @@ describe('handleCollectionRequest', () => {
 describe('the Vite middleware', () => {
   type Middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => unknown
 
-  function mountMiddleware(): Middleware {
+  function mountMiddleware(preview = false): Middleware {
     const plugin = collectionPlugin()
     const registered: Middleware[] = []
     const fakeServer = { middlewares: { use: (handler: Middleware) => registered.push(handler) } }
-    const configure = plugin.configureServer as unknown as (server: unknown) => void
+    const configure = (preview ? plugin.configurePreviewServer : plugin.configureServer) as unknown as (server: unknown) => void
     configure(fakeServer)
     expect(registered).toHaveLength(1)
     return registered[0]
@@ -141,6 +141,21 @@ describe('the Vite middleware', () => {
     }
     return res
   }
+
+  it('mounts the collection and backup-status endpoints in production preview', async () => {
+    const middleware = mountMiddleware(true)
+    const put = await handleCollectionRequest(file, 'PUT', { baseRevision: 0, counts: { 'preview/1': 3 } })
+    expect(put.status).toBe(200)
+    for (const suffix of ['', '/status']) {
+      const res = fakeResponse()
+      await middleware({ url: COLLECTION_ROUTE + suffix, method: 'GET' } as IncomingMessage,
+        res as unknown as ServerResponse, () => { throw new Error('Endpoint missing') })
+      expect(res.statusCode).toBe(200)
+      expect(JSON.parse(res.body)).toMatchObject(suffix === ''
+        ? { counts: { 'preview/1': 3 } }
+        : { git: { status: 'skipped', detail: expect.stringContaining('disabled') } })
+    }
+  })
 
   it('answers 500 instead of rejecting when reading the request body fails', async () => {
     const warn = vi.spyOn(console, 'error').mockImplementation(() => {})

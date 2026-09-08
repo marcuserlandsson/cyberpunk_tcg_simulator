@@ -14,6 +14,7 @@ import {
   getSyncStatus,
   initCollectionSync,
   resolveConflict,
+  retryCollection,
 } from '../../src/ui/collectionSync'
 
 const okFile = { version: 1, revision: 3, savedAt: '2026-09-05T00:00:00.000Z', counts: { 'a/1': 1 } }
@@ -36,6 +37,43 @@ afterEach(() => {
 })
 
 describe('initCollectionSync', () => {
+  it('reloads an unavailable collection on manual retry without issuing a PUT', async () => {
+    stubFetch(() => ({ status: 500, body: {} }))
+    await initCollectionSync()
+    expect(getSyncStatus().state).toBe('error')
+    stubFetch((_url, init) => {
+      expect(init?.method).not.toBe('PUT')
+      return { status: 200, body: okFile }
+    })
+    await retryCollection()
+    expect(getCollection().counts).toEqual(okFile.counts)
+    expect(getSyncStatus().available).toBe(true)
+  })
+
+  it('reports the final background backup failure without another save', async () => {
+    vi.useFakeTimers()
+    try {
+      let writes = 0
+      stubFetch((url, init) => {
+        if (url.endsWith('/status')) return { status: 200, body: { git: { status: 'failed', detail: 'push rejected' } } }
+        if (init?.method === 'PUT') {
+          writes++
+          return { status: 200, body: { revision: 4, git: { status: 'pending' } } }
+        }
+        return { status: 200, body: okFile }
+      })
+      await initCollectionSync()
+      setCount('a/1', 2)
+      await flushNow()
+      expect(getSyncStatus().git).toBe('pending')
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(getSyncStatus()).toMatchObject({ state: 'idle', git: 'failed', gitDetail: 'push rejected' })
+      expect(writes).toBe(1)
+    } finally {
+      _resetSyncForTests()
+      vi.useRealTimers()
+    }
+  })
   it('saves the complete collection to disk even while browser writes fail', async () => {
     let saved: unknown
     stubFetch((_url, init) => {

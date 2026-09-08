@@ -16,7 +16,7 @@ import {
   importCollectionJson,
   importCollectionText,
 } from './collection'
-import { useSyncStatus, flushNow, resolveConflict, confirmEmptySave, ownershipAvailable } from './collectionSync'
+import { useSyncStatus, retryCollection, resolveConflict, confirmEmptySave, ownershipAvailable } from './collectionSync'
 
 /** Sum of raw per-printing counts — the same arithmetic `completionStats`
  *  uses for `totalOwned`, applied to the disk-side counts a conflict hands
@@ -87,11 +87,13 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
             {syncStatus.git === 'failed' && (
               <span className="collection-header__sync-note">
                 {' '}
-                · git push failed — your data is safe on disk
+                · git backup failed — your data is safe on disk
               </span>
             )}
           </>
         )}
+        {syncStatus.git === 'pending' && <> · Background backup pending…</>}
+        {syncStatus.gitDetail && <span className="collection-header__sync-note"> · {syncStatus.gitDetail}</span>}
         {syncStatus.state === 'saving' && <>Saving…</>}
         {syncStatus.state === 'unsaved' && (
           <>
@@ -138,8 +140,8 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
           </>
         )}
       </span>
-      {syncStatus.state === 'unsaved' && (
-        <button type="button" data-testid="sync-retry" onClick={() => void flushNow()}>
+      {(syncStatus.state === 'unsaved' || syncStatus.state === 'error') && (
+        <button type="button" data-testid="sync-retry" onClick={() => void retryCollection()}>
           Retry now
         </button>
       )}

@@ -71,7 +71,8 @@ export interface SyncStatus {
   pendingCount: number
   lastSavedAt?: string
   message?: string
-  git?: 'ok' | 'skipped' | 'failed'
+  git?: 'ok' | 'skipped' | 'failed' | 'pending'
+  gitDetail?: string
   /** True only when a flush or backoff retry is actually armed. The banner
    *  says "retrying…" from this flag rather than from `state === 'unsaved'`,
    *  because several terminal refusals (400 invalid, 405, a 409 whose body
@@ -99,6 +100,34 @@ let lastConfirmed: Record<string, number> = {}
 let diskVersion: { counts: Record<string, number>; revision: number } | undefined
 
 let timer: ReturnType<typeof setTimeout> | undefined
+let gitTimer: ReturnType<typeof setTimeout> | undefined
+let gitPollGeneration = 0
+
+function watchGitResult(): void {
+  if (gitTimer !== undefined) clearTimeout(gitTimer)
+  const generation = ++gitPollGeneration
+  async function poll(): Promise<void> {
+    try {
+      const response = await fetch(`${ROUTE}/status`, { cache: 'no-store' })
+      if (!response.ok) throw new Error('Backup status unavailable')
+      const body = await response.json() as { git?: { status?: SyncStatus['git']; detail?: string } }
+      if (generation !== gitPollGeneration) return
+      if (body.git && ['ok', 'skipped', 'failed', 'pending'].includes(body.git.status ?? '')) {
+        setStatus({ git: body.git.status, gitDetail: body.git.detail })
+        if (body.git.status !== 'pending') return
+      }
+    } catch {
+      if (generation !== gitPollGeneration) return
+      setStatus({ gitDetail: 'Cannot check background backup; local disk save is complete.' })
+    }
+    gitTimer = setTimeout(() => void poll(), 2000)
+  }
+  gitTimer = setTimeout(() => void poll(), 1000)
+}
+
+export function retryCollection(): Promise<void> {
+  return readPendingBuffer() === undefined ? initCollectionSync() : flushNow()
+}
 let attempt = 0
 let started = false
 let unsubscribeCollection: (() => void) | undefined
@@ -212,11 +241,13 @@ async function performFlush(confirmEmpty: boolean): Promise<void> {
     current?: unknown
     revision?: number
     savedAt?: string
-    git?: { status: 'ok' | 'skipped' | 'failed' }
+    git?: { status: SyncStatus['git']; detail?: string }
   }
 
   if (response.status === 200 && typeof body.revision === 'number') {
     setStatus({ available: true })
+    setStatus({ gitDetail: body.git?.detail })
+    if (body.git?.status === 'pending') watchGitResult()
     // Invariant 1: never trust that `buffer` (what was SENT) is still what
     // the player wants. Re-read the live buffer and compare.
     const live = readPendingBuffer()
@@ -561,6 +592,9 @@ export async function initCollectionSync(): Promise<void> {
 }
 
 export function _resetSyncForTests(): void {
+  ++gitPollGeneration
+  if (gitTimer !== undefined) clearTimeout(gitTimer)
+  gitTimer = undefined
   if (timer !== undefined) clearTimeout(timer)
   timer = undefined
   attempt = 0

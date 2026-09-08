@@ -29,7 +29,7 @@ export default defineConfig({
   webServer: {
     // `--strictPort` so a stale server on another port can never be mistaken
     // for this one; the dedicated port keeps `npm run dev` usable alongside it.
-    command: `npm run dev -- --port ${PORT} --strictPort`,
+    command: `npm run ${process.env.CTCG_E2E_PREVIEW === '1' ? 'preview' : 'dev'} -- --port ${PORT} --strictPort`,
     url: BASE_URL,
     // Never reuse: this suite's whole safety story is that the server it talks
     // to was started with CTCG_COLLECTION_FILE pointed at a scratch file. A

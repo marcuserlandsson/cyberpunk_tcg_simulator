@@ -16,7 +16,7 @@ import { promisify } from 'node:util'
 const run = promisify(execFile)
 const DEBOUNCE_MS = 5000
 
-export type GitResult = { status: 'ok' | 'skipped' | 'failed'; detail: string }
+export type GitResult = { status: 'ok' | 'skipped' | 'failed' | 'pending'; detail: string }
 
 async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await run('git', args, { cwd })
@@ -99,11 +99,14 @@ export function scheduleCommit(
   summary: string,
   onResult: (result: GitResult) => void
 ): void {
-  if (gitAutomationDisabled()) return
+  if (gitAutomationDisabled()) {
+    onResult({ status: 'skipped', detail: 'CTCG_COLLECTION_FILE is set; git automation disabled' })
+    return
+  }
   if (timer !== undefined) clearTimeout(timer)
   timer = setTimeout(() => {
     timer = undefined
-    inFlight = commitCollection(filePath, summary)
+    inFlight = (inFlight ?? Promise.resolve()).then(() => commitCollection(filePath, summary))
       .then((result) => {
         // The spec promises a non-ok git outcome is LOGGED. `onResult` only
         // reaches the browser on the *next* PUT's response, so the last save

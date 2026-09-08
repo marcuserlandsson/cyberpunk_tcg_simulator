@@ -45,9 +45,14 @@ npm run dev
 ```
 
 Then open the printed local URL (Vite's default is `http://localhost:5173`).
-There is no backend and nothing is sent over the network at runtime — all
-state lives in your browser's `localStorage`, and the app works fully
-offline once loaded.
+The local Node server persists your collection to `data/collection.json`.
+Decks, saved games, and settings live in this browser's `localStorage`.
+Collection saves also trigger Git commits and pushes when an upstream is
+configured. Keep the local server running while using the app. A static
+`dist/` deployment alone cannot persist the collection.
+
+For normal use without development hot reload, run `npm run build`, then
+`npm run preview`. Both server modes provide the same collection endpoint.
 
 To also run the end-to-end browser tests, Playwright needs its own bundled
 Chromium once:
@@ -177,7 +182,7 @@ way automatically when needed.
 ## Collection tracking
 
 The **Collection** tab tracks which physical cards you own, per *printing* —
-`data/printings.json` holds 426 printings of the 141 cards across 12 sets, so
+`data/printings.json` currently holds 438 printings of the 141 cards across 13 sets, so
 an alt art is a separate thing to own rather than a flag on the card.
 
 - One tile per card showing `owned/target`, plus **✓** when the playset is
@@ -199,9 +204,8 @@ is **informational only** — ownership never blocks an add, a save, or a game.
 ### Where the collection is stored
 
 `data/collection.json` is the source of truth and is **committed to the
-repo** — it's not local-only state. Saves go through a dev-server endpoint,
-so `npm run dev` has to be running for edits to persist; the app talks to it
-automatically, there's nothing to start by hand beyond the dev server itself.
+repo** — it's not local-only state. Saves go through the local server endpoint,
+so `npm run dev` or `npm run preview` has to be running for edits to persist.
 
 Edits are batched: after you stop editing for a few seconds, the change is
 written to `data/collection.json` and, a few seconds after that, auto-committed
@@ -209,6 +213,11 @@ and pushed. If the dev server is unreachable or a save fails, your edits stay
 in the browser and are retried automatically — the header shows a "N changes
 not yet saved to disk" banner with a manual Retry button, and nothing is ever
 silently dropped.
+
+The header reports background Git backup progress and the eventual result
+without requiring another edit. A failed commit or push does not undo the
+disk save. Only one browser tab edits the collection at a time; waiting tabs
+show updates and take over when the editing tab closes.
 
 `CTCG_COLLECTION_FILE` (an environment variable) overrides the file path and,
 when set, disables the auto-commit/push entirely — this is how the test
@@ -297,7 +306,7 @@ src/
 
 data/
 ├── cards.json           # all 141 cards: stats, verbatim text, effect definitions
-├── printings.json       # 426 physical printings of those 141 cards across 12 sets
+├── printings.json       # 438 physical printings of those 141 cards across 13 sets
 │                        # (generated — see data/printings.schema.md)
 ├── decks/                # the two bundled starter decks
 └── images/               # (gitignored) official art, populated by scripts/fetch-images.mjs

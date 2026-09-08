@@ -190,9 +190,9 @@ describe('sync status', () => {
     expect(screen.getByTestId('sync-status').textContent).toContain('The collection file on disk is corrupt.')
   })
 
-  it('retry calls flushNow', () => {
+  it('retry calls the collection recovery entry point', () => {
     vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'unsaved', pendingCount: 2 })
-    const flush = vi.spyOn(sync, 'flushNow').mockResolvedValue(undefined)
+    const flush = vi.spyOn(sync, 'retryCollection').mockResolvedValue(undefined)
     render(<CollectionHeader db={db} printings={printings} />)
     fireEvent.click(screen.getByTestId('sync-retry'))
     expect(flush).toHaveBeenCalledOnce()
@@ -264,7 +264,7 @@ describe('sync status', () => {
     vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'idle', pendingCount: 0, git: 'failed' })
     render(<CollectionHeader db={db} printings={printings} />)
     expect(screen.getByTestId('sync-status').textContent).toMatch(/saved/i)
-    expect(screen.getByTestId('sync-status').textContent).toMatch(/push/i)
+    expect(screen.getByTestId('sync-status').textContent).toMatch(/backup failed/i)
     // The failed-push note must never read as a failed save.
     expect(screen.getByTestId('sync-status').textContent).not.toMatch(/save failed|not saved/i)
   })

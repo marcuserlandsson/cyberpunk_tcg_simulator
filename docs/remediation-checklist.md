@@ -8,7 +8,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 02. Coordinate collection editing and recovery across browser tabs.
 - [x] 03. Fix overlapping Collection cards and verify responsive layouts.
 - [x] 04. Refresh deck choices across views and suppress unknown ownership figures.
-- [ ] 05. Support collection persistence outside the dev server; expose Git outcomes and correct documentation.
+- [x] 05. Support collection persistence outside the dev server; expose Git outcomes and correct documentation.
 - [ ] 06. Obtain/version comprehensive rules and errata; audit each rules section against implementation and record discrepancies.
 - [ ] 07. Discover/import current cards and printings, track data freshness and implementation coverage, and correct errata.
 - [ ] 08. Implement rules-audit corrections, explicit effect/player choices, private knowledge, and payment choices, with card/engine regressions.
@@ -42,3 +42,7 @@ Collection cards now fit their grid cells; expanded printing text wraps and quic
 ### 04 — deck choices and ownership availability
 
 Deck libraries now update across mounted views and browser tabs, with valid fallback selections after deletion. Loading or failed collection reads show unknown ownership and suppress misleading buy-lists. Verified TypeScript, 126 targeted unit/component tests (83 rerun after selection refinements), and two browser workflows covering immediate Play selection and failed collection loading.
+
+### 05 — production persistence and backup results
+
+The production preview now mounts the same collection service as development. A separate status endpoint reports pending/final Git backup outcomes without another save; background commits serialize and stale callbacks cannot replace newer status. Manual retry can reload an unreadable collection without writing. Documentation distinguishes local disk, browser storage, and Git backup. Verified 79 server/sync/header tests, production build, and three browser/API checks against production preview using only a scratch collection.

@@ -15,7 +15,7 @@
 // of two racing requests always sees the first one's result and is correctly
 // treated as stale if it is.
 
-import type { Plugin } from 'vite'
+import type { Plugin, ViteDevServer } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   readCollectionFile,
@@ -27,6 +27,7 @@ import { scheduleCommit, type GitResult } from './collectionGit.ts'
 export const COLLECTION_ROUTE = '/__collection'
 
 let lastGitResult: GitResult = { status: 'skipped', detail: 'no save yet' }
+let gitGeneration = 0
 
 async function handlePut(
   filePath: string,
@@ -61,8 +62,10 @@ async function handlePut(
 
   const cards = Object.values(result.file.counts).reduce((sum, n) => sum + n, 0)
   const printings = Object.keys(result.file.counts).length
+  const generation = ++gitGeneration
+  lastGitResult = { status: 'pending', detail: 'Waiting for background backup' }
   scheduleCommit(filePath, `${cards} cards, ${printings} printings`, (r) => {
-    lastGitResult = r
+    if (generation === gitGeneration) lastGitResult = r
   })
 
   return {
@@ -128,12 +131,10 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 }
 
 export function collectionPlugin(): Plugin {
-  return {
-    name: 'ctcg-collection',
-    configureServer(server) {
+  const configure = (server: Pick<ViteDevServer, 'middlewares'>) => {
       server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
         const url = (req.url ?? '').split('?')[0]
-        if (url !== COLLECTION_ROUTE) return next()
+        if (url !== COLLECTION_ROUTE && url !== `${COLLECTION_ROUTE}/status`) return next()
         // Connect does not catch async middleware rejections, so anything
         // that throws in here becomes an unhandled rejection -- fatal by
         // default in modern Node, i.e. the dev server dies mid-entry-session.
@@ -143,6 +144,13 @@ export function collectionPlugin(): Plugin {
         // browser-side buffer still holds the work), but the server must
         // survive it.
         try {
+          if (url === `${COLLECTION_ROUTE}/status`) {
+            res.statusCode = req.method === 'GET' ? 200 : 405
+            res.setHeader('Content-Type', 'application/json')
+            res.setHeader('Cache-Control', 'no-store')
+            res.end(JSON.stringify(req.method === 'GET' ? { git: lastGitResult } : { reason: 'invalid' }))
+            return
+          }
           const filePath = resolveCollectionPath()
           const body = req.method === 'PUT' ? await readBody(req) : undefined
           const result = await handleCollectionRequest(filePath, req.method ?? 'GET', body)
@@ -160,6 +168,10 @@ export function collectionPlugin(): Plugin {
           res.end(JSON.stringify({ reason: 'invalid', message: String(err) }))
         }
       })
-    },
+    }
+  return {
+    name: 'ctcg-collection',
+    configureServer: configure,
+    configurePreviewServer: configure,
   }
 }
