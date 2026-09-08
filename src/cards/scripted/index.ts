@@ -36,7 +36,7 @@ import {
   opponentOf,
   valuePairCount,
 } from '../../engine/query'
-import { chooseEffectOption } from '../../engine/choices'
+import { chooseEffectOption, discardChosenCards } from '../../engine/choices'
 import { nextInt, shuffle } from '../../engine/rng'
 import type { CardDb, GameState, PlayerId } from '../../engine/types'
 import { playCardOnDraft, readyFriendlyEddies, spendOnDraft, type EffectCtx } from '../effects'
@@ -213,16 +213,12 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    *
    * A one-off shape (no other card in the pool shares it), so it is fully
    * scripted rather than grown into vocabulary (docs/rulings.md §48/§55 ff.).
-   * "May draw 5" is taken whenever possible, but — unlike a mandatory `draw`
-   * node (docs/rulings.md §17/§36) — it draws only *up to* 5 and never decks
-   * a player out, the same "up to what the deck holds" reading
-   * `trashFromDeck` already uses (docs/rulings.md §36). The bonus "draw 2" IS
-   * a mandatory draw and can end the game on an empty deck, like any other
-   * `draw` node.
+   * Each player may decline. Accepting draws exactly five and can deck out.
    */
   'shattered-memories': (db, state, ctx) => {
     let totalDiscarded = 0
-    for (const player of [0, 1] as const) {
+    // CR 2.9/10.2.2: the turn player completes their action before the rival.
+    for (const player of [state.activePlayer, opponentOf(state.activePlayer)]) {
       const p = state.players[player]
       totalDiscarded += p.hand.length
       for (const uid of p.hand) {
@@ -230,16 +226,26 @@ export const scriptedCards: Record<string, ScriptedCard> = {
         state.events.push({ type: 'cardTrashed', uid })
       }
       p.hand = []
-      for (let i = 0; i < 5; i++) {
-        const drawn = p.deck.shift()
-        if (drawn === undefined) break
-        p.hand.push(drawn)
-        state.events.push({ type: 'cardDrawn', player, uid: drawn })
+      const draw = chooseEffectOption(state, player, ctx.sourceUid, 'Draw exactly 5 cards?', [1, -1], { 1: 'Draw 5', [-1]: 'Decline' })
+      if (draw === 1 && !drawCards(state, player, 5)) {
+        endGame(state, opponentOf(player), 'deckout')
+        return state
       }
     }
-    const matches = state.players[ctx.player].gigArea.some((die) => die.value === totalDiscarded)
-    if (matches && !drawCards(state, ctx.player, 2)) {
-      endGame(state, opponentOf(ctx.player), 'deckout')
+    const matches = state.players[ctx.player].gigArea.some(die => die.value === totalDiscarded)
+    if (matches && !drawCards(state, ctx.player, 2)) endGame(state, opponentOf(ctx.player), 'deckout')
+    return state
+  },
+
+  'caliber-totentanz-s-top-dog': (db, state, ctx) => {
+    const rival = opponentOf(ctx.player)
+    const [discarded] = discardChosenCards(db, state, rival, ctx.sourceUid, 1)
+    if (discarded !== undefined) {
+      const def = db[state.cards[discarded].defId]
+      const cost = def.printedCost === null ? 0 : def.cost
+      if (state.players[ctx.player].gigArea.some(die => die.value === cost)) {
+        discardChosenCards(db, state, rival, ctx.sourceUid, 1)
+      }
     }
     return state
   },

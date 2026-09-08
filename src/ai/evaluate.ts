@@ -1,3 +1,4 @@
+import { stillLive } from '../engine/game'
 // The heuristic AI's static evaluation function: how good is this position for
 // one player, in a single number?
 //
@@ -168,8 +169,8 @@ export function evaluate(
   perspective: PlayerId,
   weights: EvalWeights = DEFAULT_WEIGHTS
 ): number {
-  if (state.winner !== null) {
-    return state.winner === perspective ? weights.terminal : -weights.terminal
+  if (!stillLive(state)) {
+    return state.winner === null ? 0 : state.winner === perspective ? weights.terminal : -weights.terminal
   }
 
   const rival = opponentOf(perspective)

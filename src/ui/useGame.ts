@@ -315,6 +315,8 @@ const END_REASONS: Record<string, string> = {
   overtimeSevenGigs: '7 Gigs in overtime',
   deckout: 'ran out of cards',
   concede: 'conceded',
+  simultaneousWins: 'both players won simultaneously',
+  simultaneousLosses: 'both players lost simultaneously',
 }
 
 /**
@@ -380,6 +382,7 @@ export function describeEvent(db: CardDb, state: GameState, event: GameEvent): s
       return event.player === HUMAN ? 'You ended your turn.' : 'Rival ended their turn.'
     case 'gameEnded': {
       const reason = END_REASONS[event.reason] ?? event.reason
+      if (event.winner === null) return `Game over: draw (${reason}).`
       return event.winner === HUMAN
         ? `Game over: you win (${reason}).`
         : `Game over: Rival wins (${reason}).`

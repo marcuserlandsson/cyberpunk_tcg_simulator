@@ -1,4 +1,5 @@
-import type { GameState, PlayerId } from './types'
+import { stopAtHiddenInformation } from './preview'
+import type { CardDb, GameState, PlayerId } from './types'
 import { askIntercept } from './intercept'
 import { nextInt } from './rng'
 
@@ -31,4 +32,23 @@ export function chooseEffectOption(
       ...(cardOptions ? options.filter(uid => state.cards[uid]).map(uid => ({ uid, viewer: player })) : []),
     ],
   })
+}
+
+/** Printed discard instructions give the affected player the card decision. */
+export function discardChosenCards(db: CardDb, state: GameState, player: PlayerId, sourceUid: number, count: number): number[] {
+  const p = state.players[player]
+  const discarded: number[] = []
+  for (let i = 0; i < count && p.hand.length > 0; i++) {
+    // The discarded identity (and any following cost comparison) is not known
+    // to another player's lookahead before this choice has been made.
+    stopAtHiddenInformation(state)
+    const chosen = chooseEffectOption(state, player, sourceUid, 'Choose a card to discard', [...p.hand],
+      Object.fromEntries(p.hand.map(uid => [uid, db[state.cards[uid].defId].name])), true)
+    if (chosen === null) break
+    p.hand = p.hand.filter(uid => uid !== chosen)
+    p.trash.push(chosen)
+    state.events.push({ type: 'cardTrashed', uid: chosen })
+    discarded.push(chosen)
+  }
+  return discarded
 }

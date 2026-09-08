@@ -489,7 +489,7 @@ describe('heuristic AI: hidden-information invariance', () => {
    * whichever position it picks, so the two clones provably discard different
    * cards.
    */
-  it('scores a block that discards a DIFFERENT rival card identically in each clone', () => {
+  it('scores a block before the rival chooses a discard without reading that choice', () => {
     const base = draftState(
       fixtureWithHand(
         1,
@@ -520,8 +520,13 @@ describe('heuristic AI: hidden-information invariance', () => {
     expect(offered).toContainEqual(block)
     expect(legalActions(db, reversed)).toEqual(offered)
 
-    const outcomeA = applyAction(db, attacked, block)
-    const outcomeB = applyAction(db, reversed, block)
+    const pendingA = applyAction(db, attacked, block)
+    const pendingB = applyAction(db, reversed, block)
+    expect(pendingA.pendingIntercept?.player).toBe(1)
+    expect(pendingA.players[1].hand).toEqual(attacked.players[1].hand)
+    expect(scoreAction(db, attacked, block, 0)).toBe(scoreAction(db, reversed, block, 0))
+    const outcomeA = applyAction(db, pendingA, { type: 'answerIntercept', answer: attacked.players[1].hand[0] })
+    const outcomeB = applyAction(db, pendingB, { type: 'answerIntercept', answer: reversed.players[1].hand[0] })
     const discardedA = outcomeA.players[1].trash.filter(
       (uid) => !attacked.players[1].trash.includes(uid)
     )

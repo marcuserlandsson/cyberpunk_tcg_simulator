@@ -1,3 +1,4 @@
+import { stillLive } from '../engine/game'
 // The effect interpreter: the data-driven half of the rules engine.
 //
 // A card's behaviour is a list of `EffectDef`s (types.ts), each a trigger + an
@@ -48,7 +49,7 @@ import {
 import { nextInt, rollDie } from '../engine/rng'
 import { stopAtHiddenInformation } from '../engine/preview'
 import { PRIVATE_INFORMATION_SCRIPTS } from './scripted/index'
-import { chooseEffectOption } from '../engine/choices'
+import { chooseEffectOption, discardChosenCards } from '../engine/choices'
 import { chooseAndStealGigs } from '../engine/stealing'
 import { scriptedCards } from './scripted/index'
 import {
@@ -576,6 +577,11 @@ function applyNode(
       return
     }
 
+    case 'discardRival': {
+      discardChosenCards(db, draft, opponentOf(ctx.player), ctx.sourceUid, node.count)
+      return
+    }
+
     case 'discardRandomRival': {
       const rival = opponentOf(ctx.player)
       const p = draft.players[rival]
@@ -736,7 +742,7 @@ function applyNode(
       }
       const shared: EffectCtx = { ...ctx, chosen: target }
       for (const child of node.effects) {
-        if (draft.winner !== null) break
+        if (!stillLive(draft)) break
         applyNode(db, draft, child, shared, slots)
       }
       slots.next = end
@@ -767,7 +773,7 @@ function applyNode(
         conditionHolds(draft, ctx.player, node.allIf, ctx.context ?? {}, ctx.sourceUid)
       ) {
         for (let index = 0; index < node.modes.length; index++) {
-          if (draft.winner !== null) break
+          if (!stillLive(draft)) break
           applyMode(index)
         }
         slots.next = end
@@ -781,7 +787,7 @@ function applyNode(
         !behindOnStreetCred(draft, ctx.player)
       ) {
         for (let index = 0; index < node.modes.length; index++) {
-          if (draft.winner !== null) break
+          if (!stillLive(draft)) break
           applyMode(index)
         }
         slots.next = end
@@ -864,7 +870,7 @@ function applyNode(
       const sourceUid = ctx.context?.equipHostUid ?? ctx.sourceUid
       const eligible = stealableDieIndexes(db, draft, ctx.player, sourceUid, node.distinctValueOnly === true)
       chooseAndStealGigs(db, draft, sourceUid, ctx.player, node.count, eligible)
-      if (draft.winner === null) note(draft, ctx.sourceUid, `steal ${Math.min(node.count, eligible.length)} gig(s)`)
+      if (stillLive(draft)) note(draft, ctx.sourceUid, `steal ${Math.min(node.count, eligible.length)} gig(s)`)
       return
     }
 
@@ -975,7 +981,7 @@ function applyNode(
     case 'sequence': {
       for (const child of node.effects) {
         // A node can end the game (a `draw` off an empty deck): stop resolving.
-        if (draft.winner !== null) return
+        if (!stillLive(draft)) return
         applyNode(db, draft, child, ctx, slots)
       }
       return
@@ -1004,7 +1010,7 @@ function applyNode(
       // already stop their own work the moment that happens, but this
       // wrapper must not still log a trailing `effectResolved` note AFTER the
       // terminal `gameEnded` event (found by the Task 9 fuzz harness).
-      if (draft.winner !== null) return
+      if (!stillLive(draft)) return
       note(draft, ctx.sourceUid, `scripted:${node.name}`)
       return
     }
@@ -1050,7 +1056,7 @@ export function applyEffectDefOnDraft(
 ): void {
   const card = draft.cards[sourceUid]
   if (!card) return
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   const player = controller ?? effectController(draft, sourceUid)
   context = { ...context, sourcePower: effectivePower(db, draft, context.equipHostUid ?? context.defeatedHostUid ?? abilityHost(draft, sourceUid)) }
   if (!conditionMet(draft, player, def, context, sourceUid)) return
@@ -1173,7 +1179,7 @@ export function fireCardTrigger(
   // caused this (see e.g. `resolveAttack`), but this entry check is what
   // makes every downstream/sibling call safe BY CONSTRUCTION rather than by
   // each caller remembering to check.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   const def = defOf(db, draft, sourceUid)
   if (!def) return
   const player = controller ?? effectController(draft, sourceUid)
@@ -1227,7 +1233,7 @@ export function fireCardTrigger(
     // ended the game could set fresh pending state (e.g. `stealGig`'s own
     // `draft.phase = 'chooseGig'`) that clobbers the terminal `gameOver`
     // phase `endGame` already committed.
-    if (draft.winner !== null) return
+    if (!stillLive(draft)) return
   }
 }
 
@@ -1271,17 +1277,17 @@ export function fireTriggerOnDraft(
   // the FIRST call below, but it's what stops a fresh call to THIS function
   // (from any caller, present or future) from even reaching for `sourceUid`
   // once the game is over.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   const card = draft.cards[sourceUid]
   if (!card) return
   const controller = effectController(draft, sourceUid)
   fireCardTrigger(db, draft, trigger, sourceUid, targets, controller, context)
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
 
   if (!GEAR_PROPAGATED_TRIGGERS.includes(trigger)) return
   for (const gearUid of [...card.attachedGear]) {
     fireCardTrigger(db, draft, trigger, gearUid, [], controller, { ...context, equipHostUid: sourceUid })
-    if (draft.winner !== null) return
+    if (!stillLive(draft)) return
   }
 }
 
@@ -1365,7 +1371,7 @@ export function fireWatcherTrigger(
   // itself decked the player out) would still fire the FIRST watching
   // card's effect for real before any later, per-iteration check got a
   // chance to stop it.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   const p = draft.players[player]
   const watchers = [...p.field, ...p.legends.filter((uid) => draft.cards[uid].faceUp)]
   for (const uid of watchers) {
@@ -1380,7 +1386,7 @@ export function fireWatcherTrigger(
       // draw off an empty deck) — once that happens, no LATER watcher in
       // this broadcast may still run (see the matching guard inside
       // `fireCardTrigger`, docs/rulings.md's deckout rule).
-      if (draft.winner !== null) return
+      if (!stillLive(draft)) return
     }
   }
 }
@@ -1439,7 +1445,7 @@ export function resolveNodeOnDraft(
   // own guard (it calls `applyNode` directly), so it needs its own — e.g.
   // `fight`'s floating `winFightMarginSteal` resolution, which runs after a
   // fight whose OWN on-defeat chain may already have ended the game.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   const def: EffectDef = { trigger: 'activated', effect: node }
   const slots = bindSlots(db, draft, def, sourceUid, [], player)
   applyNode(db, draft, node, { player, sourceUid, targets: [] }, slots)
@@ -1735,7 +1741,7 @@ export function playCardOnDraft(
 
   // Pay before entry. Any payment-triggered effects wait in the action's queue.
   spendOnDraft(db, draft, payment)
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   p.hand = p.hand.filter((uid) => uid !== cardUid)
   p.trash = p.trash.filter(uid => uid !== cardUid)
   p.deck = p.deck.filter(uid => uid !== cardUid)
@@ -1778,7 +1784,7 @@ export function playCardOnDraft(
   // The payment's own {Spend} trigger can end the game outright — nothing
   // below (the `cardPlayed` event, the once-per-turn discount marking,
   // `onPlay`, `onFriendlyCardPlayed`) may still run (docs/rulings.md §147).
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   draft.events.push({ type: 'cardPlayed', player, uid: cardUid })
 
   // "Play your first CYBERWARE Gear each turn for -3 €$, to a minimum of
@@ -1802,7 +1808,7 @@ export function playCardOnDraft(
   // CR 4.14.2: a Program is outside all areas while its instructions resolve.
   if (def.type === 'program') {
     p.trash.push(cardUid)
-    if (draft.winner === null) {
+    if (stillLive(draft)) {
       draft.events.push({ type: 'cardTrashed', uid: cardUid })
       if (programDestination === 'deckBottom') {
         p.trash = p.trash.filter(uid => uid !== cardUid)

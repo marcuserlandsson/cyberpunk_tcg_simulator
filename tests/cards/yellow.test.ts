@@ -287,7 +287,7 @@ describe('caliber-totentanz-s-top-dog', () => {
     expect(next.players[1].field).toContain(tough)
   })
 
-  it('discards 1 on its own defeat, or 2 when its own cost matches a friendly Gig', () => {
+  it('discards 1 on defeat when no friendly Gig matches', () => {
     const { state } = fixtureWithHand(1, ['japantown-jonin'])
     const caliber = fieldCard(state, 0, 'caliber-totentanz-s-top-dog', { ready: false }) // cost 5
     const brute = fieldCard(state, 1, 'animals-wrecker')
@@ -298,11 +298,11 @@ describe('caliber-totentanz-s-top-dog', () => {
     expect(next.players[1].hand).toHaveLength(handBefore - 1)
   })
 
-  it('discards an extra card when a friendly Gig equals its own cost (5)', () => {
+  it('discards an extra card when a friendly Gig equals the discarded card cost', () => {
     const { state } = fixtureWithHand(1, ['japantown-jonin', 'japantown-jonin'])
     const caliber = fieldCard(state, 0, 'caliber-totentanz-s-top-dog', { ready: false })
     const brute = fieldCard(state, 1, 'animals-wrecker')
-    setGigs(state, 0, [{ size: 10, value: 5 }])
+    setGigs(state, 0, [{ size: 10, value: db['japantown-jonin'].cost }])
     const handBefore = state.players[1].hand.length
     const next = resolvePendingOrder(db, passReact(db, startAttack(db, state, brute, caliber)))
     expect(next.players[0].trash).toContain(caliber)

@@ -257,25 +257,9 @@ export function draftState(state: GameState): GameState {
 // Shared mutations on a draft
 // ---------------------------------------------------------------------------
 
-/**
- * True while the game hasn't ended yet. A named alias for `state.winner ===
- * null`, for the one place that most needs a readable, greppable name for
- * it: `src/cards/scripted/index.ts`'s escape-hatch scripts, which fire a
- * nested trigger mid-script (via `fireTriggerOnDraft`) and then keep
- * mutating `state` in the SAME function afterward — unlike the engine's own
- * resolution choke points (`resolveAttack`, `fight`, `defeatUnit`, the
- * trigger wrappers themselves), a scripted card's own body cannot be
- * guarded "by construction" from the outside, since only the script itself
- * knows what still needs to run after its own nested fire. Every
- * `fireTriggerOnDraft` call site in `scripted/index.ts` is swept for this in
- * docs/rulings.md §148 (Task 9 fuzz harness, fix round 3) — most are already
- * safe because the mutation that matters (a revived card's own zone
- * assignment) happens BEFORE the nested fire, mirroring `playCardOnDraft`'s
- * own Program handling (§147); the ones that still run something AFTER
- * check `stillLive` first.
- */
+/** A drawn game is terminal even though neither player is its winner. */
 export function stillLive(state: GameState): boolean {
-  return state.winner === null
+  return state.winner === null && state.phase !== 'gameOver'
 }
 
 /**
@@ -292,10 +276,10 @@ export function stillLive(state: GameState): boolean {
  */
 export function endGame(
   draft: GameState,
-  winner: PlayerId,
-  reason: 'sevenGigs' | 'overtimeMajority' | 'overtimeSevenGigs' | 'deckout' | 'concede'
+  winner: PlayerId | null,
+  reason: Extract<GameEvent, { type: 'gameEnded' }>['reason']
 ): void {
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   draft.winner = winner
   draft.phase = 'gameOver'
   draft.events.push({ type: 'gameEnded', winner, reason })
@@ -450,7 +434,7 @@ export function beginTurn(draft: GameState, player: PlayerId, turnNumber: number
   ))
   resetTurnState(draft, player)
   beforeReady?.()
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   // CR 10.23.1: existing durations end after this boundary's pending effects.
   // Preserve effects newly created by those start-of-turn resolutions.
   draft.floatingEffects = draft.floatingEffects.filter(entry => !expiring.has(entry))
@@ -480,10 +464,14 @@ export function isOvertime(state: GameState): boolean {
  * CR 1.11: in overtime, seven or more Gigs wins immediately.
  */
 export function checkOvertimeWin(draft: GameState): void {
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   if (!isOvertime(draft)) return
   const mine = draft.players[0].gigArea.length
   const theirs = draft.players[1].gigArea.length
   if (mine < GIGS_TO_WIN && theirs < GIGS_TO_WIN) return
+  if (mine >= GIGS_TO_WIN && theirs >= GIGS_TO_WIN) {
+    endGame(draft, null, 'simultaneousWins')
+    return
+  }
   endGame(draft, mine >= GIGS_TO_WIN ? 0 : 1, 'overtimeSevenGigs')
 }

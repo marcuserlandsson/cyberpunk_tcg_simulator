@@ -312,9 +312,10 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
   }
 
   const winsA = result?.games.filter((g) => g.winner === 0).length ?? 0
-  const winsB = result === null ? 0 : result.games.length - winsA
+  const winsB = result?.games.filter(g => g.winner === 1).length ?? 0
+  const draws = result?.games.filter(g => g.winner === null).length ?? 0
 
-  const winRateB = result === null ? 0 : 1 - result.winRateA
+  const winRateB = result?.games.length ? winsB / result.games.length : 0
 
   return (
     <section aria-label="Simulate" className="simulate-view" data-testid="simulate-view">
@@ -323,7 +324,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
       {lastResult !== null && result === null && !running && (
         <div className="sim-banner panel" data-testid="sim-last-result-banner">
           Last run: {lastResult.games.length} games — Deck A won {pct(lastResult.winRateA)}, Deck B
-          won {pct(1 - lastResult.winRateA)}.
+          won {pct(lastResult.games.filter(g => g.winner === 1).length / lastResult.games.length)}.
         </div>
       )}
 
@@ -474,6 +475,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
               </span>
             </div>
 
+            {draws > 0 && <p>{draws} draws</p>}
             <div className="sim-reasons" data-testid="sim-reasons">
               <span className="sim-reasons__label">End reasons:</span>
               {Object.entries(result.reasons).map(([reason, count]) => (

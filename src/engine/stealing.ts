@@ -1,3 +1,4 @@
+import { stillLive } from './game'
 import { fireWatcherTrigger } from '../cards/effects'
 import { chooseEffectOption } from './choices'
 import { checkOvertimeWin } from './game'
@@ -46,7 +47,7 @@ export function transferStolenGigs(db: CardDb, draft: GameState, sourceUid: numb
   }
   // A winning transfer ends the game before any following instruction/draw.
   checkOvertimeWin(draft)
-  if (draft.winner !== null) return stolen.length
+  if (!stillLive(draft)) return stolen.length
   const def = db[draft.cards[sourceUid]?.defId]
   for (const [offset, die] of stolen.entries()) fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
     stolenDieId: die.id, stolenDieSize: die.size, stolenDieValue: die.value, stealerUid: sourceUid,

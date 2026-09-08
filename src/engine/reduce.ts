@@ -1,3 +1,4 @@
+import { stillLive } from './game'
 import { callChosenLegend } from './knowledge'
 // The reducer: `applyAction(db, state, action) -> newState`.
 //
@@ -248,7 +249,7 @@ function chooseGigDie(draft: GameState, db: CardDb, size: number): void {
 
   fireGigRollTrigger(db, draft, player, die.size, value)
   // A roll trigger can end the game (a forced draw off an empty deck).
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
 
   // Where the gig-gain step lands once nothing else is owed: the reroll
   // decision if the roller has that static live, the main phase otherwise.
@@ -295,7 +296,7 @@ function chooseGigReroll(draft: GameState, db: CardDb, reroll: boolean): void {
       fireGigRollTrigger(db, draft, pending.player, die.size, value)
     }
   }
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   // The reroll's own trigger firing can owe a Gig-die choice too, so this
   // hands back through the same guard (docs/rulings.md §145).
   settleAfterGigRoll(draft, 'main')
@@ -315,7 +316,7 @@ function resolveEndOfTurnFloating(draft: GameState, db: CardDb): void {
     if (uid === undefined || draft.cards[uid] === undefined) continue
     if (!draft.players[draft.cards[uid].owner].field.includes(uid)) continue
     defeatUnit(draft, db, uid)
-    if (draft.winner !== null) return
+    if (!stillLive(draft)) return
   }
 }
 
@@ -427,16 +428,16 @@ function endTurn(draft: GameState, db: CardDb): void {
   // wipe (docs/rulings.md §55 ff.).
   fireWatcherTrigger(db, draft, 'onEndTurn', player, {})
   flushPendingEffects(db, draft)
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   // "... defeat it at the end of this turn" (docs/rulings.md §141) — resolved
   // before the buffs (and the floating entries themselves) are wiped.
   resolveEndOfTurnFloating(draft, db)
   flushPendingEffects(db, draft)
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   clearTurnBuffs(draft)
   if ((draft.emptyFixerStarts ?? 0) >= 2) draft.overtime = true
   checkOvertimeWin(draft)
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   const next = opponentOf(player)
   // turnNumber counts each player's own turns and advances when the first
   // player begins a turn — see the comment at the top of game.ts.

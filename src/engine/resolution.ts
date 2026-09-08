@@ -1,3 +1,4 @@
+import { stillLive } from './game'
 import type { CardDb, EffectDef, GameState, PlayerId } from './types'
 import { applyEffectDefOnDraft, type TriggerContext } from '../cards/effects'
 import { askIntercept } from './intercept'
@@ -17,7 +18,7 @@ export function flushPendingEffects(db: CardDb, draft: GameState): void {
   draft.resolvingEffects = true
   let player = draft.activePlayer
   try {
-    while (draft.effectQueue.length > 0 && draft.winner === null) {
+    while (draft.effectQueue.length > 0 && stillLive(draft)) {
       let indexes = draft.effectQueue.flatMap((effect, index) => effect.controller === player ? [index] : [])
       if (indexes.length === 0) {
         player = player === 0 ? 1 : 0
@@ -34,7 +35,7 @@ export function flushPendingEffects(db: CardDb, draft: GameState): void {
       })
       const [pending] = draft.effectQueue.splice(index, 1)
       for (const clause of pending.clauses) {
-        if (draft.winner !== null) break
+        if (!stillLive(draft)) break
         applyEffectDefOnDraft(db, draft, clause.def, pending.sourceUid, clause.targets, pending.controller, pending.context)
         checkOvertimeWin(draft)
       }

@@ -1,3 +1,4 @@
+import { stillLive } from '../engine/game'
 // The heuristic opponent: a one-ply greedy search over `legalActions`, scored
 // by `evaluate`, with two layers on top of the plain argmax.
 //
@@ -167,7 +168,7 @@ function continuationAction(db: CardDb, state: GameState, actions: Action[]): Ac
 function resolveWindows(db: CardDb, state: GameState, stepLimit: number): GameState {
   let current = state
   for (let step = 0; step < stepLimit; step++) {
-    if (current.winner !== null || !isWindowPhase(current)) break
+    if (!stillLive(current) || !isWindowPhase(current)) break
     const actions = legalActions(db, current)
     if (actions.length === 0) break
     const next = continuationAction(db, current, actions)

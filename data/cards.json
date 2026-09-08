@@ -390,7 +390,7 @@
       {
         "trigger": "onBlock",
         "effect": {
-          "kind": "discardRandomRival",
+          "kind": "discardRival",
           "count": 1
         }
       }
@@ -531,18 +531,8 @@
       {
         "trigger": "onDefeat",
         "effect": {
-          "kind": "discardRandomRival",
-          "count": 1
-        }
-      },
-      {
-        "trigger": "onDefeat",
-        "condition": {
-          "friendlyGigValueEquals": 5
-        },
-        "effect": {
-          "kind": "discardRandomRival",
-          "count": 1
+          "kind": "scripted",
+          "name": "caliber-totentanz-s-top-dog"
         }
       }
     ],
@@ -2450,7 +2440,7 @@
           "sourceEquipped": true
         },
         "effect": {
-          "kind": "discardRandomRival",
+          "kind": "discardRival",
           "count": 1
         }
       }
@@ -3899,7 +3889,7 @@
           "stolenDieValueParity": "odd"
         },
         "effect": {
-          "kind": "discardRandomRival",
+          "kind": "discardRival",
           "count": 1
         }
       }
@@ -4189,7 +4179,7 @@
       {
         "trigger": "onDefeat",
         "effect": {
-          "kind": "discardRandomRival",
+          "kind": "discardRival",
           "count": 1
         }
       }

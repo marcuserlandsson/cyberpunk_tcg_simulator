@@ -59,7 +59,7 @@ export interface CardStat {
 
 /** One completed game's outcome. `winner`/`seed` are keyed by DECK, not seat — see this file's header. */
 export interface GameResult {
-  winner: 0 | 1
+  winner: 0 | 1 | null
   turns: number
   reason: string
   seed: number
@@ -183,12 +183,7 @@ export function runGames(
     const { state, deckASeat } = playOneGame(db, opts, i)
 
     const seatWinner = state.winner
-    if (seatWinner === null) {
-      // Unreachable: the loop above only exits once phase === 'gameOver',
-      // which game.ts's endGame() only sets alongside a non-null winner.
-      throw new Error(`sim: game ${i} (seed ${gameSeed}) ended without a winner.`)
-    }
-    const deckWinner: 0 | 1 = seatWinner === deckASeat ? 0 : 1
+    const deckWinner: 0 | 1 | null = seatWinner === null ? null : seatWinner === deckASeat ? 0 : 1
 
     const lastEvent = state.events.at(-1)
     const reason = lastEvent !== undefined && lastEvent.type === 'gameEnded' ? lastEvent.reason : 'unknown'
@@ -257,6 +252,6 @@ export function runGames(
  */
 export function toCsv(result: SimResult): string {
   const header = 'game,seed,winner,turns,reason'
-  const rows = result.games.map((g, i) => `${i},${g.seed},${g.winner},${g.turns},${g.reason}`)
+  const rows = result.games.map((g, i) => `${i},${g.seed},${g.winner === null ? 'draw' : g.winner},${g.turns},${g.reason}`)
   return [header, ...rows].join('\n')
 }

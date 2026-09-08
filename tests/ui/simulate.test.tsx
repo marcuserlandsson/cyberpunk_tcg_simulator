@@ -84,6 +84,17 @@ afterEach(() => {
 })
 
 describe('SimulateView — run, progress, cancel', () => {
+  it('counts draws separately without giving them to Deck B', () => {
+    const { worker } = renderView()
+    fireEvent.click(screen.getByTestId('sim-run'))
+    const result = { ...CANNED_RESULT, winRateA: 1 / 3,
+      games: [CANNED_RESULT.games[0], CANNED_RESULT.games[1], { winner: null, turns: 4, seed: 44, reason: 'simultaneousWins' }] }
+    act(() => worker().emit({ type: 'result', result }))
+    expect(screen.getByTestId('sim-winrate-a').textContent).toContain('1 wins (33.3%)')
+    expect(screen.getByTestId('sim-winrate-b').textContent).toContain('1 wins (33.3%)')
+    expect(screen.getByText('1 draws')).toBeTruthy()
+  })
+
   it('runs a sim through the injected worker and renders win rates from a canned result', () => {
     const { worker } = renderView()
     fireEvent.click(screen.getByTestId('sim-run'))

@@ -1,3 +1,4 @@
+import { stillLive } from './game'
 // Enumerates every action the acting player may legally take right now.
 // `applyAction` validates against this list, so this file is the single
 // authority on legality — reducers may assume their action was legal.
@@ -105,7 +106,7 @@ function mainPhaseActions(db: CardDb, state: GameState): Action[] {
 }
 
 export function legalActions(db: CardDb, state: GameState): Action[] {
-  if (state.winner !== null || state.phase === 'gameOver') return []
+  if (!stillLive(state) || state.phase === 'gameOver') return []
 
   switch (state.phase) {
     case 'chooseOrder':

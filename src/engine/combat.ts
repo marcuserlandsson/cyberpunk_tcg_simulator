@@ -1,3 +1,4 @@
+import { stillLive } from './game'
 import { chooseEffectOption } from './choices'
 // Combat: declaring an attack, the react window, blocks, fights and Gig
 // stealing. The rules authority is the gameplay guide's ATTACK (p10) and
@@ -333,7 +334,7 @@ function endAttack(draft: GameState): void {
   // not un-set it by reaching for `main`/`chooseGig` (found by the Task 9
   // fuzz harness: `resolveAttack` -> `fight` -> a chained on-defeat draw
   // ending the game -> this ran anyway and clobbered the terminal phase).
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   draft.pendingAttack = null
   delete draft.pendingFight
   const steal = draft.pendingSteal
@@ -349,7 +350,7 @@ function endAttack(draft: GameState): void {
 /** CR 9.26: recheck the ongoing attack after a completed action/effect window. */
 export function validatePendingAttack(db: CardDb, draft: GameState): void {
   const attack = draft.pendingAttack
-  if (!attack || draft.winner !== null) return
+  if (!attack || !stillLive(draft)) return
   const target = attack.redirectedTo ?? attack.target
   const player = controllerOf(draft, attack.attacker)
   if (!onField(draft, attack.attacker) || cantAttack(db, draft, attack.attacker) ||
@@ -388,7 +389,7 @@ export function declareAttack(
   // fires here (docs/rulings.md §47).
   spendOnDraft(db, draft, [attacker])
   // An on-spend effect can end the game; never open a window over `gameOver`.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   draft.events.push({ type: 'attackDeclared', attacker, target })
 
   // [trigger seam] on-attack effects on the attacking Unit (and its Gear)
@@ -403,7 +404,7 @@ export function declareAttack(
 
   // An on-attack effect can end the game (a forced draw off an empty deck, an
   // overtime-winning steal). Never re-open a decision window over `gameOver`.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
 
   // [trigger seam] "The first time a friendly ARASAKA Unit attacks each turn,
   // ..." — a watcher, broadcast to every in-play card of the ATTACKER'S OWN
@@ -411,10 +412,10 @@ export function declareAttack(
   fireWatcherTrigger(db, draft, 'onFriendlyAttack', controllerOf(draft, attacker), {
     attackerTags: cardTags(db[draft.cards[attacker].defId]),
   })
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
 
   flushPendingEffects(db, draft)
-  if (draft.winner !== null) {
+  if (!stillLive(draft)) {
     draft.pendingAttack = null
     return
   }
@@ -539,7 +540,7 @@ export function defeatUnit(
   // this resolution simply stays wherever it currently sits — the game is
   // over, and every OTHER choke point (`endGame`, the trigger wrappers)
   // already stopped for the same reason.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   const used = opts.usedReplacements ?? []
   const shields = defeatShieldsOf(db, draft, uid).filter(source => !used.includes(source))
   if (shields.length) {
@@ -598,7 +599,7 @@ export function defeatUnit(
     defeatedOwner: controller,
     defeatedWasEquipped,
   })
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
 
   // [trigger seam] on-defeat effects resolve once the Unit and its Gear have
   // left the field (guide step 04). A Gear's own "{Defeated} ..." text means
@@ -621,7 +622,7 @@ export function defeatUnit(
  */
 export function defeatGear(draft: GameState, db: CardDb, gearUid: number): void {
   // Entry guard, same reasoning as `defeatUnit`'s (docs/rulings.md §147).
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   let host: number | null = null
   for (const player of [0, 1] as const) {
     for (const candidate of [...draft.players[player].field, ...draft.players[player].legends]) {
@@ -654,7 +655,7 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // matching `resolveAttack`'s own entry guard which is what stops today's
   // only caller (`blockAttack`'s fall-through — the Critical this round
   // fixes).
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   // "+2 power while fighting a Legend" — a bonus that only exists for the
   // duration of this fight and its pending effects (CR 9.16.1, 9.29).
   // "... have +N power while attacking" (saburo-arasaka-stubborn-patriarch,
@@ -730,7 +731,7 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // `defeatUnit` call for `loseFightDefeatFoe`) that the trigger wrappers'
   // OWN entry guards don't reach on their own — this fight is fully over
   // either way, win/loss bookkeeping included.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
 
   // Delayed, one-shot floating consequences of this fight (docs/rulings.md
   // §141), resolved after the win/loss outcome has been determined — the
@@ -770,7 +771,7 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
     if (onField(draft, foe)) defeatUnit(draft, db, foe)
   }
   flushPendingEffects(db, draft)
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   // A fight outcome survives shields; a zero-power opponent cannot cause defeat.
   // Recheck protection after fight-triggered effects have finished resolving.
   const casualties = defeated.filter(uid => {
@@ -799,7 +800,7 @@ export function blockAttack(draft: GameState, db: CardDb, blocker: number): void
   // can end the game outright (docs/rulings.md §147) — the rest of this
   // function (the `attackBlocked` event, `onBlock`/`onFriendlyBlock`, the
   // fight) must not still run.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   attack.redirectedTo = blocker
   draft.events.push({ type: 'attackBlocked', blocker })
   // [trigger seam] "When this Unit uses {Blocker}, ..." — before the fight, so
@@ -831,7 +832,7 @@ export function resolveAttack(draft: GameState, db: CardDb): void {
   // guard, a full fight (or steal) still resolved on a finished game. This
   // single check also covers the `react: 'pass'` path into this same
   // function, and any future caller.
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   const attack = draft.pendingAttack
   // Unreachable: `legalActions` only offers reactions inside a react window.
   if (attack === null) return
@@ -906,7 +907,7 @@ function finishSteal(draft: GameState, head: PendingSteal): void {
   // deck) — once `endGame` has committed `phase: 'gameOver'`, this must not
   // un-set it by resuming into `chooseGig`/`main` (the same class of bug as
   // `endAttack`'s guard above, found by the Task 9 fuzz harness).
-  if (draft.winner !== null) return
+  if (!stillLive(draft)) return
   const queue = head.queue ?? []
   const next = queue.shift()
   if (next !== undefined) {

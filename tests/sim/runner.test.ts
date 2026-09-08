@@ -133,9 +133,10 @@ describe('deckASeatFor: alternation convention', () => {
 
 function replayAndCollectCardPlays(
   opts: SimOptions
-): { perDeck: [Map<string, number>, Map<string, number>]; winsByDeck: [number, number] } {
+): { perDeck: [Map<string, number>, Map<string, number>]; winsByDeck: [number, number]; winsPerCard: [Map<string, number>, Map<string, number>] } {
   const gamesSeenA = new Map<string, number>()
   const gamesSeenB = new Map<string, number>()
+  const winsPerCard: [Map<string, number>, Map<string, number>] = [new Map(), new Map()]
   let winsA = 0
   let winsB = 0
 
@@ -157,7 +158,7 @@ function replayAndCollectCardPlays(
 
     const deckWinnerIsA = state.winner === deckASeat
     if (deckWinnerIsA) winsA += 1
-    else winsB += 1
+    else if (state.winner !== null) winsB += 1
 
     const seenThisGame: [Set<string>, Set<string>] = [new Set(), new Set()]
     for (const event of state.events) {
@@ -169,11 +170,15 @@ function replayAndCollectCardPlays(
       const map = seat === deckASeat ? gamesSeenA : gamesSeenB
       for (const defId of seenThisGame[seat]) {
         map.set(defId, (map.get(defId) ?? 0) + 1)
+        if (state.winner === seat) {
+          const wins = winsPerCard[seat === deckASeat ? 0 : 1]
+          wins.set(defId, (wins.get(defId) ?? 0) + 1)
+        }
       }
     }
   }
 
-  return { perDeck: [gamesSeenA, gamesSeenB], winsByDeck: [winsA, winsB] }
+  return { perDeck: [gamesSeenA, gamesSeenB], winsByDeck: [winsA, winsB], winsPerCard }
 }
 
 describe('runGames: per-card stats', () => {
@@ -195,17 +200,15 @@ describe('runGames: per-card stats', () => {
     expect(result.cardStatsA.length + result.cardStatsB.length).toBeGreaterThan(0)
   })
 
-  it('winRateWhenPlayed is wins-among-gamesSeen for a card seen in every game', () => {
+  it('winRateWhenPlayed matches independently replayed wins among games played', () => {
     const opts = baseOpts({ games: 16, seed: 500 })
     const result = runGames(db, opts)
-    const ubiquitous = [...result.cardStatsA, ...result.cardStatsB].find((c) => c.gamesSeen === 16)
-    // Not every seed produces a card played in literally every game; only assert
-    // the arithmetic when one exists, and require the fixture to have found one
-    // so the assertion isn't silently skipped.
-    expect(ubiquitous).toBeDefined()
-    if (ubiquitous !== undefined) {
-      expect(ubiquitous.winRateWhenPlayed).toBeGreaterThanOrEqual(0)
-      expect(ubiquitous.winRateWhenPlayed).toBeLessThanOrEqual(1)
+    const replay = replayAndCollectCardPlays(opts)
+    expect(result.cardStatsA.length + result.cardStatsB.length).toBeGreaterThan(0)
+    for (const deck of [0, 1] as const) {
+      for (const stat of deck === 0 ? result.cardStatsA : result.cardStatsB) {
+        expect(stat.winRateWhenPlayed).toBe((replay.winsPerCard[deck].get(stat.defId) ?? 0) / replay.perDeck[deck].get(stat.defId)!)
+      }
     }
   })
 

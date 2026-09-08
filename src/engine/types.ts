@@ -245,7 +245,8 @@ export type EffectNode =
   // "Draw 1 for each friendly Gig with an odd value" needs a board-read count
   // too, not just a printed one (docs/rulings.md §68 ff.).
   | { kind: 'draw'; count: number | DynamicAmount }
-  | { kind: 'discardRandomRival'; count: number }
+  | { kind: 'discardRandomRival'; count: number } // Legacy custom/replay vocabulary.
+  | { kind: 'discardRival'; count: number }
   | {
       kind: 'buffPower'
       amount: number | DynamicAmount
@@ -1006,4 +1007,4 @@ export type GameEvent =
   | { type: 'cardRemoved'; uid: number }
   | { type: 'abilityActivated'; player: PlayerId; uid: number; abilityIndex: number }
   | { type: 'turnEnded'; player: PlayerId }
-  | { type: 'gameEnded'; winner: PlayerId; reason: 'sevenGigs' | 'overtimeMajority' | 'overtimeSevenGigs' | 'deckout' | 'concede' }
+  | { type: 'gameEnded'; winner: PlayerId | null; reason: 'sevenGigs' | 'overtimeMajority' | 'overtimeSevenGigs' | 'deckout' | 'concede' | 'simultaneousWins' | 'simultaneousLosses' }

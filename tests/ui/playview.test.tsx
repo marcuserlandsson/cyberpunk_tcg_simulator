@@ -15,7 +15,7 @@ import { newGame } from '../../src/engine/game'
 import { legalActions } from '../../src/engine/legal'
 import { actingPlayer, effectivePower } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
-import { AI, HUMAN } from '../../src/ui/useGame'
+import { AI, HUMAN, describeEvent } from '../../src/ui/useGame'
 import { listGameRecords, saveGameRecord } from '../../src/ui/storage'
 import type { DeckList } from '../../src/engine/deck'
 import type { GameRecord } from '../../src/engine/replay'
@@ -371,6 +371,13 @@ describe('endReasonLabel / lastGameEnded (pure — the game-over overlay reason 
     const state = stateWithEvents([{ type: 'turnEnded', player: HUMAN }])
     expect(lastGameEnded(state)).toBeUndefined()
     expect(endReasonLabel(undefined)).toBe('')
+  })
+
+  it('describes draws without declaring a winner', () => {
+    const event = { type: 'gameEnded' as const, winner: null, reason: 'simultaneousLosses' as const }
+    expect(endReasonLabel(event)).toBe('Both players lost simultaneously')
+    expect(describeEvent(db, stateWithEvents([event]), event)).toBe('Game over: draw (both players lost simultaneously).')
+    expect(endReasonLabel({ ...event, reason: 'simultaneousWins' })).toBe('Both players won simultaneously')
   })
 
   it('maps every ending reason to its words, including the deckout direction', () => {

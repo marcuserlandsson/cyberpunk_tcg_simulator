@@ -159,6 +159,10 @@ export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> 
       return event.winner === HUMAN ? 'Rival deck ran out' : 'You ran out of cards'
     case 'concede':
       return 'Conceded'
+    case 'simultaneousWins':
+      return 'Both players won simultaneously'
+    case 'simultaneousLosses':
+      return 'Both players lost simultaneously'
   }
 }
 
@@ -676,7 +680,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             // seed chip stay legible right beside it per the brief.
             <div className="game-over-overlay" data-testid="game-over">
               <div className="game-over-overlay__result">
-                {state.winner === HUMAN ? 'WIN' : 'LOSS'}
+                {state.winner === null ? 'DRAW' : state.winner === HUMAN ? 'WIN' : 'LOSS'}
               </div>
               <div className="game-over-overlay__reason">{endReasonLabel(lastGameEnded(state))}</div>
               <button

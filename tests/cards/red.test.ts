@@ -1022,7 +1022,7 @@ describe('shattered-memories', () => {
     return fixture
   }
 
-  it('discards and redraws up to 5 for both players, skipping the bonus draw', () => {
+  it('discards and optionally redraws exactly 5 for both players, skipping the bonus draw', () => {
     const { state } = stage()
     // Playing the card removes it from hand first, leaving 2 discards for
     // player 0 and 2 for player 1 -> total 4, which this Gig does not match.
