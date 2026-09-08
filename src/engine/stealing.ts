@@ -3,7 +3,7 @@ import { fireWatcherTrigger } from '../cards/effects'
 import { chooseEffectOption } from './choices'
 import { checkOvertimeWin } from './game'
 import { askIntercept, DECLINE } from './intercept'
-import { cardTags, opponentOf, stealInterceptorsFor } from './query'
+import { effectivePower, isUnitStealer, cardTags, opponentOf, stealInterceptorsFor } from './query'
 import type { CardDb, GameState, PlayerId } from './types'
 
 /** CR 6.7/9.23: all choices precede prevention; all transfers precede triggers. */
@@ -50,6 +50,7 @@ export function transferStolenGigs(db: CardDb, draft: GameState, sourceUid: numb
   if (!stillLive(draft)) return stolen.length
   const def = db[draft.cards[sourceUid]?.defId]
   for (const [offset, die] of stolen.entries()) fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
+    stealerPower: effectivePower(db, draft, sourceUid), stealerIsUnit: isUnitStealer(db, draft, sourceUid),
     stolenDieId: die.id, stolenDieSize: die.size, stolenDieValue: die.value, stealerUid: sourceUid,
     stolenDieIndex: draft.players[thief].gigArea.length - stolen.length + offset,
     stealerIsLegend: def?.type === 'legend',

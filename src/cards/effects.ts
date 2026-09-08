@@ -30,7 +30,7 @@ import { stillLive } from '../engine/game'
 
 import { defeatGear, defeatUnit, leaveField, stealableDieIndexes } from '../engine/combat'
 import { canonicalPayment, pay } from '../engine/economy'
-import { draftState, drawCards, endGame } from '../engine/game'
+import { readyCardOnDraft, draftState, drawCards, endGame } from '../engine/game'
 import {
   cardTags,
   conditionHolds,
@@ -38,11 +38,12 @@ import {
   conditionMet,
   effectiveCardCost,
   effectivePower,
+  goSoloCost,
+  hasKeyword,
   firstMatchingPlayDiscountSources,
   opponentOf,
   reducedCost,
   resolvePowerAmount,
-  rivalGoSoloTax,
   streetCredOrder,
   type ConditionContext,
 } from '../engine/query'
@@ -273,6 +274,8 @@ function floatingTarget(spec: FloatingSpec): { target: TargetSpec; filter?: Targ
   if (
     spec.kind === 'defeatIfActed' ||
     spec.kind === 'unitCantAttack' ||
+    spec.kind === 'unitCantReady' ||
+    spec.kind === 'goSoloDiscount' ||
     spec.kind === 'mustAttack'
   ) {
     return { target: spec.target, filter: spec.filter }
@@ -856,7 +859,7 @@ function applyNode(
     case 'readyCard': {
       const target = takeTarget(node, ctx, slots)
       if (target === null || !draft.cards[target]) return
-      draft.cards[target].ready = true
+      readyCardOnDraft(draft, target)
       note(draft, ctx.sourceUid, `ready ${target}`)
       return
     }
@@ -972,6 +975,7 @@ function applyNode(
         entry.margin = spec.margin
         entry.count = spec.count
       }
+      if (spec.kind === 'goSoloDiscount') entry.amount = spec.amount
       if (spec.kind === 'defeatIfActed') entry.acted = false
       draft.floatingEffects.push(entry)
       note(
@@ -1156,7 +1160,7 @@ function markOncePerTurn(draft: GameState, sourceUid: number, index: number): vo
 // Event qualifiers decide whether an effect becomes pending. Board-state "if"
 // conditions are evaluated when it resolves (CR 10.15–10.15.1).
 const EVENT_CONDITION_KEYS = [
-  'stolenDieSize', 'selfIsStealer', 'attackerKeyword', 'defeatedKeyword',
+  'anotherUnitStealsBelowPower', 'stolenDieSize', 'selfIsStealer', 'attackerKeyword', 'defeatedKeyword',
   'stealerIsLegend', 'stolenDieValueParity', 'defeatedIsFriendly',
   'defeatedWasEquipped', 'playedCardColor', 'playedCardType', 'playedCardKeyword',
   'stealerKeywordAnyOf', 'rolledExtremeValue', 'rolledDieSizeAnyOf',
@@ -1632,13 +1636,12 @@ export function goSoloPayment(
   const card = state.cards[uid]
   if (!card.faceUp) return null
   const def = db[card.defId]
-  // Printed keywords only, deliberately: Gear may grant {blocker}/{adrenaline}
-  // to its host, but never {go-solo} (docs/rulings.md §30).
-  if (def.type !== 'legend' || !def.keywords.includes('go-solo')) return null
+  // Include Go Solo granted by effects such as Nocturne; Gear cannot grant it.
+  if (def.type !== 'legend' || !hasKeyword(db, state, uid, 'go-solo')) return null
   // The same reduced cost `reduce.ts` validates the payment against (§44),
   // plus a RIVAL's "Rivals must pay +N €$ to use {Go Solo}" tax if active
   // (riot-shield, docs/rulings.md §107 ff.).
-  const cost = effectiveCardCost(db, state, player, uid) + rivalGoSoloTax(db, state, player)
+  const cost = goSoloCost(db, state, player, uid)
   return canonicalPayment(db, state, player, cost)
 }
 
@@ -1742,7 +1745,7 @@ export function playCardOnDraft(
   const card = draft.cards[cardUid]
   const def = db[card.defId]
 
-  const solo = def.type === 'legend' && (goSolo ?? def.keywords.includes('go-solo'))
+  const solo = def.type === 'legend' && (goSolo ?? hasKeyword(db, draft, cardUid, 'go-solo'))
 
   // Pay before entry. Any payment-triggered effects wait in the action's queue.
   spendOnDraft(db, draft, payment)

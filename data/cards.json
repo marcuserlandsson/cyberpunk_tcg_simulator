@@ -2719,8 +2719,44 @@
       "braindance"
     ],
     "text": "Spend a rival Unit. It can't ready until your next turn. If your ☆ (Street Cred) is an even number, draw 1.",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "sameTarget",
+              "target": "rivalUnit",
+              "effects": [
+                {
+                  "kind": "spendCard",
+                  "target": "chosen"
+                },
+                {
+                  "kind": "floatingEffect",
+                  "floating": {
+                    "kind": "unitCantReady",
+                    "target": "chosen",
+                    "expiry": "ownerNextTurnStart"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "streetCredParity": "even"
+              },
+              "effect": {
+                "kind": "draw",
+                "count": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
     "printedCost": 4
   },
   {
@@ -3111,8 +3147,42 @@
       "go-solo"
     ],
     "text": "If your fixer area is empty, play this Program for 1 €$. Choose one effect.\nDraw 2. // A Unit can't attack until your next turn. // A friendly Legend may use {Go Solo} for -2 €$ this turn, to a minimum of 1 €$.",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "static",
+        "condition": {
+          "friendlyFixerEmpty": true
+        },
+        "effect": {
+          "kind": "playCost",
+          "amount": 1
+        }
+      },
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "chooseOne",
+          "modes": [
+            {
+              "kind": "draw",
+              "count": 2
+            },
+            {
+              "kind": "floatingEffect",
+              "floating": {
+                "kind": "unitCantAttack",
+                "target": "anyUnit",
+                "expiry": "ownerNextTurnStart"
+              }
+            },
+            {
+              "kind": "scripted",
+              "name": "nocturne-op55-n1:go-solo"
+            }
+          ]
+        }
+      }
+    ],
     "printedCost": 3
   },
   {
@@ -3933,12 +4003,37 @@
     "sellTag": false,
     "keywords": [
       "fixer",
-      "merc",
-      "quick"
+      "merc"
     ],
     "text": "The first time another friendly Unit steals a Gig with value less than its power each turn, ready 2 Eddies.\n{Quick} 2 €$,  {Spend} A rival Unit loses power equal to this Unit's power this turn.",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "onFriendlyStealDie",
+        "oncePerTurn": true,
+        "condition": {
+          "anotherUnitStealsBelowPower": true
+        },
+        "effect": {
+          "kind": "readyEddies",
+          "count": 2
+        }
+      },
+      {
+        "trigger": "activated",
+        "quick": true,
+        "cost": {
+          "eddies": 2,
+          "selfSpend": true
+        },
+        "effect": {
+          "kind": "scripted",
+          "name": "rogue-amendiares-queen-of-the-afterlife:weaken",
+          "targets": [
+            "rivalUnit"
+          ]
+        }
+      }
+    ],
     "printedCost": 5
   },
   {
@@ -5222,8 +5317,18 @@
       "netrunner"
     ],
     "text": "{Play} Until your next turn, rival Legends can't steal friendly Gigs with value less than their power.",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "floatingEffect",
+          "floating": {
+            "kind": "rivalLegendStealFloorByPower",
+            "expiry": "ownerNextTurnStart"
+          }
+        }
+      }
+    ],
     "printedCost": 4
   },
   {

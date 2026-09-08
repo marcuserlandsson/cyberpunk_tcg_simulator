@@ -125,6 +125,8 @@ export interface ConditionContext {
   sourcePower?: number
   /** `onFriendlyStealDie` only: the card uid that actually did the stealing. */
   stealerUid?: number
+  stealerPower?: number
+  stealerIsUnit?: boolean
   /** `onFriendlyAttack` only: the attacking Unit's own faction/keyword tags. */
   attackerTags?: string[]
   /** `onUnitDefeated` only: the defeated Unit's own faction/keyword tags. */
@@ -188,6 +190,12 @@ export function conditionHolds(
   sourceUid?: number
 ): boolean {
   if (condition === undefined) return true
+  if (condition.friendlyFixerEmpty === true && state.players[player].fixer.length !== 0) return false
+  if (condition.anotherUnitStealsBelowPower === true && (
+    context.stealerIsUnit !== true || context.stealerUid === sourceUid ||
+    context.stolenDieValue === undefined || context.stealerPower === undefined ||
+    context.stolenDieValue >= context.stealerPower
+  )) return false
   if (
     condition.streetCredAtLeast !== undefined &&
     streetCredOrder(state, player) < condition.streetCredAtLeast
@@ -1117,4 +1125,18 @@ export function winsFightRegardless(
   return activeStaticNodes(db, state, uid).some(
     (node) => node.kind === 'winsFightVsKeyword' && hasKeyword(db, state, foe, node.keyword)
   )
+}
+
+/** Go Solo's payable cost includes granted discounts and rival taxes. */
+export function goSoloCost(db: CardDb, state: GameState, player: PlayerId, uid: number): number {
+  const discount = state.floatingEffects.filter(entry => entry.kind === 'goSoloDiscount' && entry.unitUid === uid)
+    .reduce((sum, entry) => sum + (entry.amount ?? 0), 0)
+  const cost = effectiveCardCost(db, state, player, uid) + rivalGoSoloTax(db, state, player) - discount
+  return discount > 0 ? Math.max(1, cost) : cost
+}
+
+export function stealValueFloor(db: CardDb, state: GameState, victim: PlayerId, uid: number): number | null {
+  if (db[state.cards[uid]?.defId]?.type !== 'legend') return null
+  if (!state.floatingEffects.some(entry => entry.kind === 'rivalLegendStealFloorByPower' && entry.controller === victim)) return null
+  return effectivePower(db, state, uid)
 }

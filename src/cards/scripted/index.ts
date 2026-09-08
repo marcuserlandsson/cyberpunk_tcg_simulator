@@ -27,7 +27,7 @@ import { callChosenLegend, chooseFaceDownLegend, peekLegends } from '../../engin
 
 import { bottomDeckCards, defeatGear, defeatUnit, leaveField } from '../../engine/combat'
 import { canonicalPayment } from '../../engine/economy'
-import { endGame, drawCards, stillLive } from '../../engine/game'
+import { readyCardOnDraft, endGame, drawCards, stillLive } from '../../engine/game'
 import {
   cardTags,
   effectiveCardCost,
@@ -123,6 +123,22 @@ function mistyReveal(cardType: 'unit' | 'gear' | 'program'): ScriptedCard {
 }
 
 export const scriptedCards: Record<string, ScriptedCard> = {
+  'nocturne-op55-n1:go-solo': (db, state, ctx) => {
+    const legends = state.players[ctx.player].legends
+    const uid = chooseEffectOption(state, ctx.player, ctx.sourceUid, 'Choose a Legend for Go Solo at -2 this turn', [...legends],
+      Object.fromEntries(legends.map((uid, index) => [uid, state.cards[uid].faceUp ? db[state.cards[uid].defId].name : 'Face-down Legend ' + (index + 1)])))
+    if (uid !== null) {
+      state.cards[uid].tempKeywords.push('go-solo')
+      state.floatingEffects.push({ kind: 'goSoloDiscount', controller: ctx.player, sourceDefId: state.cards[ctx.sourceUid].defId,
+        unitUid: uid, amount: 2, expiry: 'endOfTurn' })
+    }
+    return state
+  },
+  'rogue-amendiares-queen-of-the-afterlife:weaken': (db, state, ctx) => {
+    const target = ctx.targets[0]
+    if (target !== undefined) state.cards[target].tempPower -= effectivePower(db, state, ctx.sourceUid)
+    return state
+  },
   'we-gotta-live-together': (db, state, ctx) => {
     const eligible = state.players[ctx.player].trash.filter(uid => {
       const def = db[state.cards[uid].defId]
@@ -789,7 +805,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   sandevistan: (db, state, ctx) => {
     const hostUid = ctx.context?.equipHostUid
     if (hostUid === undefined || !state.cards[hostUid]) return state
-    state.cards[hostUid].ready = true
+    readyCardOnDraft(state, hostUid)
     return state
   },
 
@@ -812,7 +828,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (!source.attachedGear.includes(gear)) return state
     source.attachedGear = source.attachedGear.filter((uid) => uid !== gear)
     state.cards[host].attachedGear.push(gear)
-    state.cards[host].ready = true
+    readyCardOnDraft(state, host)
     return state
   },
 
@@ -829,7 +845,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const equipped = [...p.field, ...p.legends.filter((uid) => state.cards[uid].faceUp)].filter(
       (uid) => state.cards[uid].attachedGear.length > 0
     )
-    for (const uid of equipped) state.cards[uid].ready = true
+    for (const uid of equipped) readyCardOnDraft(state, uid)
     return state
   },
 
@@ -869,7 +885,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const eligible = p.legends.filter(
       (uid) => state.cards[uid].faceUp && hasKeyword(db, state, uid, 'merc')
     )
-    for (const uid of pickN(db, state, ctx, eligible, 2)) state.cards[uid].ready = true
+    for (const uid of pickN(db, state, ctx, eligible, 2)) readyCardOnDraft(state, uid)
     return state
   },
 
@@ -880,7 +896,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    */
   'saul-bright-stormrider': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    for (const uid of pickN(db, state, ctx, p.field, 3)) state.cards[uid].ready = true
+    for (const uid of pickN(db, state, ctx, p.field, 3)) readyCardOnDraft(state, uid)
     return state
   },
 
@@ -940,7 +956,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       (uid) => uid !== ctx.sourceUid && effectivePower(db, state, uid) === stolenValue
     )
     const target = pick(db, state, ctx, candidates)
-    if (target !== undefined) state.cards[target].ready = true
+    if (target !== undefined) readyCardOnDraft(state, target)
     return state
   },
 

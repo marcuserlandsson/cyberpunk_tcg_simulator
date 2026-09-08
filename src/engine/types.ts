@@ -509,6 +509,9 @@ export type EffectNode =
 export type FloatingExpiry = 'endOfTurn' | 'ownerNextTurnStart'
 
 export type FloatingSpec =
+  | { kind: 'rivalLegendStealFloorByPower'; expiry: FloatingExpiry }
+  | { kind: 'unitCantReady'; expiry: FloatingExpiry; target: TargetSpec; filter?: TargetFilter }
+  | { kind: 'goSoloDiscount'; expiry: FloatingExpiry; target: TargetSpec; filter?: TargetFilter; amount: number }
   // chrome-fang: "Until your next turn, rival Units can't steal friendly Gigs
   // with value higher than their power." A lasting restriction on which dice
   // `chooseGig` offers a rival UNIT stealing from the controller's Gig area.
@@ -555,6 +558,7 @@ export interface FloatingEffect {
   /** `defeatIfActed` / `unitCantAttack` / `mustAttack`: the card it names. */
   unitUid?: number
   /** `winFightMarginSteal`: the printed power margin and Gig count. */
+  amount?: number
   margin?: number
   count?: number
   /** `defeatIfActed`: has the named Unit stolen or fought since this landed? */
@@ -567,6 +571,8 @@ export interface FloatingEffect {
  * can carry one too, without an `EffectDef['condition']` indexed-access alias.
  */
 export interface EffectCondition {
+    friendlyFixerEmpty?: boolean
+    anotherUnitStealsBelowPower?: boolean
     streetCredAtLeast?: number
     /** "If you control a Gig with 8+ value" */
     friendlyGigValueAtLeast?: number

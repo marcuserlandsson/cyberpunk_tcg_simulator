@@ -128,6 +128,8 @@ const dieSizeSchema = z.union([
  * (docs/rulings.md §92 ff.) can reuse the exact same shape.
  */
 const conditionSchema = z.strictObject({
+  friendlyFixerEmpty: z.boolean().optional(),
+  anotherUnitStealsBelowPower: z.boolean().optional(),
   streetCredAtLeast: z.number().optional(),
   friendlyGigValueAtLeast: z.number().optional(),
   rivalGigLeadAtLeast: z.number().optional(),
@@ -174,6 +176,9 @@ const conditionSchema = z.strictObject({
  * like every other node.
  */
 const floatingSpecSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('rivalLegendStealFloorByPower'), expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']) }),
+  z.strictObject({ kind: z.literal('unitCantReady'), expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']), target: targetSpecSchema, filter: targetFilterSchema.optional() }),
+  z.strictObject({ kind: z.literal('goSoloDiscount'), expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']), target: targetSpecSchema, filter: targetFilterSchema.optional(), amount: z.number() }),
   z.strictObject({
     kind: z.literal('rivalStealCappedByPower'),
     expiry: z.enum(['endOfTurn', 'ownerNextTurnStart']),

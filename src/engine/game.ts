@@ -323,7 +323,7 @@ function readySpentCards(draft: GameState, player: PlayerId, turnNumber: number)
       draft.cards[uid].skipNextReady = false
       continue
     }
-    draft.cards[uid].ready = true
+    readyCardOnDraft(draft, uid)
   }
 }
 
@@ -474,4 +474,11 @@ export function checkOvertimeWin(draft: GameState): void {
     return
   }
   endGame(draft, mine >= GIGS_TO_WIN ? 0 : 1, 'overtimeSevenGigs')
+}
+
+/** Restrictions on readying apply to natural ready steps and card effects alike. */
+export function readyCardOnDraft(state: GameState, uid: number): boolean {
+  if (!state.cards[uid] || state.floatingEffects.some(entry => entry.kind === 'unitCantReady' && entry.unitUid === uid)) return false
+  state.cards[uid].ready = true
+  return true
 }

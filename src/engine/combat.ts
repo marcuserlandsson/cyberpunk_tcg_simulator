@@ -61,6 +61,7 @@ import {
   opponentOf,
   rivalDeniesFreshAttacks,
   stealValueCap,
+  stealValueFloor,
   winsFightRegardless,
 } from './query'
 import type { Action, CardDb, GameState, PendingSteal, PlayerId } from './types'
@@ -280,8 +281,10 @@ export function stealableDieIndexes(
   const victim = opponentOf(thief)
   const dice = state.players[victim].gigArea
   const cap = stealValueCap(db, state, victim, stealerUid)
+  const floor = stealValueFloor(db, state, victim, stealerUid)
   let indexes = dice.map((_die, dieIndex) => dieIndex)
   if (cap !== null) indexes = indexes.filter((dieIndex) => dice[dieIndex].value <= cap)
+  if (floor !== null) indexes = indexes.filter(index => dice[index].value >= floor)
   if (distinctValueOnly) {
     const friendlyValues = new Set(state.players[thief].gigArea.map((die) => die.value))
     const qualifying = indexes.filter((dieIndex) => !friendlyValues.has(dice[dieIndex].value))
@@ -448,6 +451,7 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
         signedPower: signedPower(db, draft, source), ...(source !== uid ? { hostUid: uid } : {}) }
     }
   }
+  draft.floatingEffects = draft.floatingEffects.filter(entry => entry.unitUid !== uid)
   const owner = draft.players[card.owner]
   for (const player of draft.players) {
     player.field = player.field.filter(u => u !== uid)

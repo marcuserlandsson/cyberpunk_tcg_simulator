@@ -127,3 +127,7 @@ Enabled Detonate, Tyger's Whisper and MaxTac Heavy after implementing rival-Gear
 ### 08r — new search, revival and modal Programs
 
 Implemented We Gotta Live Together's conditional price and zero-to-two distinct free Unit plays, Three Mouths One Desire's mandatory first selection and optional min-Gig extras, and both Towerfall modes including their ordered combined resolution when behind on Street Cred. Search selections keep the searched cards in the deck until moved; bottom-deck groups include attached Gear. Four imported cards remain pending. Verified 1,033 engine/card/data/fuzz checks, three AI hidden-information checks and TypeScript.
+
+### 08s — final imported cards and persistent restrictions
+
+Implemented Memory Relapse, Westbrook Netrunner, Nocturne OP55 N1 and Rogue Queen of the Afterlife. Readying restrictions now apply to natural steps and card effects, and targeted duration effects end on field exit. Legend-steal floors use current contextual power. Nocturne can grant temporary discounted Go Solo (including a face-down position without exposing identity), respects null/unpayable costs and floors discounts at one. Rogue's once-per-turn trigger checks another Unit's event-time power; its Quick Spend ability uses its own current power. All 151 cards now have implementations; rules corrections remain provisional. Verified 732 engine/card/data tests, 415 AI/fuzz checks, TypeScript/build and five production-preview browser workflows.

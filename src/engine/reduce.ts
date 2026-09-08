@@ -41,9 +41,10 @@ import { legalActions } from './legal'
 import {
   actingPlayer,
   effectiveCardCost,
+  goSoloCost,
+  hasKeyword,
   friendlyGigRerollOption,
   opponentOf,
-  rivalGoSoloTax,
 } from './query'
 import { nextInt, rollDie, shuffle } from './rng'
 import type { Action, CardDb, GameState, Phase, PlayerId, Reaction } from './types'
@@ -129,9 +130,8 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     )
     if (!shapeMatches) return false
     const def = db[state.cards[action.card].defId]
-    const solo = def.type === 'legend' && (action.goSolo ?? def.keywords.includes('go-solo'))
-    const tax = solo ? rivalGoSoloTax(db, state, state.activePlayer) : 0
-    const cost = effectiveCardCost(db, state, state.activePlayer, action.card) + tax
+    const solo = def.type === 'legend' && (action.goSolo ?? hasKeyword(db, state, action.card, 'go-solo'))
+    const cost = solo ? goSoloCost(db, state, state.activePlayer, action.card) : effectiveCardCost(db, state, state.activePlayer, action.card)
     return canPayWith(db, state, state.activePlayer, action.payment, cost)
   }
 
