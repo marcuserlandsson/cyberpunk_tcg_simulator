@@ -43,3 +43,16 @@ export function callChosenLegend(db: CardDb, state: GameState, player: PlayerId,
   state.events.push({ type: 'legendCalled', player, uid })
   fireTriggerOnDraft(db, state, 'onCall', uid, [])
 }
+
+/** Public reveal lasts through an explicit acknowledgement, with a permanent log entry. */
+export function revealCards(db: CardDb, state: GameState, player: PlayerId, uids: number[], sourceUid: number, acknowledge = true): void {
+  if (!uids.length) return
+  stopAtHiddenInformation(state)
+  for (const uid of uids) state.events.push({ type: 'cardRevealed', player, uid })
+  if (!acknowledge || (state.effectQueue === undefined && state.interceptAnswers.length === 0)) return
+  askIntercept(state, { kind: 'effectChoice', player, protector: sourceUid, subject: sourceUid,
+    options: [0], optionLabels: { 0: 'Continue' },
+    prompt: 'Public reveal: ' + uids.map(uid => { const def = db[state.cards[uid].defId]; return def.name + (def.subtitle ? ' — ' + def.subtitle : '') + '. ' + def.text }).join(' | '),
+    knownCards: uids.map(uid => ({ uid, viewer: 'all' })),
+  })
+}

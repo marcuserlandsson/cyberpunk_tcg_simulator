@@ -370,6 +370,8 @@ export function describeEvent(db: CardDb, state: GameState, event: GameEvent): s
         : `You stole Rival's ${dieText(event.die.size, event.die.value)}.`
     case 'effectResolved':
       return `${nameOf(db, state, event.sourceUid)}: ${event.description}.`
+    case 'cardRevealed':
+      return `${who(event.player)} revealed ${nameOf(db, state, event.uid)}.`
     case 'cardTrashed':
       return `${ownedName(db, state, event.uid)} goes to the trash.`
     case 'cardBottomDecked':

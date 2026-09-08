@@ -1784,6 +1784,7 @@ export function playCardOnDraft(
       effectTargets = targets.slice(1)
       break
     case 'program':
+      draft.resolvingPrograms = [...(draft.resolvingPrograms ?? []), cardUid]
       // "unless you played a Program this turn" (jacked-in-voodoo-boy,
       // docs/rulings.md §120 ff.) — cleared for this player only at their own
       // next turn start (`resetTurnState`), matching `soldThisTurn`'s scope.
@@ -1817,6 +1818,8 @@ export function playCardOnDraft(
   fireCardTrigger(db, draft, 'onPlay', cardUid, effectTargets, player)
   // CR 4.14.2: a Program is outside all areas while its instructions resolve.
   if (def.type === 'program') {
+    draft.resolvingPrograms = draft.resolvingPrograms?.filter(uid => uid !== cardUid)
+    if (!draft.resolvingPrograms?.length) delete draft.resolvingPrograms
     p.trash.push(cardUid)
     if (stillLive(draft)) {
       draft.events.push({ type: 'cardTrashed', uid: cardUid })

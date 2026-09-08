@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { db, fixtureWithHand } from '../cards/fixtures'
+import { applyAction } from '../../src/engine/reduce'
 import { legalActions } from '../../src/engine/legal'
 import { PlayView } from '../../src/ui/PlayView'
 import { actionPayment, withPayment } from '../../src/ui/payments'
@@ -11,6 +12,22 @@ vi.mock('../../src/ui/useGame', async importOriginal => ({ ...(await importOrigi
 afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear() })
 
 describe('human payment selection', () => {
+  it('renders the current public trash during an effect choice', () => {
+    const { state } = fixtureWithHand(0, ['all-is-lost'])
+    const program = state.players[0].hand[0]
+    const units = state.players[0].deck.filter(uid => db[state.cards[uid].defId].type === 'unit').slice(0, 2)
+    state.players[0].deck = [...units, ...state.players[0].deck.filter(uid => !units.includes(uid))]
+    const action = legalActions(db, state).find(a => a.type === 'playCard' && a.card === program)!
+    const pending = applyAction(db, state, action)
+    mock.api = { state: pending, record: { actions: [action], config: { seed: 1 } }, legal: legalActions(db, pending),
+      aiThinking: false, canUndo: false, loadError: null, eventsForLog: [], act: mock.act }
+    render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+    fireEvent.click(screen.getByTestId('cancel-setup'))
+    expect(screen.getByTestId('resolving-programs').textContent).toContain(db['all-is-lost'].name)
+    const details = screen.getByText('Inspect trash and removed cards').closest('details')!
+    expect(details.textContent).toContain(db[state.cards[units[0]].defId].name)
+    expect(details.textContent).toContain(db[state.cards[units[1]].defId].name)
+  })
   it('allows replacing the proposed Eddie with a hidden Legend before committing a Call', () => {
     const { state } = fixtureWithHand(0, [])
     const legend = state.players[0].legends[0]

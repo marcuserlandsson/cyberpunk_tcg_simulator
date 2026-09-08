@@ -867,6 +867,8 @@ export interface PendingSteal {
  * the rng lives in the state that is being replayed.
  */
 export interface PendingIntercept {
+  /** Immutable board at this choice; never used as the replay base. */
+  view?: GameState
   /** Which mutation is being intercepted. */
   kind: 'defeat' | 'steal' | 'effectOrder' | 'effectChoice'
   prompt?: string
@@ -888,6 +890,8 @@ export interface PendingIntercept {
 }
 
 export interface GameState {
+  /** Programs currently resolving outside all normal areas (CR 4.14.2). */
+  resolvingPrograms?: number[]
   /** Action-scoped last valid information for pieces whose effects are still pending. */
   lastKnownCards?: Record<number, { instance: CardInstance; power: number; signedPower: number; hostUid?: number }>
   pendingFight?: { attacker: number; defender: number }
@@ -996,6 +1000,7 @@ export type Reaction =
 // ---------------------------------------------------------------------------
 
 export type GameEvent =
+  | { type: 'cardRevealed'; player: PlayerId; uid: number }
   | { type: 'gameStarted'; seed: number; orderRolls: [number, number] }
   | { type: 'playOrderChosen'; first: PlayerId }
   | { type: 'mulliganTaken'; player: PlayerId }

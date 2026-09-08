@@ -1,4 +1,4 @@
-import { callChosenLegend, chooseFaceDownLegend, peekLegends } from '../../engine/knowledge'
+import { revealCards, callChosenLegend, chooseFaceDownLegend, peekLegends } from '../../engine/knowledge'
 // Escape hatch for the handful of cards whose text no reasonable data
 // vocabulary will ever express (multi-step searches, "choose one" modes,
 // look-at-a-face-down-Legend, and so on). A card reaches it via the
@@ -109,8 +109,10 @@ function trashFromTop(state: GameState, player: PlayerId, count: number): number
 function mistyReveal(cardType: 'unit' | 'gear' | 'program'): ScriptedCard {
   return (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const uid = p.deck.shift()
+    const uid = p.deck[0]
     if (uid === undefined) return state
+    revealCards(db, state, ctx.player, [uid], ctx.sourceUid)
+    p.deck.shift()
     if (db[state.cards[uid].defId]?.type === cardType) {
       p.hand.push(uid)
       readyFriendlyEddies(state, ctx.player, 1)
@@ -429,15 +431,12 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    */
   'hanako-arasaka-in-a-gilded-cage': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const top: number[] = []
-    for (let i = 0; i < 4; i++) {
-      const uid = p.deck.shift()
-      if (uid === undefined) break
-      top.push(uid)
-    }
+    const top = p.deck.slice(0, 4)
     const values = new Set(p.gigArea.map((die) => die.value))
     const eligible = top.filter(uid => values.has(db[state.cards[uid].defId].cost))
     const taken = pickN(db, state, ctx, eligible, eligible.length)
+    revealCards(db, state, ctx.player, taken, ctx.sourceUid)
+    p.deck = p.deck.filter(uid => !top.includes(uid))
     p.hand.push(...taken)
     const [rest, rng] = shuffle(state.rng, top.filter(uid => !taken.includes(uid)))
     state.rng = rng
@@ -486,14 +485,11 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    */
   'sketchy-ripper': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const top: number[] = []
-    for (let i = 0; i < 3; i++) {
-      const uid = p.deck.shift()
-      if (uid === undefined) break
-      top.push(uid)
-    }
+    const top = p.deck.slice(0, 3)
     const gears = top.filter((uid) => db[state.cards[uid].defId].type === 'gear')
     const chosen = pick(db, state, ctx, gears, ctx.player, true)
+    revealCards(db, state, ctx.player, chosen === undefined ? [] : [chosen], ctx.sourceUid)
+    p.deck = p.deck.filter(uid => !top.includes(uid))
     if (chosen !== undefined) p.hand.push(chosen)
     const [rest, rng] = shuffle(state.rng, top.filter(uid => uid !== chosen))
     state.rng = rng
@@ -592,17 +588,14 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    */
   'viktor-vektor-sit-down-and-relax': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const top: number[] = []
-    for (let i = 0; i < 5; i++) {
-      const uid = p.deck.shift()
-      if (uid === undefined) break
-      top.push(uid)
-    }
+    const top = p.deck.slice(0, 5)
     const qualifying = top.filter((uid) => {
       const def = db[state.cards[uid].defId]
       return def.type === 'gear' && def.cost <= 2
     })
     const taken = pickN(db, state, ctx, qualifying, 2)
+    revealCards(db, state, ctx.player, taken, ctx.sourceUid)
+    p.deck = p.deck.filter(uid => !top.includes(uid))
     const rest = top.filter((uid) => !taken.includes(uid))
     const [shuffled, rng2] = shuffle(state.rng, rest)
     state.rng = rng2
@@ -640,19 +633,12 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    */
   'river-ward-detective-on-the-hunt:defeat-search': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const top: number[] = []
-    for (let i = 0; i < 2; i++) {
-      const uid = p.deck.shift()
-      if (uid === undefined) break
-      top.push(uid)
-    }
+    const top = p.deck.slice(0, 2)
     const chosen = pick(db, state, ctx, top)
     if (chosen === undefined) return state
+    p.deck = p.deck.filter(uid => uid !== chosen)
     p.trash.push(chosen)
     state.events.push({ type: 'cardTrashed', uid: chosen })
-    for (const uid of top) {
-      if (uid !== chosen) p.deck.unshift(uid)
-    }
     return state
   },
 
@@ -749,6 +735,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       revealed.push(uid)
     }
     if (revealed.length === 0) return state
+    revealCards(db, state, ctx.player, revealed, ctx.sourceUid, false)
     const names = revealed.map(uid => db[state.cards[uid].defId].name).join(', ')
     const modeIndex = chooseEffectOption(state, opponentOf(ctx.player), ctx.sourceUid,
       `Revealed: ${names}. Choose their destination`, [0, 1], { 0: 'Add both to their hand', 1: 'Trash them; they draw 2' }, false, revealed.map(uid => ({ uid, viewer: 'all' })))
@@ -1106,6 +1093,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const p = state.players[ctx.player]
     const uid = p.deck[0]
     if (uid === undefined) return state
+    revealCards(db, state, ctx.player, [uid], ctx.sourceUid, false)
     const def = db[state.cards[uid].defId]
     const yes = chooseEffectOption(state, ctx.player, ctx.sourceUid, `Revealed: ${def.name}. Play it for free?`, [1, 0], { 1: 'Play for free', 0: 'Add to hand' }, false, [{ uid, viewer: 'all' }])
     let targets: number[] = []
@@ -1240,8 +1228,10 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    */
   'sasha-yakovleva-won-t-let-you-down': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const uid = p.deck.shift()
+    const uid = p.deck[0]
     if (uid === undefined) return state
+    revealCards(db, state, ctx.player, [uid], ctx.sourceUid)
+    p.deck.shift()
     p.hand.push(uid)
     const cost = db[state.cards[uid].defId].cost
     const source = state.cards[ctx.sourceUid]

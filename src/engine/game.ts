@@ -229,6 +229,7 @@ export function draftState(state: GameState): GameState {
     ...state,
     players: [clonePlayer(state.players[0]), clonePlayer(state.players[1])],
     cards,
+    ...(state.resolvingPrograms ? { resolvingPrograms: [...state.resolvingPrograms] } : {}),
     ...(state.lastKnownCards ? { lastKnownCards: structuredClone(state.lastKnownCards) } : {}),
     ...(state.pendingFight ? { pendingFight: { ...state.pendingFight } } : {}),
     ...(state.effectQueue ? { effectQueue: structuredClone(state.effectQueue) } : {}),

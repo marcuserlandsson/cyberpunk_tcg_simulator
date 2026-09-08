@@ -31,6 +31,14 @@ describe('comprehensive rules: pending resolution', () => {
     const [first, second] = state.players[0].deck
     const pending = applyAction(cards, state, { type: 'playCard', card: program, payment: [], targets: [] })
     expect(pending.pendingIntercept).toMatchObject({ kind: 'effectChoice', player: 0, options: [first, second] })
+    const view = pending.pendingIntercept!.view!
+    expect(view.players[0].trash).toEqual([first, second])
+    expect(view.players[0].hand).not.toContain(program)
+    expect(view.resolvingPrograms).toEqual([program])
+    expect(view.pendingIntercept).toBeNull()
+    expect(view.effectQueue).toBeUndefined()
+    expect(pending.players[0].trash).toEqual(state.players[0].trash)
+    expect(pending.players[0].hand).toContain(program)
     const next = applyAction(cards, pending, { type: 'answerIntercept', answer: second })
     expect(next.players[0].hand).toContain(second)
     expect(next.players[0].trash).toEqual([first, program])

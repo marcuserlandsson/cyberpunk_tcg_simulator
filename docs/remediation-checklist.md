@@ -136,3 +136,8 @@ Implemented Memory Relapse, Westbrook Netrunner, Nocturne OP55 N1 and Rogue Quee
 
 Paid plays and Calls now have an editable payment selection. Costs inside activated, triggered and replacement effects also ask for the payment cards, with safe positional labels for hidden Legends and no duplicate spending. Optional trigger costs can be declined. Abilities remain available when their effect has no target, as required by partial resolution; stale UI choices clear when loading another record. Verified 1,031 engine/card/UI tests, 415 AI/fuzz checks, TypeScript/build and four production-preview browser checks.
 
+
+### 08u — resolution display and reveal/search visibility
+
+Choice prompts now display the current resolution board while replay retains its original base. Resolving Programs have an explicit transient location and both public trash/removed areas can be inspected. Searched cards remain counted in the deck until movement, with original order retained where required. Public reveals have an acknowledgement and log entry; private searches keep viewer-scoped identity metadata. Verified 1,031 engine/card/UI tests, nine focused resolution/UI checks, five visibility/AI-privacy checks, 415 AI/fuzz checks, TypeScript/build and four production-preview browser workflows.
+

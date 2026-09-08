@@ -170,7 +170,10 @@ export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> 
 
 export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): ReactElement {
   const game = useGame(db, aiDelayMs === undefined ? {} : { aiDelayMs })
-  const { state, record, legal } = game
+  const { record, legal } = game
+  const state = game.state?.pendingIntercept?.view
+    ? { ...game.state.pendingIntercept.view, phase: game.state.phase, pendingIntercept: game.state.pendingIntercept }
+    : game.state
 
   // Showpiece motion (Task 8) is off under `prefers-reduced-motion: reduce`
   // and whenever `aiDelayMs === 0` — the latter is how the E2E suite always
@@ -608,6 +611,12 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     >
       <div className="playmat__body">
         <div className="playmat__board">
+          {!!state.resolvingPrograms?.length && <div className="prompt-bar" data-testid="resolving-programs">Resolving: {state.resolvingPrograms.map(uid => nameOf(db, state, uid)).join(', ')}</div>}
+          <details className="public-areas"><summary>Inspect trash and removed cards</summary>
+            {([HUMAN, AI] as const).map(player => <div key={player}><strong>{player === HUMAN ? 'Your' : 'Rival'} public areas</strong>
+              {(['trash', 'removed'] as const).map(zone => <div key={zone}>{zone}: {state.players[player][zone].length === 0 ? 'Empty' : state.players[player][zone].map(uid => <button type="button" key={uid} onMouseEnter={() => setZoomUid(uid)} onMouseLeave={() => setZoomUid(null)} onFocus={() => setZoomUid(uid)} onBlur={() => setZoomUid(null)}>{nameOf(db, state, uid)}</button>)}</div>)}
+            </div>)}
+          </details>
           <div className="rival-strip" data-testid="rival-side">
             {/* Turn/phase/whose-turn already read prominently off `StreetStrip`'s
                 vs-block below; these stay tiny and muted so nothing is said

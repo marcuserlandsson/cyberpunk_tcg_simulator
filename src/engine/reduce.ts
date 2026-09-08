@@ -508,9 +508,13 @@ function runAction(
     validatePendingAttack(db, draft)
   } catch (error) {
     if (error instanceof InterceptRequired) {
+      delete draft.effectQueue
+      delete draft.resolvingEffects
+      draft.interceptAnswers = []
       const paused = draftState(state)
       paused.pendingIntercept = {
         ...error.ask,
+        ...(!state.simulationPreview ? { view: draft } : {}),
         knownCards: [...knownCards, ...(error.ask.knownCards ?? [])],
         action,
         answers: [...answers],
