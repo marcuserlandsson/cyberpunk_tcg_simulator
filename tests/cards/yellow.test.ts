@@ -373,7 +373,7 @@ describe('dum-dum-maelstrom-triggerman', () => {
     const deckBefore = afterEquip.players[0].deck.length
 
     const call = actionsOfType(db, afterEquip, 'callLegend')[0]
-    const next = applyAction(db, afterEquip, call)
+    const next = resolveEffectChoices(db, applyAction(db, afterEquip, call))
     expect(next.cards[dumdum].faceUp).toBe(true)
     expect(next.players[0].trash).toContain(gear)
     expect(next.players[0].deck).toHaveLength(deckBefore - 2)

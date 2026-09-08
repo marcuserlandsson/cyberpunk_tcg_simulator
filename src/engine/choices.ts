@@ -11,6 +11,7 @@ export function chooseEffectOption(
   options: number[],
   optionLabels: Record<number, string>,
   cardOptions = false,
+  disclosedCards: { uid: number; viewer: PlayerId | 'all' }[] = [],
 ): number | null {
   if (options.length === 0) return null
   if (options.length === 1) return options[0]
@@ -25,8 +26,9 @@ export function chooseEffectOption(
     kind: 'effectChoice', player, protector: sourceUid, subject: sourceUid,
     options, prompt, optionLabels,
     knownCards: [
-      { uid: sourceUid, viewer: 'all' },
-      ...(cardOptions ? options.map(uid => ({ uid, viewer: player })) : []),
+      ...(state.cards[sourceUid] ? [{ uid: sourceUid, viewer: 'all' as const }] : []),
+      ...disclosedCards,
+      ...(cardOptions ? options.filter(uid => state.cards[uid]).map(uid => ({ uid, viewer: player })) : []),
     ],
   })
 }

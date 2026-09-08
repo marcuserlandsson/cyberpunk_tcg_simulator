@@ -6,6 +6,7 @@ import { legalActions } from '../../src/engine/legal'
 import { actingPlayer } from '../../src/engine/query'
 import { applyAction, IllegalActionError } from '../../src/engine/reduce'
 import type { Action, DieSize, GameState, GigDie, PlayerId, Reaction } from '../../src/engine/types'
+import { resolveEffectChoices } from '../cards/fixtures'
 import { db, decks, totalDice } from './gameHelpers'
 
 // ---------------------------------------------------------------------------
@@ -151,7 +152,7 @@ function declare(state: GameState, attacker: number, target: number | 'gigArea')
 }
 
 function react(state: GameState, reaction: Reaction): GameState {
-  return applyAction(db, state, { type: 'react', reaction })
+  return resolveEffectChoices(db, applyAction(db, state, { type: 'react', reaction }))
 }
 
 const passReaction: Reaction = { type: 'pass' }

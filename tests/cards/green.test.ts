@@ -331,7 +331,7 @@ describe('goro-takemura-vengeful-bodyguard', () => {
 
     s = startAttack(db, s, attacker, 'gigArea')
     const deckBefore = s.players[0].deck.length
-    s = applyAction(db, s, { type: 'react', reaction: { type: 'block', blocker } })
+    s = resolveEffectChoices(db, applyAction(db, s, { type: 'react', reaction: { type: 'block', blocker } }))
 
     expect(s.players[0].trash).toContain(fodder)
     expect(s.players[0].hand).not.toContain(fodder)
@@ -422,7 +422,7 @@ describe('maxtac-squadron', () => {
       faceUp: true,
       ready: false,
     })
-    const next = applyAction(db, state, { type: 'endTurn' })
+    const next = resolveEffectChoices(db, applyAction(db, state, { type: 'endTurn' }))
     expect(next.cards[legend].ready).toBe(true)
   })
 
@@ -433,7 +433,7 @@ describe('maxtac-squadron', () => {
       faceUp: true,
       ready: false,
     })
-    const next = applyAction(db, state, { type: 'endTurn' })
+    const next = resolveEffectChoices(db, applyAction(db, state, { type: 'endTurn' }))
     expect(next.cards[legend].ready).toBe(false)
   })
 })
@@ -612,7 +612,7 @@ describe('panam-palmer-nomad-cavalry', () => {
       state.players[0].trash = state.players[0].trash.filter((uid) => uid !== gear)
     }
 
-    const next = applyAction(db, state, { type: 'endTurn' })
+    const next = resolveEffectChoices(db, applyAction(db, state, { type: 'endTurn' }))
     expect(hosts.every((uid) => next.cards[uid].ready)).toBe(true)
   })
 })
@@ -859,7 +859,9 @@ describe('saul-bright-stormrider', () => {
       fieldCard(state, 0, 'corpo-security', { ready: false }),
     ]
 
-    const next = applyAction(db, state, { type: 'endTurn' })
+    let next = applyAction(db, state, { type: 'endTurn' })
+    for (const uid of units.slice(0, 3)) next = applyAction(db, next, { type: 'answerIntercept', answer: uid })
+    next = resolveEffectChoices(db, next)
     expect(units.filter((uid) => next.cards[uid].ready)).toHaveLength(3)
   })
 })

@@ -54,33 +54,34 @@ export const PRIVATE_INFORMATION_SCRIPTS = new Set([
 
 export type ScriptedCard = (db: CardDb, state: GameState, ctx: EffectCtx) => GameState
 
-/** Picks one element through the seeded rng, advancing it on the draft. */
-function pick<T>(state: GameState, items: T[]): T | undefined {
-  if (items.length === 0) return undefined
+/** Choices made during a script resolve through the same replay transaction as node targets. */
+function pick(db: CardDb, state: GameState, ctx: EffectCtx, items: number[], chooser = ctx.player, optional = false): number | undefined {
+  const options = [...items, ...(optional ? [-1] : [])]
+  const labels = Object.fromEntries(items.map(uid => [uid, `${db[state.cards[uid].defId].name} #${uid}`]))
+  if (optional) labels[-1] = 'Decline'
+  const chosen = chooseEffectOption(state, chooser, ctx.sourceUid, 'Choose a card', options, labels, true)
+  return chosen === null || chosen === -1 ? undefined : chosen
+}
+
+/** Up-to selections may stop after any number, including zero. */
+function pickN(db: CardDb, state: GameState, ctx: EffectCtx, items: number[], n: number, optional = true): number[] {
+  const pool = [...items]
+  const taken: number[] = []
+  while (taken.length < n && pool.length > 0) {
+    const chosen = pick(db, state, ctx, pool, ctx.player, optional)
+    if (chosen === undefined) break
+    taken.push(chosen)
+    pool.splice(pool.indexOf(chosen), 1)
+  }
+  return taken
+}
+
+/** Face-down Legend selection will be migrated with private knowledge handling. */
+function randomLegend(state: GameState, items: number[]): number | undefined {
+  if (!items.length) return undefined
   const [index, rng] = nextInt(state.rng, items.length)
   state.rng = rng
   return items[index]
-}
-
-/**
- * Picks up to `n` distinct items through the seeded rng — every item if the
- * pool holds `n` or fewer (docs/rulings.md §107 ff.'s "up to N, no printed
- * tie-breaker" convention: when the pool exceeds `n`, nothing on the card
- * distinguishes *which* ones, so those are chosen uniformly at random, the
- * same "no enumerable decision left" reasoning as `viktor-vektor-sit-down-
- * and-relax`'s "reveal up to 2 Gears" — extended here from a mid-resolution
- * reveal to an already-visible board zone).
- */
-function pickN<T>(state: GameState, items: T[], n: number): T[] {
-  if (items.length <= n) return [...items]
-  const pool = [...items]
-  const taken: T[] = []
-  while (taken.length < n && pool.length > 0) {
-    const [index, rng] = nextInt(state.rng, pool.length)
-    state.rng = rng
-    taken.push(...pool.splice(index, 1))
-  }
-  return taken
 }
 
 /** Every Gear card attached anywhere on `player`'s side (field + legends). */
@@ -138,7 +139,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   'all-is-lost': (db, state, ctx) => {
     const trashed = trashFromTop(state, ctx.player, 3)
     const units = trashed.filter((uid) => db[state.cards[uid].defId].type === 'unit')
-    const chosen = pick(state, units)
+    const chosen = pick(db, state, ctx, units)
     if (chosen === undefined) return state
     const p = state.players[ctx.player]
     p.trash = p.trash.filter((uid) => uid !== chosen)
@@ -159,7 +160,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    */
   'arasaka-emergency-radioport': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const legend = pick(
+    const legend = randomLegend(
       state,
       p.legends.filter((uid) => !state.cards[uid].faceUp)
     )
@@ -195,7 +196,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   },
 
   /** The stolen die is identified in the trigger, including multi-die steals. */
-  'v-roamer-of-the-badlands': (_db, state, ctx) => {
+  'v-roamer-of-the-badlands': (db, state, ctx) => {
     const p = state.players[ctx.player]
     const die = p.gigArea[ctx.context?.stolenDieIndex ?? p.gigArea.length - 1]
     if (die === undefined) return state
@@ -330,7 +331,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const candidates = state.players[rival].field.filter(
       (uid) => db[state.cards[uid].defId].cost <= 3
     )
-    const target = pick(state, candidates)
+    const target = pick(db, state, ctx, candidates)
     if (target !== undefined) defeatUnit(state, db, target)
     return state
   },
@@ -356,7 +357,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * from whether that pick found anything.
    */
   'dum-dum-maelstrom-triggerman': (db, state, ctx) => {
-    const gear = pick(state, friendlyGearUids(state, ctx.player))
+    const gear = pick(db, state, ctx, friendlyGearUids(state, ctx.player), ctx.player, true)
     if (gear !== undefined) defeatGear(state, db, gear)
     if (!drawCards(state, ctx.player, gear === undefined ? 1 : 2)) {
       endGame(state, opponentOf(ctx.player), 'deckout')
@@ -406,10 +407,12 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       top.push(uid)
     }
     const values = new Set(p.gigArea.map((die) => die.value))
-    for (const uid of top) {
-      if (values.has(db[state.cards[uid].defId].cost)) p.hand.push(uid)
-      else p.deck.push(uid)
-    }
+    const eligible = top.filter(uid => values.has(db[state.cards[uid].defId].cost))
+    const taken = pickN(db, state, ctx, eligible, eligible.length)
+    p.hand.push(...taken)
+    const [rest, rng] = shuffle(state.rng, top.filter(uid => !taken.includes(uid)))
+    state.rng = rng
+    p.deck.push(...rest)
     return state
   },
 
@@ -441,7 +444,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       defeatUnit(state, db, own)
     }
     const rival = opponentOf(ctx.player)
-    const rivalUnit = pick(state, state.players[rival].field)
+    const rivalUnit = pick(db, state, ctx, state.players[rival].field, rival)
     if (rivalUnit !== undefined) defeatUnit(state, db, rivalUnit)
     return state
   },
@@ -467,7 +470,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       top.push(uid)
     }
     const gears = top.filter((uid) => db[state.cards[uid].defId].type === 'gear')
-    const chosen = pick(state, gears)
+    const chosen = pick(db, state, ctx, gears)
     for (const uid of top) {
       if (uid === chosen) p.hand.push(uid)
       else p.deck.push(uid)
@@ -488,7 +491,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   't-bug-amateur-philosopher': (db, state, ctx) => {
     const p = state.players[ctx.player]
     if (p.calledLegendThisTurn) return state
-    const legend = pick(
+    const legend = randomLegend(
       state,
       p.legends.filter((uid) => !state.cards[uid].faceUp)
     )
@@ -515,14 +518,14 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   'the-heist': (db, state, ctx) => {
     const trashed = trashFromTop(state, ctx.player, 4)
     const gears = trashed.filter((uid) => db[state.cards[uid].defId].type === 'gear')
-    const chosen = pick(state, gears)
+    const chosen = pick(db, state, ctx, gears)
     if (chosen === undefined) return state
     const p = state.players[ctx.player]
     const cost = db[state.cards[chosen].defId].cost
     const matches = p.gigArea.some((die) => die.value === cost)
     if (matches) {
       const hosts = [...p.field, ...p.legends.filter((uid) => state.cards[uid].faceUp)]
-      const host = pick(state, hosts)
+      const host = pick(db, state, ctx, hosts)
       if (host !== undefined) {
         p.trash = p.trash.filter((uid) => uid !== chosen)
         state.cards[host].attachedGear.push(chosen)
@@ -556,7 +559,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       const candidateDef = db[state.cards[uid].defId]
       return candidateDef.type === 'unit' && candidateDef.cost <= 9
     })
-    const chosen = pick(state, candidates)
+    const chosen = pick(db, state, ctx, candidates)
     if (chosen !== undefined) {
       p.trash = p.trash.filter((uid) => uid !== chosen)
       const card = state.cards[chosen]
@@ -603,13 +606,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       const def = db[state.cards[uid].defId]
       return def.type === 'gear' && def.cost <= 2
     })
-    const taken: number[] = []
-    const pool = [...qualifying]
-    while (taken.length < 2 && pool.length > 0) {
-      const [index, rng] = nextInt(state.rng, pool.length)
-      state.rng = rng
-      taken.push(...pool.splice(index, 1))
-    }
+    const taken = pickN(db, state, ctx, qualifying, 2)
     const rest = top.filter((uid) => !taken.includes(uid))
     const [shuffled, rng2] = shuffle(state.rng, rest)
     state.rng = rng2
@@ -650,7 +647,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * same "search the top N, act on some of them" shape (docs/rulings.md §81
    * ff.).
    */
-  'river-ward-detective-on-the-hunt:defeat-search': (_db, state, ctx) => {
+  'river-ward-detective-on-the-hunt:defeat-search': (db, state, ctx) => {
     const p = state.players[ctx.player]
     const top: number[] = []
     for (let i = 0; i < 2; i++) {
@@ -658,7 +655,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       if (uid === undefined) break
       top.push(uid)
     }
-    const chosen = pick(state, top)
+    const chosen = pick(db, state, ctx, top)
     if (chosen === undefined) return state
     p.trash.push(chosen)
     state.events.push({ type: 'cardTrashed', uid: chosen })
@@ -712,7 +709,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const spentUnits = [0, 1]
       .flatMap((player) => state.players[player as PlayerId].field)
       .filter((uid) => !state.cards[uid].ready)
-    const target = pick(state, spentUnits)
+    const target = pick(db, state, ctx, spentUnits)
     if (target !== undefined) defeatUnit(state, db, target)
     return state
   },
@@ -744,7 +741,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const candidates = state.players[rival].field.filter(
       (uid) => !state.cards[uid].ready && db[state.cards[uid].defId].cost <= cost
     )
-    const target = pick(state, candidates)
+    const target = pick(db, state, ctx, candidates)
     if (target !== undefined) defeatUnit(state, db, target)
     return state
   },
@@ -761,7 +758,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * required draw that can end the game on an empty deck (docs/rulings.md
    * §17/§36).
    */
-  'fool-on-the-hill': (_db, state, ctx) => {
+  'fool-on-the-hill': (db, state, ctx) => {
     const p = state.players[ctx.player]
     const revealed: number[] = []
     for (let i = 0; i < 2; i++) {
@@ -770,8 +767,9 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       revealed.push(uid)
     }
     if (revealed.length === 0) return state
-    const [modeIndex, rng] = nextInt(state.rng, 2)
-    state.rng = rng
+    const names = revealed.map(uid => db[state.cards[uid].defId].name).join(', ')
+    const modeIndex = chooseEffectOption(state, opponentOf(ctx.player), ctx.sourceUid,
+      `Revealed: ${names}. Choose their destination`, [0, 1], { 0: 'Add both to their hand', 1: 'Trash them; they draw 2' }, false, revealed.map(uid => ({ uid, viewer: 'all' })))
     if (modeIndex === 0) {
       p.hand.push(...revealed)
     } else {
@@ -797,9 +795,9 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * already forced into a script for `dum-dum-maelstrom-triggerman`/
    * `gilded-mato-n`'s "if you do, X".
    */
-  'goro-takemura-vengeful-bodyguard': (_db, state, ctx) => {
+  'goro-takemura-vengeful-bodyguard': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const discarded = pick(state, p.hand)
+    const discarded = pick(db, state, ctx, p.hand, ctx.player, true)
     if (discarded === undefined) return state
     p.hand = p.hand.filter((uid) => uid !== discarded)
     p.trash.push(discarded)
@@ -822,7 +820,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * host uid `fireWatcherTrigger` now threads through
    * `ctx.context.equipHostUid` instead (docs/rulings.md §107 ff.).
    */
-  sandevistan: (_db, state, ctx) => {
+  sandevistan: (db, state, ctx) => {
     const hostUid = ctx.context?.equipHostUid
     if (hostUid === undefined || !state.cards[hostUid]) return state
     state.cards[hostUid].ready = true
@@ -841,7 +839,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * whole activation was never legal/offered in the first place (no
    * partial-move case to gate on).
    */
-  'panam-palmer-nomad-cavalry:move-gear': (_db, state, ctx) => {
+  'panam-palmer-nomad-cavalry:move-gear': (db, state, ctx) => {
     const [gear, host] = ctx.targets
     if (gear === undefined || host === undefined) return state
     const source = state.cards[ctx.sourceUid]
@@ -860,7 +858,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * mass defeat (docs/rulings.md §68 ff.), but readying every EQUIPPED
    * friendly Unit/Legend rather than every Unit.
    */
-  'panam-palmer-nomad-cavalry:ready-equipped': (_db, state, ctx) => {
+  'panam-palmer-nomad-cavalry:ready-equipped': (db, state, ctx) => {
     const p = state.players[ctx.player]
     const equipped = [...p.field, ...p.legends.filter((uid) => state.cards[uid].faceUp)].filter(
       (uid) => state.cards[uid].attachedGear.length > 0
@@ -878,7 +876,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * up), the same "if you do" target-dependency shape §102/§103 already
    * forced into a script.
    */
-  'panam-palmer-strength-through-family': (_db, state, ctx) => {
+  'panam-palmer-strength-through-family': (db, state, ctx) => {
     const discarded = ctx.targets[0]
     if (discarded === undefined) return state
     const p = state.players[ctx.player]
@@ -905,7 +903,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const eligible = p.legends.filter(
       (uid) => state.cards[uid].faceUp && hasKeyword(db, state, uid, 'merc')
     )
-    for (const uid of pickN(state, eligible, 2)) state.cards[uid].ready = true
+    for (const uid of pickN(db, state, ctx, eligible, 2)) state.cards[uid].ready = true
     return state
   },
 
@@ -914,9 +912,9 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * friendly Units." Same "act on all if ≤N, else N at random" convention as
    * `pepe-najarro-working-doubles` above (docs/rulings.md §107 ff.).
    */
-  'saul-bright-stormrider': (_db, state, ctx) => {
+  'saul-bright-stormrider': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    for (const uid of pickN(state, p.field, 3)) state.cards[uid].ready = true
+    for (const uid of pickN(db, state, ctx, p.field, 3)) state.cards[uid].ready = true
     return state
   },
 
@@ -931,7 +929,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const pairs = valuePairCount(state, ctx.player)
     if (pairs <= 0) return state
     const rival = opponentOf(ctx.player)
-    const targets = pickN(state, state.players[rival].field, pairs)
+    const targets = pickN(db, state, ctx, state.players[rival].field, pairs, false)
     if (targets.length > 0) spendOnDraft(db, state, targets)
     return state
   },
@@ -975,7 +973,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const candidates = state.players[ctx.player].field.filter(
       (uid) => uid !== ctx.sourceUid && effectivePower(db, state, uid) === stolenValue
     )
-    const target = pick(state, candidates)
+    const target = pick(db, state, ctx, candidates)
     if (target !== undefined) state.cards[target].ready = true
     return state
   },
@@ -993,7 +991,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   'hacked-corpo': (db, state, ctx) => {
     const trashed = trashFromTop(state, ctx.player, 3)
     const programs = trashed.filter((uid) => db[state.cards[uid].defId].type === 'program')
-    const chosen = pick(state, programs)
+    const chosen = pick(db, state, ctx, programs)
     if (chosen === undefined) return state
     const p = state.players[ctx.player]
     p.trash = p.trash.filter((uid) => uid !== chosen)
@@ -1020,7 +1018,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * value ranges `[1, size]`, so there is no die-specific floor distinct
    * from 1) — only the SUBJECT of the check was wrong, not the threshold.
    */
-  'jackie-welles-pour-one-out-for-me': (_db, state, ctx) => {
+  'jackie-welles-pour-one-out-for-me': (db, state, ctx) => {
     const index = ctx.targets[0]
     if (index === undefined) return state
     const p = state.players[ctx.player]
@@ -1101,7 +1099,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   'chrome-reverie': (db, state, ctx) => {
     const p = state.players[ctx.player]
     if (p.calledLegendThisTurn) return state
-    const legend = pick(
+    const legend = randomLegend(
       state,
       p.legends.filter((uid) => !state.cards[uid].faceUp)
     )
@@ -1172,7 +1170,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
 
     if (def.type === 'gear') {
       const hosts = [...p.field, ...p.legends.filter((h) => state.cards[h].faceUp)]
-      const host = pick(state, hosts)
+      const host = pick(db, state, ctx, hosts)
       if (host === undefined) {
         p.hand.push(uid)
         return state
@@ -1259,7 +1257,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * *after* a pair that can be jointly unfillable is exactly the "3+
    * slots, unfillable middle" shape this batch's brief calls out to avoid.
    */
-  'maman-brigitte-spirit-of-death:take-it': (_db, state, ctx) => {
+  'maman-brigitte-spirit-of-death:take-it': (db, state, ctx) => {
     const [progA, progB] = ctx.targets
     if (progA === undefined || progB === undefined || progA === progB) return state
     const p = state.players[ctx.player]
@@ -1273,7 +1271,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const candidates = state.players[rival].field.filter(
       (uid) => state.cards[uid].attachedGear.length === 0
     )
-    const target = pick(state, candidates)
+    const target = pick(db, state, ctx, candidates)
     if (target !== undefined) {
       state.players[rival].field = state.players[rival].field.filter((uid) => uid !== target)
       state.players[rival].deck.push(target)
@@ -1309,7 +1307,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * through the rng exactly like Maman Brigitte's, since the printed text
    * draws no distinction among rival Units.
    */
-  'placide-voodoo-sentinel:take-it': (_db, state, ctx) => {
+  'placide-voodoo-sentinel:take-it': (db, state, ctx) => {
     const program = ctx.targets[0]
     if (program === undefined) return state
     const p = state.players[ctx.player]
@@ -1318,7 +1316,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     p.trash.push(program)
     state.events.push({ type: 'cardTrashed', uid: program })
     const rival = opponentOf(ctx.player)
-    const target = pick(state, state.players[rival].field)
+    const target = pick(db, state, ctx, state.players[rival].field)
     if (target !== undefined) {
       state.players[rival].field = state.players[rival].field.filter((uid) => uid !== target)
       state.players[rival].deck.push(target)
@@ -1366,12 +1364,12 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * docs/rulings.md §88 already cites for the pool-wide "keep it on top"
    * default when nothing is trashed.
    */
-  'tetratronic-rippler': (_db, state, ctx) => {
+  'tetratronic-rippler': (db, state, ctx) => {
     const p = state.players[ctx.player]
     const uid = p.deck[0]
     if (uid === undefined) return state
-    const [roll, rng] = nextInt(state.rng, 2)
-    state.rng = rng
+    const roll = chooseEffectOption(state, ctx.player, ctx.sourceUid,
+      `Looked at: ${db[state.cards[uid].defId].name}. Trash it or keep it on top?`, [0, 1], { 0: 'Trash', 1: 'Keep on top' }, false, [{ uid, viewer: ctx.player }])
     if (roll === 0) {
       p.deck.shift()
       p.trash.push(uid)
@@ -1393,7 +1391,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * otherwise shift a later slot's value into the wrong index (docs/
    * rulings.md §133's `bound.filter` note).
    */
-  'unlikely-bond': (_db, state, ctx) => {
+  'unlikely-bond': (db, state, ctx) => {
     const rival = opponentOf(ctx.player)
     let friendly: number | undefined
     let rivalTarget: number | undefined

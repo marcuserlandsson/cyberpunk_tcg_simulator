@@ -87,3 +87,7 @@ Empty Gig areas now have null Street Cred (shown as a dash), satisfy neither par
 ### 08h — Legend play modes and payable costs
 
 Face-up Legends with numeric costs now offer ordinary play (preserve post-payment orientation, add Lag), separately from Go Solo (enter ready without Lag). A spent Legend can Go Solo and an eligible Sell-tag Legend can pay toward its own play. The Play view explains both modes and their payment amounts; Go Solo taxes only apply to that mode. Null costs remain unpayable/unmodifiable, and payment reductions floor at one. Verified 675 existing engine/card/PlayView tests plus six new Legend/cost regressions, TypeScript, and a complete Chromium game. The entry records how the Legend was played for subsequent movement rules.
+
+### 08i — script-internal choices
+
+Scripted searches, secondary targets, rival-selected casualties/destinations, optional discard/defeat, and multi-card up-to selections now use explicit replayable player decisions instead of RNG. Hanako's unselected searched cards are bottom-decked randomly. Fool on the Hill discloses its revealed cards to both players before the rival chooses; Tetratronic asks whether to trash the privately inspected card. Verified 670 engine/card tests, TypeScript, and the AI hidden-information checks. Legend-position selection/private peeks and additional optional/card-entry scripts remain open in step 8.
