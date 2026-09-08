@@ -740,6 +740,7 @@ describe('la-llorona-ghost-of-the-past', () => {
     ).toBe(true)
 
     next = blockWith(db, next, llorona)
+    next = passReact(db, next)
     expect(gigValues(next, 0)).toEqual([5]) // 2 + up to 3
     expect(next.cards[llorona].ready).toBe(false) // spent to block
     expect(next.players[1].trash).toContain(attacker) // 3 beats 0

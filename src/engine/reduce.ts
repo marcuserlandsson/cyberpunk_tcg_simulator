@@ -21,7 +21,7 @@ import {
   playCardOnDraft,
   spendOnDraft,
 } from '../cards/effects'
-import { blockAttack, declareAttack, defeatUnit, resolveAttack, takeStolenGig } from './combat'
+import { blockAttack, declareAttack, defeatUnit, resolveAttack, takeStolenGig, validatePendingAttack } from './combat'
 import { canPayWith, legendCallCost } from './economy'
 import {
   beginTurn,
@@ -522,6 +522,7 @@ function runAction(
 
   try {
     dispatch(db, draft, action)
+    validatePendingAttack(db, draft)
   } catch (error) {
     if (error instanceof InterceptRequired) {
       const paused = draftState(state)

@@ -420,7 +420,7 @@ describe('EffectNode: defeat / bounce / bottomDeck', () => {
     expect(next.events.some((e) => e.type === 'unitDefeated' && e.uid === victim)).toBe(true)
   })
 
-  it('bounce returns the target to its owner hand and drops its gear', () => {
+  it('bounce returns the target and its unequipped Gear to their owner hand', () => {
     const db = makeDb([
       def('shoo', 'program', { effects: [onPlay({ kind: 'bounce', target: 'rivalUnit' })] }),
       def('grunt', 'unit'),
@@ -433,8 +433,8 @@ describe('EffectNode: defeat / bounce / bottomDeck', () => {
 
     const next = fire(db, s, src, [victim])
     expect(next.players[1].field).toEqual([])
-    expect(next.players[1].hand).toEqual([victim])
-    expect(next.players[1].trash).toEqual([gear])
+    expect(next.players[1].hand).toEqual([victim, gear])
+    expect(next.players[1].trash).toEqual([])
     expect(next.cards[victim].tempPower).toBe(0) // buffs die with the field exit
     expect(next.events.some((e) => e.type === 'unitDefeated')).toBe(false)
   })
@@ -1467,9 +1467,8 @@ describe('quick', () => {
     const next = applyAction(db, declared, { type: 'react', reaction: quickAbilities[0] })
     expect(next.players[0].trash).toContain(attacker)
     // The attacker vanished: the attack fizzles with no steal.
-    const resolved = applyAction(db, next, { type: 'react', reaction: pass })
-    expect(resolved.phase).toBe('main')
-    expect(resolved.players[1].gigArea).toHaveLength(1)
+    expect(next.phase).toBe('main')
+    expect(next.players[1].gigArea).toHaveLength(1)
   })
 
   it('a quick ability is still a normal main-phase ability (docs/rulings.md §33)', () => {
@@ -2092,6 +2091,8 @@ describe('trigger: onBlock (docs/rulings.md §41)', () => {
     let next = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
     next = applyAction(db, next, { type: 'react', reaction: { type: 'block', blocker: wall } })
     expect(next.players[1].gigArea.map((d) => d.value)).toEqual([4])
+    expect(next.phase).toBe('react')
+    next = applyAction(db, next, { type: 'react', reaction: { type: 'pass' } })
     expect(next.players[0].trash).toContain(attacker) // 2 vs 3: the blocker won
   })
 })
@@ -2458,6 +2459,7 @@ describe('trigger: onSpend (docs/rulings.md §47)', () => {
     const legendDb = makeDb([
       def('patron', 'legend', {
         power: null,
+        sellTag: true,
         effects: [{ trigger: 'onSpend', effect: { kind: 'draw', count: 1 } }],
       }),
       def('grunt', 'unit', { cost: 1, power: 1 }),

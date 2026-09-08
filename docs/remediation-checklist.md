@@ -58,3 +58,7 @@ Discovery now paginates the full official catalog and fetches every card detail.
 ### 08a — turn boundaries, overtime state and payment eligibility
 
 Step 8 remains open. First checkpoint: overtime tracks consecutive empty-fixer starts and requires seven Gigs; start effects precede ready/draw; Lag and played-this-turn flags expire for both players at every turn end. Payment generation and validation exclude revealed Legends lacking Sell tags, and AI resource scoring uses the same eligibility. Legacy overtime result labels remain readable, with a new result reason for current rules. Updated obsolete tests and excluded pending cards from generated gameplay decks. Verified TypeScript, 404 engine/card/UI/simulation tests, plus 111 core/AI tests in the preceding run. Immediate win checks within multi-part effects and queued start effects will be completed with the resolution changes next.
+
+### 08b — reactions and Gear destinations
+
+Blocking now leaves reactions open; subsequent Quick effects and further Blockers resolve before the defender passes. Attacks end when their attacker leaves or their target becomes invalid. Gear follows its host to hand/deck/trash; a removed Legend leaves its Gear at the intermediate destination, and bottom-decked host/Gear groups use seeded randomization. Verified TypeScript, 505 engine/card regressions, and a full browser game with no page error. Pending-resolution ordering and randomization across several simultaneously moved hosts remain part of the next resolution checkpoint.

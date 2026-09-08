@@ -612,7 +612,9 @@ describe('blocker reactions', () => {
     const blocker = putUnit(s, 1, 'corpo-security') // power 2, {blocker}
     s.players[1].gigArea = dice(4, 6)
 
-    const next = react(declare(s, attacker, 'gigArea'), { type: 'block', blocker })
+    const blocked = react(declare(s, attacker, 'gigArea'), { type: 'block', blocker })
+    expect(blocked.phase).toBe('react')
+    const next = react(blocked, passReaction)
     expect(next.events.some((e) => e.type === 'attackBlocked' && e.blocker === blocker)).toBe(true)
     expect(next.players[1].trash).toContain(blocker) // lost the fight
     expect(next.players[0].field).toContain(attacker)
@@ -620,7 +622,7 @@ describe('blocker reactions', () => {
     expect(next.players[0].gigArea).toEqual([])
     expect(next.players[1].gigArea).toHaveLength(2)
     expect(next.events.some((e) => e.type === 'gigStolen')).toBe(false)
-    expect(next.phase).toBe('main') // the block resolves the attack immediately
+    expect(next.phase).toBe('main') // passing finishes the redirected attack
     expect(next.pendingAttack).toBeNull()
     expect(next.pendingSteal).toBeNull()
   })
@@ -631,7 +633,9 @@ describe('blocker reactions', () => {
     const blocker = putUnit(s, 1, 'secondhand-bombus') // power 0, {blocker}
     s.players[1].gigArea = dice(4)
 
-    const next = react(declare(s, attacker, 'gigArea'), { type: 'block', blocker })
+    const blocked = react(declare(s, attacker, 'gigArea'), { type: 'block', blocker })
+    expect(blocked.phase).toBe('react')
+    const next = react(blocked, passReaction)
     expect(next.cards[blocker].ready).toBe(false)
     expect(next.players[1].trash).toContain(blocker)
     expect(next.players[1].gigArea).toHaveLength(1) // nothing stolen
@@ -644,7 +648,7 @@ describe('blocker reactions', () => {
     const target = putUnit(s, 1, 'delamain-cab', { ready: false }) // power 4
     const blocker = putUnit(s, 1, 'corpo-security') // power 2, {blocker}
 
-    const next = react(declare(s, attacker, target), { type: 'block', blocker })
+    const next = react(react(declare(s, attacker, target), { type: 'block', blocker }), passReaction)
     expect(next.pendingAttack).toBeNull()
     expect(next.players[1].field).toContain(target) // untouched
     expect(next.players[1].trash).toContain(blocker)
@@ -656,7 +660,9 @@ describe('blocker reactions', () => {
     const blocker = putUnit(s, 1, 'corpo-security') // power 2, {blocker}
     s.players[1].gigArea = dice(4)
 
-    const next = react(declare(s, attacker, 'gigArea'), { type: 'block', blocker })
+    const blocked = react(declare(s, attacker, 'gigArea'), { type: 'block', blocker })
+    expect(blocked.phase).toBe('react')
+    const next = react(blocked, passReaction)
     expect(next.players[0].trash).toContain(attacker)
     expect(next.players[1].field).toContain(blocker)
     expect(next.cards[blocker].ready).toBe(false)
@@ -784,7 +790,7 @@ describe('callLegend as a reaction', () => {
     const called = react(window, call)
     expect(reactionOptions(called).some((r) => r.type === 'block')).toBe(true)
 
-    const blocked = react(called, { type: 'block', blocker })
+    const blocked = react(react(called, { type: 'block', blocker }), passReaction)
     expect(blocked.players[1].trash).toContain(blocker)
     expect(blocked.players[0].gigArea).toEqual([])
     expect(blocked.phase).toBe('main')

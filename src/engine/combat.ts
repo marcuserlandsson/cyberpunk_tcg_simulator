@@ -38,6 +38,7 @@ import {
 } from '../cards/effects'
 import { canonicalPayment, legendCallPayment } from './economy'
 import { askIntercept, DECLINE } from './intercept'
+import { shuffle } from './rng'
 import {
   attackableReadyKeyword,
   ATTACK_READY,
@@ -341,6 +342,20 @@ function endAttack(draft: GameState): void {
   draft.phase = 'main'
 }
 
+/** CR 9.26: recheck the ongoing attack after a completed action/effect window. */
+export function validatePendingAttack(db: CardDb, draft: GameState): void {
+  const attack = draft.pendingAttack
+  if (!attack || draft.winner !== null) return
+  const target = attack.redirectedTo ?? attack.target
+  const player = draft.cards[attack.attacker].owner
+  if (!onField(draft, attack.attacker) || cantAttack(db, draft, attack.attacker) ||
+    (typeof target === 'number' && !attackTargets(db, draft, player, attack.attacker).includes(target)) ||
+    (target === 'gigArea' && cantAttackGigArea(db, draft, attack.attacker))) {
+    endAttack(draft)
+  }
+  // CR 5.12.4.1 specifically continues an attack on a now-empty Gig area.
+}
+
 /**
  * Guide step 01+02: spend the attacker, declare the target, then hand the
  * decision to the defender (`phase = 'react'`, which flips
@@ -409,15 +424,9 @@ export function declareAttack(
 export type FieldExit = 'trash' | 'hand' | 'deckBottom'
 
 /**
- * Moves a card off the field to `exit`, dropping everything equipped to it
- * (guide p11 step 04). Details, all shared by every exit route (defeat, bounce,
- * bottom-deck) so they cannot drift apart:
- *   * attached Gear goes to *its own* owner's trash, which matters for the one
- *     card that can equip to a rival Unit (docs/rulings.md §8);
- *   * power buffs die with the field exit — a bounced Unit replayed later is a
- *     fresh, unbuffed card (docs/rulings.md §29);
- *   * a Legend on the field is a {go-solo} Legend, and "if it leaves the field,
- *     remove it from the game" — whatever the exit (docs/rulings.md §31).
+ * CR 4.12: move the host and equipped Gear to their owners' destination areas,
+ * then unequip. A Legend is removed while its Gear remains at the destination.
+ * Bottom-decked host/Gear groups are randomized; exiting clears modifiers.
  */
 export function leaveField(draft: GameState, db: CardDb, uid: number, exit: FieldExit): void {
   const card = draft.cards[uid]
@@ -459,9 +468,26 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
     }
   }
 
+  // CR 4.12: Gear follows the host's destination, then becomes unequipped.
+  // A Legend is removed separately; its Gear stays at the intermediate destination.
   for (const gearUid of gear) {
-    draft.players[draft.cards[gearUid].owner].trash.push(gearUid)
-    draft.events.push({ type: 'cardTrashed', uid: gearUid })
+    const gearOwner = draft.players[draft.cards[gearUid].owner]
+    const destination = exit === 'hand' ? gearOwner.hand : exit === 'deckBottom' ? gearOwner.deck : gearOwner.trash
+    destination.push(gearUid)
+    draft.cards[gearUid].tempPower = 0
+    draft.cards[gearUid].permPower = 0
+    draft.cards[gearUid].tempKeywords = []
+    if (exit === 'trash') draft.events.push({ type: 'cardTrashed', uid: gearUid })
+    if (exit === 'deckBottom') draft.events.push({ type: 'cardBottomDecked', uid: gearUid })
+  }
+  if (exit === 'deckBottom') {
+    for (const player of [0, 1] as const) {
+      const moved = [uid, ...gear].filter(cardUid => draft.cards[cardUid].owner === player && db[draft.cards[cardUid].defId].type !== 'legend')
+      if (moved.length < 2) continue
+      const [randomized, rng] = shuffle(draft.rng, moved)
+      draft.rng = rng
+      draft.players[player].deck = [...draft.players[player].deck.filter(cardUid => !moved.includes(cardUid)), ...randomized]
+    }
   }
 }
 
@@ -748,12 +774,9 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
 }
 
 /**
- * Guide p11 BLOCKER: "Spend a Unit with the {blocker} keyword to redirect the
- * attack to it instead." The attack then resolves at once as a fight against
- * the blocker, and steals nothing — "When a Unit redirects your attempt to
- * attack your Rival directly, a fight plays out as though your Unit attacked
- * the blocking Unit instead. Even if you defeat it, you don't steal any Gigs
- * for that attack." (docs/rulings.md §27 for why the window closes here.)
+ * CR 9.7–9.12 and 11.24: spending a Blocker replaces the defending target.
+ * Resolve its triggers, then keep the reaction window open until a pass.
+ * The subsequent fight steals no Gigs even if the attacker wins.
  */
 export function blockAttack(draft: GameState, db: CardDb, blocker: number): void {
   const attack = draft.pendingAttack
@@ -776,7 +799,8 @@ export function blockAttack(draft: GameState, db: CardDb, blocker: number): void
   // (goro-takemura-vengeful-bodyguard, docs/rulings.md §92 ff.), unlike the
   // self-referential `onBlock` fired just above.
   fireWatcherTrigger(db, draft, 'onFriendlyBlock', draft.cards[blocker].owner, {})
-  resolveAttack(draft, db)
+  // CR 9.7–9.12: blocking changes the target, but reactions remain open.
+  // Combat begins only when the defender passes.
 }
 
 /**

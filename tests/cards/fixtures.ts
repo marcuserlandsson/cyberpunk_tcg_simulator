@@ -368,7 +368,7 @@ export function passReact(db: CardDb, state: GameState): GameState {
   return applyAction(db, state, { type: 'react', reaction: { type: 'pass' } })
 }
 
-/** The defender blocks with `blockerUid`, which resolves the attack at once. */
+/** The defender redirects with `blockerUid`; reactions remain open until pass. */
 export function blockWith(db: CardDb, state: GameState, blockerUid: number): GameState {
   return applyAction(db, state, { type: 'react', reaction: { type: 'block', blocker: blockerUid } })
 }
