@@ -9,7 +9,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 03. Fix overlapping Collection cards and verify responsive layouts.
 - [x] 04. Refresh deck choices across views and suppress unknown ownership figures.
 - [x] 05. Support collection persistence outside the dev server; expose Git outcomes and correct documentation.
-- [ ] 06. Obtain/version comprehensive rules and errata; audit each rules section against implementation and record discrepancies.
+- [x] 06. Obtain/version comprehensive rules and errata; audit each rules section against implementation and record discrepancies.
 - [ ] 07. Discover/import current cards and printings, track data freshness and implementation coverage, and correct errata.
 - [ ] 08. Implement rules-audit corrections, explicit effect/player choices, private knowledge, and payment choices, with card/engine regressions.
 - [ ] 09. Model unique artwork independently of printings; separate playset/artwork targets, filters, progress, and buy-lists.
@@ -46,3 +46,7 @@ Deck libraries now update across mounted views and browser tabs, with valid fall
 ### 05 — production persistence and backup results
 
 The production preview now mounts the same collection service as development. A separate status endpoint reports pending/final Git backup outcomes without another save; background commits serialize and stale callbacks cannot replace newer status. Manual retry can reload an unreadable collection without writing. Documentation distinguishes local disk, browser storage, and Git backup. Verified 79 server/sync/header tests, production build, and three browser/API checks against production preview using only a scratch collection.
+
+### 06 — comprehensive rules audit
+
+Captured the official site's rules data (updated September 1), read all 11 numbered chapters, and mapped them against engine code/tests. Recorded 20 actionable discrepancies and three interpretation notes in `rules-audit-2026-09-08.md`, plus official errata and version metadata. Verified all 713 unique anchors, chapter completeness and snapshot SHA-256. This checkpoint completes the audit, not the gameplay corrections: those remain explicitly scheduled in steps 7–8.

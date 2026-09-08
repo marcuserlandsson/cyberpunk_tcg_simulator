@@ -1,0 +1,17 @@
+{
+  "retrievedAt": "2026-09-08",
+  "rulesPage": "https://cyberpunktcg.com/comprehensive-rules",
+  "rulesData": "https://api.netdeck.gg/api/cyberpunk/comprehensive-rules",
+  "updatedAt": "2026-09-01T19:28:10.028Z",
+  "snapshot": "comprehensive-rules-2026-09-08.json",
+  "sha256": "b1e36a820eefa70885cee00b2116b55077dd90565554f81400bc1700e6cbe06a",
+  "nodeCount": 713,
+  "errataPage": "https://cyberpunktcg.com/errata",
+  "errata": [
+    { "card": "Johnny Silverhand: Never Stop Fighting", "change": "Beta Iconic printing cannot be sold; erroneous Sell tag." },
+    { "card": "Kiroshi Optics", "change": "Equip only to a friendly Unit or face-up Legend." },
+    { "card": "Nocturne OP55N1", "change": "Artist credit: Daniel Valaisis." }
+  ],
+  "audit": "../rules-audit-2026-09-08.md",
+  "implementationStatus": "corrections-pending"
+}
