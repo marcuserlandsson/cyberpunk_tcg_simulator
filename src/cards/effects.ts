@@ -33,6 +33,7 @@ import { draftState, drawCards, endGame } from '../engine/game'
 import {
   cardTags,
   conditionHolds,
+  controllerOf,
   conditionMet,
   effectiveCardCost,
   firstMatchingPlayDiscountSources,
@@ -521,7 +522,7 @@ function takeSlot(slots: Slots): number | null {
 
 /** The next bound target for a node, or null when the slot could not be filled. */
 function takeTarget(node: { target: TargetSpec }, ctx: EffectCtx, slots: Slots): number | null {
-  if (node.target === 'self') return ctx.sourceUid
+  if (node.target === 'self') return ctx.context?.equipHostUid ?? ctx.sourceUid
   // A `chosen` reference reads the enclosing sameTarget's binding, and consumes
   // no slot (docs/rulings.md §53).
   if (node.target === 'chosen') return ctx.chosen ?? null
@@ -1050,7 +1051,9 @@ export function applyEffectDefOnDraft(
     if (context.payOptionalCosts !== true) return
     if (!payTriggerCost(db, draft, def, sourceUid, player)) return
   }
-  const ctx: EffectCtx = { player, sourceUid, targets, context }
+  const inheritedHost = context.equipHostUid ?? context.defeatedHostUid ?? abilityHost(draft, sourceUid)
+  const inheritedContext = inheritedHost !== sourceUid ? { ...context, equipHostUid: inheritedHost } : context
+  const ctx: EffectCtx = { player, sourceUid, targets, context: inheritedContext }
   const slots = bindSlots(db, draft, def, sourceUid, targets, player)
   applyNode(db, draft, def.effect, ctx, slots)
 }
@@ -1288,7 +1291,7 @@ export function hasPayableOptionalTrigger(
 function inPlay(state: GameState, uid: number): boolean {
   const card = state.cards[uid]
   if (!card) return false
-  const p = state.players[card.owner]
+  const p = state.players[controllerOf(state, uid)]
   if (p.field.includes(uid)) return true
   return p.legends.includes(uid) && card.faceUp
 }
@@ -1311,7 +1314,7 @@ export function spendOnDraft(db: CardDb, draft: GameState, uids: number[]): void
     const card = draft.cards[uid]
     const def = db[card.defId]
     if (card.attachedGear.length > 0 && (def.type === 'unit' || def.type === 'legend')) {
-      fireWatcherTrigger(db, draft, 'onFriendlyEquippedSpend', card.owner, {})
+      fireWatcherTrigger(db, draft, 'onFriendlyEquippedSpend', controllerOf(draft, uid), {})
     }
   }
 }
@@ -1459,7 +1462,7 @@ export function effectController(state: GameState, uid: number): PlayerId {
   const host = abilityHost(state, uid)
   const card = state.cards[host] ?? state.cards[uid]
   if (!card) throw new Error(`Unknown card instance uid: ${uid}`)
-  return card.owner
+  return controllerOf(state, host)
 }
 
 /**
@@ -1662,7 +1665,7 @@ export function readyFriendlyEddies(draft: GameState, player: PlayerId, count: n
 function stateAfterEntry(db: CardDb, state: GameState, uid: number): GameState {
   const card = state.cards[uid]
   const def = db[card.defId]
-  const player = card.owner
+  const player = controllerOf(state, uid)
   const p = state.players[player]
   const entersField = def.type === 'unit' || def.type === 'legend'
   const moved: PlayerState = {

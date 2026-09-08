@@ -13,7 +13,7 @@
 // to the *source card's owner*, never to the active player: a Gear card equipped
 // to a rival Unit still targets its own owner's side (docs/rulings.md §8).
 
-import { effectivePower, hasKeyword, opponentOf, streetCredOrder } from '../engine/query'
+import { actingCardFor, controllerOf, effectivePower, hasKeyword, opponentOf, streetCredOrder } from '../engine/query'
 import type {
   CardDb,
   GameState,
@@ -24,12 +24,7 @@ import type {
   TargetSpec,
 } from '../engine/types'
 
-/** The player an effect acts for: the owner of the card the effect is on. */
-export function controllerOf(state: GameState, sourceUid: number): PlayerId {
-  const card = state.cards[sourceUid]
-  if (!card) throw new Error(`Unknown card instance uid: ${sourceUid}`)
-  return card.owner
-}
+export { controllerOf }
 
 function fieldOf(state: GameState, player: PlayerId): number[] {
   return state.players[player].field.slice()
@@ -57,6 +52,7 @@ export function targetsFor(
   sourceUid: number,
   controller?: PlayerId
 ): number[] {
+  sourceUid = actingCardFor(state, sourceUid)
   const me = controller ?? controllerOf(state, sourceUid)
   const rival = opponentOf(me)
 
@@ -222,6 +218,7 @@ export function filterTargets(
   controller: PlayerId
 ): number[] {
   if (filter === undefined) return candidates
+  sourceUid = actingCardFor(state, sourceUid)
   const friendlyBest = filter.weakerThanAFriendlyUnit
     ? bestFriendlyPower(db, state, controller)
     : null

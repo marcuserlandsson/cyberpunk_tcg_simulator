@@ -33,6 +33,20 @@ export function opponentOf(player: PlayerId): PlayerId {
   return player === 0 ? 1 : 0
 }
 
+/** Control follows the public play area; ownership is retained for destination zones. */
+export function controllerOf(state: GameState, uid: number): PlayerId {
+  for (const player of [0, 1] as const) {
+    const p = state.players[player]
+    if (p.eddies.includes(uid)) return player
+    for (const host of [...p.field, ...p.legends]) {
+      if (host === uid || state.cards[host].attachedGear.includes(uid)) return player
+    }
+  }
+  const card = state.cards[uid]
+  if (!card) throw new Error(`Unknown card instance uid: ${uid}`)
+  return card.owner
+}
+
 /**
  * Street Cred = the sum of the top faces of every die in the player's gig
  * area (gameplay guide, p12). Dice still in the fixer are unrolled and do not
@@ -84,7 +98,7 @@ export function maxGigValue(state: GameState, player: PlayerId): number {
  * printed on Gear (gorilla-arms) reads its host's identity, not the Gear
  * card's own uid (docs/rulings.md §68 ff.).
  */
-function actingCardFor(state: GameState, uid: number): number {
+export function actingCardFor(state: GameState, uid: number): number {
   for (const player of [0, 1] as const) {
     for (const host of [...state.players[player].field, ...state.players[player].legends]) {
       if (state.cards[host].attachedGear.includes(uid)) return host
@@ -259,7 +273,7 @@ export function conditionHolds(
     if (diff < condition.streetCredDiffAtLeast) return false
   }
   if (condition.sourceEquipped === true) {
-    const source = sourceUid !== undefined ? state.cards[sourceUid] : undefined
+    const source = sourceUid !== undefined ? state.cards[actingCardFor(state, sourceUid)] : undefined
     if (source === undefined || source.attachedGear.length === 0) return false
   }
   // Batch 4 additions (docs/rulings.md §81 ff.):
@@ -287,7 +301,7 @@ export function conditionHolds(
     if (state.players[player].legends.some((uid) => !state.cards[uid].faceUp)) return false
   }
   if (condition.sourceSpent === true) {
-    const source = sourceUid !== undefined ? state.cards[sourceUid] : undefined
+    const source = sourceUid !== undefined ? state.cards[actingCardFor(state, sourceUid)] : undefined
     if (source === undefined || source.ready) return false
   }
   if (condition.friendlyGigValuePair === true && valuePairCount(state, player) < 1) {
@@ -304,7 +318,7 @@ export function conditionHolds(
   }
   // Batch 7 additions (docs/rulings.md §120 ff.):
   if (condition.sourceStoleGigThisTurn === true) {
-    const source = sourceUid !== undefined ? state.cards[sourceUid] : undefined
+    const source = sourceUid !== undefined ? state.cards[actingCardFor(state, sourceUid)] : undefined
     if (source === undefined || source.stoleGigThisTurn !== true) return false
   }
   if (
@@ -518,7 +532,7 @@ function staticNodes(state: GameState, def: CardDef, player: PlayerId): EffectNo
 function inPlay(state: GameState, uid: number): boolean {
   const card = state.cards[uid]
   if (!card) return false
-  const p = state.players[card.owner]
+  const p = state.players[controllerOf(state, uid)]
   if (p.field.includes(uid)) return true
   return p.legends.includes(uid) && card.faceUp
 }
@@ -534,12 +548,12 @@ function activeStaticNodes(db: CardDb, state: GameState, uid: number): EffectNod
   if (!card) return []
   const nodes: EffectNode[] = []
   const def = db[card.defId]
-  if (def && inPlay(state, uid)) nodes.push(...staticNodes(state, def, card.owner))
+  if (def && inPlay(state, uid)) nodes.push(...staticNodes(state, def, controllerOf(state, uid)))
   for (const gearUid of card.attachedGear) {
     const gear = state.cards[gearUid]
     const gearDef = gear ? db[gear.defId] : undefined
     if (!gear || !gearDef) continue
-    nodes.push(...staticNodes(state, gearDef, gear.owner))
+    nodes.push(...staticNodes(state, gearDef, controllerOf(state, uid)))
   }
   return nodes
 }
@@ -569,7 +583,7 @@ export function signedPower(db: CardDb, state: GameState, uid: number): number {
     if (gearDef) power += gearDef.power ?? 0
   }
   for (const node of activeStaticNodes(db, state, uid)) {
-    if (node.kind === 'staticPower') power += resolvePowerAmount(state, node.amount, uid, card.owner)
+    if (node.kind === 'staticPower') power += resolvePowerAmount(state, node.amount, uid, controllerOf(state, uid))
   }
   return power
 }
@@ -678,7 +692,7 @@ export function attackPowerBonus(db: CardDb, state: GameState, uid: number): num
   const card = state.cards[uid]
   const def = card ? db[card.defId] : undefined
   if (!card || !def) return 0
-  const p = state.players[card.owner]
+  const p = state.players[controllerOf(state, uid)]
   const hosts = [...p.field, ...p.legends.filter((u) => state.cards[u].faceUp)]
   let bonus = 0
   for (const host of hosts) {
@@ -771,7 +785,7 @@ export function canAttackUnitDespiteLag(db: CardDb, state: GameState, uid: numbe
 export function rivalDeniesFreshAttacks(db: CardDb, state: GameState, uid: number): boolean {
   const card = state.cards[uid]
   if (!card) return false
-  const rival = state.players[opponentOf(card.owner)]
+  const rival = state.players[opponentOf(controllerOf(state, uid))]
   const hosts = [...rival.field, ...rival.legends.filter((u) => state.cards[u].faceUp)]
   return hosts.some((host) =>
     activeStaticNodes(db, state, host).some((node) => node.kind === 'rivalCantAttackWhenPlayed')
@@ -901,8 +915,8 @@ export function isUnitStealer(db: CardDb, state: GameState, uid: number): boolea
   const card = state.cards[uid]
   const def = card ? db[card.defId] : undefined
   if (!card || !def) return false
-  if (def.type === 'unit') return state.players[card.owner].field.includes(uid)
-  if (def.type === 'legend') return state.players[card.owner].field.includes(uid)
+  if (def.type === 'unit') return state.players[controllerOf(state, uid)].field.includes(uid)
+  if (def.type === 'legend') return state.players[controllerOf(state, uid)].field.includes(uid)
   return false
 }
 
@@ -984,7 +998,7 @@ export function defeatInterceptorFor(
 ): { protector: number; eddies: number } | null {
   const card = state.cards[uid]
   if (!card) return null
-  const player = card.owner
+  const player = controllerOf(state, uid)
   if (!state.players[player].field.includes(uid)) return null
   const hosts = [
     ...state.players[player].field,
@@ -1027,7 +1041,7 @@ export function stealInterceptorFor(
   dieValue: number
 ): { protector: number; candidates: number[] } | null {
   if (!isUnitStealer(db, state, stealerUid)) return null
-  if (state.cards[stealerUid]?.owner === victim) return null
+  if (controllerOf(state, stealerUid) === victim) return null
   const hosts = [
     ...state.players[victim].field,
     ...state.players[victim].legends.filter((u) => state.cards[u].faceUp),
@@ -1069,7 +1083,7 @@ export function defeatShieldOf(db: CardDb, state: GameState, uid: number): numbe
     const gear = state.cards[gearUid]
     const gearDef = gear ? db[gear.defId] : undefined
     if (!gear || !gearDef) continue
-    const shields = staticNodes(state, gearDef, gear.owner).some(
+    const shields = staticNodes(state, gearDef, controllerOf(state, uid)).some(
       (node) => node.kind === 'defeatShield'
     )
     if (shields) return gearUid

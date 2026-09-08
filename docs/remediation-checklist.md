@@ -95,3 +95,7 @@ Scripted searches, secondary targets, rival-selected casualties/destinations, op
 ### 08j — private Legend peeks and chosen Calls
 
 Call a Legend now selects a face-down position without exposing its identity. Kiroshi, Radioport and T-Bug implement private peeks with an explicit finish-looking step, viewer-scoped replay knowledge and persistent public previously-seen markers. Hovering marked face-down Legends still shows only the card back. Optional free Calls can be declined; T-Bug still looks even after the Call allowance is used. The human UI explicitly excludes rival-only prompts. Verified 676 engine/card/knowledge/zoom tests, TypeScript, and three AI hidden-information checks. Transient public reveals and source-lifetime snapshots remain within the open resolution audit.
+
+### 08k — control and inherited Gear effects
+
+Derived control now follows the public play area, including attached Gear, while ownership governs exit destinations. Inherited self targets, source conditions and other-unit filters refer to the host. Host/gear statics evaluate the controller's board. Leaving play removes the card from the controller's zone and moves it to its owner; defeating Gear alone does not fire its inherited host Defeated text. Verified 673 engine/card tests and TypeScript, including targeted foreign-control and Gear regressions.

@@ -51,6 +51,7 @@ import {
   cantAttackGigArea,
   cantBeBlocked,
   cardTags,
+  controllerOf,
   defeatInterceptorFor,
   defeatShieldOf,
   effectivePower,
@@ -316,7 +317,7 @@ export function chooseGigActions(db: CardDb, state: GameState): Action[] {
 function onField(state: GameState, uid: number): boolean {
   const card = state.cards[uid]
   if (card === undefined) return false
-  return state.players[card.owner].field.includes(uid)
+  return state.players[controllerOf(state, uid)].field.includes(uid)
 }
 
 /**
@@ -439,7 +440,10 @@ export type FieldExit = 'trash' | 'hand' | 'deckBottom'
 export function leaveField(draft: GameState, db: CardDb, uid: number, exit: FieldExit): void {
   const card = draft.cards[uid]
   const owner = draft.players[card.owner]
-  owner.field = owner.field.filter((u) => u !== uid)
+  for (const player of draft.players) {
+    player.field = player.field.filter(u => u !== uid)
+    player.legends = player.legends.filter(u => u !== uid)
+  }
   // A face-up Legend still in the legends zone can leave play too: its own
   // "defeat this Legend instead" interception reaches it there
   // (jackie-welles-mama-s-favorite, docs/rulings.md §144). Filtering both
@@ -566,7 +570,7 @@ export function defeatUnit(
     }
   }
 
-  const controller = draft.cards[uid].owner
+  const controller = controllerOf(draft, uid)
   // `leaveField` detaches the Gear, so capture it first: a Gear card's
   // "{Defeated} ..." text is about the Unit wearing it being defeated
   // (docs/rulings.md §37), and it resolves for that Unit's controller.
@@ -635,7 +639,7 @@ export function defeatGear(draft: GameState, db: CardDb, gearUid: number): void 
   const owner = draft.cards[gearUid].owner
   draft.players[owner].trash.push(gearUid)
   draft.events.push({ type: 'cardTrashed', uid: gearUid })
-  fireCardTrigger(db, draft, 'onDefeat', gearUid, [], owner)
+  // The host inherits bottom-box Defeated text; defeating the Gear itself does not fire it.
 }
 
 /**
