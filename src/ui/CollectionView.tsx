@@ -1,3 +1,4 @@
+import { CollectionSessions } from './CollectionSessions'
 import { PrintingCount } from './PrintingCount'
 import { BulkCollectionEntry } from './BulkCollectionEntry'
 import { matchesPrinting } from './collectionEntry'
@@ -167,6 +168,7 @@ export function CollectionView({
         <QuickAddBar db={db} printings={loadResult.printings} />
       </fieldset>
 
+      <CollectionSessions printings={loadResult.printings} known={known} />
       <BulkCollectionEntry printings={loadResult.printings} known={known} />
       <div className="collection-view__filters">
         <label>Search cards or printing numbers<input data-testid="collection-search" value={search} onChange={e=>{setSearch(e.target.value);setRowLimit(60)}} placeholder="Name, subtitle, collector number, set, artist…" /></label>

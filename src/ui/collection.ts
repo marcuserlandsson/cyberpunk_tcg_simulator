@@ -1,3 +1,4 @@
+import { recordCollectionChange, resetJournalMemoryForTests, type ChangeMetadata } from './collectionJournal'
 import { cardIdentity } from '../engine/deck'
 import { artworkGroups, ownedArtworkIds, missingArtworks, completionPercentage } from './artworks'
 // The player's owned-cards collection: a flat printingKey -> count map in
@@ -152,7 +153,7 @@ export function getStorageError(): string {
   return storageError
 }
 
-function writeCollection(collection: Collection): void {
+function writeCollection(collection: Collection, metadata?: ChangeMetadata): void {
   if (!canEditCollection()) return
   const previous = getCollection()
   // Prune zero counts: absence means 0.
@@ -173,6 +174,7 @@ function writeCollection(collection: Collection): void {
     storageError = `Could not save the collection (invalid counts, nothing was written):\n${formatZodIssues(validated.error)}`
     cache = freeze({ counts: { ...previous.counts } })
   } else {
+    recordCollectionChange(previous.counts, counts, metadata)
     const pending = { counts, baseRevision }
     try {
       localStorage.setItem(PENDING_KEY, JSON.stringify(pending))
@@ -215,8 +217,8 @@ export function useCollection(): Collection {
 }
 
 /** Replaces the whole collection in one write (used by import — Task 6). */
-export function replaceCollection(collection: Collection): void {
-  writeCollection(collection)
+export function replaceCollection(collection: Collection, metadata?: ChangeMetadata): void {
+  writeCollection(collection, metadata)
 }
 
 /** Adopt state that is already on disk: updates the snapshot and notifies
@@ -234,6 +236,7 @@ export function setCollectionFromFile(counts: Record<string, number>, revision: 
 /** Test-only: drops the snapshot cache so localStorage seeding/clearing in a
  *  test is observed. Underscore-prefixed by convention; not for app code. */
 export function _resetCollectionCacheForTests(): void {
+  resetJournalMemoryForTests()
   cache = undefined
   memoryPending = undefined
   storageError = ''
@@ -381,17 +384,17 @@ export function exportCollectionJson(collection: Collection): string {
 
 function applyImport(counts: Record<string, number>, mode: 'replace' | 'merge'): void {
   if (mode === 'replace') {
-    replaceCollection({ counts })
+    replaceCollection({ counts }, {kind:'Replace import'})
     return
   }
   const merged = { ...getCollection().counts }
   for (const [key, count] of Object.entries(counts)) {
     merged[key] = (merged[key] ?? 0) + count
   }
-  replaceCollection({ counts: merged })
+  replaceCollection({ counts: merged }, {kind:'Merge import'})
 }
 
-export function importCollectionJson(text: string, mode: 'replace' | 'merge'): void {
+export function parseCollectionJson(text: string): Record<string,number> {
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -402,7 +405,7 @@ export function importCollectionJson(text: string, mode: 'replace' | 'merge'): v
   if (!result.success) {
     throw new Error(`Could not import collection:\n${formatZodIssues(result.error)}`)
   }
-  applyImport(result.data.counts, mode)
+  return result.data.counts
 }
 
 export function exportCollectionText(
@@ -420,7 +423,7 @@ export function exportCollectionText(
   return lines.join('\n')
 }
 
-export function importCollectionText(text: string, mode: 'replace' | 'merge'): void {
+export function parseCollectionText(text: string): Record<string,number> {
   const counts: Record<string, number> = {}
   const errors: string[] = []
   // Distinct from "counts stayed empty": a well-formed text export can only
@@ -460,5 +463,15 @@ export function importCollectionText(text: string, mode: 'replace' | 'merge'): v
   if (!sawLine) {
     throw new Error('Could not import collection: no card lines found.')
   }
-  applyImport(counts, mode)
+  return counts
+}
+
+export function importCollectionJson(text:string,mode:'replace'|'merge'):void {applyImport(parseCollectionJson(text),mode)}
+export function importCollectionText(text:string,mode:'replace'|'merge'):void {applyImport(parseCollectionText(text),mode)}
+export function previewCollectionImport(text:string,mode:'replace'|'merge'):{before:Record<string,number>;after:Record<string,number>} {
+  const parsed=text.trimStart().startsWith('{')?parseCollectionJson(text):parseCollectionText(text)
+  const before={...getCollection().counts},after=mode==='replace'?{...parsed}:{...before}
+  if(mode==='merge')for(const [key,n] of Object.entries(parsed))after[key]=(after[key]??0)+n
+  collectionSchema.parse({counts:after})
+  return {before,after}
 }

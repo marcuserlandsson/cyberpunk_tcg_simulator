@@ -43,6 +43,9 @@ describe('CollectionHeader', () => {
       target: { value: JSON.stringify({ version: 1, counts: { [printings[0].key]: 2 } }) },
     })
     fireEvent.click(screen.getByTestId('import-submit'))
+    expect(getCollection().counts[printings[0].key]).toBe(1)
+    expect(screen.getByTestId('import-preview')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('import-apply'))
     expect(getCollection().counts[printings[0].key]).toBe(3)
   })
 

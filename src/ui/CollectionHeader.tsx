@@ -13,9 +13,9 @@ import {
   buildBuyList,
   exportCollectionJson,
   exportCollectionText,
-  importCollectionJson,
-  importCollectionText,
+  previewCollectionImport, getCollection, replaceCollection,
 } from './collection'
+import { collectionChanges } from './collectionJournal'
 import { useSyncStatus, retryCollection, resolveConflict, confirmEmptySave, ownershipAvailable } from './collectionSync'
 
 /** Sum of raw per-printing counts — the same arithmetic `completionStats`
@@ -56,15 +56,14 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
   )
   const [importText, setImportText] = useState('')
   const [mode, setMode] = useState<'replace' | 'merge'>('replace')
+  const [preview,setPreview] = useState<ReturnType<typeof previewCollectionImport>|null>(null)
   const [error, setError] = useState('')
   const [copyError, setCopyError] = useState('')
   const derivedUnavailable = !ownershipAvailable(syncStatus)
 
   function runImport(): void {
     try {
-      if (importText.trimStart().startsWith('{')) importCollectionJson(importText, mode)
-      else importCollectionText(importText, mode)
-      setImportText('')
+      setPreview(previewCollectionImport(importText,mode))
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -240,7 +239,7 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
           data-testid="import-input"
           value={importText}
           placeholder="Paste a collection JSON or text export…"
-          onChange={(event) => setImportText(event.target.value)}
+          onChange={(event) => {setImportText(event.target.value);setPreview(null)}}
         />
         <label>
           <input
@@ -248,7 +247,7 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
             name="import-mode"
             data-testid="import-mode-replace"
             checked={mode === 'replace'}
-            onChange={() => setMode('replace')}
+            onChange={() => {setMode('replace');setPreview(null)}}
           />
           Replace
         </label>
@@ -258,18 +257,19 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
             name="import-mode"
             data-testid="import-mode-merge"
             checked={mode === 'merge'}
-            onChange={() => setMode('merge')}
+            onChange={() => {setMode('merge');setPreview(null)}}
           />
           Merge (add counts)
         </label>
         <button
           type="button"
           data-testid="import-submit"
-          disabled={importText.trim() === ''}
+          disabled={derivedUnavailable || importText.trim() === ''}
           onClick={runImport}
         >
-          Import
+          Preview import
         </button>
+        {preview && <div data-testid="import-preview"><p>{mode} import: {Object.keys(collectionChanges(preview.before,preview.after)).length} changed printing rows · total {totalCount(preview.before)} → {totalCount(preview.after)}</p><details><summary>Changed counts</summary>{Object.entries(collectionChanges(preview.before,preview.after)).map(([key,c])=><p key={key}>{key}: {c.before} → {c.after}</p>)}</details><button disabled={derivedUnavailable} data-testid="import-apply" onClick={()=>{try{if(JSON.stringify(getCollection().counts)!==JSON.stringify(preview.before))throw new Error("Collection changed; preview again.");replaceCollection({counts:preview.after},{kind:mode+" import"});setPreview(null);setImportText("");setError("")}catch(e){setError(String(e))}}}>Apply reviewed import</button></div>}
         {error !== '' && (
           <div data-testid="import-error" className="collection-header__error">
             {error}

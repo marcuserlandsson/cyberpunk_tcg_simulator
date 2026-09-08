@@ -19,7 +19,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 13. Add deck diagnostics, legal-RAM filtering, opening-hand sampling, and manual practice scenarios.
 - [x] 14. Add multi-deck acquisition planning with shared/assembled inventories and optional binder reservations.
 - [x] 15. Add compact collection search, collector numbers, artwork previews, bulk entry, and scoped filters.
-- [ ] 16. Add recoverable acquisition/trade sessions, import previews/history, optional date/source/cost, and starter entry.
+- [x] 16. Add recoverable acquisition/trade sessions, import previews/history, optional date/source/cost, and starter entry.
 - [ ] 17. Add sealed pool validation/building and best-of-three/manual match tracking.
 - [ ] 18. Stabilize verification timeouts/cleanup, run final regression/build/browser checks, and reconcile documentation.
 
@@ -175,3 +175,7 @@ Collection now plans purchases across selected saved decks, using the maximum di
 ### 15 — compact collection entry and scoped filters
 
 Added multi-word search across names/subtitles/text and printing keys/numbers/sets/artists, a paged compact printing list with exact thumbnails, and direct whole-number counts. Set/rarity/search now match the same printing and restrict expanded rows; scoped physical totals are labeled separately from global card goals. Bulk absolute counts validate every row, preview changes and apply together, refusing stale previews and unknown/duplicate/invalid rows. Verified collection/search/bulk regressions, TypeScript/build and a phone-viewport browser workflow covering row bounds, direct counts, preview/apply and persistence. Undo/history is the next checkpoint.
+
+### 16 — acquisition/trade sessions and recoverable history
+
+Every collection edit now records affected before/after counts in independent browser history entries; quota failures retain entries in memory for export. Undo/reapply checks current affected rows and preserves unrelated acquisitions. Signed acquisition/trade sessions retain drafts across reload, capture date/source/total-cost notes, validate underflow, preview and apply atomically. Bundled demo starter contents map to exact printings; they are explicitly not assumed Beta/retail box manifests. Replace/merge imports now preview affected counts and reject stale previews before application. Inventory/history JSON supports separate count and metadata restoration. History and draft persistence is browser-local; inventory continues through the existing disk service. Verified 116 collection/sync/history checks, TypeScript/build and two browser workflows for phone entry, draft reload, metadata, undo/reapply and reviewed imports. The combined browser run exposed shared scratch-state assumptions; this test now initializes its own count, with suite-wide isolation assigned to step 18.

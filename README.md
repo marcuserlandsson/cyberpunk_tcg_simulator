@@ -240,6 +240,8 @@ The diagnostics panel shows cost/type distributions, Sell density and adjustable
 
 Collection’s purchase planner combines selected decks using maximum requirements for shared cards or summed requirements for assembled decks. Optional reservations keep one owned copy per artwork in the binder. It shows available copies, deck gaps, separate playset gaps and missing-artwork printing alternatives.
 
+Collection sessions stage signed acquisitions/trades with optional date, source and total-cost notes. Drafts survive reload; reviewed changes apply together. Every edit has browser-local before/after history with conflict-aware undo/reapply. Export inventory and history JSON to back up metadata; restore counts through the import preview and history through its separate metadata importer. The inventory file remains the disk source of counts. Bundled demo starter buttons use the checked-in demo quantities, not a Beta/retail box manifest.
+
 ## Simulation
 
 The **Simulate** tab picks two decks, runs N AI-vs-AI games in a background
