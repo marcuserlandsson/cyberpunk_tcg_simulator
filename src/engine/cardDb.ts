@@ -328,6 +328,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
       filter: targetFilterSchema.optional(),
     }),
     z.strictObject({ kind: z.literal('attackGigAreaDespiteLag') }),
+    z.strictObject({ kind: z.literal('optionalEffect'), prompt: z.string(), effect: effectNodeSchema }),
     z.strictObject({
       kind: z.literal('conditionalEffect'),
       condition: conditionSchema,

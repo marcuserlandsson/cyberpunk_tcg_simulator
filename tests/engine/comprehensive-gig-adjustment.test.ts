@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { db, startedGame, mintInto } from '../cards/fixtures'
+import { db, startedGame, mintInto, resolveEffectChoices } from '../cards/fixtures'
 import { applyAction } from '../../src/engine/reduce'
 import type { CardDb, EffectNode } from '../../src/engine/types'
 
@@ -12,7 +12,7 @@ function adjust(effect: EffectNode, targets: number[]) {
   const trash = mintInto(state, 1, 'trash', 'animals-wrecker')
   state.players[0].gigArea = [{ size: 10, value: 9 }]
   state.players[1].gigArea = [{ size: 6, value: 2 }]
-  const next = applyAction(cards, state, { type: 'playCard', card: program, payment: [], targets })
+  const next = resolveEffectChoices(cards, applyAction(cards, state, { type: 'playCard', card: program, payment: [], targets }))
   return { next, trash }
 }
 

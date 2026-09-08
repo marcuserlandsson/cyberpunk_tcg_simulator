@@ -407,6 +407,7 @@ export type EffectNode =
   // already flagged this card as sameTarget's motivating case; the *value-
   // pair* half of it needed this to land). Consumes its child's slots whether
   // or not the condition holds, so later siblings still read the right ones.
+  | { kind: 'optionalEffect'; prompt: string; effect: EffectNode }
   | { kind: 'conditionalEffect'; condition: EffectCondition; effect: EffectNode }
   // Batch 6 additions (docs/rulings.md §107 ff.):
   // "Set a Gig's value to the value of another Gig" (peace-offering,

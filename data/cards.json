@@ -433,10 +433,14 @@
                 "rivalGigLeadAtLeast": 2
               },
               "effect": {
-                "kind": "defeat",
-                "target": "rivalUnit",
-                "filter": {
-                  "maxPower": 4
+                "kind": "optionalEffect",
+                "prompt": "Defeat a second rival Unit with power 4 or less?",
+                "effect": {
+                  "kind": "defeat",
+                  "target": "rivalUnit",
+                  "filter": {
+                    "maxPower": 4
+                  }
                 }
               }
             }
@@ -1386,11 +1390,15 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "scripted",
-          "name": "gilded-mato-n",
-          "targets": [
-            "friendlyGear"
-          ]
+          "kind": "optionalEffect",
+          "prompt": "Defeat a friendly Gear to defeat a rival Unit?",
+          "effect": {
+            "kind": "scripted",
+            "name": "gilded-mato-n",
+            "targets": [
+              "friendlyGear"
+            ]
+          }
         }
       }
     ],
@@ -1729,11 +1737,15 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "scripted",
-          "name": "heywood-ripperdoc",
-          "targets": [
-            "anyGear"
-          ]
+          "kind": "optionalEffect",
+          "prompt": "Defeat a Gear?",
+          "effect": {
+            "kind": "scripted",
+            "name": "heywood-ripperdoc",
+            "targets": [
+              "anyGear"
+            ]
+          }
         }
       }
     ],
@@ -2391,17 +2403,21 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "sameTarget",
-          "target": "friendlyHandOrTrashProgram",
-          "filter": {
-            "maxCost": 3
-          },
-          "effects": [
-            {
-              "kind": "scripted",
-              "name": "lizzy-wizzy-delicate-weapon"
-            }
-          ]
+          "kind": "optionalEffect",
+          "prompt": "Play a Program with cost 3 or less for free?",
+          "effect": {
+            "kind": "sameTarget",
+            "target": "friendlyHandOrTrashProgram",
+            "filter": {
+              "maxCost": 3
+            },
+            "effects": [
+              {
+                "kind": "scripted",
+                "name": "lizzy-wizzy-delicate-weapon"
+              }
+            ]
+          }
         }
       }
     ],
@@ -2587,7 +2603,11 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "swapGig"
+          "kind": "optionalEffect",
+          "prompt": "Swap a friendly Gig with a rival Gig?",
+          "effect": {
+            "kind": "swapGig"
+          }
         }
       }
     ],
@@ -2724,8 +2744,12 @@
       {
         "trigger": "onRivalAdjustFriendlyGig",
         "effect": {
-          "kind": "retrieveFromTrash",
-          "target": "friendlyTrashCard"
+          "kind": "optionalEffect",
+          "prompt": "Add a card from your trash to your hand?",
+          "effect": {
+            "kind": "retrieveFromTrash",
+            "target": "friendlyTrashCard"
+          }
         }
       }
     ],
@@ -3427,7 +3451,11 @@
           "kind": "sequence",
           "effects": [
             {
-              "kind": "matchGig"
+              "kind": "optionalEffect",
+              "prompt": "Set a Gig to the value of another Gig?",
+              "effect": {
+                "kind": "matchGig"
+              }
             },
             {
               "kind": "conditionalEffect",
@@ -5282,23 +5310,27 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "sameTarget",
-          "target": "friendlyHandOrTrashUnit",
-          "filter": {
-            "maxCost": 4
-          },
-          "effects": [
-            {
-              "kind": "scripted",
-              "name": "yorinobu-arasaka-steel-dragon"
+          "kind": "optionalEffect",
+          "prompt": "Play a Unit with cost 4 or less for free?",
+          "effect": {
+            "kind": "sameTarget",
+            "target": "friendlyHandOrTrashUnit",
+            "filter": {
+              "maxCost": 4
             },
-            {
-              "kind": "grantKeyword",
-              "keyword": "adrenaline",
-              "target": "chosen",
-              "duration": "turn"
-            }
-          ]
+            "effects": [
+              {
+                "kind": "scripted",
+                "name": "yorinobu-arasaka-steel-dragon"
+              },
+              {
+                "kind": "grantKeyword",
+                "keyword": "adrenaline",
+                "target": "chosen",
+                "duration": "turn"
+              }
+            ]
+          }
         }
       },
       {

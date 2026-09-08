@@ -211,6 +211,7 @@ function slotSpecs(node: EffectNode): SlotSpec[] {
     // are still reserved either way, matching `sameTarget`'s "step over the
     // fizzled construct's own slots" rule.
     case 'conditionalEffect':
+    case 'optionalEffect':
       return slotSpecs(node.effect)
     case 'sameTarget':
       return [
@@ -698,6 +699,13 @@ function applyNode(
       if (target === null || !draft.cards[target]) return
       draft.cards[target].skipNextReady = true
       note(draft, ctx.sourceUid, `${target} skips its next ready step`)
+      return
+    }
+
+    case 'optionalEffect': {
+      const accept = chooseEffectOption(draft, ctx.player, ctx.sourceUid, node.prompt, [1, -1], { 1: 'Accept', [-1]: 'Decline' })
+      if (accept === 1) applyNode(db, draft, node.effect, ctx, slots)
+      else slots.next += slotWidth(node.effect)
       return
     }
 

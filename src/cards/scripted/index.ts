@@ -432,7 +432,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       top.push(uid)
     }
     const gears = top.filter((uid) => db[state.cards[uid].defId].type === 'gear')
-    const chosen = pick(db, state, ctx, gears)
+    const chosen = pick(db, state, ctx, gears, ctx.player, true)
     if (chosen !== undefined) p.hand.push(chosen)
     const [rest, rng] = shuffle(state.rng, top.filter(uid => uid !== chosen))
     state.rng = rng
@@ -468,7 +468,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const p = state.players[ctx.player]
     const cost = db[state.cards[chosen].defId].cost
     const matches = p.gigArea.some((die) => die.value === cost)
-    if (matches) {
+    if (matches && chooseEffectOption(state, ctx.player, ctx.sourceUid, 'Play the Gear for free instead of adding it to your hand?', [1, -1], { 1: 'Play for free', [-1]: 'Add to hand' }) === 1) {
       const hosts = [...p.field, ...p.legends.filter((uid) => state.cards[uid].faceUp)]
       const host = pick(db, state, ctx, hosts)
       if (host !== undefined) {
@@ -1022,7 +1022,8 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (uid === undefined) return state
     p.trash.push(uid)
     state.events.push({ type: 'cardTrashed', uid })
-    if (db[state.cards[uid].defId]?.type === 'program') {
+    if (db[state.cards[uid].defId]?.type === 'program' && chooseEffectOption(state, ctx.player, ctx.sourceUid,
+      'Add the trashed Program to your hand?', [1, -1], { 1: 'Add to hand', [-1]: 'Leave in trash' }) === 1) {
       p.trash = p.trash.filter((u) => u !== uid)
       p.hand.push(uid)
     }
