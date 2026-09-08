@@ -77,6 +77,7 @@ type Targeted = Action & { targets: number[] }
  */
 type Pending =
   | { kind: 'targets'; title: string; variants: Targeted[] }
+  | { kind: 'playMode'; title: string; variants: Targeted[] }
   | { kind: 'attackTarget'; attacker: number }
   | {
       kind: 'attackVariant'
@@ -208,6 +209,11 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
    */
   function resolveTargets(title: string, variants: Targeted[]): void {
     if (variants.length === 0) return
+    const plays = variants.filter((a): a is Extract<Action, { type: 'playCard' }> => a.type === 'playCard')
+    if (plays.some(a => a.goSolo === false) && plays.some(a => a.goSolo !== false)) {
+      setPending({ kind: 'playMode', title, variants })
+      return
+    }
     if (firstDivergentSlot(variants) === -1) {
       setPending(null)
       game.act(variants[0])
@@ -232,6 +238,15 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
   const options: Option[] = useMemo(() => {
     if (state === null || pending === null) return []
     switch (pending.kind) {
+      case 'playMode':
+        return [true, false].map(solo => {
+          const variants = pending.variants.filter((a): a is Extract<Action, { type: 'playCard' }> => a.type === 'playCard' && (a.goSolo !== false) === solo)
+          const detail = solo ? 'Go Solo — ready, no Lag' : 'Ordinary play — keep orientation, add Lag'
+          return {
+            key: String(solo), label: `${detail} (${variants[0].payment.length} €$)`,
+            pick: () => resolveTargets(pending.title, variants),
+          }
+        })
       case 'targets': {
         const slot = firstDivergentSlot(pending.variants)
         if (slot === -1) return []
@@ -290,7 +305,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     for (const option of options) if (option.uid !== undefined) targets.add(option.uid)
     const gigAreaTarget = options.some((option) => option.gigArea === true)
     const selected =
-      pending !== null && pending.kind !== 'targets' ? pending.attacker : null
+      pending !== null && pending.kind !== 'targets' && pending.kind !== 'playMode' ? pending.attacker : null
 
     // While a choice is open, only its candidates are live: leaving the
     // ordinary glows on would offer moves that would silently abandon the
@@ -886,7 +901,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
         {pending !== null && options.length > 0 && (
           <div className="prompt-bar prompt-bar--choice" data-testid="choice-bar">
             <span className="prompt-bar__label">
-              {pending.kind === 'targets'
+              {pending.kind === 'targets' || pending.kind === 'playMode'
                 ? pending.title
                 : pending.kind === 'attackTarget'
                   ? `Choose what ${nameOf(db, state, pending.attacker)} attacks`

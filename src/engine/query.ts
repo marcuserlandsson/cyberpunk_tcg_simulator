@@ -394,7 +394,7 @@ export function reducedCost(
     // docs/rulings.md §107 ff.).
     matching = state.players[player].legends.filter((uid) => state.cards[uid].faceUp).length
   }
-  return Math.max(reduction.minimum, base - matching * reduction.amount)
+  return Math.max(1, reduction.minimum, base - matching * reduction.amount)
 }
 
 /**
@@ -449,6 +449,7 @@ export function effectiveCardCost(
   uid: number
 ): number {
   const def = db[state.cards[uid].defId]
+  if (def.printedCost === null) return Infinity // null cannot be paid or modified
   let cost = def.cost
   for (const effect of def.effects) {
     if (effect.trigger !== 'static') continue
@@ -460,7 +461,7 @@ export function effectiveCardCost(
   for (const { hostUid, index, node } of firstMatchingPlayDiscountSources(db, state, player)) {
     if (def.type !== node.cardType || !def.keywords.includes(node.keyword)) continue
     if (state.oncePerTurnUsed.includes(`${hostUid}:${index}`)) continue
-    cost = Math.max(node.minimum, cost - node.amount)
+    cost = Math.max(1, node.minimum, cost - node.amount)
   }
   return cost
 }

@@ -122,17 +122,15 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
       (candidate) =>
         candidate.type === 'playCard' &&
         candidate.card === action.card &&
+        (candidate.goSolo !== false) === (action.goSolo !== false) &&
         deepEqual(candidate.targets, action.targets)
     )
     if (!shapeMatches) return false
     const def = db[state.cards[action.card].defId]
-    // A {go-solo} Legend can never help pay its own cost (docs/rulings.md §31).
-    const exclude = def.type === 'legend' ? action.card : undefined
-    // A {go-solo} Legend play also owes a RIVAL's "Rivals must pay +N €$ to
-    // use {Go Solo}" tax if active (riot-shield, docs/rulings.md §107 ff.).
-    const tax = def.type === 'legend' ? rivalGoSoloTax(db, state, state.activePlayer) : 0
+    const solo = def.type === 'legend' && (action.goSolo ?? def.keywords.includes('go-solo'))
+    const tax = solo ? rivalGoSoloTax(db, state, state.activePlayer) : 0
     const cost = effectiveCardCost(db, state, state.activePlayer, action.card) + tax
-    return canPayWith(db, state, state.activePlayer, action.payment, cost, exclude)
+    return canPayWith(db, state, state.activePlayer, action.payment, cost)
   }
 
   if (action.type === 'callLegend') {
@@ -350,9 +348,10 @@ function playCard(
   db: CardDb,
   cardUid: number,
   payment: number[],
-  targets: number[]
+  targets: number[],
+  goSolo?: boolean
 ): void {
-  playCardOnDraft(db, draft, draft.activePlayer, cardUid, payment, targets)
+  playCardOnDraft(db, draft, draft.activePlayer, cardUid, payment, targets, goSolo)
 }
 
 /**
@@ -581,7 +580,7 @@ function dispatch(db: CardDb, draft: GameState, action: Action): void {
       sellCard(draft, action.card)
       break
     case 'playCard':
-      playCard(draft, db, action.card, action.payment, action.targets)
+      playCard(draft, db, action.card, action.payment, action.targets, action.goSolo)
       break
     case 'callLegend':
       callLegend(draft, db, draft.activePlayer, action.payment)

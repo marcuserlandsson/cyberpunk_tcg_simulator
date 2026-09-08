@@ -48,7 +48,7 @@ export function canPayWith(
   cost: number,
   exclude?: number
 ): boolean {
-  if (payment.length !== cost) return false
+  if (!Number.isSafeInteger(cost) || cost < 0 || payment.length !== cost) return false
   if (exclude !== undefined && payment.includes(exclude)) return false
   const eligible = new Set(readyPaymentUids(db, state, player))
   const seen = new Set<number>()
@@ -74,6 +74,7 @@ export function canonicalPayment(
   cost: number,
   exclude?: number
 ): number[] | null {
+  if (!Number.isSafeInteger(cost) || cost < 0) return null
   const combined = readyPaymentUids(db, state, player).filter((uid) => uid !== exclude)
   if (combined.length < cost) return null
   return combined.slice(0, cost)

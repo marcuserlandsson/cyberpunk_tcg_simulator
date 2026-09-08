@@ -1581,13 +1581,7 @@ export function quickReactionActions(db: CardDb, state: GameState, defender: Pla
 // Playing cards (shared by the main phase and the quick reaction)
 // ---------------------------------------------------------------------------
 
-/**
- * Does `uid` (a Legend in `player`'s legends zone) have a legal Go Solo play
- * right now? "Pay this Legend's cost to play it as a ready Unit." — the Legend
- * must be face-up (you cannot choose to play an identity you have not seen,
- * guide p10 "don't peek") and ready (a spent card cannot be used again until it
- * readies), and it may never help pay its own cost (docs/rulings.md §31).
- */
+/** A face-up Go Solo Legend may pay with itself and may begin spent (CR 11.25). */
 export function goSoloPayment(
   db: CardDb,
   state: GameState,
@@ -1595,7 +1589,7 @@ export function goSoloPayment(
   uid: number
 ): number[] | null {
   const card = state.cards[uid]
-  if (!card.faceUp || !card.ready) return null
+  if (!card.faceUp) return null
   const def = db[card.defId]
   // Printed keywords only, deliberately: Gear may grant {blocker}/{adrenaline}
   // to its host, but never {go-solo} (docs/rulings.md §30).
@@ -1604,7 +1598,7 @@ export function goSoloPayment(
   // plus a RIVAL's "Rivals must pay +N €$ to use {Go Solo}" tax if active
   // (riot-shield, docs/rulings.md §107 ff.).
   const cost = effectiveCardCost(db, state, player, uid) + rivalGoSoloTax(db, state, player)
-  return canonicalPayment(db, state, player, cost, uid)
+  return canonicalPayment(db, state, player, cost)
 }
 
 /**
@@ -1699,11 +1693,14 @@ export function playCardOnDraft(
   player: PlayerId,
   cardUid: number,
   payment: number[],
-  targets: number[]
+  targets: number[],
+  goSolo?: boolean
 ): void {
   const p = draft.players[player]
   const card = draft.cards[cardUid]
   const def = db[card.defId]
+
+  const solo = def.type === 'legend' && (goSolo ?? def.keywords.includes('go-solo'))
 
   // Pay before entry. Any payment-triggered effects wait in the action's queue.
   spendOnDraft(db, draft, payment)
@@ -1722,8 +1719,9 @@ export function playCardOnDraft(
       p.field.push(cardUid)
       break
     case 'legend':
-      card.ready = true
-      card.lag = false
+      if (solo) card.ready = true
+      card.lag = !solo
+      card.playedViaGoSolo = solo
       card.faceUp = true
       // {Go Solo} deliberately skips Lag ("it can attack this turn", §31),
       // but it still entered the field THIS turn — `playedThisTurn` is what

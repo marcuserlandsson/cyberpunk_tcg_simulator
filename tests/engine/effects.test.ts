@@ -1644,11 +1644,12 @@ describe('go-solo', () => {
     expect(next.players[0].removed).toContain(legend)
   })
 
-  it('is not offered without the keyword, while face-down, or while spent', () => {
+  it('offers ordinary play without the keyword, Go Solo while spent, and neither while face-down', () => {
     const plain = scenario()
     mint(plain, 0, 'legends', 'homebody')
     mint(plain, 0, 'eddies', 'grunt', { faceUp: false })
-    expect(playActions(db, plain)).toEqual([])
+    expect(playActions(db, plain)).toHaveLength(1)
+    expect(playActions(db, plain)[0].goSolo).toBe(false)
 
     const hidden = scenario()
     mint(hidden, 0, 'legends', 'solo', { faceUp: false })
@@ -1658,10 +1659,10 @@ describe('go-solo', () => {
     const spent = scenario()
     mint(spent, 0, 'legends', 'solo', { ready: false })
     mint(spent, 0, 'eddies', 'grunt', { faceUp: false })
-    expect(playActions(db, spent)).toEqual([])
+    expect(playActions(db, spent)).toHaveLength(2)
   })
 
-  it('cannot pay for itself', () => {
+  it('cannot pay for itself without a Sell tag', () => {
     const s = scenario()
     const legend = mint(s, 0, 'legends', 'solo')
     // The legend is the only ready payment source: cost 1 is unaffordable.

@@ -742,6 +742,7 @@ export interface CardInstance {
   // independent of whether Lag itself was ever applied. Optional for the
   // same reason `skipNextReady` is — instance state, never part of the
   // card-data zod schema.
+  playedViaGoSolo?: boolean
   playedThisTurn?: boolean
   // Batch 6 additions (docs/rulings.md §107 ff.), both cleared to 0 alongside
   // `tempPower` in `clearTurnBuffs`:
@@ -938,7 +939,7 @@ export type Action =
   | { type: 'keepHand' }
   | { type: 'chooseGigDie'; size: DieSize }
   | { type: 'sellCard'; card: number }
-  | { type: 'playCard'; card: number; payment: number[]; targets: number[] }
+  | { type: 'playCard'; card: number; payment: number[]; targets: number[]; goSolo?: boolean }
   | { type: 'callLegend'; payment: number[] }
   | { type: 'activateAbility'; card: number; abilityIndex: number; targets: number[] }
   // `payOptionalCosts` answers a "{Attack} You may pay N €$" trigger: omitted

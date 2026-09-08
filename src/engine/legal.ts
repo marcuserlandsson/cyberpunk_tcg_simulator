@@ -69,13 +69,15 @@ function mainPhaseActions(db: CardDb, state: GameState): Action[] {
     }
   }
 
-  // {go-solo}: "Pay this Legend's cost to play it as a ready Unit" — a play
-  // from the legends zone, not from hand (docs/rulings.md §31).
+  // Ordinary play retains orientation and adds Lag; Go Solo is a separate option.
   for (const uid of p.legends) {
-    const payment = goSoloPayment(db, state, player, uid)
-    if (payment === null) continue
+    if (!state.cards[uid].faceUp) continue
+    const solo = goSoloPayment(db, state, player, uid)
+    const normal = canonicalPayment(db, state, player, effectiveCardCost(db, state, player, uid))
     for (const targets of playCardTargetChoices(db, state, uid)) {
-      actions.push({ type: 'playCard', card: uid, payment, targets })
+      // Omitted flag preserves existing Go Solo replay actions.
+      if (solo !== null) actions.push({ type: 'playCard', card: uid, payment: solo, targets })
+      if (normal !== null) actions.push({ type: 'playCard', card: uid, payment: normal, targets, goSolo: false })
     }
   }
 
