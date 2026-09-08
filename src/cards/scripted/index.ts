@@ -176,7 +176,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   /** The stolen die is identified in the trigger, including multi-die steals. */
   'v-roamer-of-the-badlands': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const die = p.gigArea[ctx.context?.stolenDieIndex ?? p.gigArea.length - 1]
+    const die = ctx.context?.stolenDieId !== undefined ? p.gigArea.find(die => die.id === ctx.context?.stolenDieId) : p.gigArea[ctx.context?.stolenDieIndex ?? p.gigArea.length - 1]
     if (die === undefined) return state
     const options = Array.from({ length: Math.min(5, die.size - die.value) + 1 }, (_, i) => Math.min(5, die.size - die.value) - i)
     const amount = chooseEffectOption(state, ctx.player, ctx.sourceUid, 'Increase the stolen Gig by up to 5', options,

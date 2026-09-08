@@ -104,7 +104,12 @@ export function actingCardFor(state: GameState, uid: number): number {
       if (state.cards[host].attachedGear.includes(uid)) return host
     }
   }
-  return uid
+  return state.lastKnownCards?.[uid]?.hostUid ?? uid
+}
+
+export function sourceCardInformation(state: GameState, uid: number) {
+  const actor = actingCardFor(state, uid)
+  return !inPlay(state, actor) && state.lastKnownCards?.[actor] ? state.lastKnownCards[actor].instance : state.cards[actor]
 }
 
 /**
@@ -129,6 +134,7 @@ export interface ConditionContext {
   stolenDieValue?: number
   /** Index of this die after its simultaneous transfer. */
   stolenDieIndex?: number
+  stolenDieId?: number
   /** `onFriendlyStealDie` only: was the stealing card's own type a Legend? */
   stealerIsLegend?: boolean
   /** `onUnitDefeated` only: the PlayerId that owned the defeated Unit. */
@@ -273,7 +279,7 @@ export function conditionHolds(
     if (diff < condition.streetCredDiffAtLeast) return false
   }
   if (condition.sourceEquipped === true) {
-    const source = sourceUid !== undefined ? state.cards[actingCardFor(state, sourceUid)] : undefined
+    const source = sourceUid !== undefined ? sourceCardInformation(state, sourceUid) : undefined
     if (source === undefined || source.attachedGear.length === 0) return false
   }
   // Batch 4 additions (docs/rulings.md §81 ff.):
@@ -301,7 +307,7 @@ export function conditionHolds(
     if (state.players[player].legends.some((uid) => !state.cards[uid].faceUp)) return false
   }
   if (condition.sourceSpent === true) {
-    const source = sourceUid !== undefined ? state.cards[actingCardFor(state, sourceUid)] : undefined
+    const source = sourceUid !== undefined ? sourceCardInformation(state, sourceUid) : undefined
     if (source === undefined || source.ready) return false
   }
   if (condition.friendlyGigValuePair === true && valuePairCount(state, player) < 1) {
@@ -318,7 +324,7 @@ export function conditionHolds(
   }
   // Batch 7 additions (docs/rulings.md §120 ff.):
   if (condition.sourceStoleGigThisTurn === true) {
-    const source = sourceUid !== undefined ? state.cards[actingCardFor(state, sourceUid)] : undefined
+    const source = sourceUid !== undefined ? sourceCardInformation(state, sourceUid) : undefined
     if (source === undefined || source.stoleGigThisTurn !== true) return false
   }
   if (
@@ -566,7 +572,12 @@ function activeStaticNodes(db: CardDb, state: GameState, uid: number): EffectNod
  * host (docs/rulings.md §29).
  */
 export function effectivePower(db: CardDb, state: GameState, uid: number): number {
-  return Math.max(0, signedPower(db, state, uid))
+  if (!inPlay(state, uid) && state.lastKnownCards?.[uid]) return state.lastKnownCards[uid].power
+  let power = signedPower(db, state, uid)
+  if (state.pendingAttack?.attacker === uid) power += attackPowerBonus(db, state, uid)
+  const fight = state.pendingFight
+  if (fight && (fight.attacker === uid || fight.defender === uid)) power += fightPowerBonus(db, state, uid, fight.attacker === uid ? fight.defender : fight.attacker)
+  return Math.max(0, power)
 }
 
 /** Signed arithmetic is retained until all contextual modifiers have been added. */
@@ -576,6 +587,7 @@ export function signedPower(db: CardDb, state: GameState, uid: number): number {
   const def = db[card.defId]
   if (!def) throw new Error(`Unknown card definition: ${card.defId}`)
 
+  if (!inPlay(state, uid) && state.lastKnownCards?.[uid]) return state.lastKnownCards[uid].signedPower
   let power = (def.power ?? 0) + card.tempPower + card.permPower
   for (const gearUid of card.attachedGear) {
     const gear = state.cards[gearUid]
@@ -612,7 +624,7 @@ export function resolvePowerAmount(
     return state.players[player].legends.filter((uid) => state.cards[uid].faceUp).length
   }
   if ('perEquippedGear' in amount) {
-    return state.cards[subjectUid].attachedGear.length * amount.perEquippedGear
+    return sourceCardInformation(state, subjectUid).attachedGear.length * amount.perEquippedGear
   }
   // "+2 power for each friendly Gig with an even value" / "Draw 1 for each
   // friendly Gig with an odd value" (docs/rulings.md §68 ff.).
@@ -657,9 +669,8 @@ export function cardTags(def: CardDef): string[] {
 /**
  * The extra power `uid` fights with against this specific `foe` — "+2 power
  * while fighting a Legend" (meredith-stout-stone-cold-corpo). Deliberately
- * separate from `effectivePower`: the bonus only exists while a fight against
- * a matching foe is actually happening, so `fight()` is the only reader
- * (docs/rulings.md §55 ff.).
+ * computed separately and included by `effectivePower` while a fight and its
+ * pending effects are resolving (CR 9.16.1, 9.29).
  */
 export function fightPowerBonus(db: CardDb, state: GameState, uid: number, foe: number): number {
   const foeCard = state.cards[foe]
@@ -683,10 +694,8 @@ export function fightPowerBonus(db: CardDb, state: GameState, uid: number, foe: 
  * Units have +2 power while attacking" (saburo-arasaka-stubborn-patriarch,
  * saul-bright-stormrider, docs/rulings.md §107 ff.) — a power bonus that
  * exists only for the duration of `uid`'s own attack, the mirror image of
- * `fightPowerBonus` (about the FOE's type, not "is this an attack"). Read by
- * `combat.ts`'s `fight()` (attacker's side only) and `resolveAttack()`'s
- * steal-count calculation, never `effectivePower` generally — there is no
- * "currently attacking" fact outside an attack in progress.
+ * `fightPowerBonus` (about the FOE's type, not "is this an attack"). Included by `effectivePower` from attack declaration through the end of
+ * pending effects, using the current attack context (CR 9.5, 9.29).
  */
 export function attackPowerBonus(db: CardDb, state: GameState, uid: number): number {
   const card = state.cards[uid]
@@ -946,7 +955,7 @@ export function stealValueCap(
   )
   if (!capped) return null
   if (!isUnitStealer(db, state, stealerUid)) return null
-  return Math.max(0, signedPower(db, state, stealerUid) + attackPowerBonus(db, state, stealerUid))
+  return effectivePower(db, state, stealerUid)
 }
 
 /**

@@ -11,6 +11,7 @@ import type { RngState } from './rng'
 export type PlayerId = 0 | 1
 export type DieSize = 4 | 6 | 8 | 10 | 12 | 20
 export interface GigDie {
+  id?: number
   size: DieSize
   value: number // value 0 = unrolled (in fixer)
 }
@@ -750,8 +751,8 @@ export interface CardInstance {
   // `tempPower` in `clearTurnBuffs`:
   /**
    * "+N power ... while fighting rival Units this turn" (synapse-burnout) — a
-   * temporary bonus consulted ONLY by `query.fightPowerBonus` (never
-   * `effectivePower`), unlike `tempPower` which is a general power delta.
+   * temporary bonus included by `effectivePower` during a fight and its
+   * pending effects, unlike `tempPower` which is a general power delta.
    */
   fightPowerBonusThisTurn?: number
   /** "steals 1 fewer Gig this turn" (take-control) — read by `combat.ts`'s attack-driven steal count. */
@@ -876,6 +877,10 @@ export interface PendingIntercept {
 }
 
 export interface GameState {
+  /** Action-scoped last valid information for pieces whose effects are still pending. */
+  lastKnownCards?: Record<number, { instance: CardInstance; power: number; signedPower: number; hostUid?: number }>
+  pendingFight?: { attacker: number; defender: number }
+
   /** AI-only scratch state: stop lookahead at a future hidden-information read. */
   simulationPreview?: boolean
   /** Transient resolution work, scoped to a single deterministic action replay. */

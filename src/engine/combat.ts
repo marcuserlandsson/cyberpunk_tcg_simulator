@@ -45,7 +45,6 @@ import { transferStolenGigs } from './stealing'
 import {
   attackableReadyKeyword,
   ATTACK_READY,
-  attackPowerBonus,
   canAttackGigAreaDespiteLag,
   canAttackUnitDespiteLag,
   cantAttack,
@@ -57,7 +56,6 @@ import {
   defeatShieldsOf,
   effectivePower,
   signedPower,
-  fightPowerBonus,
   hasKeyword,
   opponentOf,
   rivalDeniesFreshAttacks,
@@ -337,6 +335,7 @@ function endAttack(draft: GameState): void {
   // ending the game -> this ran anyway and clobbered the terminal phase).
   if (draft.winner !== null) return
   draft.pendingAttack = null
+  delete draft.pendingFight
   const steal = draft.pendingSteal
   if (steal !== null && steal.thief !== undefined) {
     steal.resumePhase = 'main'
@@ -352,7 +351,7 @@ export function validatePendingAttack(db: CardDb, draft: GameState): void {
   const attack = draft.pendingAttack
   if (!attack || draft.winner !== null) return
   const target = attack.redirectedTo ?? attack.target
-  const player = draft.cards[attack.attacker].owner
+  const player = controllerOf(draft, attack.attacker)
   if (!onField(draft, attack.attacker) || cantAttack(db, draft, attack.attacker) ||
     (typeof target === 'number' && !attackTargets(db, draft, player, attack.attacker).includes(target)) ||
     (target === 'gigArea' && cantAttackGigArea(db, draft, attack.attacker))) {
@@ -383,6 +382,8 @@ export function declareAttack(
     (entry) => !(entry.kind === 'mustAttack' && entry.unitUid === attacker)
   )
 
+  draft.pendingAttack = { attacker, target }
+
   // Spending the attacker is a spend like any other: "When this Unit is spent"
   // fires here (docs/rulings.md §47).
   spendOnDraft(db, draft, [attacker])
@@ -407,12 +408,11 @@ export function declareAttack(
   // [trigger seam] "The first time a friendly ARASAKA Unit attacks each turn,
   // ..." — a watcher, broadcast to every in-play card of the ATTACKER'S OWN
   // side (docs/rulings.md §55 ff.), never the attacker's own printed text.
-  fireWatcherTrigger(db, draft, 'onFriendlyAttack', draft.cards[attacker].owner, {
+  fireWatcherTrigger(db, draft, 'onFriendlyAttack', controllerOf(draft, attacker), {
     attackerTags: cardTags(db[draft.cards[attacker].defId]),
   })
   if (draft.winner !== null) return
 
-  draft.pendingAttack = { attacker, target }
   flushPendingEffects(db, draft)
   if (draft.winner !== null) {
     draft.pendingAttack = null
@@ -440,6 +440,13 @@ export type FieldExit = 'trash' | 'hand' | 'deckBottom'
  */
 export function leaveField(draft: GameState, db: CardDb, uid: number, exit: FieldExit, randomize = true): void {
   const card = draft.cards[uid]
+  if (draft.effectQueue) {
+    draft.lastKnownCards ??= {}
+    for (const source of [uid, ...card.attachedGear]) {
+      draft.lastKnownCards[source] = { instance: structuredClone(draft.cards[source]), power: effectivePower(db, draft, source),
+        signedPower: signedPower(db, draft, source), ...(source !== uid ? { hostUid: uid } : {}) }
+    }
+  }
   const owner = draft.players[card.owner]
   for (const player of draft.players) {
     player.field = player.field.filter(u => u !== uid)
@@ -626,6 +633,11 @@ export function defeatGear(draft: GameState, db: CardDb, gearUid: number): void 
     if (host !== null) break
   }
   if (host === null) return
+  if (draft.effectQueue) {
+    draft.lastKnownCards ??= {}
+    draft.lastKnownCards[gearUid] = { instance: structuredClone(draft.cards[gearUid]),
+      power: effectivePower(db, draft, gearUid), signedPower: signedPower(db, draft, gearUid), hostUid: host }
+  }
   draft.cards[host].attachedGear = draft.cards[host].attachedGear.filter((uid) => uid !== gearUid)
   const owner = draft.cards[gearUid].owner
   draft.players[owner].trash.push(gearUid)
@@ -644,16 +656,13 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // fixes).
   if (draft.winner !== null) return
   // "+2 power while fighting a Legend" — a bonus that only exists for the
-  // duration of this specific fight, never folded into `effectivePower`
-  // (docs/rulings.md §55 ff.).
+  // duration of this fight and its pending effects (CR 9.16.1, 9.29).
   // "... have +N power while attacking" (saburo-arasaka-stubborn-patriarch,
   // saul-bright-stormrider, docs/rulings.md §107 ff.) only ever applies to
   // the ATTACKER's own side of this fight, never the defender's.
-  const attackPower = Math.max(0,
-    signedPower(db, draft, attacker) +
-    fightPowerBonus(db, draft, attacker, defender) +
-    attackPowerBonus(db, draft, attacker))
-  const defendPower = Math.max(0, signedPower(db, draft, defender) + fightPowerBonus(db, draft, defender, attacker))
+  draft.pendingFight = { attacker, defender }
+  const attackPower = effectivePower(db, draft, attacker)
+  const defendPower = effectivePower(db, draft, defender)
   // "This Unit wins all fights against CORPO Units" overrides the power
   // comparison in that Unit's favour (docs/rulings.md §41).
   const attackerAlwaysWins = winsFightRegardless(db, draft, attacker, defender)
@@ -766,8 +775,7 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // Recheck protection after fight-triggered effects have finished resolving.
   const casualties = defeated.filter(uid => {
     const foe = uid === attacker ? defender : attacker
-    const power = signedPower(db, draft, foe) + fightPowerBonus(db, draft, foe, uid)
-      + (foe === attacker ? attackPowerBonus(db, draft, foe) : 0)
+    const power = effectivePower(db, draft, foe)
     return onField(draft, uid) && !hasKeyword(db, draft, uid, FIGHT_IMMUNE) && power > 0
   })
   for (const uid of casualties) {
@@ -849,7 +857,7 @@ export function resolveAttack(draft: GameState, db: CardDb): void {
   // like a fight (docs/rulings.md §107 ff.); "steals 1 fewer Gig this turn"
   // (take-control, docs/rulings.md §107 ff.) then reduces the resulting
   // count, floored at 0.
-  const power = signedPower(db, draft, attacker) + attackPowerBonus(db, draft, attacker)
+  const power = effectivePower(db, draft, attacker)
   const reduction = draft.cards[attacker].stealReduction ?? 0
   const rawCount = Math.max(0, stealCount(power) - reduction)
   // Capped by what this attacker may actually take, not merely by how many

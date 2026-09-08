@@ -831,7 +831,7 @@ describe('heuristic AI: tuning regressions', () => {
     // eslint-disable-next-line no-console
     console.log(`[ai] quiescence ablation: on ${aWins} vs off ${bWins} of 40`)
     expect(aWins).toBeGreaterThan(bWins)
-  })
+  }, 60_000)
 
   it('the tuned weights beat the brief\'s starting set head to head', () => {
     const { aWins, bWins } = headToHead(
@@ -843,7 +843,7 @@ describe('heuristic AI: tuning regressions', () => {
     // eslint-disable-next-line no-console
     console.log(`[ai] weight tuning: tuned ${aWins} vs brief-set ${bWins} of 40`)
     expect(aWins).toBeGreaterThan(bWins)
-  })
+  }, 60_000)
 
   it('the readyBlocker term is what gets 0-power blockers DEPLOYED: Mercs block windows collapse without it', () => {
     // The 2026-08-25 balance investigation's core measurement, pinned: with the

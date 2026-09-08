@@ -264,7 +264,8 @@ describe('goro-takemura-losing-his-way', () => {
     expect(effectivePower(db, s, unit)).toBe(4)
     s = startAttack(db, s, unit, rivalUnit)
     s = resolvePendingOrder(db, s)
-    expect(effectivePower(db, s, unit)).toBe(9)
+    // Saburo also grants +1 while attacking.
+    expect(effectivePower(db, s, unit)).toBe(10)
   })
 
   it('does not gain the bonus while a friendly Legend is still face-down', () => {

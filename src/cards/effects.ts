@@ -36,6 +36,7 @@ import {
   controllerOf,
   conditionMet,
   effectiveCardCost,
+  effectivePower,
   firstMatchingPlayDiscountSources,
   opponentOf,
   reducedCost,
@@ -705,7 +706,9 @@ function applyNode(
       // later sibling still reads the right ones (docs/rulings.md §92 ff.,
       // the same "step over a fizzled construct's slots" rule as sameTarget).
       const width = slotWidth(node.effect)
-      if (!conditionHolds(draft, ctx.player, node.condition, ctx.context ?? {}, ctx.sourceUid)) {
+      const context = { ...ctx.context, sourcePower: effectivePower(db, draft,
+        ctx.context?.equipHostUid ?? ctx.context?.defeatedHostUid ?? abilityHost(draft, ctx.sourceUid)) }
+      if (!conditionHolds(draft, ctx.player, node.condition, context, ctx.sourceUid)) {
         slots.next += width
         return
       }
@@ -866,7 +869,7 @@ function applyNode(
           Object.fromEntries(options.map(index => [index, `d${p.gigArea[index].size}: ${p.gigArea[index].value}`])))
         if (index === null) break
         const [die] = p.gigArea.splice(index, 1)
-        p.fixer.push({ size: die.size, value: 0 })
+        p.fixer.push({ ...die, value: 0 })
       }
       note(draft, ctx.sourceUid, `return ${node.count} gig(s) to the fixer`)
       return
@@ -1041,6 +1044,7 @@ export function applyEffectDefOnDraft(
   if (!card) return
   if (draft.winner !== null) return
   const player = controller ?? effectController(draft, sourceUid)
+  context = { ...context, sourcePower: effectivePower(db, draft, context.equipHostUid ?? context.defeatedHostUid ?? abilityHost(draft, sourceUid)) }
   if (!conditionMet(draft, player, def, context, sourceUid)) return
   // A *triggered* def may carry an optional cost ("{Attack} You may pay 2 €$.
   // If you do, ..."). Paying is the controller's decision, carried on the
@@ -1130,6 +1134,21 @@ function markOncePerTurn(draft: GameState, sourceUid: number, index: number): vo
  * resolved, so a sibling that fires later in this same pass is never blocked
  * by its own group's marking (only a LATER firing is).
  */
+// Event qualifiers decide whether an effect becomes pending. Board-state "if"
+// conditions are evaluated when it resolves (CR 10.15–10.15.1).
+const EVENT_CONDITION_KEYS = [
+  'stolenDieSize', 'selfIsStealer', 'attackerKeyword', 'defeatedKeyword',
+  'stealerIsLegend', 'stolenDieValueParity', 'defeatedIsFriendly',
+  'defeatedWasEquipped', 'playedCardColor', 'playedCardType', 'playedCardKeyword',
+  'stealerKeywordAnyOf', 'rolledExtremeValue', 'rolledDieSizeAnyOf',
+] as const satisfies readonly (keyof EffectCondition)[]
+function triggerConditionMet(state: GameState, player: PlayerId, def: EffectDef, context: TriggerContext, sourceUid: number): boolean {
+  const condition = Object.fromEntries(EVENT_CONDITION_KEYS.flatMap(key =>
+    def.condition?.[key] === undefined ? [] : [[key, def.condition[key]]]
+  )) as EffectCondition
+  return conditionHolds(state, player, condition, context, sourceUid)
+}
+
 export function fireCardTrigger(
   db: CardDb,
   draft: GameState,
@@ -1160,7 +1179,7 @@ export function fireCardTrigger(
   for (const [index, effect] of def.effects.entries()) {
     if (effect.trigger !== trigger || effect.oncePerTurn !== true) continue
     if (effect.onceKey === undefined || alreadySpent[index]) continue
-    if (conditionMet(draft, player, effect, context, sourceUid)) {
+    if (triggerConditionMet(draft, player, effect, context, sourceUid)) {
       groupEvaluated.add(effect.onceKey)
     }
   }
@@ -1173,7 +1192,7 @@ export function fireCardTrigger(
     const slice = targets.slice(offset, offset + demand)
     offset += demand
     if (alreadySpent[index]) continue
-    const met = conditionMet(draft, player, effect, context, sourceUid)
+    const met = triggerConditionMet(draft, player, effect, context, sourceUid)
     if (effect.oncePerTurn === true) {
       const groupSpent = effect.onceKey !== undefined && groupEvaluated.has(effect.onceKey)
       if (groupSpent || met) markOncePerTurn(draft, sourceUid, index)

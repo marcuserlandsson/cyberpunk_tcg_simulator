@@ -24,6 +24,7 @@ describe('private Legend knowledge', () => {
     next = applyAction(db, next, { type: 'answerIntercept', answer: legend })
     expect(next.pendingIntercept?.player).toBe(0)
     expect(next.pendingIntercept?.prompt).toContain(db[state.cards[legend].defId].name)
+    expect(next.pendingIntercept?.prompt).not.toContain('[object Object]')
     expect(next.pendingIntercept?.knownCards).toContainEqual({ uid: legend, viewer: 0 })
     next = resolveEffectChoices(db, applyAction(db, next, { type: 'answerIntercept', answer: 0 }))
     expect(next.cards[legend]).toMatchObject({ faceUp: false, knownTo: [0] })

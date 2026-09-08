@@ -229,6 +229,8 @@ export function draftState(state: GameState): GameState {
     ...state,
     players: [clonePlayer(state.players[0]), clonePlayer(state.players[1])],
     cards,
+    ...(state.lastKnownCards ? { lastKnownCards: structuredClone(state.lastKnownCards) } : {}),
+    ...(state.pendingFight ? { pendingFight: { ...state.pendingFight } } : {}),
     ...(state.effectQueue ? { effectQueue: structuredClone(state.effectQueue) } : {}),
     pendingAttack: state.pendingAttack ? { ...state.pendingAttack } : null,
     pendingSteal: clonePendingSteal(state.pendingSteal),
@@ -443,17 +445,15 @@ export function beginTurn(draft: GameState, player: PlayerId, turnNumber: number
     return
   }
 
-  // "Until your next turn, ..." / "... next turn if it can" (docs/rulings.md
-  // §141/§142): an entry created on this player's own turn spans exactly the
-  // rival's intervening turn and lapses here, the moment its controller's next
-  // turn begins — before `readySpentCards`, so nothing can read a stale one.
-  draft.floatingEffects = draft.floatingEffects.filter(
-    (entry) => !(entry.expiry === 'ownerNextTurnStart' && entry.controller === player)
-  )
-
+  const expiring = new Set(draft.floatingEffects.filter(
+    entry => entry.expiry === 'ownerNextTurnStart' && entry.controller === player
+  ))
   resetTurnState(draft, player)
   beforeReady?.()
   if (draft.winner !== null) return
+  // CR 10.23.1: existing durations end after this boundary's pending effects.
+  // Preserve effects newly created by those start-of-turn resolutions.
+  draft.floatingEffects = draft.floatingEffects.filter(entry => !expiring.has(entry))
   readySpentCards(draft, player, turnNumber)
 
   if (!drawCards(draft, player, 1)) {

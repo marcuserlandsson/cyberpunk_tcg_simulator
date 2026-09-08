@@ -242,7 +242,7 @@ function chooseGigDie(draft: GameState, db: CardDb, size: number): void {
   const [die] = p.fixer.splice(index, 1)
   const [value, rng] = rollDie(draft.rng, die.size)
   draft.rng = rng
-  p.gigArea.push({ size: die.size, value })
+  p.gigArea.push({ ...die, value })
   const dieIndex = p.gigArea.length - 1
   draft.events.push({ type: 'dieRolled', player, size: die.size, value })
 
@@ -497,6 +497,9 @@ function runAction(
   draft.pendingIntercept = null
 
   draft.effectQueue = []
+  draft.lastKnownCards = {}
+  let nextDieId = Math.max(0, ...draft.players.flatMap(p => [...p.fixer, ...p.gigArea].map(die => die.id ?? 0))) + 1
+  for (const player of draft.players) for (const die of [...player.fixer, ...player.gigArea]) die.id ??= nextDieId++
 
   try {
     dispatch(db, draft, action)
@@ -522,6 +525,7 @@ function runAction(
   draft.interceptAnswers = []
   delete draft.effectQueue
   delete draft.resolvingEffects
+  delete draft.lastKnownCards
   checkOvertimeWin(draft)
   return draft
 }

@@ -3156,7 +3156,7 @@ describe('EffectNode: stealGig with distinctValueOnly (docs/rulings.md §68 ff.)
 
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 }) // take the d20
     expect(next.phase).toBe('main') // the only qualifying bonus die was taken
-    expect(next.players[1].gigArea).toEqual([{ size: 6, value: 2 }])
+    expect(next.players[1].gigArea.map(({ size, value }) => ({ size, value }))).toEqual([{ size: 6, value: 2 }])
     expect(next.players[0].gigArea).toHaveLength(3)
   })
 
@@ -3906,7 +3906,7 @@ describe('interception: stealInterceptByDiscard (alt-cunningham, §144)', () => 
     })
 
     const prevented = applyAction(db, asked, { type: 'answerIntercept', answer: match })
-    expect(prevented.players[1].gigArea).toEqual([{ size: 6, value: 3 }])
+    expect(prevented.players[1].gigArea.map(({ size, value }) => ({ size, value }))).toEqual([{ size: 6, value: 3 }])
     expect(prevented.players[0].gigArea).toEqual([])
     expect(prevented.players[1].trash).toEqual([match])
     expect(prevented.phase).toBe('main')
@@ -3924,7 +3924,7 @@ describe('interception: stealInterceptByDiscard (alt-cunningham, §144)', () => 
       { type: 'chooseGig', dieIndex: 0 }
     )
     const stolen = applyAction(db, asked, { type: 'answerIntercept', answer: -1 })
-    expect(stolen.players[0].gigArea).toEqual([{ size: 6, value: 3 }])
+    expect(stolen.players[0].gigArea.map(({ size, value }) => ({ size, value }))).toEqual([{ size: 6, value: 3 }])
     expect(stolen.players[1].gigArea).toEqual([])
     expect(stolen.players[1].hand).toHaveLength(2)
   })

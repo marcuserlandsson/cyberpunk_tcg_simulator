@@ -498,8 +498,8 @@ describe('gig-area attacks', () => {
 
     // Take the d8 first, then the d4 — order and identity must be respected.
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 2 })
-    expect(next.players[0].gigArea).toEqual([])
-    expect(next.players[1].gigArea).toEqual([
+    expect(next.players[0].gigArea.map(({ size, value }) => ({ size, value }))).toEqual([])
+    expect(next.players[1].gigArea.map(({ size, value }) => ({ size, value }))).toEqual([
       { size: 4, value: 1 },
       { size: 6, value: 5 },
       { size: 8, value: 8 },
@@ -511,11 +511,11 @@ describe('gig-area attacks', () => {
     expect(next.events.some(e => e.type === 'gigStolen')).toBe(false)
 
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
-    expect(next.players[0].gigArea).toEqual([
+    expect(next.players[0].gigArea.map(({ size, value }) => ({ size, value }))).toEqual([
       { size: 8, value: 8 },
       { size: 4, value: 1 },
     ])
-    expect(next.players[1].gigArea).toEqual([{ size: 6, value: 5 }])
+    expect(next.players[1].gigArea.map(({ size, value }) => ({ size, value }))).toEqual([{ size: 6, value: 5 }])
     expect(next.phase).toBe('main')
   })
 

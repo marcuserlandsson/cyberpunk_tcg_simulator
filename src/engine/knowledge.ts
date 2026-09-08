@@ -26,7 +26,7 @@ export function peekLegends(db: CardDb, state: GameState, player: PlayerId, uids
     kind: 'effectChoice', player, protector: sourceUid, subject: sourceUid, options: [0], optionLabels: { 0: 'Finish looking' },
     prompt: `Private peek: ${uids.map(uid => {
       const def = db[state.cards[uid].defId]
-      return `Legend ${legends.indexOf(uid) + 1}: ${def.name}${def.subtitle ? ` — ${def.subtitle}` : ''}. Cost ${def.printedCost === null ? '—' : def.cost}; power ${def.power ?? '—'}; RAM ${def.ram}; ${def.color}. ${def.text}`
+      return `Legend ${legends.indexOf(uid) + 1}: ${def.name}${def.subtitle ? ` — ${def.subtitle}` : ''}. Cost ${def.printedCost === null ? '—' : def.cost}; power ${def.power ?? '—'}; RAM ${def.ramLimit ? `${def.ramLimit.color} ${def.ramLimit.value}` : def.ram ? `${def.ram.color} ${def.ram.value}` : '—'}; ${def.color}. ${def.text}`
     }).join(' | ')}`,
     knownCards: uids.map(uid => ({ uid, viewer: player })),
   })
