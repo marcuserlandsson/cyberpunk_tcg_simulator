@@ -17,7 +17,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 11. Clarify simulation identities/metrics, add uncertainty and controlled matchup comparisons.
 - [x] 12. Add explicit deck formats, deck versions/notes, and direct Play this deck.
 - [x] 13. Add deck diagnostics, legal-RAM filtering, opening-hand sampling, and manual practice scenarios.
-- [ ] 14. Add multi-deck acquisition planning with shared/assembled inventories and optional binder reservations.
+- [x] 14. Add multi-deck acquisition planning with shared/assembled inventories and optional binder reservations.
 - [ ] 15. Add compact collection search, collector numbers, artwork previews, bulk entry, and scoped filters.
 - [ ] 16. Add recoverable acquisition/trade sessions, import previews/history, optional date/source/cost, and starter entry.
 - [ ] 17. Add sealed pool validation/building and best-of-three/manual match tracking.
@@ -167,3 +167,7 @@ Constructed/Demo format choices control validation even when a legacy demo flag 
 ### 13 — diagnostics, opening hands and manual scenarios
 
 Added copy-weighted cost/type distributions, Sell counts/ratios, configurable early-Unit density, subtitle search and a selected-Legend RAM filter. Opening-hand sampling uses the actual seeded deal and labels stale samples after edits. Manual practice controls both seats with no AI timer, follows the deciding player across board/payment/private prompts, preserves the mode in named saved positions and undoes one decision. Existing game saves provide repeatable scenario checkpoints without inventing illegal board states. Verified 341 UI/replay checks, 51 focused diagnostics/manual/perspective checks, TypeScript/build and five browser workflows including both manual seats, undo/resume and a complete AI game.
+
+### 14 — multi-deck acquisition planning
+
+Collection now plans purchases across selected saved decks, using the maximum distinct-card requirement for shared cards or summed requirements for assembled decks. Eligible printings pool across equivalent card identities. Optional binder reservations remove one owned copy per unique artwork, preferring collection-only objects when possible. The table distinguishes owned/available/reserved/buy/playset gaps and lists playable printing alternatives for missing artworks; it explains when a purchase can serve both goals. Unknown ownership suppresses purchase counts. Verified nine arithmetic/artwork checks, 32 collection/planner checks, TypeScript/build and a scratch browser workflow exercising sharing, assembly, binder reservation and export text without altering inventory through the planner.

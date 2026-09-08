@@ -1,3 +1,4 @@
+import { AcquisitionPlanner } from './AcquisitionPlanner'
 import { artworkGroups, ownedArtworkIds } from './artworks'
 // The Collection tab: every card in the pool as a tile (CardFrame + owned/
 // target badge), expandable into per-printing rows with +/− steppers.
@@ -155,6 +156,7 @@ export function CollectionView({
         </div>
       )}
       <CollectionHeader db={db} printings={loadResult.printings} />
+      <AcquisitionPlanner db={db} printings={loadResult.printings} counts={collection.counts} known={known} />
       <fieldset disabled={!known} className="collection-editor">
         <QuickAddBar db={db} printings={loadResult.printings} />
       </fieldset>

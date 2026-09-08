@@ -238,6 +238,8 @@ The builder offers explicit Constructed and Demo formats. Constructed validates 
 
 The diagnostics panel shows cost/type distributions, Sell density and adjustable early-Unit density. Opening six-card samples use the engine’s real seeded deal. The browser can filter by the selected Legends’ combined RAM. Play offers manual practice controlling both sides: the board follows the deciding player, no AI moves automatically, Undo rewinds one decision, and named saved positions serve as repeatable scenarios.
 
+Collection’s purchase planner combines selected decks using maximum requirements for shared cards or summed requirements for assembled decks. Optional reservations keep one owned copy per artwork in the binder. It shows available copies, deck gaps, separate playset gaps and missing-artwork printing alternatives.
+
 ## Simulation
 
 The **Simulate** tab picks two decks, runs N AI-vs-AI games in a background
