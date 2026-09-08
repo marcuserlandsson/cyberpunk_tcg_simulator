@@ -18,7 +18,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 12. Add explicit deck formats, deck versions/notes, and direct Play this deck.
 - [x] 13. Add deck diagnostics, legal-RAM filtering, opening-hand sampling, and manual practice scenarios.
 - [x] 14. Add multi-deck acquisition planning with shared/assembled inventories and optional binder reservations.
-- [ ] 15. Add compact collection search, collector numbers, artwork previews, bulk entry, and scoped filters.
+- [x] 15. Add compact collection search, collector numbers, artwork previews, bulk entry, and scoped filters.
 - [ ] 16. Add recoverable acquisition/trade sessions, import previews/history, optional date/source/cost, and starter entry.
 - [ ] 17. Add sealed pool validation/building and best-of-three/manual match tracking.
 - [ ] 18. Stabilize verification timeouts/cleanup, run final regression/build/browser checks, and reconcile documentation.
@@ -171,3 +171,7 @@ Added copy-weighted cost/type distributions, Sell counts/ratios, configurable ea
 ### 14 — multi-deck acquisition planning
 
 Collection now plans purchases across selected saved decks, using the maximum distinct-card requirement for shared cards or summed requirements for assembled decks. Eligible printings pool across equivalent card identities. Optional binder reservations remove one owned copy per unique artwork, preferring collection-only objects when possible. The table distinguishes owned/available/reserved/buy/playset gaps and lists playable printing alternatives for missing artworks; it explains when a purchase can serve both goals. Unknown ownership suppresses purchase counts. Verified nine arithmetic/artwork checks, 32 collection/planner checks, TypeScript/build and a scratch browser workflow exercising sharing, assembly, binder reservation and export text without altering inventory through the planner.
+
+### 15 — compact collection entry and scoped filters
+
+Added multi-word search across names/subtitles/text and printing keys/numbers/sets/artists, a paged compact printing list with exact thumbnails, and direct whole-number counts. Set/rarity/search now match the same printing and restrict expanded rows; scoped physical totals are labeled separately from global card goals. Bulk absolute counts validate every row, preview changes and apply together, refusing stale previews and unknown/duplicate/invalid rows. Verified collection/search/bulk regressions, TypeScript/build and a phone-viewport browser workflow covering row bounds, direct counts, preview/apply and persistence. Undo/history is the next checkpoint.

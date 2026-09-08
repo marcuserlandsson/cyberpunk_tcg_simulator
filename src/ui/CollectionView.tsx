@@ -1,3 +1,6 @@
+import { PrintingCount } from './PrintingCount'
+import { BulkCollectionEntry } from './BulkCollectionEntry'
+import { matchesPrinting } from './collectionEntry'
 import { AcquisitionPlanner } from './AcquisitionPlanner'
 import { artworkGroups, ownedArtworkIds } from './artworks'
 // The Collection tab: every card in the pool as a tile (CardFrame + owned/
@@ -95,6 +98,9 @@ export function CollectionView({
     }
   }, [])
 
+  const [search,setSearch]=useState('')
+  const [compact,setCompact]=useState(false)
+  const [rowLimit,setRowLimit]=useState(60)
   const [colors, setColors] = useState<Set<string>>(new Set())
   const [types, setTypes] = useState<Set<CardType>>(new Set())
   const [rarities, setRarities] = useState<Set<string>>(new Set())
@@ -118,8 +124,8 @@ export function CollectionView({
       .map((def) => rollup(def, loadResult.byCard.get(def.id) ?? [], collection, owned[def.id] ?? 0))
       .filter((r) => colors.size === 0 || colors.has(r.def.color))
       .filter((r) => types.size === 0 || types.has(r.def.type))
-      .filter((r) => rarities.size === 0 || r.printings.some((p) => rarities.has(p.rarity)))
-      .filter((r) => setCode === '' || r.printings.some((p) => p.setCode === setCode))
+      .map(r=>({...r,matchingPrintings:r.printings.filter(p=>matchesPrinting(r.def,p,search,setCode,rarities))}))
+      .filter(r=>r.matchingPrintings.length>0)
       .filter((r) => {
         if (goal === 'missing-playset') return !r.playsetDone
         if (goal === 'missing-arts') return !r.artsDone
@@ -127,7 +133,7 @@ export function CollectionView({
         return true
       })
       .sort((a, b) => a.def.name.localeCompare(b.def.name))
-  }, [db, loadResult, collection, owned, colors, types, rarities, setCode, goal])
+  }, [db, loadResult, collection, owned, colors, types, rarities, setCode, goal, search])
 
   if (loadResult.error !== undefined) {
     return <div data-testid="collection-error">Collection unavailable: {loadResult.error}</div>
@@ -161,7 +167,10 @@ export function CollectionView({
         <QuickAddBar db={db} printings={loadResult.printings} />
       </fieldset>
 
+      <BulkCollectionEntry printings={loadResult.printings} known={known} />
       <div className="collection-view__filters">
+        <label>Search cards or printing numbers<input data-testid="collection-search" value={search} onChange={e=>{setSearch(e.target.value);setRowLimit(60)}} placeholder="Name, subtitle, collector number, set, artist…" /></label>
+        <label><input data-testid="collection-compact" type="checkbox" checked={compact} onChange={e=>setCompact(e.target.checked)} />Compact printing list</label>
         <div className="card-browser__chips">
           {COLORS.map((color) => (
             <button type="button" key={color} data-testid={`collection-color-${color}`}
@@ -206,11 +215,19 @@ export function CollectionView({
             CardFrame's click-to-expand target underneath it. Spell the two
             glyphs out here instead, next to the goal filters they mirror. */}
         <p className="collection-view__legend" data-testid="collection-legend">
-          ✓ playset complete · ★ every artwork owned (any printing)
+          ✓ playset complete · ★ every artwork owned (any printing). Card goals and top totals cover the full collection; set, rarity and search restrict the printing rows below.
         </p>
       </div>
 
-      <div className="collection-view__grid" data-testid="collection-grid">
+      <p data-testid="collection-scope">Matching scope: {rollups.reduce((n,r)=>n+r.matchingPrintings.length,0)} printing rows · {known ? rollups.reduce((n,r)=>n+r.matchingPrintings.reduce((a,p)=>a+(collection.counts[p.key]??0),0),0) : '?'} physical copies owned</p>
+      {compact ? <div className="compact-printings" data-testid="compact-printings">
+        {rollups.flatMap(r=>r.matchingPrintings.map(p=>({r,p}))).slice(0,rowLimit).map(({r,p})=><div key={p.key} className="compact-printing" data-testid="compact-printing" data-printing-key={p.key}>
+          {getPrintingImageUrl(p.key) && <a href={getPrintingImageUrl(p.key)} target="_blank" rel="noreferrer"><img src={getPrintingImageUrl(p.key)} alt={p.collectorNumber} width={48} loading="lazy" /></a>}
+          <span><strong>{r.def.name}{r.def.subtitle ? ' — '+r.def.subtitle : ''}</strong><br />{p.setName} · {p.collectorNumber} · {p.rarity}{p.finish ? ' · '+p.finish : ''}<br /><small>{p.key} · {p.playable===false ? 'Collection only' : 'Playable printing'} · {p.artworkId ? 'Reviewed artwork' : 'Artwork unreviewed'}</small></span>
+          <PrintingCount printingKey={p.key} count={collection.counts[p.key]??0} known={known} />
+        </div>)}
+        {rollups.reduce((n,r)=>n+r.matchingPrintings.length,0)>rowLimit && <button onClick={()=>setRowLimit(n=>n+60)}>Show 60 more printings</button>}
+      </div> : <div className="collection-view__grid" data-testid="collection-grid">
         {rollups.map((r) => (
           <div key={r.def.id} className="collection-view__cell" data-testid="collection-cell"
             data-card-id={r.def.id}>
@@ -228,7 +245,7 @@ export function CollectionView({
             </button>
             {expanded === r.def.id && (
               <div className="collection-view__printings">
-                {r.printings.map((p) => {
+                {r.matchingPrintings.map((p) => {
                   const count = collection.counts[p.key] ?? 0
                   // Only show this exact printing: substituting base art misidentifies alternate illustrations.
                   const imageUrl = getPrintingImageUrl(p.key)
@@ -245,7 +262,7 @@ export function CollectionView({
                           onClick={() => adjustCount(p.key, -1)}>
                           −
                         </button>
-                        <span>{known ? count : '?'}</span>
+                        <PrintingCount printingKey={p.key} count={count} known={known} />
                         <button type="button" data-testid={`printing-inc-${p.key}`}
                           disabled={!known}
                           onClick={() => adjustCount(p.key, 1)}>
@@ -259,7 +276,7 @@ export function CollectionView({
             )}
           </div>
         ))}
-      </div>
+      </div>}
       </fieldset>
     </div>
   )
