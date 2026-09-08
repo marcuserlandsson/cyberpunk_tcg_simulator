@@ -19,6 +19,7 @@
 import { createRng, rollDie, shuffle, type RngState } from './rng'
 import type { DeckList } from './deck'
 import { opponentOf } from './query'
+import { stopAtHiddenInformation } from './preview'
 import type {
   CardDb,
   CardInstance,
@@ -226,6 +227,7 @@ export function draftState(state: GameState): GameState {
     ...state,
     players: [clonePlayer(state.players[0]), clonePlayer(state.players[1])],
     cards,
+    ...(state.effectQueue ? { effectQueue: structuredClone(state.effectQueue) } : {}),
     pendingAttack: state.pendingAttack ? { ...state.pendingAttack } : null,
     pendingSteal: clonePendingSteal(state.pendingSteal),
     oncePerTurnUsed: state.oncePerTurnUsed.slice(),
@@ -307,6 +309,8 @@ export function drawCards(draft: GameState, player: PlayerId, count: number): bo
     p.hand.push(uid)
     draft.events.push({ type: 'cardDrawn', player, uid })
   }
+  // The number drawn is knowable; their identities must not affect lookahead.
+  if (count > 0) stopAtHiddenInformation(draft)
   return true
 }
 

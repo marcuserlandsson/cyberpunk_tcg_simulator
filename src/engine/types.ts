@@ -851,7 +851,9 @@ export interface PendingSteal {
  */
 export interface PendingIntercept {
   /** Which mutation is being intercepted. */
-  kind: 'defeat' | 'steal'
+  kind: 'defeat' | 'steal' | 'effectOrder' | 'effectChoice'
+  prompt?: string
+  optionLabels?: Record<number, string>
   /** Who answers — the controller of the intercepting card. */
   player: PlayerId
   /** The in-play card whose printed text offers the interception. */
@@ -867,6 +869,11 @@ export interface PendingIntercept {
 }
 
 export interface GameState {
+  /** AI-only scratch state: stop lookahead at a future hidden-information read. */
+  simulationPreview?: boolean
+  /** Transient resolution work, scoped to a single deterministic action replay. */
+  effectQueue?: import('./resolution').PendingEffect[]
+  resolvingEffects?: boolean
   /** Consecutive turns whose active player began with an empty fixer. */
   emptyFixerStarts?: number
   overtime?: boolean

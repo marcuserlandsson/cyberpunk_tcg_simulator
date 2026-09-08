@@ -376,14 +376,14 @@ describe('fights', () => {
     }
   })
 
-  it('a 0-power unit attacking a 0-power unit defeats it (and dies) — a 0-0 tie', () => {
+  it('a 0-0 tie loses both fights but neither zero-power Unit can defeat the other', () => {
     const s = base()
     const attacker = putUnit(s, 0, 'japantown-jonin') // power 0
     const target = putUnit(s, 1, 'evelyn-parker-scheming-siren', { ready: false }) // power 0
 
     const next = react(declare(s, attacker, target), passReaction)
-    expect(next.players[0].trash).toContain(attacker)
-    expect(next.players[1].trash).toContain(target)
+    expect(next.players[0].field).toContain(attacker)
+    expect(next.players[1].field).toContain(target)
   })
 
   // Regression (found by the Task 9 fuzz harness, tests/fuzz/invariants.test.ts,

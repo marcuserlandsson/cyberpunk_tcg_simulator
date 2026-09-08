@@ -36,6 +36,7 @@ import {
   hasKeyword,
 } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
+import { resolvePendingOrder } from './fixtures'
 import type { CardDb, GameState } from '../../src/engine/types'
 import {
   activate,
@@ -261,6 +262,7 @@ describe('goro-takemura-losing-his-way', () => {
     const rivalUnit = fieldCard(s, 1, 'japantown-jonin', { ready: false })
     expect(effectivePower(db, s, unit)).toBe(4)
     s = startAttack(db, s, unit, rivalUnit)
+    s = resolvePendingOrder(db, s)
     expect(effectivePower(db, s, unit)).toBe(9)
   })
 

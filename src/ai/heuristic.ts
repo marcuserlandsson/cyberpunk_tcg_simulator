@@ -55,6 +55,7 @@
 
 import { legalActions } from '../engine/legal'
 import { applyAction } from '../engine/reduce'
+import { PreviewStopped } from '../engine/preview'
 import { actingPlayer, opponentOf } from '../engine/query'
 import { createRng, nextInt, type RngState } from '../engine/rng'
 import { DEFAULT_WEIGHTS, evaluate, type EvalWeights } from './evaluate'
@@ -96,19 +97,9 @@ const MULLIGAN_MIN_CHEAP_CARDS = 2
 /** "Cheap" = castable off the first couple of €$ the game hands you. */
 const MULLIGAN_CHEAP_COST = 2
 
-/**
- * Whether to take the first turn when the d20 roll makes it this AI's call.
- * Going first wins the race to a 7-Gig turn start (the win check runs at the
- * start of each turn, so the first player checks first every round), but it
- * costs two Legends spent and un-readied through turn 1 (guide p9) — and in
- * mirror games (heuristic vs heuristic, first player forced and alternated) the
- * second player wins **54.5% over 400 games**, and between 51.7% and 56.7%
- * across six different 120-game seed ranges: a small but consistently
- * one-directional edge, so the tempo is not worth the two Legends. The
- * measurement is pinned by a regression test (tests/ai/heuristic.test.ts's
- * tuning suite), which also asserts this constant agrees with it.
- */
-const PREFER_GOING_FIRST = false
+/** Current rules/AI mirror sample: first won 114 of 200 seeded games.
+ * This is a policy calibration, not a general claim about the TCG matchup. */
+const PREFER_GOING_FIRST = true
 
 /** The phases whose decision is a window inside a larger action. */
 function isWindowPhase(state: GameState): boolean {
@@ -190,16 +181,33 @@ function resolveWindows(db: CardDb, state: GameState, stepLimit: number): GameSt
  * One candidate's score: apply it (one internal `draftState` copy — this
  * function never clones anything itself), quiesce, evaluate.
  */
-function scoreAction(
+export function scoreAction(
   db: CardDb,
   state: GameState,
   action: Action,
   perspective: PlayerId,
-  weights: EvalWeights,
-  quiescenceSteps: number
+  weights: EvalWeights = DEFAULT_WEIGHTS,
+  quiescenceSteps: number = QUIESCENCE_STEP_LIMIT
 ): number {
-  const applied = applyAction(db, state, action)
-  const quiet = resolveWindows(db, applied, quiescenceSteps)
+  let quiet: GameState
+  try {
+    const applied = applyAction(db, { ...state, simulationPreview: true }, action)
+    quiet = resolveWindows(db, applied, quiescenceSteps)
+  } catch (error) {
+    if (!(error instanceof PreviewStopped)) throw error
+    quiet = error.state
+    // An unknown reveal does not end the rival's attack. Keep the public
+    // continuation (pass/steal) in the estimate without resolving that reveal.
+    // A second information boundary ends the estimate; never replay it twice.
+    if (quiet.phase === 'react' && quiet.pendingAttack !== null && quiescenceSteps > 0) {
+      try {
+        quiet = resolveWindows(db, quiet, quiescenceSteps)
+      } catch (nextError) {
+        if (!(nextError instanceof PreviewStopped)) throw nextError
+        quiet = nextError.state
+      }
+    }
+  }
   const score = evaluate(db, quiet, perspective, weights)
   return action.type === 'endTurn' ? score - END_TURN_TEMPO_PENALTY : score
 }

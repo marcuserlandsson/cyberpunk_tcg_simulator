@@ -841,9 +841,9 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
         {state.phase === 'intercept' && legal.length > 0 && state.pendingIntercept !== null && (
           <div className="prompt-bar" data-testid="intercept-bar">
             <span className="prompt-bar__label">
-              {state.pendingIntercept.kind === 'defeat'
+              {state.pendingIntercept.prompt ?? (state.pendingIntercept.kind === 'defeat'
                 ? `${nameOf(db, state, state.pendingIntercept.subject)} would be defeated — intervene with ${nameOf(db, state, state.pendingIntercept.protector)}?`
-                : `A Gig would be stolen — prevent it with ${nameOf(db, state, state.pendingIntercept.protector)}?`}
+                : `A Gig would be stolen — prevent it with ${nameOf(db, state, state.pendingIntercept.protector)}?`)}
             </span>
             <div className="prompt-bar__options">
               {legal.map((action, index) =>
@@ -854,11 +854,11 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
                     data-testid={action.answer === -1 ? 'intercept-decline' : 'intercept-option'}
                     onClick={() => game.act(action)}
                   >
-                    {action.answer === -1
+                    {state.pendingIntercept!.optionLabels?.[action.answer] ?? (action.answer === -1
                       ? 'Decline'
                       : state.pendingIntercept!.kind === 'defeat'
                         ? `Pay and defeat ${nameOf(db, state, action.answer)} instead`
-                        : `Discard ${nameOf(db, state, action.answer)} to prevent it`}
+                        : `Discard ${nameOf(db, state, action.answer)} to prevent it`)}
                   </button>
                 )
               )}

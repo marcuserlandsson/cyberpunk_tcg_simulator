@@ -37,6 +37,16 @@ import mercsDeck from '../../data/decks/mercs-the-heist.json'
 
 export const db: CardDb = loadCardDb()
 
+/** Legacy card scenarios use printed order unless the test is specifically about ordering. */
+export function resolvePendingOrder(db: CardDb, initial: GameState): GameState {
+  let state = initial
+  for (let count = 0; state.pendingIntercept?.kind === 'effectOrder'; count++) {
+    if (count > 100) throw new Error('Pending effects did not settle')
+    state = applyAction(db, state, { type: 'answerIntercept', answer: state.pendingIntercept.options[0] })
+  }
+  return state
+}
+
 const decks: [DeckList, DeckList] = [
   arasakaDeck as unknown as DeckList,
   mercsDeck as unknown as DeckList,

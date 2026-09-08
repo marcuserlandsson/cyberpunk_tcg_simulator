@@ -32,7 +32,7 @@ import type { GameState, PendingIntercept } from './types'
 /** The question an interception point asks, minus the replay bookkeeping. */
 export type InterceptAsk = Pick<
   PendingIntercept,
-  'kind' | 'player' | 'protector' | 'subject' | 'options'
+  'kind' | 'player' | 'protector' | 'subject' | 'options' | 'prompt' | 'optionLabels'
 >
 
 /**
@@ -58,7 +58,10 @@ export class InterceptRequired extends Error {
  */
 export function askIntercept(draft: GameState, ask: InterceptAsk): number {
   const answer = draft.interceptAnswers.shift()
-  if (answer !== undefined) return answer
+  if (answer !== undefined) {
+    if (!ask.options.includes(answer)) throw new Error('The replay answer is not valid for this decision.')
+    return answer
+  }
   throw new InterceptRequired(ask)
 }
 

@@ -39,6 +39,18 @@ import { nextInt, shuffle } from '../../engine/rng'
 import type { CardDb, GameState, PlayerId } from '../../engine/types'
 import { fireTriggerOnDraft, readyFriendlyEddies, spendOnDraft, type EffectCtx } from '../effects'
 
+/** Scripts that inspect/reveal previously unknown cards. AI previews stop before entry. */
+export const PRIVATE_INFORMATION_SCRIPTS = new Set([
+  'all-is-lost', 'arasaka-emergency-radioport', 'shattered-memories',
+  'hanako-arasaka-in-a-gilded-cage', 'kiroshi-optics', 'sketchy-ripper',
+  't-bug-amateur-philosopher', 'the-heist', 'viktor-vektor-sit-down-and-relax',
+  'river-ward-detective-on-the-hunt:defeat-search', 'fool-on-the-hill',
+  'hacked-corpo', 'chrome-reverie', 'judy-a-lvarez-braindance-maestro',
+  'judy-a-lvarez-nothing-to-doubt', 'misty-olszewski-mender-of-broken-spirits:unit',
+  'misty-olszewski-mender-of-broken-spirits:gear', 'misty-olszewski-mender-of-broken-spirits:program',
+  'sasha-yakovleva-won-t-let-you-down', 'tetratronic-rippler',
+])
+
 export type ScriptedCard = (db: CardDb, state: GameState, ctx: EffectCtx) => GameState
 
 /** Picks one element through the seeded rng, advancing it on the draft. */

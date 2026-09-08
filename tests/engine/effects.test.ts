@@ -1116,20 +1116,20 @@ describe('trigger: onDefeat', () => {
     let next = applyAction(db, s, { type: 'attack', attacker, target: victim })
     next = applyAction(db, next, { type: 'react', reaction: pass })
     // A tie defeats both; each casualty owes its own controller a die choice,
-    // resolved in the order the triggers fired (the defender's first).
+    // resolved with the turn player's pending effects first (CR 10.13).
     expect(next.players[0].trash).toContain(attacker)
     expect(next.players[1].trash).toContain(victim)
     expect(next.phase).toBe('chooseGig')
-    expect(actingPlayer(next)).toBe(1)
-
-    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 }) // p1 takes p0's 1
-    // The second steal is still owed, now to player 0.
-    expect(next.phase).toBe('chooseGig')
     expect(actingPlayer(next)).toBe(0)
-    // Player 1's area is now 5, 6 and the die they just took.
-    expect(gigChoices(db, next)).toEqual([0, 1, 2])
 
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 1 }) // p0 takes p1's 6
+    // The second steal is still owed, now to player 1.
+    expect(next.phase).toBe('chooseGig')
+    expect(actingPlayer(next)).toBe(1)
+    // Player 0's area is now 1, 2 and the die they just took.
+    expect(gigChoices(db, next)).toEqual([0, 1, 2])
+
+    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 }) // p1 takes p0's 1
     expect(next.phase).toBe('main')
     expect(next.pendingSteal).toBeNull()
     expect(next.pendingAttack).toBeNull()

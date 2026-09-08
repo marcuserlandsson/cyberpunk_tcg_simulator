@@ -20,6 +20,7 @@
 import { describe, expect, it } from 'vitest'
 import { effectiveCardCost, effectivePower } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
+import { resolvePendingOrder } from './fixtures'
 import { createRng } from '../../src/engine/rng'
 import { draftState } from '../../src/engine/game'
 import type { DieSize, GameState } from '../../src/engine/types'
@@ -155,17 +156,8 @@ describe('alt-cunningham-mother-of-daemons', () => {
     expect(attacked.players[0].hand).toHaveLength(handBefore)
   })
 
-  // Ruled-intended (docs/rulings.md §147's `playCardOnDraft` reorder,
-  // analyzed — not silently left — per task review of the Task 9 fuzz
-  // harness's fix round 2): playing a Gear now equips it to its host BEFORE
-  // paying for it, so a face-up Legend that is BOTH the new Gear's host AND
-  // one of the cards spent to pay for it already carries that Gear
-  // (`attachedGear.length > 0`) at the exact moment `spendOnDraft` spends
-  // her — genuinely more accurate than the pre-round-2 ordering, which
-  // asked "is this card equipped" before the equip that same action causes
-  // had actually happened yet. No card in the pool broke from this; this
-  // pins the behavior the ruling actually chose.
-  it('fires when a face-up Legend is both a new Gear\'s host and part of its own payment', () => {
+  // Comprehensive rules supersede the old equip-before-payment interpretation.
+  it('does not count a new Gear as equipped before its own payment', () => {
     const { state } = fixtureWithHand(0, ['mantis-blades'], { eddies: 0 })
     fieldCard(state, 0, 'alt-cunningham-mother-of-daemons')
     state.players[0].legends = []
@@ -176,10 +168,9 @@ describe('alt-cunningham-mother-of-daemons', () => {
 
     expect(next.cards[legend].attachedGear).toHaveLength(1)
     expect(next.cards[legend].ready).toBe(false) // spent to pay for her own Gear
-    // mantis-blades left hand (-1) and Alt's onFriendlyEquippedSpend drew 1
-    // (+1): net unchanged count, but a genuine draw happened.
-    expect(next.players[0].hand).toHaveLength(handBefore)
-    expect(next.events.some((e) => e.type === 'cardDrawn' && e.player === 0)).toBe(true)
+    // CR 4.10/10.20: the Legend was unequipped when spent to pay for the Gear.
+    expect(next.players[0].hand).toHaveLength(handBefore - 1)
+    expect(next.events.slice(state.events.length).some((e) => e.type === 'cardDrawn' && e.player === 0)).toBe(false)
   })
 
   // Clause 2, deferred by docs/rulings.md §72 and finished by the
@@ -312,7 +303,7 @@ describe('caliber-totentanz-s-top-dog', () => {
     const brute = fieldCard(state, 1, 'animals-wrecker')
     setGigs(state, 0, [{ size: 10, value: 5 }])
     const handBefore = state.players[1].hand.length
-    const next = passReact(db, startAttack(db, state, brute, caliber))
+    const next = resolvePendingOrder(db, passReact(db, startAttack(db, state, brute, caliber)))
     expect(next.players[0].trash).toContain(caliber)
     expect(next.players[1].hand).toHaveLength(handBefore - 2)
   })

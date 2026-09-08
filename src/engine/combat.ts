@@ -39,6 +39,7 @@ import {
 import { canonicalPayment, legendCallPayment } from './economy'
 import { askIntercept, DECLINE } from './intercept'
 import { shuffle } from './rng'
+import { flushPendingEffects } from './resolution'
 import {
   attackableReadyKeyword,
   ATTACK_READY,
@@ -408,6 +409,11 @@ export function declareAttack(
   if (draft.winner !== null) return
 
   draft.pendingAttack = { attacker, target }
+  flushPendingEffects(db, draft)
+  if (draft.winner !== null) {
+    draft.pendingAttack = null
+    return
+  }
 
   // An on-attack effect can also owe the attacker a Gig-die choice
   // (docs/rulings.md §32). They take it first; the react window opens when the
@@ -631,11 +637,8 @@ export function defeatGear(draft: GameState, db: CardDb, gearUid: number): void 
 }
 
 /**
- * Guide p11 step 04 FIGHT: "Compare both Units' power. The higher power Unit
- * defeats the other. On a tie, they defeat each other." Power is
- * `effectivePower` (printed power + until-end-of-turn deltas, and Gear
- * bonuses once Task 7 lands), so `>=` in both directions is exactly
- * "strictly higher wins, tie kills both".
+ * CR 9.17–9.20: compare power, resolve pending outcome effects, then defeat
+ * losers, subject to prevention and the prohibition on zero-power defeat.
  */
 function fight(draft: GameState, db: CardDb, attacker: number, defender: number): void {
   // Entry guard (docs/rulings.md §147): defends any future direct caller,
@@ -649,11 +652,11 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // "... have +N power while attacking" (saburo-arasaka-stubborn-patriarch,
   // saul-bright-stormrider, docs/rulings.md §107 ff.) only ever applies to
   // the ATTACKER's own side of this fight, never the defender's.
-  const attackPower =
+  const attackPower = Math.max(0,
     effectivePower(db, draft, attacker) +
     fightPowerBonus(db, draft, attacker, defender) +
-    attackPowerBonus(db, draft, attacker)
-  const defendPower = effectivePower(db, draft, defender) + fightPowerBonus(db, draft, defender, attacker)
+    attackPowerBonus(db, draft, attacker))
+  const defendPower = Math.max(0, effectivePower(db, draft, defender) + fightPowerBonus(db, draft, defender, attacker))
   // "This Unit wins all fights against CORPO Units" overrides the power
   // comparison in that Unit's favour (docs/rulings.md §41).
   const attackerAlwaysWins = winsFightRegardless(db, draft, attacker, defender)
@@ -665,6 +668,10 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   if (!attackerAlwaysWins && (defenderAlwaysWins || defendPower >= attackPower)) {
     wouldDefeat.push(attacker)
   }
+  // CR 9.17–9.19: determine winners/losers before applying defeat prevention.
+  const losers = [...wouldDefeat]
+  const loser = losers.length === 1 ? losers[0] : null
+  const winner = loser === null ? null : loser === defender ? attacker : defender
   // "A friendly Unit can't be defeated in a fight this turn"
   // (muamar-reyes-el-capitán, docs/rulings.md §81 ff.): an until-end-of-turn
   // immunity granted via the ordinary `grantKeyword` machinery. The fight
@@ -676,8 +683,8 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // opposing friendly Unit." (reboot-optics, docs/rulings.md §141) — a
   // one-shot floating entry consumed by the first fight its controller has a
   // combatant in, applied at exactly the same seam as FIGHT_IMMUNE above (the
-  // fight still happens normally for the other side; a loser who is never
-  // defeated leaves nobody to have "won", per §46's `defeatShield` reading).
+  // fight still happens normally for the other side; prevention does not
+  // change either Unit's previously determined fight outcome).
   const noDefeatIndex = draft.floatingEffects.findIndex(
     (entry) =>
       entry.kind === 'rivalFightNoDefeat' &&
@@ -703,18 +710,13 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // actually leaves the field, so "the opposing rival Unit" (`fightFoeUid`)
   // is still resolvable through the ordinary `defeat` node even when both
   // sides lose a tie.
-  for (const uid of defeated) {
+  for (const uid of losers) {
     const foe = uid === attacker ? defender : attacker
     fireTriggerOnDraft(db, draft, 'onLoseFight', uid, [], { fightFoeUid: foe })
   }
 
-  for (const uid of defeated) {
-    // An on-defeat effect from the first casualty (or a retaliation from
-    // `onLoseFight` above) could already have removed the second one from
-    // the field; never defeat a card twice.
-    if (!onField(draft, uid)) continue
-    defeatUnit(draft, db, uid)
-  }
+  if (winner !== null) fireTriggerOnDraft(db, draft, 'onWinFight', winner, [])
+  flushPendingEffects(db, draft)
 
   // The `onLoseFight`/on-defeat chains just fired can end the game outright
   // (docs/rulings.md §147). Everything below is non-trigger bookkeeping
@@ -724,18 +726,8 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // either way, win/loss bookkeeping included.
   if (draft.winner !== null) return
 
-  // [trigger seam] "when this Unit wins a fight": the survivor of a fight that
-  // actually defeated the other side (docs/rulings.md §41). A tie has no
-  // winner, and neither does a fight whose loser was saved by a `defeatShield`
-  // (§46) — it was never defeated, so nobody won.
-  const loser = defeated.length === 1 ? defeated[0] : null
-  const winner = loser === null ? null : loser === defender ? attacker : defender
-  if (winner !== null && loser !== null && !onField(draft, loser) && onField(draft, winner)) {
-    fireTriggerOnDraft(db, draft, 'onWinFight', winner, [])
-  }
-
   // Delayed, one-shot floating consequences of this fight (docs/rulings.md
-  // §141), both resolved AFTER the fight itself is completely settled — the
+  // §141), resolved after the win/loss outcome has been determined — the
   // printed texts speak of a fight that has already been won or lost:
   //   * "The next time a friendly Unit wins a fight by 3+ power this turn, it
   //     also steals a Gig." (appetite-for-destruction);
@@ -762,7 +754,7 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
     }
   }
 
-  for (const uid of defeated) {
+  for (const uid of losers) {
     const foe = uid === attacker ? defender : attacker
     const index = draft.floatingEffects.findIndex(
       (entry) => entry.kind === 'loseFightDefeatFoe' && entry.controller === draft.cards[uid].owner
@@ -771,6 +763,20 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
     draft.floatingEffects.splice(index, 1)
     if (onField(draft, foe)) defeatUnit(draft, db, foe)
   }
+  flushPendingEffects(db, draft)
+  if (draft.winner !== null) return
+  // A fight outcome survives shields; a zero-power opponent cannot cause defeat.
+  // Recheck protection after fight-triggered effects have finished resolving.
+  const casualties = defeated.filter(uid => {
+    const foe = uid === attacker ? defender : attacker
+    const power = effectivePower(db, draft, foe) + fightPowerBonus(db, draft, foe, uid)
+      + (foe === attacker ? attackPowerBonus(db, draft, foe) : 0)
+    return onField(draft, uid) && !hasKeyword(db, draft, uid, FIGHT_IMMUNE) && power > 0
+  })
+  for (const uid of casualties) {
+    defeatUnit(draft, db, uid)
+  }
+  flushPendingEffects(db, draft)
 }
 
 /**

@@ -33,6 +33,8 @@ import {
   OPENING_HAND_SIZE,
 } from './game'
 import { InterceptRequired } from './intercept'
+import { flushPendingEffects } from './resolution'
+import { stopAtHiddenInformation } from './preview'
 import { legalActions } from './legal'
 import {
   actingPlayer,
@@ -215,7 +217,10 @@ function keepHand(draft: GameState, db: CardDb): void {
  * 7-Gigs win check, or a deckout on the automatic draw).
  */
 function startTurn(draft: GameState, db: CardDb, player: PlayerId, turnNumber: number): void {
-  beginTurn(draft, player, turnNumber, () => fireWatcherTrigger(db, draft, 'onStartTurn', player, {}))
+  beginTurn(draft, player, turnNumber, () => {
+    fireWatcherTrigger(db, draft, 'onStartTurn', player, {})
+    flushPendingEffects(db, draft)
+  })
 }
 
 /**
@@ -392,6 +397,7 @@ function callLegend(draft: GameState, db: CardDb, player: PlayerId, payment: num
   if (p.calledLegendThisTurn) return
   const faceDown = p.legends.filter((uid) => !draft.cards[uid].faceUp)
   if (faceDown.length === 0) return
+  stopAtHiddenInformation(draft)
   const [index, rng] = nextInt(draft.rng, faceDown.length)
   draft.rng = rng
   const target = faceDown[index]
@@ -453,10 +459,12 @@ function endTurn(draft: GameState, db: CardDb): void {
   // in-play card of the player whose turn is ending, before the turn buffs
   // wipe (docs/rulings.md §55 ff.).
   fireWatcherTrigger(db, draft, 'onEndTurn', player, {})
+  flushPendingEffects(db, draft)
   if (draft.winner !== null) return
   // "... defeat it at the end of this turn" (docs/rulings.md §141) — resolved
   // before the buffs (and the floating entries themselves) are wiped.
   resolveEndOfTurnFloating(draft, db)
+  flushPendingEffects(db, draft)
   if (draft.winner !== null) return
   clearTurnBuffs(draft)
   if ((draft.emptyFixerStarts ?? 0) >= 2) draft.overtime = true
@@ -520,8 +528,11 @@ function runAction(
   draft.interceptAnswers = [...answers]
   draft.pendingIntercept = null
 
+  draft.effectQueue = []
+
   try {
     dispatch(db, draft, action)
+    flushPendingEffects(db, draft)
     validatePendingAttack(db, draft)
   } catch (error) {
     if (error instanceof InterceptRequired) {
@@ -540,6 +551,8 @@ function runAction(
   }
 
   draft.interceptAnswers = []
+  delete draft.effectQueue
+  delete draft.resolvingEffects
   checkOvertimeWin(draft)
   return draft
 }

@@ -79,6 +79,11 @@ async function takeOneAction(page: Page, wantAttack: boolean): Promise<string> {
     await intercept.click()
     return 'intercept-decline'
   }
+  const pendingEffect = page.getByTestId('intercept-option')
+  if (await isVisible(pendingEffect)) {
+    await pendingEffect.first().click()
+    return 'pending-effect'
+  }
   const rerollNo = page.getByTestId('gig-reroll-no')
   if (await isVisible(rerollNo)) {
     await rerollNo.click()

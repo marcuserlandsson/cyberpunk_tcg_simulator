@@ -149,20 +149,25 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "changeGig",
-          "amount": 1,
-          "target": "anyGigDie",
-          "adjust": true
-        }
-      },
-      {
-        "trigger": "onPlay",
-        "condition": {
-          "friendlyGigDistinctValuesAtLeast": 2
-        },
-        "effect": {
-          "kind": "draw",
-          "count": 1
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "changeGig",
+              "amount": 1,
+              "target": "anyGigDie",
+              "adjust": true
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "friendlyGigDistinctValuesAtLeast": 2
+              },
+              "effect": {
+                "kind": "draw",
+                "count": 1
+              }
+            }
+          ]
         }
       }
     ],
@@ -411,24 +416,29 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "defeat",
-          "target": "rivalUnit",
-          "filter": {
-            "maxPower": 4
-          }
-        }
-      },
-      {
-        "trigger": "onPlay",
-        "condition": {
-          "rivalGigLeadAtLeast": 2
-        },
-        "effect": {
-          "kind": "defeat",
-          "target": "rivalUnit",
-          "filter": {
-            "maxPower": 4
-          }
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "defeat",
+              "target": "rivalUnit",
+              "filter": {
+                "maxPower": 4
+              }
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "rivalGigLeadAtLeast": 2
+              },
+              "effect": {
+                "kind": "defeat",
+                "target": "rivalUnit",
+                "filter": {
+                  "maxPower": 4
+                }
+              }
+            }
+          ]
         }
       }
     ],
@@ -455,18 +465,23 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "gainEddieFromTopDeck",
-          "count": 1
-        }
-      },
-      {
-        "trigger": "onPlay",
-        "condition": {
-          "friendlyGigEvenAndOdd": true
-        },
-        "effect": {
-          "kind": "draw",
-          "count": 2
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "gainEddieFromTopDeck",
+              "count": 1
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "friendlyGigEvenAndOdd": true
+              },
+              "effect": {
+                "kind": "draw",
+                "count": 2
+              }
+            }
+          ]
         }
       }
     ],
@@ -495,11 +510,16 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "defeat",
-          "target": "rivalUnit",
-          "filter": {
-            "maxCost": 2
-          }
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "defeat",
+              "target": "rivalUnit",
+              "filter": {
+                "maxCost": 2
+              }
+            }
+          ]
         }
       },
       {
@@ -620,22 +640,27 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "floatingEffect",
-          "floating": {
-            "kind": "unitCantAttack",
-            "expiry": "ownerNextTurnStart",
-            "target": "rivalUnit"
-          }
-        }
-      },
-      {
-        "trigger": "onPlay",
-        "condition": {
-          "friendlyGigValueEquals": 1
-        },
-        "effect": {
-          "kind": "scripted",
-          "name": "chrome-reverie"
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "floatingEffect",
+              "floating": {
+                "kind": "unitCantAttack",
+                "expiry": "ownerNextTurnStart",
+                "target": "rivalUnit"
+              }
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "friendlyGigValueEquals": 1
+              },
+              "effect": {
+                "kind": "scripted",
+                "name": "chrome-reverie"
+              }
+            }
+          ]
         }
       }
     ],
@@ -1207,18 +1232,23 @@
       {
         "trigger": "onAttack",
         "effect": {
-          "kind": "draw",
-          "count": 1
-        }
-      },
-      {
-        "trigger": "onAttack",
-        "condition": {
-          "streetCredAheadOfRival": true
-        },
-        "effect": {
-          "kind": "discardCard",
-          "target": "friendlyHandCard"
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "draw",
+              "count": 1
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "streetCredAheadOfRival": true
+              },
+              "effect": {
+                "kind": "discardCard",
+                "target": "friendlyHandCard"
+              }
+            }
+          ]
         }
       }
     ],
@@ -1726,19 +1756,24 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "changeGig",
-          "amount": 4,
-          "target": "anyGigDie"
-        }
-      },
-      {
-        "trigger": "onPlay",
-        "condition": {
-          "friendlyGigValueAtLeast": 8
-        },
-        "effect": {
-          "kind": "draw",
-          "count": 1
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "changeGig",
+              "amount": 4,
+              "target": "anyGigDie"
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "friendlyGigValueAtLeast": 8
+              },
+              "effect": {
+                "kind": "draw",
+                "count": 1
+              }
+            }
+          ]
         }
       }
     ],
@@ -3381,17 +3416,22 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "matchGig"
-        }
-      },
-      {
-        "trigger": "onPlay",
-        "condition": {
-          "friendlyGigValuePair": true
-        },
-        "effect": {
-          "kind": "draw",
-          "count": 1
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "matchGig"
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "friendlyGigValuePair": true
+              },
+              "effect": {
+                "kind": "draw",
+                "count": 1
+              }
+            }
+          ]
         }
       }
     ],
@@ -4617,19 +4657,24 @@
       {
         "trigger": "onPlay",
         "effect": {
-          "kind": "changeGig",
-          "amount": -3,
-          "target": "anyGigDie"
-        }
-      },
-      {
-        "trigger": "onPlay",
-        "condition": {
-          "friendlyGigValueEquals": 1
-        },
-        "effect": {
-          "kind": "draw",
-          "count": 1
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "changeGig",
+              "amount": -3,
+              "target": "anyGigDie"
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "friendlyGigValueEquals": 1
+              },
+              "effect": {
+                "kind": "draw",
+                "count": 1
+              }
+            }
+          ]
         }
       }
     ],
@@ -4790,20 +4835,22 @@
       {
         "trigger": "onCall",
         "effect": {
-          "kind": "trashFromDeck",
-          "whose": "friendly",
-          "count": 3
-        }
-      },
-      {
-        "trigger": "onCall",
-        "effect": {
-          "kind": "retrieveFromTrash",
-          "target": "friendlyTrashCard",
-          "filter": {
-            "cardType": "program",
-            "keyword": "braindance"
-          }
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "trashFromDeck",
+              "whose": "friendly",
+              "count": 3
+            },
+            {
+              "kind": "retrieveFromTrash",
+              "target": "friendlyTrashCard",
+              "filter": {
+                "cardType": "program",
+                "keyword": "braindance"
+              }
+            }
+          ]
         }
       }
     ],
@@ -5173,21 +5220,30 @@
           "attackerKeyword": "arasaka"
         },
         "effect": {
-          "kind": "draw",
-          "count": 1
-        }
-      },
-      {
-        "trigger": "onFriendlyAttack",
-        "oncePerTurn": true,
-        "onceKey": "embracing-destruction",
-        "condition": {
-          "attackerKeyword": "arasaka",
-          "streetCredBelow": 20
-        },
-        "effect": {
-          "kind": "discardCard",
-          "target": "friendlyHandCard"
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "attackerKeyword": "arasaka"
+              },
+              "effect": {
+                "kind": "draw",
+                "count": 1
+              }
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "attackerKeyword": "arasaka",
+                "streetCredBelow": 20
+              },
+              "effect": {
+                "kind": "discardCard",
+                "target": "friendlyHandCard"
+              }
+            }
+          ]
         }
       }
     ],
@@ -5305,20 +5361,25 @@
       {
         "trigger": "onSpend",
         "effect": {
-          "kind": "changeGig",
-          "amount": 1,
-          "target": "anyGigDie",
-          "adjust": true
-        }
-      },
-      {
-        "trigger": "onSpend",
-        "condition": {
-          "friendlyGigDistinctValuesAtLeast": 3
-        },
-        "effect": {
-          "kind": "draw",
-          "count": 1
+          "kind": "sequence",
+          "effects": [
+            {
+              "kind": "changeGig",
+              "amount": 1,
+              "target": "anyGigDie",
+              "adjust": true
+            },
+            {
+              "kind": "conditionalEffect",
+              "condition": {
+                "friendlyGigDistinctValuesAtLeast": 3
+              },
+              "effect": {
+                "kind": "draw",
+                "count": 1
+              }
+            }
+          ]
         }
       }
     ],

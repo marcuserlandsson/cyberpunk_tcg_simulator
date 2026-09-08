@@ -44,6 +44,8 @@ import {
   type ConditionContext,
 } from '../engine/query'
 import { nextInt, rollDie } from '../engine/rng'
+import { stopAtHiddenInformation } from '../engine/preview'
+import { PRIVATE_INFORMATION_SCRIPTS } from './scripted/index'
 import { scriptedCards } from './scripted/index'
 import {
   filterTargets,
@@ -431,17 +433,14 @@ function defOf(db: CardDb, state: GameState, uid: number): CardDef | undefined {
 
 /** A cursor over the pre-assigned target for each slot of one EffectDef. */
 interface Slots {
-  assigned: (number | null)[]
+  assigned: (number | null | (() => number | null))[]
   next: number
 }
 
 /**
- * Binds the def's fillable slots to concrete uids *once*, before any node runs,
- * so a node that empties the field cannot shift the targets of the nodes after
- * it. Slots the caller supplied are validated against the current candidates;
- * slots left unsupplied (triggers carry no player choice — see
- * docs/rulings.md §32) are drawn uniformly from the candidates through
- * `state.rng`, which keeps replays deterministic.
+ * Reserve slot positions up front, but bind each slot when its instruction is
+ * reached. Unsupplied slots retain the legacy seeded fallback until the
+ * explicit-choice migration (rules audit R11).
  */
 function bindSlots(
   db: CardDb,
@@ -451,22 +450,20 @@ function bindSlots(
   supplied: number[],
   controller: PlayerId
 ): Slots {
-  const assigned: (number | null)[] = []
+  const assigned: Slots['assigned'] = []
   let supply = 0
   for (const slot of fillableSlots(db, draft, sourceUid, def, controller)) {
-    if (slot.candidates.length === 0) {
-      assigned.push(null)
-      continue
-    }
-    const offered = supplied[supply]
-    supply += 1
-    if (offered !== undefined) {
-      assigned.push(slot.candidates.includes(offered) ? offered : null)
-      continue
-    }
-    const [index, rng] = nextInt(draft.rng, slot.candidates.length)
-    draft.rng = rng
-    assigned.push(slot.candidates[index])
+    const offered = slot.candidates.length ? supplied[supply++] : undefined
+    // Resolve later clauses against the board when those instructions are reached.
+    // This also lets a "trash, then retrieve" effect see the cards it just trashed.
+    assigned.push(() => {
+      const candidates = candidatesFor(db, draft, slot.slot, sourceUid, controller)
+      if (offered !== undefined) return candidates.includes(offered) ? offered : null
+      if (candidates.length === 0) return null
+      const [index, rng] = nextInt(draft.rng, candidates.length)
+      draft.rng = rng
+      return candidates[index]
+    })
   }
   return { assigned, next: 0 }
 }
@@ -492,7 +489,7 @@ function note(draft: GameState, sourceUid: number, description: string): void {
 function takeSlot(slots: Slots): number | null {
   const value = slots.assigned[slots.next]
   slots.next += 1
-  return value ?? null
+  return typeof value === 'function' ? value() : value ?? null
 }
 
 /** The next bound target for a node, or null when the slot could not be filled. */
@@ -910,6 +907,7 @@ function applyNode(
     }
 
     case 'trashFromDeck': {
+      stopAtHiddenInformation(draft)
       const player = playerFor(ctx, node.whose)
       const p = draft.players[player]
       for (let i = 0; i < node.count; i++) {
@@ -986,6 +984,7 @@ function applyNode(
     }
 
     case 'scripted': {
+      if (PRIVATE_INFORMATION_SCRIPTS.has(node.name)) stopAtHiddenInformation(draft)
       const script = scriptedCards[node.name]
       if (!script) {
         throw new Error(`Unknown scripted card effect "${node.name}" (src/cards/scripted).`)
@@ -1178,6 +1177,7 @@ export function fireCardTrigger(
   }
 
   let offset = 0
+  const queuedGroups = new Map<string, import('../engine/resolution').PendingEffect>()
   for (const [index, effect] of def.effects.entries()) {
     if (effect.trigger !== trigger) continue
     const demand = slotDemand(db, draft, sourceUid, effect, player)
@@ -1190,7 +1190,18 @@ export function fireCardTrigger(
       if (groupSpent || met) markOncePerTurn(draft, sourceUid, index)
     }
     if (!met) continue
-    applyEffectDefOnDraft(db, draft, effect, sourceUid, slice, player, context)
+    if (draft.effectQueue && !(def.type === 'program' && trigger === 'onPlay')) {
+      const groupKey = effect.onceKey ?? `effect:${index}`
+      let pending = queuedGroups.get(groupKey)
+      if (!pending) {
+        pending = { sourceUid, controller: player, clauses: [], context: { ...context } }
+        queuedGroups.set(groupKey, pending)
+        draft.effectQueue.push(pending)
+      }
+      pending.clauses.push({ def: effect, targets: slice })
+    } else {
+      applyEffectDefOnDraft(db, draft, effect, sourceUid, slice, player, context)
+    }
     // An effect can end the game outright (a forced draw off an empty deck,
     // docs/rulings.md's deckout rule) — once that happens nothing else in
     // this card's text (or anything downstream: `fireWatcherTrigger`'s other
@@ -1691,8 +1702,7 @@ function stateAfterEntry(db: CardDb, state: GameState, uid: number): GameState {
  *   * Unit   — enters the field ready with Lag (guide p7);
  *   * Legend — {go-solo}: enters the field ready with NO Lag, "it can attack
  *              this turn" (docs/rulings.md §31);
- *   * Program— goes to the trash immediately (before `onPlay` fires, exactly
- *              like a Unit/Legend's field push), then resolves;
+ *   * Program— resolves outside the normal zones, then enters trash;
  *   * Gear   — equips to `targets[0]`.
  * Shared by reduce.ts's main-phase `playCard` and the `quick` reaction, so the
  * two can never drift apart.
@@ -1709,18 +1719,14 @@ export function playCardOnDraft(
   const card = draft.cards[cardUid]
   const def = db[card.defId]
 
+  // Pay before entry. Any payment-triggered effects wait in the action's queue.
+  spendOnDraft(db, draft, payment)
+  if (draft.winner !== null) return
   p.hand = p.hand.filter((uid) => uid !== cardUid)
   p.legends = p.legends.filter((uid) => uid !== cardUid)
 
-  // Zone assignment happens before paying (`spendOnDraft`, below) and before
-  // `onPlay` fires, so this card is ALWAYS in exactly one zone regardless of
-  // what paying for it (the payment's own {Spend} trigger — e.g. a nested
-  // free Call, docs/rulings.md §146.1) or its own `onPlay` effect does
-  // afterward (docs/rulings.md §144's "every card is in exactly one zone"
-  // invariant, hardened by the Task 9 fuzz harness). No printed Program
-  // effect targets a trash-zone card of its own, so moving a Program's own
-  // trash push this early cannot let its text see (or select) itself as
-  // already-trashed.
+  // Non-Programs enter before their Play triggers become pending. Programs
+  // remain outside all areas until their instructions finish (CR 4.14.2).
   let effectTargets = targets
   switch (def.type) {
     case 'unit':
@@ -1749,12 +1755,9 @@ export function playCardOnDraft(
       // docs/rulings.md §120 ff.) — cleared for this player only at their own
       // next turn start (`resetTurnState`), matching `soldThisTurn`'s scope.
       p.playedProgramThisTurn = true
-      p.trash.push(cardUid)
-      draft.events.push({ type: 'cardTrashed', uid: cardUid })
       break
   }
 
-  spendOnDraft(db, draft, payment)
   // The payment's own {Spend} trigger can end the game outright — nothing
   // below (the `cardPlayed` event, the once-per-turn discount marking,
   // `onPlay`, `onFriendlyCardPlayed`) may still run (docs/rulings.md §147).
@@ -1779,6 +1782,11 @@ export function playCardOnDraft(
   // is `fireCardTrigger`, not `fireTriggerOnDraft`, for the same reason: onPlay
   // never propagates to the host's other Gear (docs/rulings.md §37).
   fireCardTrigger(db, draft, 'onPlay', cardUid, effectTargets, player)
+  // CR 4.14.2: a Program is outside all areas while its instructions resolve.
+  if (def.type === 'program') {
+    p.trash.push(cardUid)
+    if (draft.winner === null) draft.events.push({ type: 'cardTrashed', uid: cardUid })
+  }
 
   // "When you play a BRAINDANCE Program, ..." / "The first time you play a
   // Blue Unit or Blue Gear each turn, ..." — a watcher broadcast to every
