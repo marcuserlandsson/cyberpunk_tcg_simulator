@@ -32,6 +32,9 @@ const MAX_COPIES = 3
  */
 export function validateDeck(db: CardDb, deck: DeckList): string[] {
   const errors: string[] = []
+  for (const id of [...deck.legends, ...Object.keys(deck.cards)]) {
+    if (db[id]?.implementation === 'pending') errors.push(`Card "${id}" is awaiting simulator implementation; it can be collected and planned but cannot yet be simulated.`)
+  }
 
   if (deck.legends.length !== 3) {
     errors.push(`Deck must have exactly 3 legends; found ${deck.legends.length}.`)

@@ -690,6 +690,9 @@ export interface CardDef {
   faction?: string
   type: CardType
   cost: number
+  /** Official printed value; null is an unpayable cost, not numeric zero. */
+  printedCost?: number | null
+  implementation?: 'pending'
   power: number | null
   ram: { color: string; value: number } | null // null for legends
   ramLimit: { color: string; value: number } | null // legends only

@@ -134,6 +134,24 @@ function validateRowShape(row: Printing, errors: string[]): void {
 async function main(): Promise<void> {
   const withImages = process.argv.includes('--images')
   const cards = JSON.parse(await readFile(CARDS_JSON_PATH, 'utf8')) as { id: string }[]
+  // Discover IDs first: querying only known IDs silently missed new reveals.
+  const known = new Set(cards.map(card => card.id))
+  let offset = 0
+  let total = Infinity
+  const discovered = new Set<string>()
+  while (offset < total) {
+    const response = await fetch(`${API_BASE}?limit=100&offset=${offset}`)
+    if (!response.ok) throw new Error(`Catalog discovery failed: HTTP ${response.status}`)
+    const page = await response.json() as { total: number; items: { slug: string }[] }
+    if (!Number.isInteger(page.total) || !page.items?.length) throw new Error('Incomplete catalog discovery')
+    if (offset > 0 && page.total !== total) throw new Error('Catalog changed during discovery; retry')
+    total = page.total
+    for (const card of page.items) discovered.add(card.slug)
+    offset += page.items.length
+  }
+  if (discovered.size !== total) throw new Error('Duplicate or missing catalog IDs')
+  const missing = [...discovered].filter(id => !known.has(id))
+  if (missing.length) throw new Error(`New cards discovered: ${missing.join(', ')}. Run npm run fetch:catalog and review/import the snapshot before refreshing printings.`)
   if (withImages) await mkdir(PRINTING_IMAGES_DIR, { recursive: true })
 
   const rows: Printing[] = []
@@ -159,7 +177,7 @@ async function main(): Promise<void> {
         collectorNumber: p.collector_number,
         rarity: p.rarity,
         finish: p.finish,
-        artist: p.artist ?? '',
+        artist: card.id === 'nocturne-op55-n1' ? 'Daniel Valaisis' : p.artist ?? '',
         sourcePrintingId: p.id,
       })
       if (withImages) {

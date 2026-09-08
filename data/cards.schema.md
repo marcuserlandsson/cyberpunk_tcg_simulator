@@ -241,3 +241,10 @@ words the transcription preserves in `text`.
   "cards": { "cardId": count, ... }           // non-legend cards, by id -> copy count
 }
 ```
+# Catalog metadata added 2026-09-08
+
+`printedCost?: number | null` preserves the official printed cost independently
+of the legacy numeric `cost` used by the engine. Null is displayed as a dash.
+`implementation?: "pending"` marks newly discovered cards awaiting mechanics;
+they can be collected/planned but cannot enter a simulation. The source snapshot
+and `catalog-status.json` track discovery date and full-pool coverage.

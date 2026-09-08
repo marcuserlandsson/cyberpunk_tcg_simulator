@@ -10,7 +10,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 04. Refresh deck choices across views and suppress unknown ownership figures.
 - [x] 05. Support collection persistence outside the dev server; expose Git outcomes and correct documentation.
 - [x] 06. Obtain/version comprehensive rules and errata; audit each rules section against implementation and record discrepancies.
-- [ ] 07. Discover/import current cards and printings, track data freshness and implementation coverage, and correct errata.
+- [x] 07. Discover/import current cards and printings, track data freshness and implementation coverage, and correct errata.
 - [ ] 08. Implement rules-audit corrections, explicit effect/player choices, private knowledge, and payment choices, with card/engine regressions.
 - [ ] 09. Model unique artwork independently of printings; separate playset/artwork targets, filters, progress, and buy-lists.
 - [ ] 10. Persist complete simulation runs and deck snapshots; retain runs during navigation and support history/reopening/exports.
@@ -50,3 +50,7 @@ The production preview now mounts the same collection service as development. A 
 ### 06 — comprehensive rules audit
 
 Captured the official site's rules data (updated September 1), read all 11 numbered chapters, and mapped them against engine code/tests. Recorded 20 actionable discrepancies and three interpretation notes in `rules-audit-2026-09-08.md`, plus official errata and version metadata. Verified all 713 unique anchors, chapter completeness and snapshot SHA-256. This checkpoint completes the audit, not the gameplay corrections: those remain explicitly scheduled in steps 7–8.
+
+### 07 — catalog refresh and errata
+
+Discovery now paginates the full official catalog and fetches every card detail. Imported 10 missing cards and 22 printings (151 cards / 460 printings / 13 sets), preserving every prior collection key. New cards are explicitly pending and blocked from gameplay until step 8; they are usable for collection/deck planning. Added source snapshot, freshness/coverage UI, printed null-cost metadata, current Kiroshi equip restriction, and Nocturne artist correction. Completeness tests compare against discovery instead of a hardcoded historical total. Verified TypeScript, 360 targeted tests, 54 subsequent tests, source/printing identity checks, and a browser workflow using Detonate in both planning and collection. Existing text changes were limited to Kiroshi and editorial flavor labels.

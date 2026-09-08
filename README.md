@@ -2,10 +2,13 @@
 
 An unofficial, fan-made playtesting simulator for **WeirdCo's Official
 Cyberpunk Trading Card Game** (Cyberpunk 2077 license), built against the
-public **Beta** card pool ahead of the game's retail launch. It runs entirely
-in your browser: build a deck from the full 141-card beta pool, then play a
+public card pool ahead of the game's retail launch. The game runs
+in your browser: build a deck from the 151-card catalog, then play a
 complete game against a heuristic AI opponent, or batch-simulate thousands of
-AI-vs-AI games to see how decks and cards perform.
+AI-vs-AI games to see how decks and cards perform. Ten newly discovered cards
+are available for collection/planning with gameplay implementation pending.
+The comprehensive rules audit identified corrections still being implemented;
+see [the checklist](docs/remediation-checklist.md) before treating results as rules-accurate.
 
 **This is not an official product and is not affiliated with, endorsed by,
 or connected to WeirdCo, CD Projekt Red, or CD Projekt S.A.** Card names,
@@ -149,7 +152,7 @@ A legal deck needs:
   run Green cards up to RAM 4 and Red cards up to RAM 2, but no Blue cards at
   all.)
 
-The **Deck Builder** tab is a filterable browser over all 141 cards
+The **Deck Builder** tab is a filterable browser over all 151 cards
 (faction, type, cost, keyword, free text) plus a deck list showing a live
 per-color RAM budget and every validation error found, if any — an invalid
 deck is shown, not hidden or blocked, so you can see exactly what to fix.
@@ -182,7 +185,7 @@ way automatically when needed.
 ## Collection tracking
 
 The **Collection** tab tracks which physical cards you own, per *printing* —
-`data/printings.json` currently holds 438 printings of the 141 cards across 13 sets, so
+`data/printings.json` currently holds 460 printings of the 151 cards across 13 sets, so
 an alt art is a separate thing to own rather than a flag on the card.
 
 - One tile per card showing `owned/target`, plus **✓** when the playset is
@@ -305,8 +308,8 @@ src/
            # Collection views
 
 data/
-├── cards.json           # all 141 cards: stats, verbatim text, effect definitions
-├── printings.json       # 438 physical printings of those 141 cards across 13 sets
+├── cards.json           # 151 cards: stats, text, effect definitions and pending status
+├── printings.json       # 460 physical printings across 13 sets
 │                        # (generated — see data/printings.schema.md)
 ├── decks/                # the two bundled starter decks
 └── images/               # (gitignored) official art, populated by scripts/fetch-images.mjs

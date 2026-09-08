@@ -29,7 +29,8 @@
           "target": "anyGigDie"
         }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "adam-smasher-ender-of-legends",
@@ -59,7 +60,8 @@
           "target": "rivalUnit"
         }
       }
-    ]
+    ],
+    "printedCost": 9
   },
   {
     "id": "adam-smasher-metal-over-meat",
@@ -89,7 +91,8 @@
         }
       }
     ],
-    "scripted": "adam-smasher-metal-over-meat"
+    "scripted": "adam-smasher-metal-over-meat",
+    "printedCost": 9
   },
   {
     "id": "adrenaline-converter",
@@ -121,7 +124,8 @@
           "keyword": "adrenaline"
         }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "afterparty-at-lizzie-s",
@@ -161,7 +165,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 1
   },
   {
     "id": "all-is-lost",
@@ -188,7 +193,8 @@
         }
       }
     ],
-    "scripted": "all-is-lost"
+    "scripted": "all-is-lost",
+    "printedCost": 1
   },
   {
     "id": "alt-cunningham-mother-of-daemons",
@@ -223,7 +229,8 @@
           "kind": "stealInterceptByDiscard"
         }
       }
-    ]
+    ],
+    "printedCost": 7
   },
   {
     "id": "alt-cunningham-soulkiller-architect",
@@ -265,7 +272,8 @@
         }
       }
     ],
-    "scripted": "alt-cunningham-soulkiller-architect"
+    "scripted": "alt-cunningham-soulkiller-architect",
+    "printedCost": null
   },
   {
     "id": "animals-wrecker",
@@ -285,7 +293,8 @@
       "ganger"
     ],
     "text": "Takes a lot of juice to break bones like they do.",
-    "effects": []
+    "effects": [],
+    "printedCost": 6
   },
   {
     "id": "appetite-for-destruction",
@@ -317,7 +326,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "arasaka-emergency-radioport",
@@ -347,7 +357,8 @@
         }
       }
     ],
-    "scripted": "arasaka-emergency-radioport"
+    "scripted": "arasaka-emergency-radioport",
+    "printedCost": 2
   },
   {
     "id": "augmented-negotiators",
@@ -376,7 +387,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "bonnie-and-clyde",
@@ -419,7 +431,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "bootleg-black-sapphire-show",
@@ -456,7 +469,8 @@
           "count": 2
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "caliber-totentanz-s-top-dog",
@@ -505,7 +519,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "carnage-at-the-colosseum",
@@ -548,7 +563,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 6
   },
   {
     "id": "chrome-fang",
@@ -580,7 +596,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "chrome-reverie",
@@ -622,7 +639,8 @@
         }
       }
     ],
-    "scripted": "chrome-reverie"
+    "scripted": "chrome-reverie",
+    "printedCost": 3
   },
   {
     "id": "corpo-security",
@@ -643,8 +661,14 @@
     ],
     "text": "This Unit can't attack.\n{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
     "effects": [
-      { "trigger": "static", "effect": { "kind": "cantAttack" } }
-    ]
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "cantAttack"
+        }
+      }
+    ],
+    "printedCost": 2
   },
   {
     "id": "corporate-surveillance",
@@ -666,9 +690,16 @@
     "effects": [
       {
         "trigger": "onPlay",
-        "effect": { "kind": "spendCard", "target": "rivalUnit", "filter": { "maxCost": 4 } }
+        "effect": {
+          "kind": "spendCard",
+          "target": "rivalUnit",
+          "filter": {
+            "maxCost": 4
+          }
+        }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "cyberpsychosis",
@@ -717,7 +748,8 @@
           ]
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "deadman-transmitter",
@@ -744,7 +776,8 @@
           "kind": "defeatShield"
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "delamain-cab",
@@ -774,7 +807,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "delamain-rideshare-ai",
@@ -802,7 +836,30 @@
           "count": 2
         }
       }
-    ]
+    ],
+    "printedCost": 3
+  },
+  {
+    "id": "detonate",
+    "name": "Detonate",
+    "color": "Red",
+    "type": "program",
+    "cost": 1,
+    "power": null,
+    "ram": {
+      "color": "Red",
+      "value": 2
+    },
+    "ramLimit": null,
+    "sellTag": true,
+    "keywords": [
+      "quickhack",
+      "quick"
+    ],
+    "text": "{Quick} Defeat a rival Gear with power 2 or less.",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 1
   },
   {
     "id": "dexter-deshawn-off-the-grid",
@@ -852,7 +909,8 @@
           "target": "anyGigDie"
         }
       }
-    ]
+    ],
+    "printedCost": null
   },
   {
     "id": "dexter-deshawn-one-last-chance",
@@ -901,7 +959,8 @@
           "count": 2
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "don-t-fear-the-reaper",
@@ -923,10 +982,14 @@
     "effects": [
       {
         "trigger": "onPlay",
-        "effect": { "kind": "scripted", "name": "don-t-fear-the-reaper" }
+        "effect": {
+          "kind": "scripted",
+          "name": "don-t-fear-the-reaper"
+        }
       }
     ],
-    "scripted": "don-t-fear-the-reaper"
+    "scripted": "don-t-fear-the-reaper",
+    "printedCost": 7
   },
   {
     "id": "dum-dum-maelstrom-triggerman",
@@ -973,7 +1036,8 @@
         }
       }
     ],
-    "scripted": "dum-dum-maelstrom-triggerman"
+    "scripted": "dum-dum-maelstrom-triggerman",
+    "printedCost": null
   },
   {
     "id": "dying-night-v-s-pistol",
@@ -1011,7 +1075,8 @@
         }
       }
     ],
-    "scripted": "dying-night-v-s-pistol"
+    "scripted": "dying-night-v-s-pistol",
+    "printedCost": 2
   },
   {
     "id": "el-sombrero-n-la-venganza-lenta",
@@ -1045,7 +1110,8 @@
           "duration": "turn"
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "emergency-atlus",
@@ -1066,7 +1132,8 @@
       "zetatech"
     ],
     "text": "\"Grab the policyholder, leave the rest for the city meatwagon.\"",
-    "effects": []
+    "effects": [],
+    "printedCost": 3
   },
   {
     "id": "evelyn-parker-beautiful-enigma",
@@ -1115,7 +1182,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": null
   },
   {
     "id": "evelyn-parker-scheming-siren",
@@ -1153,7 +1221,8 @@
           "target": "friendlyHandCard"
         }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "field-operator",
@@ -1177,10 +1246,16 @@
     "effects": [
       {
         "trigger": "onPlay",
-        "condition": { "streetCredParity": "even" },
-        "effect": { "kind": "draw", "count": 1 }
+        "condition": {
+          "streetCredParity": "even"
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "floor-it",
@@ -1221,7 +1296,8 @@
           ]
         }
       }
-    ]
+    ],
+    "printedCost": 1
   },
   {
     "id": "fool-on-the-hill",
@@ -1243,10 +1319,14 @@
     "effects": [
       {
         "trigger": "onPlay",
-        "effect": { "kind": "scripted", "name": "fool-on-the-hill" }
+        "effect": {
+          "kind": "scripted",
+          "name": "fool-on-the-hill"
+        }
       }
     ],
-    "scripted": "fool-on-the-hill"
+    "scripted": "fool-on-the-hill",
+    "printedCost": 2
   },
   {
     "id": "gilded-mato-n",
@@ -1278,7 +1358,8 @@
         }
       }
     ],
-    "scripted": "gilded-mato-n"
+    "scripted": "gilded-mato-n",
+    "printedCost": 4
   },
   {
     "id": "gorilla-arms",
@@ -1310,7 +1391,8 @@
           "distinctValueOnly": true
         }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "goro-takemura-hands-unclean",
@@ -1333,7 +1415,8 @@
       "corpo"
     ],
     "text": "{Go Solo} (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. If it leaves the field, remove it from the game.)\n{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
-    "effects": []
+    "effects": [],
+    "printedCost": 5
   },
   {
     "id": "goro-takemura-losing-his-way",
@@ -1357,10 +1440,18 @@
     "effects": [
       {
         "trigger": "onAttack",
-        "condition": { "allFriendlyLegendsFaceUp": true },
-        "effect": { "kind": "buffPower", "amount": 5, "target": "self", "duration": "turn" }
+        "condition": {
+          "allFriendlyLegendsFaceUp": true
+        },
+        "effect": {
+          "kind": "buffPower",
+          "amount": 5,
+          "target": "self",
+          "duration": "turn"
+        }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "goro-takemura-vengeful-bodyguard",
@@ -1387,27 +1478,48 @@
       {
         "trigger": "activated",
         "quick": true,
-        "cost": { "selfSpend": true, "eddies": 1 },
+        "cost": {
+          "selfSpend": true,
+          "eddies": 1
+        },
         "effect": {
           "kind": "sameTarget",
           "target": "friendlyUnit",
-          "filter": { "maxCost": 4 },
+          "filter": {
+            "maxCost": 4
+          },
           "effects": [
-            { "kind": "grantKeyword", "keyword": "blocker", "target": "chosen", "duration": "turn" },
+            {
+              "kind": "grantKeyword",
+              "keyword": "blocker",
+              "target": "chosen",
+              "duration": "turn"
+            },
             {
               "kind": "conditionalEffect",
-              "condition": { "friendlyGigValuePair": true },
-              "effect": { "kind": "buffPower", "amount": 1, "target": "chosen", "duration": "turn" }
+              "condition": {
+                "friendlyGigValuePair": true
+              },
+              "effect": {
+                "kind": "buffPower",
+                "amount": 1,
+                "target": "chosen",
+                "duration": "turn"
+              }
             }
           ]
         }
       },
       {
         "trigger": "onFriendlyBlock",
-        "effect": { "kind": "scripted", "name": "goro-takemura-vengeful-bodyguard" }
+        "effect": {
+          "kind": "scripted",
+          "name": "goro-takemura-vengeful-bodyguard"
+        }
       }
     ],
-    "scripted": "goro-takemura-vengeful-bodyguard"
+    "scripted": "goro-takemura-vengeful-bodyguard",
+    "printedCost": null
   },
   {
     "id": "gunpoint-diplomacy",
@@ -1455,7 +1567,8 @@
           ]
         }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "hacked-corpo",
@@ -1484,7 +1597,8 @@
         }
       }
     ],
-    "scripted": "hacked-corpo"
+    "scripted": "hacked-corpo",
+    "printedCost": 4
   },
   {
     "id": "hanako-arasaka-daughter-of-the-emperor",
@@ -1509,14 +1623,22 @@
     "effects": [
       {
         "trigger": "activated",
-        "cost": { "selfSpend": true },
-        "effect": { "kind": "swapGig" }
+        "cost": {
+          "selfSpend": true
+        },
+        "effect": {
+          "kind": "swapGig"
+        }
       },
       {
         "trigger": "onStartTurn",
-        "effect": { "kind": "draw", "count": "friendlyGigValuePairCount" }
+        "effect": {
+          "kind": "draw",
+          "count": "friendlyGigValuePairCount"
+        }
       }
-    ]
+    ],
+    "printedCost": null
   },
   {
     "id": "hanako-arasaka-in-a-gilded-cage",
@@ -1547,7 +1669,8 @@
         }
       }
     ],
-    "scripted": "hanako-arasaka-in-a-gilded-cage"
+    "scripted": "hanako-arasaka-in-a-gilded-cage",
+    "printedCost": 4
   },
   {
     "id": "heywood-ripperdoc",
@@ -1578,7 +1701,8 @@
         }
       }
     ],
-    "scripted": "heywood-ripperdoc"
+    "scripted": "heywood-ripperdoc",
+    "printedCost": 6
   },
   {
     "id": "industrial-assembly",
@@ -1617,7 +1741,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 1
   },
   {
     "id": "jacked-in-voodoo-boy",
@@ -1647,7 +1772,8 @@
           "kind": "cantAttack"
         }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "jackie-welles-mama-s-favorite",
@@ -1676,7 +1802,8 @@
           "eddies": 1
         }
       }
-    ]
+    ],
+    "printedCost": 6
   },
   {
     "id": "jackie-welles-pour-one-out-for-me",
@@ -1730,7 +1857,8 @@
         }
       }
     ],
-    "scripted": "jackie-welles-pour-one-out-for-me"
+    "scripted": "jackie-welles-pour-one-out-for-me",
+    "printedCost": null
   },
   {
     "id": "jackie-welles-ride-or-die-choom",
@@ -1778,7 +1906,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 6
   },
   {
     "id": "japantown-jonin",
@@ -1806,7 +1935,8 @@
           "duration": "turn"
         }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "johnny-silverhand-never-stop-fighting",
@@ -1844,7 +1974,8 @@
           "keyword": "corpo"
         }
       }
-    ]
+    ],
+    "printedCost": 6
   },
   {
     "id": "johnny-silverhand-rocking-renegade",
@@ -1888,7 +2019,8 @@
         }
       }
     ],
-    "scripted": "johnny-silverhand-rocking-renegade"
+    "scripted": "johnny-silverhand-rocking-renegade",
+    "printedCost": null
   },
   {
     "id": "judy-a-lvarez-braindance-maestro",
@@ -1935,7 +2067,8 @@
         }
       }
     ],
-    "scripted": "judy-a-lvarez-braindance-maestro"
+    "scripted": "judy-a-lvarez-braindance-maestro",
+    "printedCost": null
   },
   {
     "id": "judy-a-lvarez-nothing-to-doubt",
@@ -1970,7 +2103,8 @@
         }
       }
     ],
-    "scripted": "judy-a-lvarez-nothing-to-doubt"
+    "scripted": "judy-a-lvarez-nothing-to-doubt",
+    "printedCost": 6
   },
   {
     "id": "kerry-eurodyne-axe-attitude-audience",
@@ -2028,7 +2162,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": null
   },
   {
     "id": "kerry-eurodyne-the-last-rockerboy",
@@ -2063,7 +2198,8 @@
           "count": 2
         }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "kiroshi-optics",
@@ -2081,7 +2217,7 @@
     "keywords": [
       "cyberware"
     ],
-    "text": "(Equip to a Unit or friendly face-up Legend.)\n{Attack} Look at a friendly face-down Legend. (Don't reveal it.)",
+    "text": "(Equip to a friendly Unit or face-up Legend.)\n{Attack} Look at a friendly face-down Legend. (Don't reveal it.)",
     "effects": [
       {
         "trigger": "onAttack",
@@ -2091,7 +2227,8 @@
         }
       }
     ],
-    "scripted": "kiroshi-optics"
+    "scripted": "kiroshi-optics",
+    "printedCost": 1
   },
   {
     "id": "la-llorona-ghost-of-the-past",
@@ -2122,7 +2259,8 @@
           "target": "anyGigDie"
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "les-e-le-mens",
@@ -2152,7 +2290,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "live-with-the-aftermath",
@@ -2183,7 +2322,8 @@
         }
       }
     ],
-    "scripted": "live-with-the-aftermath"
+    "scripted": "live-with-the-aftermath",
+    "printedCost": 3
   },
   {
     "id": "lizzy-wizzy-delicate-weapon",
@@ -2222,7 +2362,8 @@
         }
       }
     ],
-    "scripted": "lizzy-wizzy-delicate-weapon"
+    "scripted": "lizzy-wizzy-delicate-weapon",
+    "printedCost": 5
   },
   {
     "id": "maelstrom-goons",
@@ -2254,7 +2395,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "maelstrom-zealots",
@@ -2277,9 +2419,13 @@
     "effects": [
       {
         "trigger": "onLoseFight",
-        "effect": { "kind": "defeat", "target": "fightFoe" }
+        "effect": {
+          "kind": "defeat",
+          "target": "fightFoe"
+        }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "maman-brigitte-spirit-of-death",
@@ -2332,7 +2478,8 @@
         }
       }
     ],
-    "scripted": "maman-brigitte-spirit-of-death:take-it"
+    "scripted": "maman-brigitte-spirit-of-death:take-it",
+    "printedCost": 5
   },
   {
     "id": "mandibular-upgrade",
@@ -2352,7 +2499,8 @@
       "cyberware"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\n{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)",
-    "effects": []
+    "effects": [],
+    "printedCost": 1
   },
   {
     "id": "mantis-blades",
@@ -2371,7 +2519,8 @@
       "cyberware"
     ],
     "text": "(Equip to a friendly Unit or face-up Legend.)\n\"One cut, one kill.\"",
-    "effects": []
+    "effects": [],
+    "printedCost": 1
   },
   {
     "id": "maxtac-av",
@@ -2394,9 +2543,34 @@
     "effects": [
       {
         "trigger": "onPlay",
-        "effect": { "kind": "swapGig" }
+        "effect": {
+          "kind": "swapGig"
+        }
       }
-    ]
+    ],
+    "printedCost": 5
+  },
+  {
+    "id": "maxtac-heavy",
+    "name": "MaxTac Heavy",
+    "color": "Green",
+    "faction": "NCPD",
+    "type": "unit",
+    "cost": 7,
+    "power": 8,
+    "ram": {
+      "color": "Green",
+      "value": 3
+    },
+    "ramLimit": null,
+    "sellTag": false,
+    "keywords": [
+      "ncpd"
+    ],
+    "text": "Play this Unit for -1 €$ for each of a Rival’s Units, to a minimum of 1 €$.",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 7
   },
   {
     "id": "maxtac-squadron",
@@ -2417,10 +2591,16 @@
     "effects": [
       {
         "trigger": "onEndTurn",
-        "condition": { "sourceSpent": true },
-        "effect": { "kind": "readyCard", "target": "friendlyFaceUpLegend" }
+        "condition": {
+          "sourceSpent": true
+        },
+        "effect": {
+          "kind": "readyCard",
+          "target": "friendlyFaceUpLegend"
+        }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "maxtac-suppression-team",
@@ -2445,7 +2625,29 @@
           "kind": "rivalCantAttackWhenPlayed"
         }
       }
-    ]
+    ],
+    "printedCost": 5
+  },
+  {
+    "id": "memory-relapse",
+    "name": "Memory Relapse",
+    "color": "Green",
+    "type": "program",
+    "cost": 4,
+    "power": null,
+    "ram": {
+      "color": "Green",
+      "value": 2
+    },
+    "ramLimit": null,
+    "sellTag": true,
+    "keywords": [
+      "braindance"
+    ],
+    "text": "Spend a rival Unit. It can't ready until your next turn. If your ☆ (Street Cred) is an even number, draw 1.",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 4
   },
   {
     "id": "meredith-stout-stone-cold-corpo",
@@ -2483,7 +2685,8 @@
           "target": "friendlyTrashCard"
         }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "minotaur",
@@ -2518,7 +2721,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 7
   },
   {
     "id": "misty-olszewski-mender-of-broken-spirits",
@@ -2566,7 +2770,8 @@
         }
       }
     ],
-    "scripted": "misty-olszewski-mender-of-broken-spirits"
+    "scripted": "misty-olszewski-mender-of-broken-spirits",
+    "printedCost": 3
   },
   {
     "id": "modded-kusanagi",
@@ -2590,9 +2795,13 @@
     "effects": [
       {
         "trigger": "onEndTurn",
-        "effect": { "kind": "bounce", "target": "self" }
+        "effect": {
+          "kind": "bounce",
+          "target": "self"
+        }
       }
-    ]
+    ],
+    "printedCost": 6
   },
   {
     "id": "modded-muramasa",
@@ -2614,10 +2823,16 @@
     "effects": [
       {
         "trigger": "onEndTurn",
-        "condition": { "streetCredBehindRival": true },
-        "effect": { "kind": "readyCard", "target": "self" }
+        "condition": {
+          "streetCredBehindRival": true
+        },
+        "effect": {
+          "kind": "readyCard",
+          "target": "self"
+        }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "mox-inciters",
@@ -2650,7 +2865,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "mt0d12-flathead",
@@ -2673,10 +2889,15 @@
     "effects": [
       {
         "trigger": "static",
-        "condition": { "streetCredBehindRival": true },
-        "effect": { "kind": "cantBeBlocked" }
+        "condition": {
+          "streetCredBehindRival": true
+        },
+        "effect": {
+          "kind": "cantBeBlocked"
+        }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "muamar-reyes-el-capita-n",
@@ -2727,7 +2948,8 @@
           "adjust": true
         }
       }
-    ]
+    ],
+    "printedCost": null
   },
   {
     "id": "nadia-fighting-through-grief",
@@ -2751,10 +2973,15 @@
     "effects": [
       {
         "trigger": "static",
-        "condition": { "rivalGigLeadAtLeast": 1 },
-        "effect": { "kind": "attackGigAreaDespiteLag" }
+        "condition": {
+          "rivalGigLeadAtLeast": 1
+        },
+        "effect": {
+          "kind": "attackGigAreaDespiteLag"
+        }
       }
-    ]
+    ],
+    "printedCost": 6
   },
   {
     "id": "netwatch-netdriver",
@@ -2778,9 +3005,37 @@
     "effects": [
       {
         "trigger": "onSpend",
-        "effect": { "kind": "draw", "count": 1 }
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
       }
-    ]
+    ],
+    "printedCost": 3
+  },
+  {
+    "id": "nocturne-op55-n1",
+    "name": "Nocturne OP55 N1",
+    "color": "Blue",
+    "faction": "Arasaka",
+    "type": "program",
+    "cost": 3,
+    "power": null,
+    "ram": {
+      "color": "Blue",
+      "value": 2
+    },
+    "ramLimit": null,
+    "sellTag": true,
+    "keywords": [
+      "arasaka",
+      "plan",
+      "go-solo"
+    ],
+    "text": "If your fixer area is empty, play this Program for 1 €$. Choose one effect.\nDraw 2. // A Unit can't attack until your next turn. // A friendly Legend may use {Go Solo} for -2 €$ this turn, to a minimum of 1 €$.",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 3
   },
   {
     "id": "octant",
@@ -2814,7 +3069,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 7
   },
   {
     "id": "offduty-malfini",
@@ -2851,7 +3107,8 @@
           ]
         }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "over-the-edge",
@@ -2881,7 +3138,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "overwatch-panam-s-gift",
@@ -2906,15 +3164,21 @@
       {
         "trigger": "activated",
         "quick": true,
-        "cost": { "selfSpend": true, "eddies": 1 },
+        "cost": {
+          "selfSpend": true,
+          "eddies": 1
+        },
         "effect": {
           "kind": "scripted",
           "name": "overwatch-panam-s-gift",
-          "targets": ["friendlyHandCard"]
+          "targets": [
+            "friendlyHandCard"
+          ]
         }
       }
     ],
-    "scripted": "overwatch-panam-s-gift"
+    "scripted": "overwatch-panam-s-gift",
+    "printedCost": 4
   },
   {
     "id": "pacifica-netrunner",
@@ -2936,10 +3200,16 @@
     "effects": [
       {
         "trigger": "onPlay",
-        "condition": { "streetCredParity": "even" },
-        "effect": { "kind": "skipNextReady", "target": "rivalUnit" }
+        "condition": {
+          "streetCredParity": "even"
+        },
+        "effect": {
+          "kind": "skipNextReady",
+          "target": "rivalUnit"
+        }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "padre-man-of-the-cross",
@@ -2987,7 +3257,8 @@
           "kind": "matchGig"
         }
       }
-    ]
+    ],
+    "printedCost": null
   },
   {
     "id": "panam-palmer-nomad-cavalry",
@@ -3042,7 +3313,8 @@
         }
       }
     ],
-    "scripted": "panam-palmer-nomad-cavalry"
+    "scripted": "panam-palmer-nomad-cavalry",
+    "printedCost": null
   },
   {
     "id": "panam-palmer-strength-through-family",
@@ -3085,7 +3357,8 @@
         }
       }
     ],
-    "scripted": "panam-palmer-strength-through-family"
+    "scripted": "panam-palmer-strength-through-family",
+    "printedCost": 6
   },
   {
     "id": "peace-offering",
@@ -3121,7 +3394,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 1
   },
   {
     "id": "pepe-najarro-working-doubles",
@@ -3152,7 +3426,8 @@
         }
       }
     ],
-    "scripted": "pepe-najarro-working-doubles"
+    "scripted": "pepe-najarro-working-doubles",
+    "printedCost": 4
   },
   {
     "id": "placide-voodoo-sentinel",
@@ -3184,10 +3459,19 @@
             {
               "kind": "scripted",
               "name": "placide-voodoo-sentinel:take-it",
-              "targets": ["friendlyHandCard"],
-              "filters": [{ "cardType": "program" }]
+              "targets": [
+                "friendlyHandCard"
+              ],
+              "filters": [
+                {
+                  "cardType": "program"
+                }
+              ]
             },
-            { "kind": "sequence", "effects": [] }
+            {
+              "kind": "sequence",
+              "effects": []
+            }
           ]
         }
       },
@@ -3200,15 +3484,25 @@
             {
               "kind": "scripted",
               "name": "placide-voodoo-sentinel:take-it",
-              "targets": ["friendlyHandCard"],
-              "filters": [{ "cardType": "program" }]
+              "targets": [
+                "friendlyHandCard"
+              ],
+              "filters": [
+                {
+                  "cardType": "program"
+                }
+              ]
             },
-            { "kind": "sequence", "effects": [] }
+            {
+              "kind": "sequence",
+              "effects": []
+            }
           ]
         }
       }
     ],
-    "scripted": "placide-voodoo-sentinel:take-it"
+    "scripted": "placide-voodoo-sentinel:take-it",
+    "printedCost": 8
   },
   {
     "id": "psycho-squad",
@@ -3226,7 +3520,8 @@
     "sellTag": false,
     "keywords": [],
     "text": "Their protocol stops at “shoot first.”",
-    "effects": []
+    "effects": [],
+    "printedCost": 4
   },
   {
     "id": "pyramid-song",
@@ -3250,18 +3545,28 @@
         "trigger": "onPlay",
         "effect": {
           "kind": "chooseOne",
-          "allIf": { "friendlyGigSizeAtMin": 4 },
+          "allIf": {
+            "friendlyGigSizeAtMin": 4
+          },
           "modes": [
-            { "kind": "buffPower", "amount": -5, "target": "rivalUnit", "duration": "turn" },
+            {
+              "kind": "buffPower",
+              "amount": -5,
+              "target": "rivalUnit",
+              "duration": "turn"
+            },
             {
               "kind": "bottomDeck",
               "target": "rivalUnit",
-              "filter": { "maxPower": 0 }
+              "filter": {
+                "maxPower": 0
+              }
             }
           ]
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "rebecca-having-a-moment",
@@ -3276,7 +3581,8 @@
     "sellTag": false,
     "keywords": [],
     "text": "",
-    "effects": []
+    "effects": [],
+    "printedCost": null
   },
   {
     "id": "reboot-optics",
@@ -3307,7 +3613,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "riding-nomad",
@@ -3327,7 +3634,8 @@
       "adrenaline"
     ],
     "text": "{Adrenaline} (This Unit can attack the turn it's played.)",
-    "effects": []
+    "effects": [],
+    "printedCost": 5
   },
   {
     "id": "riot-shield",
@@ -3356,7 +3664,8 @@
           "amount": 2
         }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "rita-wheeler-no-stupid-questions",
@@ -3385,12 +3694,19 @@
         "effect": {
           "kind": "sequence",
           "effects": [
-            { "kind": "draw", "count": 1 },
-            { "kind": "discardCard", "target": "friendlyHandCard" }
+            {
+              "kind": "draw",
+              "count": 1
+            },
+            {
+              "kind": "discardCard",
+              "target": "friendlyHandCard"
+            }
           ]
         }
       }
-    ]
+    ],
+    "printedCost": 4
   },
   {
     "id": "river-ward-detective-on-the-hunt",
@@ -3446,7 +3762,8 @@
         }
       }
     ],
-    "scripted": "river-ward-detective-on-the-hunt"
+    "scripted": "river-ward-detective-on-the-hunt",
+    "printedCost": null
   },
   {
     "id": "rockn-rockerboy",
@@ -3465,7 +3782,8 @@
       "rocker"
     ],
     "text": "Scream your throat raw for something. Anything.",
-    "effects": []
+    "effects": [],
+    "printedCost": 5
   },
   {
     "id": "rogue-amendiares-preem-solo",
@@ -3509,7 +3827,32 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 7
+  },
+  {
+    "id": "rogue-amendiares-queen-of-the-afterlife",
+    "name": "Rogue Amendiares",
+    "subtitle": "Queen of the Afterlife",
+    "color": "Blue",
+    "type": "unit",
+    "cost": 5,
+    "power": 4,
+    "ram": {
+      "color": "Blue",
+      "value": 2
+    },
+    "ramLimit": null,
+    "sellTag": false,
+    "keywords": [
+      "fixer",
+      "merc",
+      "quick"
+    ],
+    "text": "The first time another friendly Unit steals a Gig with value less than its power each turn, ready 2 Eddies.\n{Quick} 2 €$,  {Spend} A rival Unit loses power equal to this Unit's power this turn.",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 5
   },
   {
     "id": "royce-don-t-call-me-simon",
@@ -3542,7 +3885,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "royce-psycho-on-the-edge",
@@ -3577,7 +3921,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 6
   },
   {
     "id": "ruthless-lowlife",
@@ -3604,7 +3949,8 @@
           "kind": "cantAttackGigArea"
         }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "saburo-arasaka-stubborn-patriarch",
@@ -3634,7 +3980,8 @@
           "keyword": "arasaka"
         }
       }
-    ]
+    ],
+    "printedCost": null
   },
   {
     "id": "safety-override",
@@ -3665,7 +4012,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "sandayu-oda-hanako-s-guardian",
@@ -3701,7 +4049,8 @@
         }
       }
     ],
-    "scripted": "sandayu-oda-hanako-s-guardian"
+    "scripted": "sandayu-oda-hanako-s-guardian",
+    "printedCost": 7
   },
   {
     "id": "sandevistan",
@@ -3729,7 +4078,8 @@
         }
       }
     ],
-    "scripted": "sandevistan"
+    "scripted": "sandevistan",
+    "printedCost": 3
   },
   {
     "id": "sasha-yakovleva-won-t-let-you-down",
@@ -3755,14 +4105,21 @@
     "effects": [
       {
         "trigger": "onAttack",
-        "effect": { "kind": "scripted", "name": "sasha-yakovleva-won-t-let-you-down" }
+        "effect": {
+          "kind": "scripted",
+          "name": "sasha-yakovleva-won-t-let-you-down"
+        }
       },
       {
         "trigger": "onDefeat",
-        "effect": { "kind": "discardRandomRival", "count": 1 }
+        "effect": {
+          "kind": "discardRandomRival",
+          "count": 1
+        }
       }
     ],
-    "scripted": "sasha-yakovleva-won-t-let-you-down"
+    "scripted": "sasha-yakovleva-won-t-let-you-down",
+    "printedCost": 5
   },
   {
     "id": "satori-sword-of-saburo",
@@ -3791,7 +4148,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 2
   },
   {
     "id": "saul-bright-stormrider",
@@ -3829,7 +4187,8 @@
         }
       }
     ],
-    "scripted": "saul-bright-stormrider"
+    "scripted": "saul-bright-stormrider",
+    "printedCost": 8
   },
   {
     "id": "screw-lovelorn-fool",
@@ -3862,7 +4221,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "secondhand-bombus",
@@ -3883,7 +4243,8 @@
       "drone"
     ],
     "text": "{Blocker} (You may spend this Unit to redirect a rival Unit's attack to it instead.)\n(Units with power 0 don't steal Gigs.)",
-    "effects": []
+    "effects": [],
+    "printedCost": 2
   },
   {
     "id": "shattered-memories",
@@ -3911,7 +4272,8 @@
         }
       }
     ],
-    "scripted": "shattered-memories"
+    "scripted": "shattered-memories",
+    "printedCost": 4
   },
   {
     "id": "sketchy-ripper",
@@ -3941,7 +4303,8 @@
         }
       }
     ],
-    "scripted": "sketchy-ripper"
+    "scripted": "sketchy-ripper",
+    "printedCost": 2
   },
   {
     "id": "swordwise-huscle",
@@ -3971,7 +4334,8 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "synapse-burnout",
@@ -4000,7 +4364,8 @@
           "target": "friendlyUnit"
         }
       }
-    ]
+    ],
+    "printedCost": 1
   },
   {
     "id": "t-bug-amateur-philosopher",
@@ -4030,7 +4395,8 @@
         }
       }
     ],
-    "scripted": "t-bug-amateur-philosopher"
+    "scripted": "t-bug-amateur-philosopher",
+    "printedCost": 4
   },
   {
     "id": "take-control",
@@ -4062,7 +4428,8 @@
         }
       }
     ],
-    "scripted": "take-control"
+    "scripted": "take-control",
+    "printedCost": 2
   },
   {
     "id": "tetratronic-rippler",
@@ -4084,10 +4451,14 @@
     "effects": [
       {
         "trigger": "onSpend",
-        "effect": { "kind": "scripted", "name": "tetratronic-rippler" }
+        "effect": {
+          "kind": "scripted",
+          "name": "tetratronic-rippler"
+        }
       }
     ],
-    "scripted": "tetratronic-rippler"
+    "scripted": "tetratronic-rippler",
+    "printedCost": 1
   },
   {
     "id": "the-heist",
@@ -4115,7 +4486,8 @@
         }
       }
     ],
-    "scripted": "the-heist"
+    "scripted": "the-heist",
+    "printedCost": 2
   },
   {
     "id": "the-relic-experimental-biochip",
@@ -4145,7 +4517,51 @@
         }
       }
     ],
-    "scripted": "the-relic-experimental-biochip"
+    "scripted": "the-relic-experimental-biochip",
+    "printedCost": 5
+  },
+  {
+    "id": "three-mouths-one-desire",
+    "name": "Three Mouths, One Desire",
+    "color": "Blue",
+    "type": "program",
+    "cost": 2,
+    "power": null,
+    "ram": {
+      "color": "Blue",
+      "value": 3
+    },
+    "ramLimit": null,
+    "sellTag": true,
+    "keywords": [
+      "braindance",
+      "doll"
+    ],
+    "text": "Search the top 3 cards of your deck. Add 1 to your hand. You may add 1 more for each friendly min Gig. Bottom-deck the rest.",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 2
+  },
+  {
+    "id": "towerfall",
+    "name": "Towerfall",
+    "color": "Blue",
+    "type": "program",
+    "cost": 6,
+    "power": null,
+    "ram": {
+      "color": "Blue",
+      "value": 4
+    },
+    "ramLimit": null,
+    "sellTag": true,
+    "keywords": [
+      "braindance"
+    ],
+    "text": "Choose one effect. If you have less ☆ (Street Cred) than a Rival, choose both instead.\nGive all rival Units -5 power this turn. // Bottom-deck all rival Units with power 0.",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 6
   },
   {
     "id": "trauma-team-operatives",
@@ -4177,7 +4593,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 6
   },
   {
     "id": "trust-no-one",
@@ -4199,14 +4616,47 @@
     "effects": [
       {
         "trigger": "onPlay",
-        "effect": { "kind": "changeGig", "amount": -3, "target": "anyGigDie" }
+        "effect": {
+          "kind": "changeGig",
+          "amount": -3,
+          "target": "anyGigDie"
+        }
       },
       {
         "trigger": "onPlay",
-        "condition": { "friendlyGigValueEquals": 1 },
-        "effect": { "kind": "draw", "count": 1 }
+        "condition": {
+          "friendlyGigValueEquals": 1
+        },
+        "effect": {
+          "kind": "draw",
+          "count": 1
+        }
       }
-    ]
+    ],
+    "printedCost": 1
+  },
+  {
+    "id": "tyger-s-whisper",
+    "name": "Tyger's Whisper",
+    "color": "Green",
+    "faction": "Tyger Claws",
+    "type": "unit",
+    "cost": 2,
+    "power": 0,
+    "ram": {
+      "color": "Green",
+      "value": 1
+    },
+    "ramLimit": null,
+    "sellTag": false,
+    "keywords": [
+      "fixer",
+      "tyger claws"
+    ],
+    "text": "{Play} You may Call a Legend for free. (You can only Call a Legend once per turn.)\n(Units with power 0 don't steal Gigs.)",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 2
   },
   {
     "id": "unlikely-bond",
@@ -4232,12 +4682,20 @@
         "effect": {
           "kind": "scripted",
           "name": "unlikely-bond",
-          "targets": ["friendlyUnit", "rivalSpentUnit"],
-          "filters": [{ "readyOnly": true }]
+          "targets": [
+            "friendlyUnit",
+            "rivalSpentUnit"
+          ],
+          "filters": [
+            {
+              "readyOnly": true
+            }
+          ]
         }
       }
     ],
-    "scripted": "unlikely-bond"
+    "scripted": "unlikely-bond",
+    "printedCost": 4
   },
   {
     "id": "v-corporate-exile",
@@ -4259,7 +4717,8 @@
       "merc"
     ],
     "text": "{Go Solo} (Pay this Legend's cost to play it as a ready Unit. It can attack this turn. When it leaves the field, remove it from the game.)",
-    "effects": []
+    "effects": [],
+    "printedCost": 5
   },
   {
     "id": "v-roamer-of-the-badlands",
@@ -4305,7 +4764,8 @@
         }
       }
     ],
-    "scripted": "v-roamer-of-the-badlands"
+    "scripted": "v-roamer-of-the-badlands",
+    "printedCost": 5
   },
   {
     "id": "v-streetkid",
@@ -4346,7 +4806,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "valentino-guerrera",
@@ -4378,7 +4839,8 @@
           "keyword": "blocker"
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "valentino-street-racer",
@@ -4413,7 +4875,8 @@
           "duration": "turn"
         }
       }
-    ]
+    ],
+    "printedCost": 3
   },
   {
     "id": "viktor-vektor-drop-your-illusions",
@@ -4444,7 +4907,8 @@
           "minimum": 1
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "viktor-vektor-sit-down-and-relax",
@@ -4473,7 +4937,8 @@
         }
       }
     ],
-    "scripted": "viktor-vektor-sit-down-and-relax"
+    "scripted": "viktor-vektor-sit-down-and-relax",
+    "printedCost": null
   },
   {
     "id": "viktor-vektor-you-might-feel-a-little-pinch",
@@ -4516,7 +4981,8 @@
         }
       }
     ],
-    "scripted": "viktor-vektor-you-might-feel-a-little-pinch"
+    "scripted": "viktor-vektor-you-might-feel-a-little-pinch",
+    "printedCost": 3
   },
   {
     "id": "wakako-okada-peace-and-harmony",
@@ -4543,17 +5009,76 @@
         "effect": {
           "kind": "chooseOne",
           "modes": [
-            { "kind": "buffPower", "amount": -2, "target": "rivalUnit", "duration": "turn" },
-            { "kind": "draw", "count": 1 }
+            {
+              "kind": "buffPower",
+              "amount": -2,
+              "target": "rivalUnit",
+              "duration": "turn"
+            },
+            {
+              "kind": "draw",
+              "count": 1
+            }
           ]
         }
       },
       {
         "trigger": "activated",
-        "cost": { "selfSpend": true },
-        "effect": { "kind": "changeGig", "amount": -2, "target": "anyGigDie" }
+        "cost": {
+          "selfSpend": true
+        },
+        "effect": {
+          "kind": "changeGig",
+          "amount": -2,
+          "target": "anyGigDie"
+        }
       }
-    ]
+    ],
+    "printedCost": null
+  },
+  {
+    "id": "we-gotta-live-together",
+    "name": "We Gotta Live Together",
+    "color": "Green",
+    "faction": "Aldecado",
+    "type": "program",
+    "cost": 5,
+    "power": null,
+    "ram": {
+      "color": "Green",
+      "value": 2
+    },
+    "ramLimit": null,
+    "sellTag": true,
+    "keywords": [
+      "aldecado",
+      "nomad"
+    ],
+    "text": "If a Rival controls at least 2 more Gigs than you, play this Program for 3 €$.\nPlay up to 2 Units with cost 3 or less from your trash for free.",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 5
+  },
+  {
+    "id": "westbrook-netrunner",
+    "name": "Westbrook Netrunner",
+    "color": "Blue",
+    "type": "unit",
+    "cost": 4,
+    "power": 5,
+    "ram": {
+      "color": "Blue",
+      "value": 2
+    },
+    "ramLimit": null,
+    "sellTag": false,
+    "keywords": [
+      "netrunner"
+    ],
+    "text": "{Play} Until your next turn, rival Legends can't steal friendly Gigs with value less than their power.",
+    "effects": [],
+    "implementation": "pending",
+    "printedCost": 4
   },
   {
     "id": "wild-in-the-streets",
@@ -4583,7 +5108,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 5
   },
   {
     "id": "wraith-marauders",
@@ -4616,7 +5142,8 @@
         }
       }
     ],
-    "scripted": "wraith-marauders"
+    "scripted": "wraith-marauders",
+    "printedCost": 5
   },
   {
     "id": "yorinobu-arasaka-embracing-destruction",
@@ -4663,7 +5190,8 @@
           "target": "friendlyHandCard"
         }
       }
-    ]
+    ],
+    "printedCost": null
   },
   {
     "id": "yorinobu-arasaka-steel-dragon",
@@ -4719,7 +5247,8 @@
         }
       }
     ],
-    "scripted": "yorinobu-arasaka-steel-dragon"
+    "scripted": "yorinobu-arasaka-steel-dragon",
+    "printedCost": 7
   },
   {
     "id": "zetatech-berserk",
@@ -4751,7 +5280,8 @@
           }
         }
       }
-    ]
+    ],
+    "printedCost": 6
   },
   {
     "id": "zetatech-faceplate",
@@ -4791,6 +5321,7 @@
           "count": 1
         }
       }
-    ]
+    ],
+    "printedCost": 2
   }
 ]

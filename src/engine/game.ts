@@ -123,6 +123,9 @@ function rollForOrder(rng: RngState): [[number, number], RngState] {
 }
 
 export function newGame(db: CardDb, config: NewGameConfig): GameState {
+  for (const deck of config.decks) for (const id of [...deck.legends, ...Object.keys(deck.cards)]) {
+    if (db[id]?.implementation === 'pending') throw new Error(`Card "${id}" is awaiting simulator implementation.`)
+  }
   const built: Built = { cards: {}, nextUid: 1 }
   let rng = createRng(config.seed)
 

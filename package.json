@@ -11,7 +11,9 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "sim": "tsx scripts/sim.ts",
-    "fetch:printings": "tsx scripts/fetch-printings.ts"
+    "fetch:printings": "tsx scripts/fetch-printings.ts",
+    "fetch:catalog": "node scripts/fetch-catalog.mjs",
+    "import:catalog": "node scripts/import-catalog.mjs"
   },
   "dependencies": {
     "@fontsource/chakra-petch": "^5.3.0",

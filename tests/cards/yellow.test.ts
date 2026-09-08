@@ -612,11 +612,11 @@ describe('kiroshi-optics', () => {
     ).toBe(true)
   })
 
-  it('may equip to a rival Unit (docs/rulings.md §8)', () => {
+  it('cannot equip to a rival Unit under the official errata', () => {
     const { state } = fixtureWithHand(0, ['kiroshi-optics'])
     const rivalUnit = fieldCard(state, 1, 'japantown-jonin')
     const plays = actionsOfType(db, state, 'playCard')
-    expect(plays.some((a) => a.targets[0] === rivalUnit)).toBe(true)
+    expect(plays.some((a) => a.targets[0] === rivalUnit)).toBe(false)
   })
 })
 

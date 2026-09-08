@@ -388,6 +388,8 @@ const cardSchema: z.ZodType<CardDef> = z.strictObject({
   faction: z.string().optional(),
   type: cardTypeSchema,
   cost: z.number(),
+  printedCost: z.number().nullable().optional(),
+  implementation: z.literal('pending').optional(),
   power: z.number().nullable(),
   ram: ramSchema.nullable(),
   ramLimit: ramSchema.nullable(),

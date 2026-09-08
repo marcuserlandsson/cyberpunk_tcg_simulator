@@ -288,22 +288,13 @@ export function filterTargets(
 // ---------------------------------------------------------------------------
 
 /**
- * Per-card equip-target overrides, keyed by card id. The default rule covers
- * 16 of the 17 Gear cards verbatim; only `kiroshi-optics` prints a different
- * line — "(Equip to a Unit or friendly face-up Legend.)", where "friendly"
- * scopes to the Legend only, so *any* Unit including a rival's is legal
- * (docs/rulings.md §8). A registry keyed by id keeps that exception out of the
- * engine's generic rule and out of the card data's node vocabulary.
+ * Explicit card-text exceptions only. Kiroshi's old reminder-text exception
+ * was removed by official errata; all current Gear uses the default rule.
  */
 export const gearTargetOverrides: Record<
   string,
   (db: CardDb, state: GameState, gearUid: number) => number[]
-> = {
-  'kiroshi-optics': (_db, state, gearUid) => {
-    const me = controllerOf(state, gearUid)
-    return [...fieldOf(state, me), ...fieldOf(state, opponentOf(me)), ...faceUpLegendsOf(state, me)]
-  },
-}
+> = {}
 
 /**
  * What `gearUid` (a Gear card in hand) may be equipped to: a friendly field

@@ -1,18 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { loadCardDb, cardDbSchema } from '../../src/engine/cardDb'
+import catalog from '../../data/catalog-status.json'
 
 describe('cardDb', () => {
   const db = loadCardDb()
   const cards = Object.values(db)
 
-  it('loads all 141 cards', () => {
-    expect(cards.length).toBe(141)
+  it('loads the complete discovered catalog', () => {
+    expect(cards.length).toBe(catalog.cardCount)
   })
 
   it('has a unique id for every card', () => {
     const ids = cards.map((c) => c.id)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(new Set(ids).size).toBe(141)
+    expect(new Set(ids).size).toBe(catalog.cardCount)
   })
 
   it('keys the db by card id', () => {

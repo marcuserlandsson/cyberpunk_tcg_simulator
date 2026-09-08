@@ -6,6 +6,7 @@ import { CollectionView } from './ui/CollectionView'
 import { loadCardDb } from './engine/cardDb'
 import { getSettings, saveSettings } from './ui/storage'
 import { startCollectionSession } from './ui/collectionSession'
+import catalogStatus from '../data/catalog-status.json'
 
 type View = 'play' | 'deckBuilder' | 'simulate' | 'collection'
 
@@ -73,6 +74,12 @@ export default function App() {
         </label>
       </header>
       <main>
+        <details className="catalog-status">
+          <summary>Card data: {catalogStatus.cardCount} cards · checked {catalogStatus.retrievedAt.slice(0, 10)} · {catalogStatus.pendingCards.length} awaiting implementation</summary>
+          <p>Comprehensive rules updated {catalogStatus.rulesUpdatedAt.slice(0, 10)}. Audit corrections are in progress; simulation results remain provisional.</p>
+          {catalogStatus.pendingCards.length > 0 && <p>Available for collecting and deck planning; gameplay support pending: {catalogStatus.pendingCards.map(id => db[id]?.name ?? id).join(', ')}.</p>}
+          <a href="https://cyberpunktcg.com/cards" target="_blank" rel="noreferrer">Official card catalog</a>
+        </details>
         {/* Kept mounted, only hidden: unmounting PlayView would throw away an
             in-progress game every time the player glanced at another tab. */}
         <div hidden={view !== 'play'}>

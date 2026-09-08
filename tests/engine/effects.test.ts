@@ -1731,10 +1731,10 @@ describe('gear keyword grants (real cards)', () => {
   })
 })
 
-describe('kiroshi-optics equip exception (docs/rulings.md §8)', () => {
+describe('kiroshi-optics official equip errata', () => {
   const real = loadCardDb()
 
-  it('may equip to any unit, friendly or rival, plus friendly face-up legends', () => {
+  it('may equip to friendly units and friendly face-up legends only', () => {
     const s = scenario()
     const mine = mint(s, 0, 'field', 'delamain-cab')
     const theirs = mint(s, 1, 'field', 'psycho-squad')
@@ -1744,7 +1744,8 @@ describe('kiroshi-optics equip exception (docs/rulings.md §8)', () => {
     mint(s, 0, 'eddies', 'mantis-blades', { faceUp: false })
 
     const targets = gearEquipTargets(real, s, gear).sort()
-    expect(targets).toEqual([mine, theirs, legend].sort())
+    expect(targets).toEqual([mine, legend].sort())
+    expect(targets).not.toContain(theirs)
     expect(targets).not.toContain(rivalLegend)
   })
 

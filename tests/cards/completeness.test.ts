@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest'
 import { scriptedCards } from '../../src/cards/scripted/index'
 import type { EffectNode } from '../../src/engine/types'
 import { db } from './fixtures'
+import catalog from '../../data/catalog-status.json'
 
 /**
  * The cards with `effects: []` on purpose: their whole printed `text` is
@@ -57,24 +58,27 @@ function allNodes(node: EffectNode): EffectNode[] {
 
 const cards = Object.values(db)
 
-describe('Task 8 completeness: all 141 cards are encoded', () => {
-  it('holds exactly 141 cards with unique ids', () => {
-    expect(cards).toHaveLength(141)
-    expect(new Set(cards.map((card) => card.id)).size).toBe(141)
+describe('catalog implementation coverage', () => {
+  it('holds every discovered card with unique ids', () => {
+    expect(cards).toHaveLength(catalog.cardCount)
+    expect(new Set(cards.map((card) => card.id)).size).toBe(catalog.cardCount)
   })
 
   it('gives every card either an effect or a documented no-rules-text reason', () => {
     const unencoded = cards
       .filter((card) => card.effects.length === 0)
+      .filter((card) => card.implementation !== 'pending')
       .filter((card) => NO_RULES_TEXT[card.id] === undefined)
       .map((card) => `${card.id}: ${JSON.stringify(card.text)}`)
     expect(unencoded).toEqual([])
   })
 
-  it('counts 141/141: encoded cards plus no-rules-text cards, with no deferrals', () => {
+  it('accounts for every card and lists pending implementations explicitly', () => {
     const encoded = cards.filter((card) => card.effects.length > 0)
     const reminderOnly = cards.filter((card) => NO_RULES_TEXT[card.id] !== undefined)
-    expect(encoded.length + reminderOnly.length).toBe(141)
+    const pending = cards.filter(card => card.implementation === 'pending')
+    expect(pending.map(card => card.id).sort()).toEqual([...catalog.pendingCards].sort())
+    expect(encoded.length + reminderOnly.length + pending.length).toBe(catalog.cardCount)
     // No overlap, and therefore no third category (a "deferred" card would be
     // in neither, and a mis-listed one in both).
     expect(encoded.some((card) => NO_RULES_TEXT[card.id] !== undefined)).toBe(false)

@@ -131,7 +131,7 @@ function CardFrameFace(props: {
     <>
       <div className="card-frame__top">
         <div className="card-frame__cost-badge">
-          <span className="card-frame__cost-value">{def.cost}</span>
+          <span className="card-frame__cost-value">{def.printedCost === null ? '–' : def.cost}</span>
           {def.sellTag && (
             <span className="card-frame__sell-tag" aria-label="Sell tag" title="Sell tag">
               €$
