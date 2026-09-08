@@ -785,7 +785,7 @@ function applyNode(
     case 'defeat': {
       const target = takeTarget(node, ctx, slots)
       if (target === null) return
-      if (!draft.players[draft.cards[target].owner].field.includes(target)) return
+      if (!draft.players[controllerOf(draft, target)].field.includes(target)) return
       note(draft, ctx.sourceUid, `defeat ${target}`)
       defeatUnit(draft, db, target)
       return
@@ -794,7 +794,7 @@ function applyNode(
     case 'bounce': {
       const target = takeTarget(node, ctx, slots)
       if (target === null) return
-      if (!draft.players[draft.cards[target].owner].field.includes(target)) return
+      if (!draft.players[controllerOf(draft, target)].field.includes(target)) return
       note(draft, ctx.sourceUid, `bounce ${target}`)
       leaveField(draft, db, target, 'hand')
       return
@@ -803,7 +803,7 @@ function applyNode(
     case 'bottomDeck': {
       const target = takeTarget(node, ctx, slots)
       if (target === null) return
-      if (!draft.players[draft.cards[target].owner].field.includes(target)) return
+      if (!draft.players[controllerOf(draft, target)].field.includes(target)) return
       note(draft, ctx.sourceUid, `bottom-deck ${target}`)
       leaveField(draft, db, target, 'deckBottom')
       return
@@ -1697,7 +1697,8 @@ export function playCardOnDraft(
   cardUid: number,
   payment: number[],
   targets: number[],
-  goSolo?: boolean
+  goSolo?: boolean,
+  programDestination: 'trash' | 'deckBottom' = 'trash'
 ): void {
   const p = draft.players[player]
   const card = draft.cards[cardUid]
@@ -1709,6 +1710,8 @@ export function playCardOnDraft(
   spendOnDraft(db, draft, payment)
   if (draft.winner !== null) return
   p.hand = p.hand.filter((uid) => uid !== cardUid)
+  p.trash = p.trash.filter(uid => uid !== cardUid)
+  p.deck = p.deck.filter(uid => uid !== cardUid)
   p.legends = p.legends.filter((uid) => uid !== cardUid)
 
   // Non-Programs enter before their Play triggers become pending. Programs
@@ -1772,7 +1775,14 @@ export function playCardOnDraft(
   // CR 4.14.2: a Program is outside all areas while its instructions resolve.
   if (def.type === 'program') {
     p.trash.push(cardUid)
-    if (draft.winner === null) draft.events.push({ type: 'cardTrashed', uid: cardUid })
+    if (draft.winner === null) {
+      draft.events.push({ type: 'cardTrashed', uid: cardUid })
+      if (programDestination === 'deckBottom') {
+        p.trash = p.trash.filter(uid => uid !== cardUid)
+        p.deck.push(cardUid)
+        draft.events.push({ type: 'cardBottomDecked', uid: cardUid })
+      }
+    }
   }
 
   // "When you play a BRAINDANCE Program, ..." / "The first time you play a

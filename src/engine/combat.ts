@@ -438,7 +438,7 @@ export type FieldExit = 'trash' | 'hand' | 'deckBottom'
  * then unequip. A Legend is removed while its Gear remains at the destination.
  * Bottom-decked host/Gear groups are randomized; exiting clears modifiers.
  */
-export function leaveField(draft: GameState, db: CardDb, uid: number, exit: FieldExit): void {
+export function leaveField(draft: GameState, db: CardDb, uid: number, exit: FieldExit, randomize = true): void {
   const card = draft.cards[uid]
   const owner = draft.players[card.owner]
   for (const player of draft.players) {
@@ -493,7 +493,7 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
     if (exit === 'trash') draft.events.push({ type: 'cardTrashed', uid: gearUid })
     if (exit === 'deckBottom') draft.events.push({ type: 'cardBottomDecked', uid: gearUid })
   }
-  if (exit === 'deckBottom') {
+  if (exit === 'deckBottom' && randomize) {
     for (const player of [0, 1] as const) {
       const moved = [uid, ...gear].filter(cardUid => draft.cards[cardUid].owner === player && db[draft.cards[cardUid].defId].type !== 'legend')
       if (moved.length < 2) continue
@@ -501,6 +501,20 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
       draft.rng = rng
       draft.players[player].deck = [...draft.players[player].deck.filter(cardUid => !moved.includes(cardUid)), ...randomized]
     }
+  }
+}
+
+/** CR 11.12.1.3: randomize all simultaneously bottom-decked hosts and Gear together. */
+export function bottomDeckCards(draft: GameState, db: CardDb, uids: number[]): void {
+  const valid = [...new Set(uids)].filter(uid => draft.players.some(p => p.field.includes(uid) || p.legends.includes(uid)))
+  const moved = valid.flatMap(uid => [uid, ...draft.cards[uid].attachedGear]).filter(uid => db[draft.cards[uid].defId].type !== 'legend')
+  for (const uid of valid) leaveField(draft, db, uid, 'deckBottom', false)
+  for (const player of [0, 1] as const) {
+    const own = moved.filter(uid => draft.cards[uid].owner === player)
+    if (own.length < 2) continue
+    const [randomized, rng] = shuffle(draft.rng, own)
+    draft.rng = rng
+    draft.players[player].deck = [...draft.players[player].deck.filter(uid => !own.includes(uid)), ...randomized]
   }
 }
 

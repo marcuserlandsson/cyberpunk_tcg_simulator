@@ -103,3 +103,7 @@ Derived control now follows the public play area, including attached Gear, while
 ### 08l — replacement choices and chains
 
 Multiple mandatory defeat shields and optional protectors are now selectable. Mandatory effects precede optional ones; substitute defeats are checked again for applicable replacements, with each replacement excluded after its first application in that chain. Optional prevention affordability respects face-up Legend Sell tags and permits eligible self-payment. Multiple steal-prevention sources are also selectable. Verified 676 engine/card tests and TypeScript, including two-shield ordering, chained Jackies and a shield on a substitute casualty.
+
+### 08m — shared scripted play/movement paths
+
+Script-driven Unit, Gear and Program plays now use the same entry/payment/trigger path as ordinary plays, including Program-play flags and friendly-play watchers. Programs resolve outside areas before cleanup; a later bottom-deck instruction cannot run after the game ends. Scripted field exits carry Gear, searched remainders randomize, and simultaneous bottom-deck groups shuffle all hosts/Gear together. Replaced an obsolete source-code lint sweep with behavior regressions. Verified 677 engine/card tests, TypeScript, and 415 AI/fuzz tests (300 random games, zero action-cap hits; hidden-information checks passed).

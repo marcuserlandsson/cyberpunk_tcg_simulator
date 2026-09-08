@@ -142,10 +142,9 @@ describe('alt-cunningham-soulkiller-architect', () => {
     expect(s.phase).toBe('gameOver')
     expect(s.winner).toBe(1)
     expect(s.events.at(-1)).toMatchObject({ type: 'gameEnded', reason: 'deckout' })
-    // The zone move (bottom-deck) still completed — only the flavor events
-    // for it, and onPlay itself, were skipped once the game had ended.
-    expect(s.players[0].deck).toContain(program)
-    expect(s.players[0].trash).not.toContain(program)
+    // The resolving Program is cleaned up in trash; the later bottom-deck instruction cannot run.
+    expect(s.players[0].deck).not.toContain(program)
+    expect(s.players[0].trash).toContain(program)
   })
 })
 

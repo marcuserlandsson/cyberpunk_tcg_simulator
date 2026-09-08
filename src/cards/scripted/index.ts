@@ -25,7 +25,7 @@ import { callChosenLegend, chooseFaceDownLegend, peekLegends } from '../../engin
 // runs at module evaluation), exactly like the engine <-> cards cycle
 // documented at the top of ../effects.ts.
 
-import { defeatGear, defeatUnit } from '../../engine/combat'
+import { defeatGear, defeatUnit, leaveField } from '../../engine/combat'
 import { canonicalPayment } from '../../engine/economy'
 import { endGame, drawCards, stillLive } from '../../engine/game'
 import {
@@ -39,7 +39,7 @@ import {
 import { chooseEffectOption } from '../../engine/choices'
 import { nextInt, shuffle } from '../../engine/rng'
 import type { CardDb, GameState, PlayerId } from '../../engine/types'
-import { fireTriggerOnDraft, readyFriendlyEddies, spendOnDraft, type EffectCtx } from '../effects'
+import { playCardOnDraft, readyFriendlyEddies, spendOnDraft, type EffectCtx } from '../effects'
 
 /** Scripts that inspect/reveal previously unknown cards. AI previews stop before entry. */
 export const PRIVATE_INFORMATION_SCRIPTS = new Set([
@@ -201,18 +201,8 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const target = ctx.chosen
     if (target === undefined) return state
     const p = state.players[ctx.player]
-    const inHand = p.hand.includes(target)
-    const inTrash = p.trash.includes(target)
-    if (!inHand && !inTrash) return state
-    if (inHand) p.hand = p.hand.filter((uid) => uid !== target)
-    if (inTrash) p.trash = p.trash.filter((uid) => uid !== target)
-    const card = state.cards[target]
-    card.ready = true
-    card.lag = true
-    card.playedThisTurn = true // docs/rulings.md §106 fix round 2
-    p.field.push(target)
-    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: target })
-    fireTriggerOnDraft(db, state, 'onPlay', target, [])
+    if (!p.hand.includes(target) && !p.trash.includes(target)) return state
+    playCardOnDraft(db, state, ctx.player, target, [], [])
     return state
   },
 
@@ -443,10 +433,10 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     }
     const gears = top.filter((uid) => db[state.cards[uid].defId].type === 'gear')
     const chosen = pick(db, state, ctx, gears)
-    for (const uid of top) {
-      if (uid === chosen) p.hand.push(uid)
-      else p.deck.push(uid)
-    }
+    if (chosen !== undefined) p.hand.push(chosen)
+    const [rest, rng] = shuffle(state.rng, top.filter(uid => uid !== chosen))
+    state.rng = rng
+    p.deck.push(...rest)
     return state
   },
 
@@ -482,10 +472,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       const hosts = [...p.field, ...p.legends.filter((uid) => state.cards[uid].faceUp)]
       const host = pick(db, state, ctx, hosts)
       if (host !== undefined) {
-        p.trash = p.trash.filter((uid) => uid !== chosen)
-        state.cards[host].attachedGear.push(chosen)
-        state.events.push({ type: 'cardPlayed', player: ctx.player, uid: chosen })
-        fireTriggerOnDraft(db, state, 'onPlay', chosen, [])
+        playCardOnDraft(db, state, ctx.player, chosen, [], [host])
         return state
       }
     }
@@ -516,14 +503,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     })
     const chosen = pick(db, state, ctx, candidates)
     if (chosen !== undefined) {
-      p.trash = p.trash.filter((uid) => uid !== chosen)
-      const card = state.cards[chosen]
-      card.ready = true
-      card.lag = true
-      card.playedThisTurn = true // docs/rulings.md §106 fix round 2
-      p.field.push(chosen)
-      state.events.push({ type: 'cardPlayed', player: ctx.player, uid: chosen })
-      fireTriggerOnDraft(db, state, 'onPlay', chosen, [])
+      playCardOnDraft(db, state, ctx.player, chosen, [], [])
       // The revived Unit's own onPlay can end the game outright (a forced
       // draw off an empty deck). The host is already safely sitting in
       // `p.trash` (it landed there when it was defeated, before this
@@ -582,12 +562,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   'river-ward-detective-on-the-hunt:free-gear': (db, state, ctx) => {
     const [gear, host] = ctx.targets
     if (gear === undefined || host === undefined) return state
-    const p = state.players[ctx.player]
-    if (!p.hand.includes(gear)) return state
-    p.hand = p.hand.filter((uid) => uid !== gear)
-    state.cards[host].attachedGear.push(gear)
-    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: gear })
-    fireTriggerOnDraft(db, state, 'onPlay', gear, [])
+    playCardOnDraft(db, state, ctx.player, gear, [], [host])
     return state
   },
 
@@ -631,18 +606,9 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   'viktor-vektor-you-might-feel-a-little-pinch': (db, state, ctx) => {
     const [gear, host] = ctx.targets
     if (gear === undefined || host === undefined) return state
-    const p = state.players[ctx.player]
-    if (!p.trash.includes(gear)) return state
-    p.trash = p.trash.filter((uid) => uid !== gear)
-    state.cards[host].attachedGear.push(gear)
-    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: gear })
-    fireTriggerOnDraft(db, state, 'onPlay', gear, [])
+    playCardOnDraft(db, state, ctx.player, gear, [], [host])
     return state
   },
-
-  // -------------------------------------------------------------------------
-  // Task 8 batch 5 (Green) — docs/rulings.md §92 ff.
-  // -------------------------------------------------------------------------
 
   /**
    * `don-t-fear-the-reaper` — "Spend all rival Units. Then, defeat a spent
@@ -1011,34 +977,10 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    */
   'alt-cunningham-soulkiller-architect': (db, state, ctx) => {
     const program = ctx.targets[0]
-    if (program === undefined) return state
-    const p = state.players[ctx.player]
-    if (!p.trash.includes(program)) return state
-    const cost = effectiveCardCost(db, state, ctx.player, program)
-    const payment = canonicalPayment(db, state, ctx.player, cost)
+    if (program === undefined || !state.players[ctx.player].trash.includes(program)) return state
+    const payment = canonicalPayment(db, state, ctx.player, effectiveCardCost(db, state, ctx.player, program))
     if (payment === null) return state
-    spendOnDraft(db, state, payment)
-    // The payment's own {Spend} trigger can end the game outright — bail
-    // before touching the Program at all, so it simply stays where it
-    // already validly sat (`p.trash`) rather than being removed with
-    // nowhere yet to go (docs/rulings.md §147/§148).
-    if (!stillLive(state)) return state
-    p.trash = p.trash.filter((uid) => uid !== program)
-    // A Program never enters a zone before its own onPlay resolves (matching
-    // `playCardOnDraft`) — no `ready`/`lag` to set.
-    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: program })
-    fireTriggerOnDraft(db, state, 'onPlay', program, [])
-    // "Bottom-deck it after you play it" — deliberately AFTER `onPlay`, not
-    // before: bottom-decking earlier would let the Program's own draw
-    // effect (e.g. `floor-it`) immediately re-draw the very card this line
-    // is about to bottom-deck, which is not what "after you play it" means.
-    // The zone move itself always completes regardless of what `onPlay`
-    // just did — this Program must land somewhere — only the flavor event
-    // for it is skipped once the game has ended, so `gameEnded` stays the
-    // terminal event (docs/rulings.md §148).
-    p.deck.push(program)
-    if (!stillLive(state)) return state
-    state.events.push({ type: 'cardBottomDecked', uid: program })
+    playCardOnDraft(db, state, ctx.player, program, payment, [], undefined, 'deckBottom')
     return state
   },
 
@@ -1100,36 +1042,18 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    */
   'judy-a-lvarez-nothing-to-doubt': (db, state, ctx) => {
     const p = state.players[ctx.player]
-    const uid = p.deck.shift()
+    const uid = p.deck[0]
     if (uid === undefined) return state
     const def = db[state.cards[uid].defId]
-    const card = state.cards[uid]
-
-    if (def.type === 'gear') {
-      const hosts = [...p.field, ...p.legends.filter((h) => state.cards[h].faceUp)]
+    const yes = chooseEffectOption(state, ctx.player, ctx.sourceUid, `Revealed: ${def.name}. Play it for free?`, [1, 0], { 1: 'Play for free', 0: 'Add to hand' }, false, [{ uid, viewer: 'all' }])
+    let targets: number[] = []
+    if (yes === 1 && def.type === 'gear') {
+      const hosts = [...p.field, ...p.legends.filter(h => state.cards[h].faceUp)]
       const host = pick(db, state, ctx, hosts)
-      if (host === undefined) {
-        p.hand.push(uid)
-        return state
-      }
-      state.cards[host].attachedGear.push(uid)
-    } else if (def.type === 'unit') {
-      card.ready = true
-      card.lag = true
-      card.playedThisTurn = true
-      p.field.push(uid)
-    } else {
-      // Program: the zone assignment happens before its own `onPlay` fires
-      // (matching `playCardOnDraft`'s own Program handling, docs/rulings.md
-      // §144/§147/§148), so it's always in exactly one zone regardless of
-      // what `onPlay` does — no printed Program effect targets a trash-zone
-      // card of its own, so this cannot let it see (or select) itself as
-      // already-trashed.
-      p.trash.push(uid)
+      if (host !== undefined) targets = [host]
     }
-    state.events.push({ type: 'cardPlayed', player: ctx.player, uid })
-    if (def.type === 'program') state.events.push({ type: 'cardTrashed', uid })
-    fireTriggerOnDraft(db, state, 'onPlay', uid, [])
+    if (yes === 1 && (def.type !== 'gear' || targets.length)) playCardOnDraft(db, state, ctx.player, uid, [], targets)
+    else { p.deck.shift(); p.hand.push(uid) }
     return state
   },
 
@@ -1147,24 +1071,8 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const target = ctx.chosen
     if (target === undefined) return state
     const p = state.players[ctx.player]
-    const inHand = p.hand.includes(target)
-    const inTrash = p.trash.includes(target)
-    if (!inHand && !inTrash) return state
-    if (inHand) p.hand = p.hand.filter((uid) => uid !== target)
-    if (inTrash) p.trash = p.trash.filter((uid) => uid !== target)
-    state.events.push({ type: 'cardPlayed', player: ctx.player, uid: target })
-    fireTriggerOnDraft(db, state, 'onPlay', target, [])
-    // "Bottom-deck it after you play it" — deliberately AFTER `onPlay`, not
-    // before: bottom-decking earlier would let the Program's own draw
-    // effect (e.g. `floor-it`) immediately re-draw the very card this line
-    // is about to bottom-deck. The zone move itself always completes
-    // regardless of what `onPlay` just did — this Program must land
-    // somewhere — only the flavor event for it is skipped once the game
-    // has ended, so `gameEnded` stays the terminal event (docs/rulings.md
-    // §148).
-    p.deck.push(target)
-    if (!stillLive(state)) return state
-    state.events.push({ type: 'cardBottomDecked', uid: target })
+    if (!p.hand.includes(target) && !p.trash.includes(target)) return state
+    playCardOnDraft(db, state, ctx.player, target, [], [], undefined, 'deckBottom')
     return state
   },
 
@@ -1210,9 +1118,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     )
     const target = pick(db, state, ctx, candidates)
     if (target !== undefined) {
-      state.players[rival].field = state.players[rival].field.filter((uid) => uid !== target)
-      state.players[rival].deck.push(target)
-      state.events.push({ type: 'cardBottomDecked', uid: target })
+      leaveField(state, db, target, 'deckBottom')
     }
     return state
   },
@@ -1255,9 +1161,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const rival = opponentOf(ctx.player)
     const target = pick(db, state, ctx, state.players[rival].field)
     if (target !== undefined) {
-      state.players[rival].field = state.players[rival].field.filter((uid) => uid !== target)
-      state.players[rival].deck.push(target)
-      state.events.push({ type: 'cardBottomDecked', uid: target })
+      leaveField(state, db, target, 'deckBottom')
     }
     return state
   },
@@ -1340,15 +1244,9 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     // own `readyOnly` filter (docs/rulings.md §134 ff.) — not re-checked
     // here, the same trust the filter machinery gets everywhere else.
     if (friendly === undefined) return state
-    state.players[ctx.player].field = state.players[ctx.player].field.filter(
-      (uid) => uid !== friendly
-    )
-    state.players[ctx.player].deck.push(friendly)
-    state.events.push({ type: 'cardBottomDecked', uid: friendly })
+    leaveField(state, db, friendly, 'deckBottom')
     if (rivalTarget === undefined) return state
-    state.players[rival].field = state.players[rival].field.filter((uid) => uid !== rivalTarget)
-    state.players[rival].deck.push(rivalTarget)
-    state.events.push({ type: 'cardBottomDecked', uid: rivalTarget })
+    leaveField(state, db, rivalTarget, 'deckBottom')
     return state
   },
 }
