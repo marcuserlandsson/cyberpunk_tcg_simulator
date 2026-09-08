@@ -5,7 +5,7 @@ import { SimulateView } from './ui/SimulateView'
 import { CollectionView } from './ui/CollectionView'
 import { loadCardDb } from './engine/cardDb'
 import { getSettings, saveSettings } from './ui/storage'
-import { initCollectionSync } from './ui/collectionSync'
+import { startCollectionSession } from './ui/collectionSession'
 
 type View = 'play' | 'deckBuilder' | 'simulate' | 'collection'
 
@@ -38,9 +38,7 @@ export default function App() {
   const db = useMemo(() => loadCardDb(), [])
   const aiDelayMs = useMemo(() => aiDelayFromUrl(), [])
 
-  useEffect(() => {
-    void initCollectionSync()
-  }, [])
+  useEffect(() => startCollectionSession(), [])
 
   function toggleOfficialImages() {
     const next = !useOfficialImages

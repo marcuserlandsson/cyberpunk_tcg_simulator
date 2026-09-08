@@ -9,6 +9,8 @@
   margin-bottom: 0.6em;
 }
 
+.collection-editor { border: 0; padding: 0; margin: 0; min-width: 0; }
+
 .collection-view__filters {
   margin-bottom: 0.6em;
 }

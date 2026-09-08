@@ -43,6 +43,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { collectionFileSchema } from '../collection/format'
+import { canEditCollection } from './collectionAccess'
 import {
   getBaseRevision,
   readLegacyCollection,
@@ -173,6 +174,7 @@ export function useSyncStatus(): SyncStatus {
  *  which is responsible for making sure at most one of these runs at a time
  *  (invariant 2 above) — never call this directly. */
 async function performFlush(confirmEmpty: boolean): Promise<void> {
+  if (!canEditCollection()) return
   const buffer = readPendingBuffer()
   if (buffer === undefined) return
   // A conflict is resolved by the user, never by the retry loop.
@@ -371,6 +373,7 @@ export async function resolveConflict(choice: 'mine' | 'disk'): Promise<void> {
 }
 
 export async function initCollectionSync(): Promise<void> {
+  if (!canEditCollection()) return
   // Registered SYNCHRONOUSLY, before the GET is even issued. Two reasons,
   // both about the await window below:
   //
@@ -430,6 +433,7 @@ export async function initCollectionSync(): Promise<void> {
     unreachable = true
   }
 
+  if (!canEditCollection()) return
   // Read AFTER the response: a mutation made during the GET is real unsaved
   // work and must be seen here, not missed because the buffer was sampled
   // before the await.

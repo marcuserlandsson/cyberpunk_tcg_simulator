@@ -25,6 +25,7 @@ import {
 } from './collection'
 import { QuickAddBar } from './QuickAddBar'
 import { CollectionHeader } from './CollectionHeader'
+import { useCollectionAccess } from './collectionAccess'
 
 const COLORS = ['Red', 'Yellow', 'Green', 'Blue'] as const
 const TYPES: CardType[] = ['legend', 'unit', 'program', 'gear']
@@ -74,6 +75,7 @@ export function CollectionView({
   useOfficialImages: boolean
 }): ReactElement {
   const collection = useCollection()
+  const access = useCollectionAccess()
 
   const loadResult = useMemo(() => {
     try {
@@ -131,6 +133,12 @@ export function CollectionView({
 
   return (
     <div className="collection-view" data-testid="collection-view">
+      {access !== 'writer' && <p role="status" data-testid="collection-readonly">
+        {access === 'waiting'
+          ? 'Collection is read-only while another tab is editing. Close that tab to continue here.'
+          : 'Safe collection editing requires a browser with Web Locks on localhost or HTTPS.'}
+      </p>}
+      <fieldset disabled={access !== 'writer'} className="collection-editor">
       {/* useCollection above re-renders this component on every collection
           write, so a failed write's error appears (and clears) live. */}
       {getStorageError() !== '' && (
@@ -239,6 +247,7 @@ export function CollectionView({
           </div>
         ))}
       </div>
+      </fieldset>
     </div>
   )
 }

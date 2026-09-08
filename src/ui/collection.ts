@@ -16,6 +16,7 @@ import type { CardDb, CardDef } from '../engine/types'
 import { collectionSchema, type Collection } from '../collection/format'
 import { formatZodIssues, getPrinting, type Printing } from './printings'
 import { buildDisplayNames } from './storage'
+import { canEditCollection } from './collectionAccess'
 
 const COLLECTION_KEY = 'ctcg:collection:v1'
 
@@ -150,6 +151,7 @@ export function getStorageError(): string {
 }
 
 function writeCollection(collection: Collection): void {
+  if (!canEditCollection()) return
   const previous = getCollection()
   // Prune zero counts: absence means 0.
   const counts: Record<string, number> = {}
@@ -176,7 +178,7 @@ function writeCollection(collection: Collection): void {
       storageError = ''
     } catch (err) {
       memoryPending = pending
-      storageError = `Could not save to browser storage: ${String(err)}. Changes are held in memory; keep this tab open until they are saved to disk.`
+      storageError = `Could not save the collection to browser storage: ${String(err)}. Changes are held in memory; keep this tab open until they are saved to disk.`
     }
     cache = freeze({ counts: { ...counts } })
   }
@@ -234,6 +236,12 @@ export function _resetCollectionCacheForTests(): void {
   memoryPending = undefined
   storageError = ''
   baseRevision = 0
+}
+
+/** Followers may display snapshots but must never clear another tab's work. */
+export function setReadOnlyCollection(counts: Record<string, number>): void {
+  cache = freeze({ counts: { ...counts } })
+  for (const listener of listeners) listener()
 }
 
 // ---------------------------------------------------------------------------

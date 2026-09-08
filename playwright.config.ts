@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test'
 // configured with (vite.config.ts) — the two runners never see each other's
 // files. Chromium only: the suite is a binding smoke test for the Play view's
 // own DOM contract, not a browser-compatibility matrix.
-const PORT = 5174
+const PORT = Number(process.env.CTCG_E2E_PORT ?? 5174)
 // `localhost`, not `127.0.0.1`: vite binds to whatever `localhost` resolves to,
 // which on a stock Windows box is the IPv6 loopback only — a `127.0.0.1` probe
 // then times out against a server that is up and serving.

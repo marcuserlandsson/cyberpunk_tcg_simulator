@@ -5,7 +5,7 @@ User request: address the app review and audit the newly published comprehensive
 ## Steps
 
 - [x] 01. Preserve collection data and attempted edits when browser storage fails.
-- [ ] 02. Coordinate collection editing and recovery across browser tabs.
+- [x] 02. Coordinate collection editing and recovery across browser tabs.
 - [ ] 03. Fix overlapping Collection cards and verify responsive layouts.
 - [ ] 04. Refresh deck choices across views and suppress unknown ownership figures.
 - [ ] 05. Support collection persistence outside the dev server; expose Git outcomes and correct documentation.
@@ -30,3 +30,7 @@ Each entry records the implementation, verification evidence, and any remaining 
 ### 01 — browser storage failure
 
 Preserved the last confirmed collection and attempted edits in memory when localStorage fails. The disk sync can flush that buffer directly; invalid counts preserve the prior snapshot. Read/removal failures no longer crash recovery. Verified 101 tests across collection, sync, error UI, and header, including temporary quota failure followed by another edit and successful disk sync while browser writes remain blocked.
+
+### 02 — cross-tab coordination
+
+An origin-scoped Web Lock allows one collection editor; waiting tabs display updates without touching the shared buffer and automatically take over after the owner closes. Browsers without Web Locks fail closed with an explanation. Verified 87 unit/component tests, TypeScript, and a real two-tab Playwright regression covering read-only protection, live counts, takeover, and saving. The E2E port can now be overridden to avoid occupied local ports. Running Playwright outside the restricted process sandbox also resolved its teardown hang.
