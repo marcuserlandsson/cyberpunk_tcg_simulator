@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactElement } from 'react'
 import { CardFrame, type CardFrameOwner } from './CardFrame'
-import { effectivePower } from '../engine/query'
+import { controllerOf, effectivePower } from '../engine/query'
 import { AI } from './useGame'
 import type { BoardAffordances, BoardHandlers } from './playAffordances'
 import type { CardDb, GameState, PlayerId } from '../engine/types'
@@ -89,7 +89,7 @@ export function BoardCard(props: {
   // Red-keys the rival's own cards (frame, ready ring, face-down back) so a
   // glance at the field tells whose card is whose — the same `owner` prop
   // ZonePanels already threads through for eddies/deck/trash piles.
-  const owner: CardFrameOwner = instance.owner === AI ? 'rival' : 'you'
+  const owner: CardFrameOwner = controllerOf(state, uid) === AI ? 'rival' : 'you'
 
   // Human attackers lunge up (the keyframe's own default, `-14px`); the
   // rival's lunge down, which needs an explicit override.

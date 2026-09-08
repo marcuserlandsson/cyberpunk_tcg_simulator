@@ -7,6 +7,11 @@ export interface DeckList {
   demo?: boolean
 }
 
+/** CR 7.3.3 groups functional copies by name and subtitle, independent of card number. */
+export function cardIdentity(def: CardDef): string {
+  return JSON.stringify([def.name.normalize('NFC'), (def.subtitle ?? '').normalize('NFC')])
+}
+
 /** Total number of non-legend cards in the deck (sum of all copy counts). */
 export function deckSize(deck: DeckList): number {
   return Object.values(deck.cards).reduce((sum, count) => sum + count, 0)
@@ -77,7 +82,12 @@ export function validateDeck(db: CardDb, deck: DeckList): string[] {
     }
   }
 
+  const identityCounts = new Map<string, { id: string; count: number }>()
   for (const [id, count] of Object.entries(deck.cards)) {
+    if (!Number.isSafeInteger(count) || count < 1) {
+      errors.push(`Card "${id}" has an invalid copy count of ${count}; use positive whole numbers.`)
+      continue
+    }
     const def = db[id]
     if (!def) {
       errors.push(`Unknown card id: "${id}".`)
@@ -90,8 +100,11 @@ export function validateDeck(db: CardDb, deck: DeckList): string[] {
     if (count > MAX_COPIES) {
       errors.push(`Card "${id}" has ${count} copies; the maximum is ${MAX_COPIES}.`)
     }
-    if (count < 1) {
-      errors.push(`Card "${id}" has an invalid copy count of ${count}.`)
+    const identity = cardIdentity(def)
+    const prior = identityCounts.get(identity)
+    identityCounts.set(identity, { id, count: (prior?.count ?? 0) + count })
+    if (prior && prior.count + count > MAX_COPIES) {
+      errors.push(`Card "${id}" shares its name and subtitle with "${prior.id}"; their combined ${prior.count + count} copies exceed the maximum ${MAX_COPIES}.`)
     }
     if (def.ram) {
       const limit = ramLimitByColor[def.ram.color] ?? 0

@@ -7,8 +7,9 @@ in your browser: build a deck from the 151-card catalog, then play a
 complete game against a heuristic AI opponent, or batch-simulate thousands of
 AI-vs-AI games to see how decks and cards perform. All 151 catalog cards
 currently have gameplay implementations.
-The comprehensive rules audit identified corrections still being implemented;
-see [the checklist](docs/remediation-checklist.md) before treating results as rules-accurate.
+The gameplay corrections from the comprehensive rules audit are implemented.
+See [current rules decisions](docs/current-rules.md) for the official ambiguities
+and scope. Simulation results estimate this AI policy, not tournament win rates.
 
 **This is not an official product and is not affiliated with, endorsed by,
 or connected to WeirdCo, CD Projekt Red, or CD Projekt S.A.** Card names,

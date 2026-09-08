@@ -1068,7 +1068,7 @@ export function applyEffectDefOnDraft(
   if (!stillLive(draft)) return
   const player = controller ?? effectController(draft, sourceUid)
   context = { ...context, sourcePower: effectivePower(db, draft, context.equipHostUid ?? context.defeatedHostUid ?? abilityHost(draft, sourceUid)) }
-  if (!conditionMet(draft, player, def, context, sourceUid)) return
+  if (!conditionMet(draft, player, def, context, context.equipHostUid ?? context.defeatedHostUid ?? sourceUid)) return
   // A *triggered* def may carry an optional cost ("{Attack} You may pay 2 €$.
   // If you do, ..."). Paying is the controller's decision, carried on the
   // action that fired the trigger; an unanswered option is declined, and the
@@ -1232,7 +1232,8 @@ export function fireCardTrigger(
         queuedGroups.set(groupKey, pending)
         draft.effectQueue.push(pending)
       }
-      pending.clauses.push({ def: effect, targets: slice })
+      const resolutionCondition = Object.fromEntries(Object.entries(effect.condition ?? {}).filter(([key]) => !(EVENT_CONDITION_KEYS as readonly string[]).includes(key)))
+      pending.clauses.push({ def: { ...effect, condition: resolutionCondition }, targets: slice })
     } else {
       applyEffectDefOnDraft(db, draft, effect, sourceUid, slice, player, context)
     }
@@ -1660,7 +1661,7 @@ export function playCardTargetChoices(db: CardDb, state: GameState, uid: number)
   // field would shift every later slot (docs/rulings.md §34). The controller is
   // always the player *playing* the card, even for a Gear card equipped to a
   // rival Unit (docs/rulings.md §38).
-  const player = state.cards[uid].owner
+  const player = controllerOf(state, uid)
   const effectTuples = triggerTargetChoices(
     db,
     stateAfterEntry(db, state, uid),

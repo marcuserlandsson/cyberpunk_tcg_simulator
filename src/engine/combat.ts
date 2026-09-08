@@ -475,6 +475,8 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
   card.playedThisTurn = false
 
   if (db[card.defId].type === 'legend') {
+    if (exit === 'trash') draft.events.push({ type: 'cardTrashed', uid })
+    if (exit === 'deckBottom') draft.events.push({ type: 'cardBottomDecked', uid })
     owner.removed.push(uid)
     draft.events.push({ type: 'cardRemoved', uid })
   } else {
@@ -666,6 +668,7 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // saul-bright-stormrider, docs/rulings.md §107 ff.) only ever applies to
   // the ATTACKER's own side of this fight, never the defender's.
   draft.pendingFight = { attacker, defender }
+  const fightController = new Map([[attacker, controllerOf(draft, attacker)], [defender, controllerOf(draft, defender)]])
   const attackPower = effectivePower(db, draft, attacker)
   const defendPower = effectivePower(db, draft, defender)
   // "This Unit wins all fights against CORPO Units" overrides the power
@@ -699,13 +702,13 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   const noDefeatIndex = draft.floatingEffects.findIndex(
     (entry) =>
       entry.kind === 'rivalFightNoDefeat' &&
-      (entry.controller === draft.cards[attacker].owner ||
-        entry.controller === draft.cards[defender].owner)
+      (entry.controller === fightController.get(attacker)! ||
+        entry.controller === fightController.get(defender)!)
   )
   if (noDefeatIndex !== -1) {
     const protectedPlayer = draft.floatingEffects[noDefeatIndex].controller
     draft.floatingEffects.splice(noDefeatIndex, 1)
-    defeated = defeated.filter((uid) => draft.cards[uid].owner !== protectedPlayer)
+    defeated = defeated.filter((uid) => fightController.get(uid)! !== protectedPlayer)
   }
 
   // "If that Unit steals or fights, defeat it at the end of this turn."
@@ -750,7 +753,7 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
     const index = draft.floatingEffects.findIndex(
       (entry) =>
         entry.kind === 'winFightMarginSteal' &&
-        entry.controller === draft.cards[winner].owner &&
+        entry.controller === fightController.get(winner)! &&
         margin >= (entry.margin ?? 0)
     )
     if (index !== -1) {
@@ -768,7 +771,7 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   for (const uid of losers) {
     const foe = uid === attacker ? defender : attacker
     const index = draft.floatingEffects.findIndex(
-      (entry) => entry.kind === 'loseFightDefeatFoe' && entry.controller === draft.cards[uid].owner
+      (entry) => entry.kind === 'loseFightDefeatFoe' && entry.controller === fightController.get(uid)!
     )
     if (index === -1) continue
     draft.floatingEffects.splice(index, 1)
@@ -814,7 +817,7 @@ export function blockAttack(draft: GameState, db: CardDb, blocker: number): void
   // broadcast to every in-play card of the blocking Unit's own controller
   // (goro-takemura-vengeful-bodyguard, docs/rulings.md §92 ff.), unlike the
   // self-referential `onBlock` fired just above.
-  fireWatcherTrigger(db, draft, 'onFriendlyBlock', draft.cards[blocker].owner, {})
+  fireWatcherTrigger(db, draft, 'onFriendlyBlock', controllerOf(draft, blocker), {})
   // CR 9.7–9.12: blocking changes the target, but reactions remain open.
   // Combat begins only when the defender passes.
 }

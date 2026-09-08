@@ -53,7 +53,7 @@ const status = {
   printingCount: printings.length, setCount: new Set(printings.map(p => p.setCode)).size,
   pendingCards: cards.filter(card => card.implementation === 'pending').map(card => card.id),
   retainedPrintingKeys: oldPrintings.filter(p => !currentKeys.has(p.key)).map(p => p.key),
-  rulesUpdatedAt: '2026-09-01T19:28:10.028Z', rulesAudit: 'corrections-pending',
+  rulesUpdatedAt: '2026-09-01T19:28:10.028Z', rulesAudit: 'implemented-with-interpretations',
 }
 // All validation precedes writing; collection counts and keys are never rewritten.
 await writeFile(path('cards.json'), JSON.stringify(cards, null, 2) + '\n')

@@ -259,3 +259,19 @@ describe('validateDeck', () => {
     expect(validateDeck(db, mercsDeck as unknown as DeckList)).toEqual([])
   })
 })
+
+
+describe('comprehensive copy-count rules', () => {
+  const cards = loadCardDb()
+  it.each([NaN, Infinity, 1.5, -1, 0, Number.MAX_SAFE_INTEGER + 1])('rejects malformed count %s', count => {
+    const deck = { ...(arasakaDeck as unknown as DeckList), cards: { 'animals-wrecker': count } }
+    expect(validateDeck(cards, deck).some(error => error.includes('invalid copy count'))).toBe(true)
+  })
+  it('combines duplicate identities across internal IDs but distinguishes subtitles', () => {
+    const db = { ...cards, alternate: { ...cards['animals-wrecker'], id: 'alternate' } }
+    const deck = { ...(arasakaDeck as unknown as DeckList), cards: { 'animals-wrecker': 2, alternate: 2 } }
+    expect(validateDeck(db, deck).some(error => error.includes('combined 4 copies'))).toBe(true)
+    db.alternate.subtitle = 'Different card'
+    expect(validateDeck(db, deck).some(error => error.includes('combined'))).toBe(false)
+  })
+})

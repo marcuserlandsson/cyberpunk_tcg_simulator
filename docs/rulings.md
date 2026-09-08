@@ -3,6 +3,7 @@
 The newly published comprehensive rules supersede conflicting interpretations below.
 See [the comprehensive rules audit](rules-audit-2026-09-08.md) for versioned sources,
 confirmed discrepancies, required regressions, and unresolved official ambiguities.
+See [current rules decisions](current-rules.md) for the implemented behavior.
 The historical rulings remain here to explain existing code; they are not evidence
 of current rules compliance. Implementation corrections are tracked in
 [the remediation checklist](remediation-checklist.md).

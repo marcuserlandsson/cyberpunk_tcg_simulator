@@ -6,6 +6,29 @@ Audited all 11 numbered chapters (713 source nodes, including headings and examp
 
 This is a source/code audit, not a certification that the simulator complies. Existing tests sometimes enforce the earlier gameplay-guide interpretation; passing them cannot establish compliance with the new document. Corrections below belong to checklist steps 7–8, with explicit formats in 12/17. The comprehensive rules supersede conflicting simulator rulings. Unresolved contradictions in the official document are listed separately.
 
+## Correction status after implementation
+
+The tables below preserve the **original audit findings**, not current behavior.
+R01–R16 and R18–R20 have corresponding gameplay corrections and regressions;
+see checkpoints 08a–08v in the remediation checklist. R17's finite integer and
+name/subtitle copy rules are corrected. Explicit format and sealed-pool controls
+remain assigned to checklist steps 12 and 17. Official ambiguities C01–C03 remain
+interpretations; the implementation is not an official certification.
+
+| Findings | Verification families |
+|---|---|
+| R01/R04 | comprehensive-turns, overtime, pending resolution |
+| R02/R18/R19 | combat, comprehensive combat and contextual power |
+| R03/R07/R14 | payments, Legend play modes, null cost |
+| R05/R09/R11/R12/R20 | pending resolution, choices, source information, steals, replacements |
+| R06/R13 | Street Cred, signed power and Gig adjustment |
+| R08/R15/R16 | Gear movement, control, errata, terminal ties |
+| R10 | private knowledge, public reveal/search, AI hidden-information invariance |
+| R17 (core) | deck validation, invalid counts and duplicate identities |
+
+[Current rules decisions](current-rules.md) supersede conflicting historical
+rulings and comments. The remaining product work is tracked separately.
+
 ## Chapter coverage
 
 | Chapter / covered subsections | Implementation inspected | Result |

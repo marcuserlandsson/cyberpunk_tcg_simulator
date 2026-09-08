@@ -76,7 +76,7 @@ export default function App() {
       <main>
         <details className="catalog-status">
           <summary>Card data: {catalogStatus.cardCount} cards · checked {catalogStatus.retrievedAt.slice(0, 10)} · {catalogStatus.pendingCards.length} awaiting implementation</summary>
-          <p>Comprehensive rules updated {catalogStatus.rulesUpdatedAt.slice(0, 10)}. Audit corrections are in progress; simulation results remain provisional.</p>
+          <p>Comprehensive rules updated {catalogStatus.rulesUpdatedAt.slice(0, 10)}. Audited gameplay corrections are implemented. Official ambiguities and AI-policy limits still apply; results are practice estimates.</p>
           {catalogStatus.pendingCards.length > 0 && <p>Available for collecting and deck planning; gameplay support pending: {catalogStatus.pendingCards.map(id => db[id]?.name ?? id).join(', ')}.</p>}
           <a href="https://cyberpunktcg.com/cards" target="_blank" rel="noreferrer">Official card catalog</a>
         </details>

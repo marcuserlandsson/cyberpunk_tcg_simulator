@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { CardFrame, type CardFrameOwner } from './CardFrame'
-import { effectiveKeywords, effectivePower } from '../engine/query'
+import { controllerOf, effectiveKeywords, effectivePower } from '../engine/query'
 import { AI } from './useGame'
 import type { CardDb, GameState } from '../engine/types'
 
@@ -38,7 +38,7 @@ export function ZoomPanel(props: ZoomPanelProps): ReactElement | null {
   const def = db[instance.defId]
   if (def === undefined) return null
 
-  const owner: CardFrameOwner = instance.owner === AI ? 'rival' : 'you'
+  const owner: CardFrameOwner = controllerOf(state, uid) === AI ? 'rival' : 'you'
   const faceDown = !instance.faceUp
 
   if (faceDown) {

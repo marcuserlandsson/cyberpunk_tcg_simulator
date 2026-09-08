@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { db, startedGame, mintInto } from '../cards/fixtures'
 import { applyAction } from '../../src/engine/reduce'
 import { controllerOf, effectivePower } from '../../src/engine/query'
+import { fireCardTrigger } from '../../src/cards/effects'
+import { flushPendingEffects } from '../../src/engine/resolution'
 import { leaveField, defeatGear } from '../../src/engine/combat'
 import type { CardDb } from '../../src/engine/types'
 
@@ -52,5 +54,46 @@ describe('CR 1.7 / 4.11: control and inherited Gear text', () => {
     expect(state.players[0].deck).toHaveLength(before)
     expect(state.players[0].trash).toContain(gear)
     expect(state.players[0].field).toContain(host)
+  })
+})
+
+
+describe('remaining control and event snapshots', () => {
+  it('protects the current controller in a fight even when the owner differs', () => {
+    const state = startedGame(0)
+    const host = mintInto(state, 1, 'field', 'animals-wrecker')
+    state.players[1].field = []
+    state.players[0].field.push(host)
+    const foe = mintInto(state, 1, 'field', 'animals-wrecker', { ready: false })
+    state.cards[foe].tempPower = 10
+    state.floatingEffects.push({ kind: 'rivalFightNoDefeat', controller: 0, sourceDefId: 'reboot-optics', expiry: 'endOfTurn' })
+    const attacking = applyAction(db, state, { type: 'attack', attacker: host, target: foe })
+    const done = applyAction(db, attacking, { type: 'react', reaction: { type: 'pass' } })
+    expect(done.players[0].field).toContain(host)
+    expect(done.floatingEffects).toHaveLength(0)
+  })
+  it('records a defeated Legend entering trash before its mandatory removal', () => {
+    const state = startedGame(0)
+    const uid = state.players[0].legends[0]
+    leaveField(state, db, uid, 'trash')
+    expect(state.events.slice(-2)).toEqual([{ type: 'cardTrashed', uid }, { type: 'cardRemoved', uid }])
+    expect(state.players[0].trash).not.toContain(uid)
+    expect(state.players[0].removed).toContain(uid)
+  })
+  it('does not re-evaluate an established Gear stealer identity after re-equipping', () => {
+    const state = startedGame(0)
+    const first = mintInto(state, 0, 'field', 'animals-wrecker')
+    const second = mintInto(state, 0, 'field', 'animals-wrecker')
+    const gear = mintInto(state, 0, 'hand', 'mantis-blades')
+    state.players[0].hand = state.players[0].hand.filter(uid => uid !== gear)
+    state.cards[first].attachedGear.push(gear)
+    const cards: CardDb = { ...db, 'mantis-blades': { ...db['mantis-blades'], effects: [{ trigger: 'onFriendlyStealDie', condition: { selfIsStealer: true }, effect: { kind: 'draw', count: 1 } }] } }
+    state.effectQueue = []
+    fireCardTrigger(cards, state, 'onFriendlyStealDie', gear, [], 0, { stealerUid: first })
+    state.cards[first].attachedGear = []
+    state.cards[second].attachedGear.push(gear)
+    const before = state.players[0].hand.length
+    flushPendingEffects(cards, state)
+    expect(state.players[0].hand).toHaveLength(before + 1)
   })
 })

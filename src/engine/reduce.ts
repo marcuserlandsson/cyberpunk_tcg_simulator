@@ -40,6 +40,7 @@ import { stopAtHiddenInformation } from './preview'
 import { legalActions } from './legal'
 import {
   actingPlayer,
+  controllerOf,
   effectiveCardCost,
   goSoloCost,
   hasKeyword,
@@ -314,7 +315,7 @@ function resolveEndOfTurnFloating(draft: GameState, db: CardDb): void {
     if (entry.kind !== 'defeatIfActed' || entry.acted !== true) continue
     const uid = entry.unitUid
     if (uid === undefined || draft.cards[uid] === undefined) continue
-    if (!draft.players[draft.cards[uid].owner].field.includes(uid)) continue
+    if (!draft.players[controllerOf(draft, uid)].field.includes(uid)) continue
     defeatUnit(draft, db, uid)
     if (!stillLive(draft)) return
   }

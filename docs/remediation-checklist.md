@@ -11,7 +11,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 05. Support collection persistence outside the dev server; expose Git outcomes and correct documentation.
 - [x] 06. Obtain/version comprehensive rules and errata; audit each rules section against implementation and record discrepancies.
 - [x] 07. Discover/import current cards and printings, track data freshness and implementation coverage, and correct errata.
-- [ ] 08. Implement rules-audit corrections, explicit effect/player choices, private knowledge, and payment choices, with card/engine regressions.
+- [x] 08. Implement rules-audit corrections, explicit effect/player choices, private knowledge, and payment choices, with card/engine regressions.
 - [ ] 09. Model unique artwork independently of printings; separate playset/artwork targets, filters, progress, and buy-lists.
 - [ ] 10. Persist complete simulation runs and deck snapshots; retain runs during navigation and support history/reopening/exports.
 - [ ] 11. Clarify simulation identities/metrics, add uncertainty and controlled matchup comparisons.
@@ -140,4 +140,9 @@ Paid plays and Calls now have an editable payment selection. Costs inside activa
 ### 08u — resolution display and reveal/search visibility
 
 Choice prompts now display the current resolution board while replay retains its original base. Resolving Programs have an explicit transient location and both public trash/removed areas can be inspected. Searched cards remain counted in the deck until movement, with original order retained where required. Public reveals have an acknowledgement and log entry; private searches keep viewer-scoped identity metadata. Verified 1,031 engine/card/UI tests, nine focused resolution/UI checks, five visibility/AI-privacy checks, 415 AI/fuzz checks, TypeScript/build and four production-preview browser workflows.
+
+
+### 08v — audit closure: control, trigger facts and deck identity
+
+Fight protection, delayed consequences, Block watchers and UI ownership cues now follow control while exit destinations retain ownership. Legend exits record the intermediate public movement before removal. Pending event qualifiers are fixed at trigger time; resolution conditions still recheck the relevant host. Deck counts must be safe positive integers and duplicate internal IDs share the name/subtitle copy limit. Reconciled the audit and current-rules guide; the three official ambiguities remain explicit interpretations. Core gameplay correction step 8 is complete; format/pool requirements remain assigned to steps 12/17. Verified 1,044 engine/card/UI checks, 415 AI/fuzz checks, TypeScript/build, four production-preview browser workflows, plus the final card/control/resolution regression run.
 
