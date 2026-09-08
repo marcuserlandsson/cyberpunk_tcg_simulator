@@ -29,7 +29,7 @@ import { ReactionBar } from './ReactionBar'
 import { StreetStrip } from './StreetStrip'
 import { ZonePanels } from './ZonePanels'
 import { ZoomPanel } from './ZoomPanel'
-import { AI, HUMAN, useGame } from './useGame'
+import { HUMAN as DEFAULT_HUMAN, useGame } from './useGame'
 import { useAnimations } from './useAnimations'
 import { deleteGameRecord, useDecks, listGameRecords } from './storage'
 import { deckPickerLabel, isDeckPickable } from './deckPicker'
@@ -55,7 +55,8 @@ import {
   type BoardHandlers,
 } from './playAffordances'
 import { currentGameRecord, type GameRecord } from '../engine/replay'
-import { opponentOf } from '../engine/query'
+import { BoardPerspective } from './BoardPerspective'
+import { actingPlayer, opponentOf } from '../engine/query'
 import type { DeckList } from '../engine/deck'
 import type { Action, CardDb, DieSize, GameEvent, GameState } from '../engine/types'
 
@@ -124,11 +125,11 @@ function nameOf(db: CardDb, state: GameState, uid: number): string {
  * as a card name — cosmetic only (the action applied is the engine's own), and
  * recorded as such in docs/rulings.md.
  */
-function targetLabel(db: CardDb, state: GameState, value: number): string {
+function targetLabel(db: CardDb, state: GameState, value: number, viewer = DEFAULT_HUMAN): string {
   if (value === NO_TARGET) return 'No target'
   const instance = state.cards[value]
   if (instance === undefined) return `Gig die #${value}`
-  return `${nameOf(db, state, value)} (${sideLabel(instance.owner, HUMAN)})`
+  return `${nameOf(db, state, value)} (${sideLabel(instance.owner, viewer)})`
 }
 
 /**
@@ -159,7 +160,7 @@ export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> 
     case 'overtimeSevenGigs':
       return '7 Gigs in overtime'
     case 'deckout':
-      return event.winner === HUMAN ? 'Rival deck ran out' : 'You ran out of cards'
+      return event.winner === DEFAULT_HUMAN ? 'Rival deck ran out' : 'You ran out of cards'
     case 'concede':
       return 'Conceded'
     case 'simultaneousWins':
@@ -170,7 +171,10 @@ export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> 
 }
 
 export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: PlayViewProps): ReactElement {
-  const game = useGame(db, aiDelayMs === undefined ? {} : { aiDelayMs })
+  const [manual,setManual] = useState(false)
+  const game = useGame(db, { aiDelayMs, manual })
+  const HUMAN = game.record?.practiceMode && game.state ? actingPlayer(game.state) : DEFAULT_HUMAN
+  const AI = opponentOf(HUMAN)
   const { record, legal } = game
   const state = game.state?.pendingIntercept?.view
     ? { ...game.state.pendingIntercept.view, phase: game.state.phase, pendingIntercept: game.state.pendingIntercept }
@@ -285,7 +289,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
         if (slot === -1) return []
         return slotOptions(pending.variants, slot).map((value) => ({
           key: `t${value}`,
-          label: targetLabel(db, state, value),
+          label: targetLabel(db, state, value, HUMAN),
           uid: state.cards[value] === undefined ? undefined : value,
           pick: () =>
             resolveTargets(
@@ -307,7 +311,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
             label:
               action.target === 'gigArea'
                 ? 'Rival Gig area'
-                : targetLabel(db, state, action.target),
+                : targetLabel(db, state, action.target, HUMAN),
             uid: action.target === 'gigArea' ? undefined : action.target,
             gigArea: action.target === 'gigArea',
             pick: () => resolveAttackTarget(pending.attacker, action.target),
@@ -474,6 +478,8 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
         data-testid="play-setup"
       >
         <h2>New game</h2>
+        <label><input data-testid="manual-practice" type="checkbox" checked={manual} onChange={e=>setManual(e.target.checked)} />Manual practice · control both sides</label>
+        <p>In manual practice the board follows the player making each decision. Save a named position to revisit a scenario; Undo takes back one decision.</p>
         <label className="play-setup__field">
           Your deck
           <select
@@ -607,7 +613,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
     // `data-awaiting` is the machine-readable form of "whose click is the game
     // waiting for" — the single fact any automated driver (the E2E suite, and
     // Task 15's) needs in order to never race the AI's own timer.
-    <section
+    <BoardPerspective.Provider value={HUMAN}><section
       className={`playmat${promptOpen ? ' playmat--prompting' : ''}${anim.glitch ? ' is-glitching' : ''}`}
       aria-label="Playmat"
       data-testid="playmat"
@@ -615,6 +621,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
       data-turn={state.turnNumber}
       data-phase={state.phase}
     >
+      {record?.practiceMode && <p data-testid="practice-seat">Manual practice · controlling player {HUMAN + 1} · log labels remain relative to player 1</p>}
       <div className="playmat__body">
         <div className="playmat__board">
           {!!state.resolvingPrograms?.length && <div className="prompt-bar" data-testid="resolving-programs">Resolving: {state.resolvingPrograms.map(uid => nameOf(db, state, uid)).join(', ')}</div>}
@@ -813,7 +820,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
           <div className="prompt-bar" data-testid="choose-order-bar">
             <span className="prompt-bar__label">
               {orderRoll !== undefined && orderRoll.type === 'gameStarted'
-                ? `Order roll — you ${orderRoll.orderRolls[0]}, Rival ${orderRoll.orderRolls[1]}. You won the roll:`
+                ? `Order roll — you ${orderRoll.orderRolls[HUMAN]}, Rival ${orderRoll.orderRolls[AI]}. You won the roll:`
                 : 'Choose who goes first:'}
             </span>
             <div className="prompt-bar__options">
@@ -975,6 +982,6 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
           </div>
         )}
       </div>
-    </section>
+    </section></BoardPerspective.Provider>
   )
 }

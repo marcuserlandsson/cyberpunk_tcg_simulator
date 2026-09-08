@@ -9,6 +9,7 @@
 import { useMemo, useState, type CSSProperties, type ReactElement } from 'react'
 import type { CardDb, CardDef, CardType } from '../engine/types'
 import { CardFrame, ramColorVar } from './CardFrame'
+import { fitsRam } from './deckAnalysis'
 import { playsetTarget } from './collection'
 
 export interface CardBrowserProps {
@@ -57,12 +58,13 @@ function compareCards(a: CardDef, b: CardDef): number {
 function matchesSearch(def: CardDef, query: string): boolean {
   if (query === '') return true
   const needle = query.toLowerCase()
-  return def.name.toLowerCase().includes(needle) || def.text.toLowerCase().includes(needle)
+  return [def.name,def.subtitle ?? ''].join(' ').toLowerCase().includes(needle) || def.text.toLowerCase().includes(needle)
 }
 
 export function CardBrowser(props: CardBrowserProps): ReactElement {
   const { db, useOfficialImages, counts, legends, owned, onAdd, onRemove, onZoom } = props
 
+  const [legalRamOnly,setLegalRamOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [colors, setColors] = useState<Set<string>>(new Set())
   const [types, setTypes] = useState<Set<CardType>>(new Set())
@@ -81,6 +83,7 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
     const min = costMin.trim() === '' ? -Infinity : Number(costMin)
     const max = costMax.trim() === '' ? Infinity : Number(costMax)
     return Object.values(db)
+      .filter(def => !legalRamOnly || fitsRam(db,legends,def))
       .filter((def) => matchesSearch(def, search))
       .filter((def) => colors.size === 0 || colors.has(def.color))
       .filter((def) => types.size === 0 || types.has(def.type))
@@ -88,11 +91,12 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
       .filter((def) => Number.isFinite(min) === false || def.cost >= min)
       .filter((def) => Number.isFinite(max) === false || def.cost <= max)
       .sort(compareCards)
-  }, [db, search, colors, types, keywords, costMin, costMax])
+  }, [db, search, colors, types, keywords, costMin, costMax, legalRamOnly, legends])
 
   return (
     <div className="card-browser" data-testid="card-browser">
       <div className="card-browser__filters">
+        <label><input data-testid="filter-legal-ram" type="checkbox" checked={legalRamOnly} onChange={e=>setLegalRamOnly(e.target.checked)} />Fits selected Legends’ RAM</label>
         <input
           type="text"
           data-testid="search-input"

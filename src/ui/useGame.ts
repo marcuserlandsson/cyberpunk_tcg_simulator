@@ -57,6 +57,7 @@ export interface LogLine {
 
 export interface UseGameOptions {
   /** Pacing delay between AI actions, in ms. 0 in tests and in E2E runs. */
+  manual?: boolean
   aiDelayMs?: number
 }
 
@@ -145,6 +146,7 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   const start = useCallback((humanDeck: DeckList, aiDeck: DeckList, seed?: number) => {
     try {
       const next = gameFromRecord(dbRef.current, {
+        practiceMode: options.manual ?? false,
         provenance: gameProvenance(dbRef.current),
         config: { decks: structuredClone([humanDeck, aiDeck]), seed: seed ?? randomSeed() },
         actions: [],
@@ -154,7 +156,7 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
     } catch (error) {
       setLoadError(describeLoadFailure(error))
     }
-  }, [])
+  }, [options.manual])
 
   const load = useCallback((record: GameRecord) => {
     try {
@@ -175,7 +177,7 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   const undo = useCallback(() => {
     setGame((current) => {
       if (current === null) return current
-      const rewound = undoToLastDecisionOf(dbRef.current, current.record, HUMAN)
+      const rewound = current.record.practiceMode ? { ...current.record, actions: current.record.actions.slice(0,-1) } : undoToLastDecisionOf(dbRef.current, current.record, HUMAN)
       if (rewound.actions.length === current.record.actions.length) return current
       return {
         record: rewound,
@@ -195,11 +197,11 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
 
   const acting = game === null ? null : actingPlayer(game.state)
   const over = game === null || game.state.phase === 'gameOver'
-  const aiThinking = game !== null && !over && acting === AI
+  const aiThinking = game !== null && !game.record.practiceMode && !over && acting === AI
 
   // --- the AI loop -------------------------------------------------------
   useEffect(() => {
-    if (game === null || game.state.phase === 'gameOver') return
+    if (game === null || game.record.practiceMode || game.state.phase === 'gameOver') return
     if (actingPlayer(game.state) !== AI) return
 
     const timer = setTimeout(() => {
@@ -225,7 +227,7 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   }, [game, aiDelayMs])
 
   const legal = useMemo(() => {
-    if (game === null || over || acting !== HUMAN) return []
+    if (game === null || over || (!game.record.practiceMode && acting !== HUMAN)) return []
     return legalActions(db, game.state)
   }, [db, game, over, acting])
 
@@ -234,7 +236,7 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
     return buildLog(db, game.state)
   }, [db, game])
 
-  const canUndo = game !== null && game.owners.includes(HUMAN)
+  const canUndo = game !== null && (game.record.practiceMode ? game.record.actions.length > 0 : game.owners.includes(HUMAN))
 
   return {
     state: game?.state ?? null,

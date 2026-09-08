@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { CardFrame, type CardFrameOwner } from './CardFrame'
 import { controllerOf, effectiveKeywords, effectivePower } from '../engine/query'
-import { AI } from './useGame'
+import { useBoardPerspective } from './BoardPerspective'
 import type { CardDb, GameState } from '../engine/types'
 
 export interface ZoomPanelProps {
@@ -31,6 +31,7 @@ export interface ZoomPanelProps {
  * is an uncalled Legend.
  */
 export function ZoomPanel(props: ZoomPanelProps): ReactElement | null {
+  const { AI } = useBoardPerspective()
   const { db, state, uid, useOfficialImages } = props
   if (uid === null) return null
   const instance = state.cards[uid]

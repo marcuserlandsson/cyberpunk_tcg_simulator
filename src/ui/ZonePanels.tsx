@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { BoardCard } from './Field'
 import { CardFrame, type CardFrameOwner } from './CardFrame'
-import { AI } from './useGame'
+import { useBoardPerspective } from './BoardPerspective'
 import type { BoardAffordances, BoardHandlers } from './playAffordances'
 import type { CardDb, CardDef, GameState, PlayerId } from '../engine/types'
 
@@ -53,6 +53,7 @@ const EDDIES_DENSE_THRESHOLD = 6
  * chip beside the row as the at-a-glance summary.
  */
 function CardZones(props: ZonePanelsProps): ReactElement {
+  const { AI } = useBoardPerspective()
   const { db, state, player, affordances, handlers, useOfficialImages } = props
   const p = state.players[player]
   const readyEddies = p.eddies.filter((uid) => state.cards[uid].ready).length

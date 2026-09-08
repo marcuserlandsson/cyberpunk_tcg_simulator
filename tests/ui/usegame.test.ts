@@ -11,7 +11,7 @@
 // `aiDelayMs: 0` throughout: the ~300ms pacing delay is a readability feature,
 // not part of the contract, and waiting for it would just make the suite slow.
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { actingPlayer } from '../../src/engine/query'
@@ -386,4 +386,35 @@ describe('describeEvent', () => {
     const line = describeEvent(db, state, { type: 'somethingNew', extra: 1 } as never)
     expect(line).toBe('[somethingNew]')
   })
+})
+
+it('manual practice controls both seats, never schedules AI, and saves/undoes a single decision', async () => {
+  vi.useFakeTimers()
+  const hook=renderHook(()=>useGame(db,{manual:true,aiDelayMs:0}))
+  try {
+    act(()=>hook.result.current.start(arasaka,mercs,42))
+    const seats=new Set<number>()
+    for(let i=0;i<35 && hook.result.current.state?.phase!=='gameOver';i++){
+      const current=hook.result.current
+      seats.add(actingPlayer(current.state!))
+      expect(current.aiThinking).toBe(false)
+      const length=current.record!.actions.length
+      act(()=>vi.advanceTimersByTime(1000))
+      expect(hook.result.current.record!.actions).toHaveLength(length)
+      const available=current.legal
+      const chosen=available.find(a=>a.type==='keepHand') ?? available.find(a=>a.type==='endTurn') ?? available[0]
+      expect(chosen).toBeDefined()
+      act(()=>hook.result.current.act(chosen))
+    }
+    expect([...seats].sort()).toEqual([0,1])
+    const before=hook.result.current.record!
+    expect(before.practiceMode).toBe(true)
+    act(()=>hook.result.current.undo())
+    expect(hook.result.current.record!.actions).toHaveLength(before.actions.length-1)
+    expect(hook.result.current.state).toEqual(replay(db,hook.result.current.record!))
+    act(()=>hook.result.current.load(before))
+    expect(hook.result.current.aiThinking).toBe(false)
+    act(()=>vi.advanceTimersByTime(1000))
+    expect(hook.result.current.record).toEqual(before)
+  } finally { hook.unmount();vi.useRealTimers() }
 })

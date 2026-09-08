@@ -16,7 +16,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 10. Persist complete simulation runs and deck snapshots; retain runs during navigation and support history/reopening/exports.
 - [x] 11. Clarify simulation identities/metrics, add uncertainty and controlled matchup comparisons.
 - [x] 12. Add explicit deck formats, deck versions/notes, and direct Play this deck.
-- [ ] 13. Add deck diagnostics, legal-RAM filtering, opening-hand sampling, and manual practice scenarios.
+- [x] 13. Add deck diagnostics, legal-RAM filtering, opening-hand sampling, and manual practice scenarios.
 - [ ] 14. Add multi-deck acquisition planning with shared/assembled inventories and optional binder reservations.
 - [ ] 15. Add compact collection search, collector numbers, artwork previews, bulk entry, and scoped filters.
 - [ ] 16. Add recoverable acquisition/trade sessions, import previews/history, optional date/source/cost, and starter entry.
@@ -163,3 +163,7 @@ Card tables include subtitles, games-played labels, explicit conditional-correla
 ### 12 — explicit formats, deck versions and direct Play
 
 Constructed/Demo format choices control validation even when a legacy demo flag remains. Builder and gameplay pickers label formats; starter conversions expose size errors. Saves preserve independent immutable versions, labels and notes; older versions restore into the editor, and text exports round-trip metadata. Save failures retain edits. Direct Play saves the selected snapshot and opens the setup without discarding an existing game. New game records include rules/engine/card provenance, preserved through actions/undo; legacy/different-version replays require an explicit current-rules attempt. Sealed is the remaining dedicated format in step 17. Verified 365 UI/deck/replay/purity checks, TypeScript/build and five browser workflows including version restore, full gameplay and saved-game resume.
+
+### 13 — diagnostics, opening hands and manual scenarios
+
+Added copy-weighted cost/type distributions, Sell counts/ratios, configurable early-Unit density, subtitle search and a selected-Legend RAM filter. Opening-hand sampling uses the actual seeded deal and labels stale samples after edits. Manual practice controls both seats with no AI timer, follows the deciding player across board/payment/private prompts, preserves the mode in named saved positions and undoes one decision. Existing game saves provide repeatable scenario checkpoints without inventing illegal board states. Verified 341 UI/replay checks, 51 focused diagnostics/manual/perspective checks, TypeScript/build and five browser workflows including both manual seats, undo/resume and a complete AI game.

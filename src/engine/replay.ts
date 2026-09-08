@@ -30,6 +30,7 @@ import type { Action, CardDb, GameState, PlayerId } from './types'
  * `Action` variant holds only primitives and arrays of primitives.
  */
 export interface GameRecord {
+  practiceMode?: boolean
   provenance?: { engine: string; rules: string; cards: string }
   config: NewGameConfig
   actions: Action[]

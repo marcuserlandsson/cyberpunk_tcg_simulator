@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactElement } from 'react'
 import { BoardCard } from './Field'
-import { AI } from './useGame'
+import { useBoardPerspective } from './BoardPerspective'
 import type { BoardAffordances, BoardHandlers } from './playAffordances'
 import type { CardDb, GameState, PlayerId } from '../engine/types'
 
@@ -53,6 +53,7 @@ export interface HandStripProps {
  * what the log deliberately hides (see `describeEvent`).
  */
 export function HandStrip(props: HandStripProps): ReactElement {
+  const { AI } = useBoardPerspective()
   const { db, state, player, hidden, affordances, handlers, useOfficialImages } = props
   const hand = state.players[player].hand
 

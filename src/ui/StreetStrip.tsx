@@ -2,7 +2,7 @@ import type { CSSProperties, ReactElement } from 'react'
 import { Die } from './Dice'
 import { isOvertime, GIGS_TO_WIN } from '../engine/game'
 import { streetCred } from '../engine/query'
-import { AI, HUMAN } from './useGame'
+import { useBoardPerspective } from './BoardPerspective'
 import type { BoardAffordances, BoardHandlers } from './playAffordances'
 import type { CardDb, DieSize, GameState, PlayerId } from '../engine/types'
 
@@ -156,6 +156,7 @@ function GigPool(props: GigPoolProps): ReactElement {
  * old `DicePanels`).
  */
 export function StreetStrip(props: StreetStripProps): ReactElement {
+  const { HUMAN, AI } = useBoardPerspective()
   const { state, affordances, handlers, tumble, steal } = props
 
   return (

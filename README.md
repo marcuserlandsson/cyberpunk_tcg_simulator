@@ -236,6 +236,8 @@ safety net, not a second source of truth.
 
 The builder offers explicit Constructed and Demo formats. Constructed validates 40–50 main-deck cards; Demo relaxes size for practice and is visibly labeled. Each builder save retains an independent version, including notes and a version label. Restore a version into the editor; give it a different name to keep both versions selectable for comparison. Deck text exports retain this metadata. Save and play opens Play with the saved deck selected. New game saves carry rules/engine/card-data provenance; older records require an explicit attempt under current rules.
 
+The diagnostics panel shows cost/type distributions, Sell density and adjustable early-Unit density. Opening six-card samples use the engine’s real seeded deal. The browser can filter by the selected Legends’ combined RAM. Play offers manual practice controlling both sides: the board follows the deciding player, no AI moves automatically, Undo rewinds one decision, and named saved positions serve as repeatable scenarios.
+
 ## Simulation
 
 The **Simulate** tab picks two decks, runs N AI-vs-AI games in a background

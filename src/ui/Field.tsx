@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactElement } from 'react'
 import { CardFrame, type CardFrameOwner } from './CardFrame'
 import { controllerOf, effectivePower } from '../engine/query'
-import { AI } from './useGame'
+import { useBoardPerspective } from './BoardPerspective'
 import type { BoardAffordances, BoardHandlers } from './playAffordances'
 import type { CardDb, GameState, PlayerId } from '../engine/types'
 
@@ -52,6 +52,7 @@ export function BoardCard(props: {
    *  never attack, so they never pass this). */
   lungeUid?: number | null
 }): ReactElement | null {
+  const { AI } = useBoardPerspective()
   const { db, state, uid, zone, affordances, handlers, useOfficialImages, style } = props
   const instance = state.cards[uid]
   if (instance === undefined) return null

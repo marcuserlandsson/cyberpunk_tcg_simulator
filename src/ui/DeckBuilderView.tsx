@@ -16,6 +16,7 @@ import type { CardDb } from '../engine/types'
 import type { DeckList } from '../engine/deck'
 import { listDeckVersions, saveDeckVersion } from './deckVersions'
 import { isDeckPickable } from './deckPicker'
+import { DeckDiagnostics } from './DeckDiagnostics'
 import { CardBrowser, isArtOnlyPromo } from './CardBrowser'
 import { DeckPanel } from './DeckPanel'
 import { CardFrame } from './CardFrame'
@@ -177,6 +178,7 @@ export function DeckBuilderView({ db, useOfficialImages, onPlayDeck }: DeckBuild
           onNew={handleNew}
         />
       </div>
+      <DeckDiagnostics db={db} deck={deck} useOfficialImages={useOfficialImages} />
       <div className="deck-missing" data-testid="deck-missing-summary">
         {!ownershipKnown ? 'Ownership unavailable — collection has not been loaded.' : missing.length === 0
           ? 'You own all cards for this deck'
