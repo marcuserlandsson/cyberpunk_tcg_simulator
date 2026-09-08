@@ -130,6 +130,7 @@ export type TargetSpec =
   // (`friendlyGear`), or on either side, controller's first (`anyGear`,
   // §39's bare convention). A real, enumerable decision — "which Gear" is
   // never left to the rng when the firing action can carry a target.
+  | 'rivalGear'
   | 'friendlyGear'
   | 'anyGear'
   // Batch 5 (docs/rulings.md §92 ff.):
@@ -212,6 +213,7 @@ export interface TargetFilter {
 export type CostReduction =
   | { per: 'friendlyGigValueAtLeast'; value: number; amount: number; minimum: number }
   | { per: 'unitInTrash'; amount: number; minimum: number }
+  | { per: 'rivalUnit'; amount: number; minimum: number }
   // "-1 €$ for each friendly face-up Legend, to a minimum of 1 €$"
   // (zetatech-berserk, docs/rulings.md §107 ff.) — a third flat-count variant,
   // alongside `unitInTrash`.

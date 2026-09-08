@@ -106,6 +106,8 @@ export function targetsFor(
       return [...fieldOf(state, me), ...faceUpLegendsOf(state, me)].flatMap(
         (uid) => state.cards[uid].attachedGear
       )
+    case 'rivalGear':
+      return [...fieldOf(state, rival), ...faceUpLegendsOf(state, rival)].flatMap(uid => state.cards[uid].attachedGear)
     case 'anyGear':
       return [
         ...[...fieldOf(state, me), ...faceUpLegendsOf(state, me)].flatMap(

@@ -878,8 +878,18 @@
       "quick"
     ],
     "text": "{Quick} Defeat a rival Gear with power 2 or less.",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "defeat",
+          "target": "rivalGear",
+          "filter": {
+            "maxPower": 2
+          }
+        }
+      }
+    ],
     "printedCost": 1
   },
   {
@@ -2621,8 +2631,19 @@
       "ncpd"
     ],
     "text": "Play this Unit for -1 €$ for each of a Rival’s Units, to a minimum of 1 €$.",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "static",
+        "effect": {
+          "kind": "costReduction",
+          "reduction": {
+            "per": "rivalUnit",
+            "amount": 1,
+            "minimum": 1
+          }
+        }
+      }
+    ],
     "printedCost": 7
   },
   {
@@ -4726,8 +4747,15 @@
       "tyger claws"
     ],
     "text": "{Play} You may Call a Legend for free. (You can only Call a Legend once per turn.)\n(Units with power 0 don't steal Gigs.)",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "optional-free-call"
+        }
+      }
+    ],
     "printedCost": 2
   },
   {

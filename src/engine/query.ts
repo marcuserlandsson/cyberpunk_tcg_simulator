@@ -405,6 +405,8 @@ export function reducedCost(
   let matching: number
   if (reduction.per === 'friendlyGigValueAtLeast') {
     matching = state.players[player].gigArea.filter((die) => die.value >= reduction.value).length
+  } else if (reduction.per === 'rivalUnit') {
+    matching = state.players[opponentOf(player)].field.length
   } else if (reduction.per === 'unitInTrash') {
     matching = state.players[player].trash.filter(
       (uid) => db[state.cards[uid].defId]?.type === 'unit'

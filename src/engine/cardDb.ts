@@ -49,6 +49,7 @@ const targetSpecSchema = z.enum([
   'friendlyHandCard',
   'friendlyHandOrTrashUnit',
   'friendlyGear',
+  'rivalGear',
   'anyGear',
   'fightFoe',
   'friendlyFaceUpLegend',
@@ -78,6 +79,7 @@ const targetFilterSchema = z.strictObject({
 })
 
 const costReductionSchema = z.discriminatedUnion('per', [
+  z.strictObject({ per: z.literal('rivalUnit'), amount: z.number(), minimum: z.number() }),
   z.strictObject({
     per: z.literal('friendlyGigValueAtLeast'),
     value: z.number(),

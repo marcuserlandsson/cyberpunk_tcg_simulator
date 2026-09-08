@@ -119,3 +119,7 @@ Added explicit accept/decline instructions for Yorinobu/Lizzy free plays, Gilded
 ### 08p — rival discards, exact draws and ties
 
 Printed rival-discard instructions now ask that rival which card to discard. Caliber checks the actual discarded card cost for its second discard, replacing the hardcoded value 5. Shattered Memories lets each player decline or draw exactly five, resolves the turn player first, and stops immediately on a failed mandatory draw. Terminal handling supports ties, recognizes simultaneous overtime wins, gives the AI a neutral terminal score, and displays/exports/counts draws separately from either deck's wins. Verified 1,017 engine/card/UI/simulation checks, 415 AI/fuzz checks, TypeScript/build, and four production-preview browser gameplay checks. Replaced a seed-fragile simulation statistic test with independent replay-based arithmetic verification.
+
+### 08q — first new catalog cards
+
+Enabled Detonate, Tyger's Whisper and MaxTac Heavy after implementing rival-Gear targeting/defeat, an optional free Call, and the rival-Unit cost reduction. Quick reactions, target power limits, Call allowance and minimum payment have focused regressions. Reimported status from the preserved source snapshot; 151 cards/460 printing keys remain unchanged and seven cards remain pending. Verified 712 engine/card/data tests, 311 fuzz checks and TypeScript.

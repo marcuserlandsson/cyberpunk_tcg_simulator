@@ -43,7 +43,7 @@ import { playCardOnDraft, readyFriendlyEddies, spendOnDraft, type EffectCtx } fr
 
 /** Scripts that inspect/reveal previously unknown cards. AI previews stop before entry. */
 export const PRIVATE_INFORMATION_SCRIPTS = new Set([
-  'all-is-lost', 'arasaka-emergency-radioport', 'shattered-memories',
+  'optional-free-call', 'all-is-lost', 'arasaka-emergency-radioport', 'shattered-memories',
   'hanako-arasaka-in-a-gilded-cage', 'kiroshi-optics', 'sketchy-ripper',
   't-bug-amateur-philosopher', 'the-heist', 'viktor-vektor-sit-down-and-relax',
   'river-ward-detective-on-the-hunt:defeat-search', 'fool-on-the-hill',
@@ -123,6 +123,10 @@ function mistyReveal(cardType: 'unit' | 'gear' | 'program'): ScriptedCard {
 }
 
 export const scriptedCards: Record<string, ScriptedCard> = {
+  'optional-free-call': (db, state, ctx) => {
+    callChosenLegend(db, state, ctx.player, ctx.sourceUid, true)
+    return state
+  },
   /**
    * `all-is-lost` — "Trash 3. Add a Unit from among them to your hand."
    * Trashes the top 3 of the controller's own deck, then takes one of the Units

@@ -28,7 +28,7 @@ import { stillLive } from '../engine/game'
 // mutate a draft the caller already owns and are what the engine's reducers
 // use, exactly like game.ts's `drawCards`.
 
-import { defeatUnit, leaveField, stealableDieIndexes } from '../engine/combat'
+import { defeatGear, defeatUnit, leaveField, stealableDieIndexes } from '../engine/combat'
 import { canonicalPayment, pay } from '../engine/economy'
 import { draftState, drawCards, endGame } from '../engine/game'
 import {
@@ -802,6 +802,10 @@ function applyNode(
     case 'defeat': {
       const target = takeTarget(node, ctx, slots)
       if (target === null) return
+      if (db[draft.cards[target]?.defId]?.type === 'gear') {
+        defeatGear(draft, db, target)
+        return
+      }
       if (!draft.players[controllerOf(draft, target)].field.includes(target)) return
       note(draft, ctx.sourceUid, `defeat ${target}`)
       defeatUnit(draft, db, target)
