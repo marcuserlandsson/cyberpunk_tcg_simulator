@@ -50,6 +50,7 @@ describe('CollectionView with an unloadable printings dataset', () => {
     // empty dataset (every badge reads "owned 0/T") rather than erroring.
     render(<DeckBuilderView db={db} useOfficialImages={false} />)
     expect(screen.getByTestId('deck-builder')).toBeTruthy()
-    expect(screen.getByTestId('owned-mantis-blades').textContent).toBe('owned 0/3')
+    expect(screen.queryByTestId('owned-mantis-blades')).toBeNull()
+    expect(screen.getByTestId('deck-missing-summary').textContent).toContain('Ownership unavailable')
   })
 })

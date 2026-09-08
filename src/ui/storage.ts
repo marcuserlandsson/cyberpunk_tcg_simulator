@@ -4,6 +4,7 @@
 // into `listDecks()` alongside whatever the player has saved.
 
 import type { CardDb } from '../engine/types'
+import { useSyncExternalStore } from 'react'
 import type { DeckList } from '../engine/deck'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import mercsDeck from '../../data/decks/mercs-the-heist.json'
@@ -52,6 +53,29 @@ function readLocalDecks(): Record<string, DeckList> {
 
 function writeLocalDecks(decks: Record<string, DeckList>): void {
   writeJson(DECKS_KEY, decks)
+  for (const listener of deckListeners) listener()
+}
+
+const deckListeners = new Set<() => void>()
+let deckSnapshot: DeckList[] = []
+let deckSnapshotRaw: string | null | undefined
+function getDeckSnapshot(): DeckList[] {
+  const raw = localStorage.getItem(DECKS_KEY)
+  if (raw !== deckSnapshotRaw) {
+    deckSnapshotRaw = raw
+    deckSnapshot = listDecks()
+  }
+  return deckSnapshot
+}
+export function useDecks(): DeckList[] {
+  return useSyncExternalStore((listener) => {
+    deckListeners.add(listener)
+    const changed = (event: StorageEvent) => {
+      if (event.key === DECKS_KEY || event.key === null) listener()
+    }
+    window.addEventListener('storage', changed)
+    return () => { deckListeners.delete(listener); window.removeEventListener('storage', changed) }
+  }, getDeckSnapshot)
 }
 
 /** Saves `deck` to localStorage, keyed by name (a second save overwrites). */

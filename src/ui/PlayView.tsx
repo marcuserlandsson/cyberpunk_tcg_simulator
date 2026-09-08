@@ -30,7 +30,7 @@ import { ZonePanels } from './ZonePanels'
 import { ZoomPanel } from './ZoomPanel'
 import { AI, HUMAN, useGame } from './useGame'
 import { useAnimations } from './useAnimations'
-import { deleteGameRecord, listDecks, listGameRecords } from './storage'
+import { deleteGameRecord, useDecks, listGameRecords } from './storage'
 import { deckPickerLabel, isDeckPickable } from './deckPicker'
 import {
   abilityUids,
@@ -368,7 +368,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
 
   // ---- new game / resume --------------------------------------------------
 
-  const decks = useMemo(() => listDecks(), [])
+  const decks = useDecks()
   // A non-demo deck that fails validateDeck cannot be offered as a seat
   // (docs/rulings.md §153) — default to the first/second PICKABLE deck so
   // the setup screen never opens with an already-illegal selection.
@@ -380,6 +380,10 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     () => pickableDecks[1]?.name ?? pickableDecks[0]?.name ?? decks[0]?.name ?? ''
   )
   const [seedText, setSeedText] = useState('')
+  useEffect(() => {
+    if (!decks.some((d) => d.name === humanDeckName)) setHumanDeckName(pickableDecks[0]?.name ?? '')
+    if (!decks.some((d) => d.name === aiDeckName)) setAiDeckName(pickableDecks[1]?.name ?? pickableDecks[0]?.name ?? '')
+  }, [decks, pickableDecks, humanDeckName, aiDeckName])
 
   useEffect(() => {
     if (setupOpen) setRecords(listGameRecords())

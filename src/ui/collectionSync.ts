@@ -66,7 +66,8 @@ export interface SyncStatus {
    *  fact there would print "0 cards owned" and a buy-list demanding every
    *  card in the game — numbers the owner might act on that nothing measured.
    *  Consumers must suppress derived figures in this state, not show zeros. */
-  state: 'idle' | 'saving' | 'unsaved' | 'conflict' | 'would-empty' | 'error'
+  state: 'idle' | 'saving' | 'unsaved' | 'conflict' | 'would-empty' | 'error' | 'loading'
+  available?: boolean
   pendingCount: number
   lastSavedAt?: string
   message?: string
@@ -170,6 +171,13 @@ export function useSyncStatus(): SyncStatus {
   return useSyncExternalStore(subscribeSync, getSyncStatus)
 }
 
+export function ownershipAvailable(value: SyncStatus): boolean {
+  return value.available !== false && value.state !== 'error' && value.state !== 'loading'
+}
+export function setCollectionAvailability(available: boolean): void {
+  setStatus({ available })
+}
+
 /** The actual PUT-and-react-to-it logic. Only ever called from `flushNow`,
  *  which is responsible for making sure at most one of these runs at a time
  *  (invariant 2 above) — never call this directly. */
@@ -208,6 +216,7 @@ async function performFlush(confirmEmpty: boolean): Promise<void> {
   }
 
   if (response.status === 200 && typeof body.revision === 'number') {
+    setStatus({ available: true })
     // Invariant 1: never trust that `buffer` (what was SENT) is still what
     // the player wants. Re-read the live buffer and compare.
     const live = readPendingBuffer()
@@ -374,6 +383,7 @@ export async function resolveConflict(choice: 'mine' | 'disk'): Promise<void> {
 
 export async function initCollectionSync(): Promise<void> {
   if (!canEditCollection()) return
+  setStatus({ state: 'loading', available: false })
   // Registered SYNCHRONOUSLY, before the GET is even issued. Two reasons,
   // both about the await window below:
   //
@@ -459,6 +469,7 @@ export async function initCollectionSync(): Promise<void> {
   }
 
   if (file !== undefined) {
+    setStatus({ available: true })
     lastConfirmed = { ...file.counts }
     if (buffer === undefined) {
       setCollectionFromFile(file.counts, file.revision)
@@ -543,6 +554,7 @@ export async function initCollectionSync(): Promise<void> {
         ? 'Cannot reach the dev server — changes are kept in this browser until it returns.'
         : (serverMessage ?? 'The collection endpoint returned an unexpected response.'),
       retrying: buffer !== undefined,
+      available: buffer !== undefined,
     })
     if (buffer !== undefined) scheduleRetry()
   }

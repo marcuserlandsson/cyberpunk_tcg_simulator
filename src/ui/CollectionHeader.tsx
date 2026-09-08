@@ -16,7 +16,7 @@ import {
   importCollectionJson,
   importCollectionText,
 } from './collection'
-import { useSyncStatus, flushNow, resolveConflict, confirmEmptySave } from './collectionSync'
+import { useSyncStatus, flushNow, resolveConflict, confirmEmptySave, ownershipAvailable } from './collectionSync'
 
 /** Sum of raw per-printing counts — the same arithmetic `completionStats`
  *  uses for `totalOwned`, applied to the disk-side counts a conflict hands
@@ -58,7 +58,7 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
   const [mode, setMode] = useState<'replace' | 'merge'>('replace')
   const [error, setError] = useState('')
   const [copyError, setCopyError] = useState('')
-  const derivedUnavailable = syncStatus.state === 'error'
+  const derivedUnavailable = !ownershipAvailable(syncStatus)
 
   function runImport(): void {
     try {
@@ -77,6 +77,7 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
         className={`collection-header__sync collection-header__sync--${syncStatus.state}`}
         data-testid="sync-status"
       >
+        {syncStatus.state === 'loading' && <>Loading collection…</>}
         {syncStatus.state === 'idle' && (
           <>
             Saved to disk

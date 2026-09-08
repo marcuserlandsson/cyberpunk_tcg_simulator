@@ -1,7 +1,7 @@
 import { collectionFileSchema } from '../collection/format'
 import { canEditCollection, setCollectionAccess } from './collectionAccess'
 import { PENDING_KEY, readPendingBuffer, setReadOnlyCollection } from './collection'
-import { initCollectionSync } from './collectionSync'
+import { initCollectionSync, setCollectionAvailability } from './collectionSync'
 
 // Web Locks are origin-scoped and released by the browser on tab close/crash.
 // Only the holder may clear/write the shared pending buffer or sync it.
@@ -10,6 +10,7 @@ export function startCollectionSession(): () => void {
   const abort = new AbortController()
   let release: (() => void) | undefined
   setCollectionAccess('waiting')
+  setCollectionAvailability(false)
   async function refreshReader(): Promise<void> {
     if (disposed || canEditCollection()) return
     try {
@@ -19,6 +20,7 @@ export function startCollectionSession(): () => void {
       const pending = readPendingBuffer()
       if (pending) setReadOnlyCollection(pending.counts)
       else if (file.success) setReadOnlyCollection(file.data.counts)
+      setCollectionAvailability(pending !== undefined || file.success)
     } catch { /* The writer owns recovery; this tab never writes. */ }
   }
   const onStorage = (event: StorageEvent): void => {

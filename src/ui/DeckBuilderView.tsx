@@ -17,7 +17,8 @@ import type { DeckList } from '../engine/deck'
 import { CardBrowser, isArtOnlyPromo } from './CardBrowser'
 import { DeckPanel } from './DeckPanel'
 import { CardFrame } from './CardFrame'
-import { deleteDeck, isReadOnlyDeck, listDecks, saveDeck, buildDisplayNames } from './storage'
+import { deleteDeck, isReadOnlyDeck, listDecks, saveDeck, buildDisplayNames, useDecks } from './storage'
+import { ownershipAvailable, useSyncStatus } from './collectionSync'
 import { useCollection, ownedByCard } from './collection'
 import { loadPrintings } from './printings'
 
@@ -32,7 +33,7 @@ function blankDeck(): DeckList {
 
 export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps): ReactElement {
   const [deck, setDeck] = useState<DeckList>(blankDeck)
-  const [decks, setDecks] = useState<DeckList[]>(() => listDecks())
+  const decks = useDecks()
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [zoomId, setZoomId] = useState<string | null>(null)
 
@@ -42,6 +43,7 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
   // may exist and be saved" philosophy extends to unaffordable ones too) —
   // never blocks an add, never touches validateDeck.
   const collection = useCollection()
+  const syncStatus = useSyncStatus()
   const printings = useMemo(() => {
     try {
       return loadPrintings()
@@ -52,6 +54,7 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
   // Shared with the Collection tab's tile badge (collection.ts's ownedByCard)
   // so the two badges are the same number by construction, not by agreement.
   const owned = useMemo(() => ownedByCard(printings, collection), [printings, collection])
+  const ownershipKnown = printings.length > 0 && ownershipAvailable(syncStatus)
 
   const missing = useMemo(() => {
     const shortfalls: { id: string; missing: number }[] = []
@@ -109,7 +112,6 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
   function handleSave(name: string): void {
     const toSave: DeckList = { ...deck, name }
     saveDeck(toSave)
-    setDecks(listDecks())
     setDeck(toSave)
     setDeleteError(null)
   }
@@ -124,7 +126,6 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
     try {
       deleteDeck(deck.name)
       const refreshed = listDecks()
-      setDecks(refreshed)
       // Deleting a local override that shadowed a bundled starter reveals
       // the bundled deck again under the same name; reflect that in the
       // editor rather than leaving it pointed at a name that no longer has
@@ -152,7 +153,7 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
           useOfficialImages={useOfficialImages}
           counts={deck.cards}
           legends={deck.legends}
-          owned={owned}
+          owned={ownershipKnown ? owned : undefined}
           onAdd={handleAdd}
           onRemove={handleRemove}
           onZoom={setZoomId}
@@ -172,10 +173,10 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
         />
       </div>
       <div className="deck-missing" data-testid="deck-missing-summary">
-        {missing.length === 0
+        {!ownershipKnown ? 'Ownership unavailable — collection has not been loaded.' : missing.length === 0
           ? 'You own all cards for this deck'
           : `Missing ${missingTotal} card${missingTotal === 1 ? '' : 's'} for this deck`}
-        {missing.length > 0 && (
+        {ownershipKnown && missing.length > 0 && (
           <button
             type="button"
             data-testid="copy-deck-buylist"

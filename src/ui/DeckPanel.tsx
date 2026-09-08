@@ -110,6 +110,9 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
   }, [deck.name])
 
   const [loadName, setLoadName] = useState(decks[0]?.name ?? '')
+  useEffect(() => {
+    if (!decks.some((d) => d.name === loadName)) setLoadName(decks[0]?.name ?? '')
+  }, [decks, loadName])
   const [exportOpen, setExportOpen] = useState(false)
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState<string | null>(null)

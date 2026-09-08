@@ -7,7 +7,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 01. Preserve collection data and attempted edits when browser storage fails.
 - [x] 02. Coordinate collection editing and recovery across browser tabs.
 - [x] 03. Fix overlapping Collection cards and verify responsive layouts.
-- [ ] 04. Refresh deck choices across views and suppress unknown ownership figures.
+- [x] 04. Refresh deck choices across views and suppress unknown ownership figures.
 - [ ] 05. Support collection persistence outside the dev server; expose Git outcomes and correct documentation.
 - [ ] 06. Obtain/version comprehensive rules and errata; audit each rules section against implementation and record discrepancies.
 - [ ] 07. Discover/import current cards and printings, track data freshness and implementation coverage, and correct errata.
@@ -38,3 +38,7 @@ An origin-scoped Web Lock allows one collection editor; waiting tabs display upd
 ### 03 — collection layout
 
 Collection cards now fit their grid cells; expanded printing text wraps and quick-add controls stack on narrow screens. Chromium verified card bounds at 1270px and 390px in both HTML/art modes, plus expanded printing panels with no internal overflow.
+
+### 04 — deck choices and ownership availability
+
+Deck libraries now update across mounted views and browser tabs, with valid fallback selections after deletion. Loading or failed collection reads show unknown ownership and suppress misleading buy-lists. Verified TypeScript, 126 targeted unit/component tests (83 rerun after selection refinements), and two browser workflows covering immediate Play selection and failed collection loading.

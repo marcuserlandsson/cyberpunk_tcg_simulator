@@ -31,7 +31,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { isDeckPickable, deckPickerLabel } from './deckPicker'
-import { listDecks, saveSimResult, getLastSimResult } from './storage'
+import { useDecks, saveSimResult, getLastSimResult } from './storage'
 import { toCsv, type AgentKind, type CardStat, type SimOptions, type SimResult } from '../sim/runner'
 import type { SimWorkerMessage } from '../sim/worker'
 import type { DeckList } from '../engine/deck'
@@ -189,7 +189,7 @@ function CardStatsTable({ db, title, stats, minGamesSeen, testId }: CardStatsTab
 // ---------------------------------------------------------------------------
 
 export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElement {
-  const decks = useMemo(() => listDecks(), [])
+  const decks = useDecks()
   const pickableDecks = useMemo(() => decks.filter((deck) => isDeckPickable(db, deck)), [db, decks])
 
   const [deckAName, setDeckAName] = useState(() => pickableDecks[0]?.name ?? decks[0]?.name ?? '')
@@ -212,6 +212,10 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
   )
 
   const workerRef = useRef<SimWorkerLike | null>(null)
+  useEffect(() => {
+    if (!decks.some((d) => d.name === deckAName)) setDeckAName(pickableDecks[0]?.name ?? '')
+    if (!decks.some((d) => d.name === deckBName)) setDeckBName(pickableDecks[1]?.name ?? pickableDecks[0]?.name ?? '')
+  }, [decks, pickableDecks, deckAName, deckBName])
 
   // A worker left running when the view unmounts (tab switch mid-run) would
   // otherwise keep spinning invisibly forever.

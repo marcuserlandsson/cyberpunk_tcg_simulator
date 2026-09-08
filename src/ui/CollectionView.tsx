@@ -26,6 +26,7 @@ import {
 import { QuickAddBar } from './QuickAddBar'
 import { CollectionHeader } from './CollectionHeader'
 import { useCollectionAccess } from './collectionAccess'
+import { ownershipAvailable, useSyncStatus } from './collectionSync'
 
 const COLORS = ['Red', 'Yellow', 'Green', 'Blue'] as const
 const TYPES: CardType[] = ['legend', 'unit', 'program', 'gear']
@@ -76,6 +77,7 @@ export function CollectionView({
 }): ReactElement {
   const collection = useCollection()
   const access = useCollectionAccess()
+  const known = ownershipAvailable(useSyncStatus())
 
   const loadResult = useMemo(() => {
     try {
@@ -147,7 +149,9 @@ export function CollectionView({
         </div>
       )}
       <CollectionHeader db={db} printings={loadResult.printings} />
-      <QuickAddBar db={db} printings={loadResult.printings} />
+      <fieldset disabled={!known} className="collection-editor">
+        <QuickAddBar db={db} printings={loadResult.printings} />
+      </fieldset>
 
       <div className="collection-view__filters">
         <div className="card-browser__chips">
@@ -205,9 +209,9 @@ export function CollectionView({
             <CardFrame def={r.def} size="zoom" useOfficialImages={useOfficialImages}
               onClick={() => setExpanded(expanded === r.def.id ? null : r.def.id)} />
             <span className="collection-view__count" data-testid={`collection-count-${r.def.id}`}>
-              {r.owned}/{r.target}
-              {r.playsetDone && <span title="Playset complete"> ✓</span>}
-              {r.artsDone && <span title="All arts owned"> ★</span>}
+              {known ? r.owned : '?'}/{r.target}
+              {known && r.playsetDone && <span title="Playset complete"> ✓</span>}
+              {known && r.artsDone && <span title="All arts owned"> ★</span>}
             </span>
             <button type="button" className="collection-view__expand"
               data-testid={`expand-${r.def.id}`}
@@ -229,12 +233,13 @@ export function CollectionView({
                       <span>{p.setName} · {p.collectorNumber} · {p.rarity}{p.finish ? ` · ${p.finish}` : ''}</span>
                       <span className="collection-view__stepper">
                         <button type="button" data-testid={`printing-dec-${p.key}`}
-                          disabled={count === 0}
+                          disabled={!known || count === 0}
                           onClick={() => adjustCount(p.key, -1)}>
                           −
                         </button>
-                        <span>{count}</span>
+                        <span>{known ? count : '?'}</span>
                         <button type="button" data-testid={`printing-inc-${p.key}`}
+                          disabled={!known}
                           onClick={() => adjustCount(p.key, 1)}>
                           +
                         </button>
