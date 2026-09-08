@@ -54,6 +54,7 @@ import {
   defeatInterceptorFor,
   defeatShieldOf,
   effectivePower,
+  signedPower,
   fightPowerBonus,
   hasKeyword,
   opponentOf,
@@ -654,10 +655,10 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // saul-bright-stormrider, docs/rulings.md §107 ff.) only ever applies to
   // the ATTACKER's own side of this fight, never the defender's.
   const attackPower = Math.max(0,
-    effectivePower(db, draft, attacker) +
+    signedPower(db, draft, attacker) +
     fightPowerBonus(db, draft, attacker, defender) +
     attackPowerBonus(db, draft, attacker))
-  const defendPower = Math.max(0, effectivePower(db, draft, defender) + fightPowerBonus(db, draft, defender, attacker))
+  const defendPower = Math.max(0, signedPower(db, draft, defender) + fightPowerBonus(db, draft, defender, attacker))
   // "This Unit wins all fights against CORPO Units" overrides the power
   // comparison in that Unit's favour (docs/rulings.md §41).
   const attackerAlwaysWins = winsFightRegardless(db, draft, attacker, defender)
@@ -770,7 +771,7 @@ function fight(draft: GameState, db: CardDb, attacker: number, defender: number)
   // Recheck protection after fight-triggered effects have finished resolving.
   const casualties = defeated.filter(uid => {
     const foe = uid === attacker ? defender : attacker
-    const power = effectivePower(db, draft, foe) + fightPowerBonus(db, draft, foe, uid)
+    const power = signedPower(db, draft, foe) + fightPowerBonus(db, draft, foe, uid)
       + (foe === attacker ? attackPowerBonus(db, draft, foe) : 0)
     return onField(draft, uid) && !hasKeyword(db, draft, uid, FIGHT_IMMUNE) && power > 0
   })
@@ -853,7 +854,7 @@ export function resolveAttack(draft: GameState, db: CardDb): void {
   // like a fight (docs/rulings.md §107 ff.); "steals 1 fewer Gig this turn"
   // (take-control, docs/rulings.md §107 ff.) then reduces the resulting
   // count, floored at 0.
-  const power = effectivePower(db, draft, attacker) + attackPowerBonus(db, draft, attacker)
+  const power = signedPower(db, draft, attacker) + attackPowerBonus(db, draft, attacker)
   const reduction = draft.cards[attacker].stealReduction ?? 0
   const rawCount = Math.max(0, stealCount(power) - reduction)
   // Capped by what this attacker may actually take, not merely by how many

@@ -13,7 +13,7 @@
 // to the *source card's owner*, never to the active player: a Gear card equipped
 // to a rival Unit still targets its own owner's side (docs/rulings.md §8).
 
-import { effectivePower, hasKeyword, opponentOf, streetCred } from '../engine/query'
+import { effectivePower, hasKeyword, opponentOf, streetCredOrder } from '../engine/query'
 import type {
   CardDb,
   GameState,
@@ -230,7 +230,7 @@ export function filterTargets(
   // rather than per candidate (docs/rulings.md §55 ff.).
   const aheadOnStreetCred =
     filter.maxPowerIfAheadOnStreetCred !== undefined
-      ? streetCred(state, controller) > streetCred(state, opponentOf(controller))
+      ? streetCredOrder(state, controller) > streetCredOrder(state, opponentOf(controller))
       : false
   const d20Cap = filter.maxPowerVsFriendlyD20 ? friendlyD20Value(state, controller) : null
   // "A Rival's lowest-power Unit. (If there are multiple, choose 1.)"

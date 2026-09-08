@@ -79,3 +79,7 @@ Steals now select the complete batch before prevention, transfer accepted dice t
 ### 08f — Gig adjustment semantics
 
 Exact changes and set effects now fail outside the die's faces or when unchanged, without firing adjustment watchers. Printed up-to changes expose partial and zero amounts; exact bidirectional adjustments retain their two directions. V and Jackie scripts now offer amounts and Jackie only draws when the selected Gig actually becomes minimum. Stolen-die trigger context identifies each member of a batch. Return/reroll instructions ask for a die. Verified 658 engine/card tests and TypeScript, including six focused comprehensive-rules cases. Remaining source-lifetime/identity edge cases belong to the pending-resolution audit still open in step 8.
+
+### 08g — null Street Cred and signed power
+
+Empty Gig areas now have null Street Cred (shown as a dash), satisfy neither parity nor a numeric difference, and compare below numeric values. Power references clamp negative totals to zero while arithmetic and combat keep signed values until contextual modifiers are added. Verified 664 engine/card/StreetStrip tests, TypeScript, and 415 AI/fuzz tests including 300 randomized games and hidden-information invariance checks.

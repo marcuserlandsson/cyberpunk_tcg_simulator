@@ -113,9 +113,9 @@ describe('gain a gig', () => {
 })
 
 describe('streetCred', () => {
-  it('is 0 with an empty gig area and sums the gig dice values otherwise', () => {
+  it('is null with an empty gig area and sums the gig dice values otherwise', () => {
     const state = startedGame(5)
-    expect(streetCred(state, 0)).toBe(0)
+    expect(streetCred(state, 0)).toBeNull()
     const withGigs = withDice(state, { gig: [3, 2], fixer: [3, 4] })
     // dice(3, true) => d4:4, d6:6, d8:8 ; dice(2, true) => d4:4, d6:6
     expect(streetCred(withGigs, 0)).toBe(18)

@@ -189,7 +189,7 @@ export function evaluate(
   // CR 1.11: overtime requires seven Gigs, even if six would be a majority.
   if (isOvertime(state)) score += ((myGigs >= GIGS_TO_WIN ? 1 : 0) - (theirGigs >= GIGS_TO_WIN ? 1 : 0)) * weights.overtimeMajority
 
-  score += (streetCred(state, perspective) - streetCred(state, rival)) * weights.streetCred
+  score += ((streetCred(state, perspective) ?? 0) - (streetCred(state, rival) ?? 0)) * weights.streetCred
 
   score += fieldPower(db, state, perspective) * weights.friendlyPower
   score -= fieldPower(db, state, rival) * weights.rivalPower

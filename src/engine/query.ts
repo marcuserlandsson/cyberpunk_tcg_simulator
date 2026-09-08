@@ -38,8 +38,14 @@ export function opponentOf(player: PlayerId): PlayerId {
  * area (gameplay guide, p12). Dice still in the fixer are unrolled and do not
  * contribute.
  */
-export function streetCred(state: GameState, player: PlayerId): number {
-  return state.players[player].gigArea.reduce((sum, die) => sum + die.value, 0)
+export function streetCred(state: GameState, player: PlayerId): number | null {
+  const area = state.players[player].gigArea
+  return area.length ? area.reduce((sum, die) => sum + die.value, 0) : null
+}
+
+/** CR 5.11.4.2: null is below numeric Street Cred, but is not a number. */
+export function streetCredOrder(state: GameState, player: PlayerId): number {
+  return streetCred(state, player) ?? -Infinity
 }
 
 /**
@@ -164,7 +170,7 @@ export function conditionHolds(
   if (condition === undefined) return true
   if (
     condition.streetCredAtLeast !== undefined &&
-    streetCred(state, player) < condition.streetCredAtLeast
+    streetCredOrder(state, player) < condition.streetCredAtLeast
   ) {
     return false
   }
@@ -185,11 +191,11 @@ export function conditionHolds(
   // Batch 2 additions (docs/rulings.md §55 ff.):
   if (
     condition.streetCredAheadOfRival === true &&
-    streetCred(state, player) <= streetCred(state, opponentOf(player))
+    streetCredOrder(state, player) <= streetCredOrder(state, opponentOf(player))
   ) {
     return false
   }
-  if (condition.streetCredBelow !== undefined && streetCred(state, player) >= condition.streetCredBelow) {
+  if (condition.streetCredBelow !== undefined && streetCredOrder(state, player) >= condition.streetCredBelow) {
     return false
   }
   if (condition.duringOwnTurn === true && state.activePlayer !== player) {
@@ -246,7 +252,10 @@ export function conditionHolds(
     return false
   }
   if (condition.streetCredDiffAtLeast !== undefined) {
-    const diff = Math.abs(streetCred(state, player) - streetCred(state, opponentOf(player)))
+    const mine = streetCred(state, player)
+    const rival = streetCred(state, opponentOf(player))
+    if (mine === null || rival === null) return false
+    const diff = Math.abs(mine - rival)
     if (diff < condition.streetCredDiffAtLeast) return false
   }
   if (condition.sourceEquipped === true) {
@@ -271,7 +280,8 @@ export function conditionHolds(
   // Batch 5 additions (docs/rulings.md §92 ff.):
   if (condition.streetCredParity !== undefined) {
     const wantEven = condition.streetCredParity === 'even'
-    if (streetCred(state, player) % 2 === 0 !== wantEven) return false
+    const cred = streetCred(state, player)
+    if (cred === null || cred % 2 === 0 !== wantEven) return false
   }
   if (condition.allFriendlyLegendsFaceUp === true) {
     if (state.players[player].legends.some((uid) => !state.cards[uid].faceUp)) return false
@@ -324,7 +334,7 @@ export function conditionHolds(
   // Batch 8 additions (docs/rulings.md §134 ff.):
   if (
     condition.streetCredBehindRival === true &&
-    streetCred(state, player) >= streetCred(state, opponentOf(player))
+    streetCredOrder(state, player) >= streetCredOrder(state, opponentOf(player))
   ) {
     return false
   }
@@ -541,6 +551,11 @@ function activeStaticNodes(db: CardDb, state: GameState, uid: number): EffectNod
  * host (docs/rulings.md §29).
  */
 export function effectivePower(db: CardDb, state: GameState, uid: number): number {
+  return Math.max(0, signedPower(db, state, uid))
+}
+
+/** Signed arithmetic is retained until all contextual modifiers have been added. */
+export function signedPower(db: CardDb, state: GameState, uid: number): number {
   const card = state.cards[uid]
   if (!card) throw new Error(`Unknown card instance uid: ${uid}`)
   const def = db[card.defId]
@@ -916,7 +931,7 @@ export function stealValueCap(
   )
   if (!capped) return null
   if (!isUnitStealer(db, state, stealerUid)) return null
-  return effectivePower(db, state, stealerUid) + attackPowerBonus(db, state, stealerUid)
+  return Math.max(0, signedPower(db, state, stealerUid) + attackPowerBonus(db, state, stealerUid))
 }
 
 /**

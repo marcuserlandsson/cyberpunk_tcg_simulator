@@ -79,7 +79,7 @@ function GigPool(props: GigPoolProps): ReactElement {
       <span className="street__label">
         {label} · <span data-testid="gig-count">{p.gigArea.length}</span>{' '}
         <span aria-hidden="true">★</span>{' '}
-        <span data-testid="street-cred">{streetCred(state, player)}</span>
+        <span data-testid="street-cred">{streetCred(state, player) ?? '—'}</span>
       </span>
       <div className="street__pool">
         <div

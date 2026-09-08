@@ -40,7 +40,7 @@ import {
   reducedCost,
   resolvePowerAmount,
   rivalGoSoloTax,
-  streetCred,
+  streetCredOrder,
   type ConditionContext,
 } from '../engine/query'
 import { nextInt, rollDie } from '../engine/rng'
@@ -297,7 +297,7 @@ function gigChangeOptions(node: Extract<EffectNode, { kind: 'changeGig' }>): num
 
 /** "If you have less ☆ (Street Cred) than a Rival" (docs/rulings.md §45). */
 function behindOnStreetCred(state: GameState, player: PlayerId): boolean {
-  return streetCred(state, player) < streetCred(state, opponentOf(player))
+  return streetCredOrder(state, player) < streetCredOrder(state, opponentOf(player))
 }
 
 /** The candidates a slot admits right now (empty = no decision to offer). */
