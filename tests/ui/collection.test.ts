@@ -151,7 +151,7 @@ describe('subscription', () => {
     }
     expect(getStorageError()).toContain('Could not save')
     expect(getCollection()).not.toBe(before)
-    expect(getCollection().counts).toEqual({}) // …but the data is unchanged
+    expect(getCollection().counts).toEqual({ 'a/1': 1 }) // the attempted edit is retained
   })
 
   it('useCollection re-renders with fresh counts and keeps a stable snapshot otherwise', () => {
@@ -173,6 +173,27 @@ describe('subscription', () => {
 })
 
 describe('pending buffer', () => {
+  it('retains the disk baseline and all edits after a temporary quota failure', () => {
+    setCollectionFromFile({ 'existing/1': 3 }, 7)
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = () => { throw new Error('QuotaExceededError') }
+    try {
+      adjustCount('new/1', 1)
+      expect(getCollection().counts).toEqual({ 'existing/1': 3, 'new/1': 1 })
+      expect(readPendingBuffer()?.baseRevision).toBe(7)
+    } finally { Storage.prototype.setItem = original }
+    adjustCount('third/1', 1)
+    expect(readPendingBuffer()?.counts).toEqual({ 'existing/1': 3, 'new/1': 1, 'third/1': 1 })
+    _resetCollectionCacheForTests()
+    expect(getCollection().counts).toEqual({ 'existing/1': 3, 'new/1': 1, 'third/1': 1 })
+  })
+
+  it('rejecting an invalid edit preserves a disk-only baseline', () => {
+    setCollectionFromFile({ 'existing/1': 3 }, 7)
+    setCount('bad/1', Infinity)
+    expect(getCollection().counts).toEqual({ 'existing/1': 3 })
+    expect(readPendingBuffer()).toBeUndefined()
+  })
   it('records every mutation with the current base revision', () => {
     setBaseRevision(7)
     setCount('a/1', 2)

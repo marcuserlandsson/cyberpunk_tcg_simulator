@@ -36,6 +36,25 @@ afterEach(() => {
 })
 
 describe('initCollectionSync', () => {
+  it('saves the complete collection to disk even while browser writes fail', async () => {
+    let saved: unknown
+    stubFetch((_url, init) => {
+      if (init?.method !== 'PUT') return { status: 200, body: okFile }
+      saved = JSON.parse(String(init.body)).counts
+      return { status: 200, body: { revision: 4, savedAt: 'now' } }
+    })
+    await initCollectionSync()
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = () => { throw new Error('QuotaExceededError') }
+    try {
+      setCount('b/2', 2)
+      await flushNow()
+      expect(saved).toEqual({ 'a/1': 1, 'b/2': 2 })
+      expect(getCollection().counts).toEqual(saved)
+      expect(getSyncStatus().state).toBe('idle')
+      expect(readPendingBuffer()).toBeUndefined()
+    } finally { Storage.prototype.setItem = original }
+  })
   it('adopts the file from the endpoint', async () => {
     stubFetch(() => ({ status: 200, body: okFile }))
     await initCollectionSync()

@@ -68,6 +68,9 @@ function emptyCollection(): Collection {
 // same reference until the store actually changes, so reads go through this
 // cache and every write invalidates it.
 let cache: Collection | undefined
+// A storage failure must not discard either the disk baseline or the edit.
+// The sync layer reads this buffer too, so it can still save directly to disk.
+let memoryPending: PendingBuffer | undefined
 
 // The revision the pending buffer (or the last confirmed file read) is based
 // on. Not persisted itself — it travels inside the pending buffer once one
@@ -87,9 +90,10 @@ export function setBaseRevision(revision: number): void {
  *  simply treated as "no unsaved work recorded" — the legacy key or empty
  *  collection then takes over as the read fallback. */
 export function readPendingBuffer(): PendingBuffer | undefined {
-  const raw = localStorage.getItem(PENDING_KEY)
-  if (raw === null) return undefined
+  if (memoryPending !== undefined) return memoryPending
   try {
+    const raw = localStorage.getItem(PENDING_KEY)
+    if (raw === null) return undefined
     const parsed = pendingSchema.safeParse(JSON.parse(raw))
     return parsed.success ? parsed.data : undefined
   } catch {
@@ -106,15 +110,18 @@ export function readPendingBuffer(): PendingBuffer | undefined {
  *  something that repopulates the cache in the same breath; in practice
  *  that is always `setCollectionFromFile`, never this function alone. */
 export function clearPendingBuffer(): void {
-  localStorage.removeItem(PENDING_KEY)
+  memoryPending = undefined
+  // A stale durable buffer is reconciled with the file on the next load.
+  // Failure to remove it must not prevent adopting a confirmed disk save.
+  try { localStorage.removeItem(PENDING_KEY) } catch { /* storage unavailable */ }
 }
 
 /** The pre-file-storage key. Read-only from now on: a migration source for a
  *  browser that has old data but no pending buffer yet, never written to. */
 export function readLegacyCollection(): Collection | undefined {
-  const raw = localStorage.getItem(COLLECTION_KEY)
-  if (raw === null) return undefined
   try {
+    const raw = localStorage.getItem(COLLECTION_KEY)
+    if (raw === null) return undefined
     const parsed = collectionSchema.safeParse(JSON.parse(raw))
     return parsed.success ? freeze(parsed.data) : undefined
   } catch {
@@ -143,6 +150,7 @@ export function getStorageError(): string {
 }
 
 function writeCollection(collection: Collection): void {
+  const previous = getCollection()
   // Prune zero counts: absence means 0.
   const counts: Record<string, number> = {}
   for (const [key, count] of Object.entries(collection.counts)) {
@@ -159,15 +167,19 @@ function writeCollection(collection: Collection): void {
   const validated = collectionSchema.safeParse({ counts })
   if (!validated.success) {
     storageError = `Could not save the collection (invalid counts, nothing was written):\n${formatZodIssues(validated.error)}`
+    cache = freeze({ counts: { ...previous.counts } })
   } else {
+    const pending = { counts, baseRevision }
     try {
-      localStorage.setItem(PENDING_KEY, JSON.stringify({ counts, baseRevision }))
+      localStorage.setItem(PENDING_KEY, JSON.stringify(pending))
+      memoryPending = undefined
       storageError = ''
     } catch (err) {
-      storageError = `Could not save the collection (browser storage full or blocked): ${String(err)}`
+      memoryPending = pending
+      storageError = `Could not save to browser storage: ${String(err)}. Changes are held in memory; keep this tab open until they are saved to disk.`
     }
+    cache = freeze({ counts: { ...counts } })
   }
-  cache = undefined
   for (const listener of listeners) listener()
 }
 
@@ -219,6 +231,8 @@ export function setCollectionFromFile(counts: Record<string, number>, revision: 
  *  test is observed. Underscore-prefixed by convention; not for app code. */
 export function _resetCollectionCacheForTests(): void {
   cache = undefined
+  memoryPending = undefined
+  storageError = ''
   baseRevision = 0
 }
 

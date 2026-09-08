@@ -4,7 +4,7 @@ User request: address the app review and audit the newly published comprehensive
 
 ## Steps
 
-- [ ] 01. Preserve collection data and attempted edits when browser storage fails.
+- [x] 01. Preserve collection data and attempted edits when browser storage fails.
 - [ ] 02. Coordinate collection editing and recovery across browser tabs.
 - [ ] 03. Fix overlapping Collection cards and verify responsive layouts.
 - [ ] 04. Refresh deck choices across views and suppress unknown ownership figures.
@@ -26,3 +26,7 @@ User request: address the app review and audit the newly published comprehensive
 ## Completion log
 
 Each entry records the implementation, verification evidence, and any remaining limitations. Commit history provides the corresponding checkpoints.
+
+### 01 — browser storage failure
+
+Preserved the last confirmed collection and attempted edits in memory when localStorage fails. The disk sync can flush that buffer directly; invalid counts preserve the prior snapshot. Read/removal failures no longer crash recovery. Verified 101 tests across collection, sync, error UI, and header, including temporary quota failure followed by another edit and successful disk sync while browser writes remain blocked.
