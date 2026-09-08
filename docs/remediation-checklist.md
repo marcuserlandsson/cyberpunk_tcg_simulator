@@ -6,7 +6,7 @@ User request: address the app review and audit the newly published comprehensive
 
 - [x] 01. Preserve collection data and attempted edits when browser storage fails.
 - [x] 02. Coordinate collection editing and recovery across browser tabs.
-- [ ] 03. Fix overlapping Collection cards and verify responsive layouts.
+- [x] 03. Fix overlapping Collection cards and verify responsive layouts.
 - [ ] 04. Refresh deck choices across views and suppress unknown ownership figures.
 - [ ] 05. Support collection persistence outside the dev server; expose Git outcomes and correct documentation.
 - [ ] 06. Obtain/version comprehensive rules and errata; audit each rules section against implementation and record discrepancies.
@@ -34,3 +34,7 @@ Preserved the last confirmed collection and attempted edits in memory when local
 ### 02 — cross-tab coordination
 
 An origin-scoped Web Lock allows one collection editor; waiting tabs display updates without touching the shared buffer and automatically take over after the owner closes. Browsers without Web Locks fail closed with an explanation. Verified 87 unit/component tests, TypeScript, and a real two-tab Playwright regression covering read-only protection, live counts, takeover, and saving. The E2E port can now be overridden to avoid occupied local ports. Running Playwright outside the restricted process sandbox also resolved its teardown hang.
+
+### 03 — collection layout
+
+Collection cards now fit their grid cells; expanded printing text wraps and quick-add controls stack on narrow screens. Chromium verified card bounds at 1270px and 390px in both HTML/art modes, plus expanded printing panels with no internal overflow.

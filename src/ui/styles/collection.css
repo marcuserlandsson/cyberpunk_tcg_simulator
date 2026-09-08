@@ -184,6 +184,16 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  min-width: 0;
+}
+
+.collection-view__cell .card-frame--zoom { width: 100%; box-sizing: border-box; }
+.collection-view__printing-row { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 600px) {
+  .quick-add { flex-wrap: wrap; }
+  .quick-add input[type='text'], .quick-add select { width: 100%; max-width: 100%; }
+  .collection-view__grid { grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); }
 }
 
 /* Corner owned/target badge, matching `.card-browser__count`'s placement
