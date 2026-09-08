@@ -36,6 +36,7 @@ import {
   replay,
   undoToLastDecisionOf,
   type GameRecord,
+  gameProvenance,
 } from '../engine/replay'
 import { saveGameRecord } from './storage'
 import type { DeckList } from '../engine/deck'
@@ -117,7 +118,7 @@ interface Game {
 
 function applyOne(db: CardDb, game: Game, action: Action): Game {
   return {
-    record: { config: game.record.config, actions: [...game.record.actions, action] },
+    record: { ...game.record, actions: [...game.record.actions, action] },
     state: applyAction(db, game.state, action),
     owners: [...game.owners, actingPlayer(game.state)],
   }
@@ -144,7 +145,8 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   const start = useCallback((humanDeck: DeckList, aiDeck: DeckList, seed?: number) => {
     try {
       const next = gameFromRecord(dbRef.current, {
-        config: { decks: [humanDeck, aiDeck], seed: seed ?? randomSeed() },
+        provenance: gameProvenance(dbRef.current),
+        config: { decks: structuredClone([humanDeck, aiDeck]), seed: seed ?? randomSeed() },
         actions: [],
       })
       setGame(next)

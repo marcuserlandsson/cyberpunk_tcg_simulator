@@ -50,8 +50,8 @@ describe('isDeckPickable', () => {
     expect(mercs.demo).toBe(true)
     expect(isDeckPickable(db, arasaka)).toBe(true)
     expect(isDeckPickable(db, mercs)).toBe(true)
-    expect(deckPickerLabel(db, arasaka)).toBe(arasaka.name)
-    expect(deckPickerLabel(db, mercs)).toBe(mercs.name)
+    expect(deckPickerLabel(db, arasaka)).toBe(arasaka.name + " [demo]")
+    expect(deckPickerLabel(db, mercs)).toBe(mercs.name + " [demo]")
   })
 
   it('still rejects a non-demo deck with any validateDeck error, unchanged', () => {

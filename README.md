@@ -232,12 +232,18 @@ suites point the endpoint at a scratch file instead of the real collection.
 from before the last write; it's gitignored and exists purely as a local
 safety net, not a second source of truth.
 
+## Deck versions and practice formats
+
+The builder offers explicit Constructed and Demo formats. Constructed validates 40–50 main-deck cards; Demo relaxes size for practice and is visibly labeled. Each builder save retains an independent version, including notes and a version label. Restore a version into the editor; give it a different name to keep both versions selectable for comparison. Deck text exports retain this metadata. Save and play opens Play with the saved deck selected. New game saves carry rules/engine/card-data provenance; older records require an explicit attempt under current rules.
+
 ## Simulation
 
 The **Simulate** tab picks two decks, runs N AI-vs-AI games in a background
 Web Worker (so the UI stays responsive), and reports win rates, average game
 length, and per-card play-count/win-correlation stats, exportable as JSON or
 CSV.
+
+Completed runs retain exact decks, seeds, agents, versions and outcomes in browser history. Navigation keeps workers alive. JSON carries complete runs; separate game/card CSV exports include provenance. Matched comparisons run two versions against several opponents with the same seeds, alternating seats and fixed agents. Games played means played, not drawn; conditional win rates are correlation. The 95% [Wilson intervals](https://www.itl.nist.gov/div898/handbook/prc/section2/prc241.htm) describe sampling uncertainty, not AI quality or rules correctness. Reported changes are descriptive, not significance tests.
 
 The same runner is available from the command line, which is how the
 project's own 1,000-game acceptance check is run:

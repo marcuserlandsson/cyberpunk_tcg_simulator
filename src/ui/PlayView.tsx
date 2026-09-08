@@ -54,7 +54,7 @@ import {
   type BoardAffordances,
   type BoardHandlers,
 } from './playAffordances'
-import type { GameRecord } from '../engine/replay'
+import { currentGameRecord, type GameRecord } from '../engine/replay'
 import { opponentOf } from '../engine/query'
 import type { DeckList } from '../engine/deck'
 import type { Action, CardDb, DieSize, GameEvent, GameState } from '../engine/types'
@@ -63,6 +63,7 @@ export interface PlayViewProps {
   db: CardDb
   useOfficialImages: boolean
   /** Pacing delay between AI actions; 0 in E2E runs (`?aiDelay=0`). */
+  requestedDeck?: { name: string; id: number }
   aiDelayMs?: number
 }
 
@@ -168,7 +169,7 @@ export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> 
   }
 }
 
-export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): ReactElement {
+export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: PlayViewProps): ReactElement {
   const game = useGame(db, aiDelayMs === undefined ? {} : { aiDelayMs })
   const { record, legal } = game
   const state = game.state?.pendingIntercept?.view
@@ -199,6 +200,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
   // The name of the save slot the most recent "resume" click tried to load,
   // so a failed load (`game.loadError`) knows which slot to offer deleting —
   // `game.load` only ever sees the record, never its name.
+  const [versionWarning, setVersionWarning] = useState<{ name: string; record: GameRecord } | null>(null)
   const [resumeAttempt, setResumeAttempt] = useState<string | null>(null)
 
   // Any change to the record (an action, or an undo) invalidates a half-made
@@ -429,6 +431,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     () => pickableDecks[1]?.name ?? pickableDecks[0]?.name ?? decks[0]?.name ?? ''
   )
   const [seedText, setSeedText] = useState('')
+  useEffect(() => { if (requestedDeck) { setHumanDeckName(requestedDeck.name); setSetupOpen(true) } }, [requestedDeck])
   useEffect(() => {
     if (!decks.some((d) => d.name === humanDeckName)) setHumanDeckName(pickableDecks[0]?.name ?? '')
     if (!decks.some((d) => d.name === aiDeckName)) setAiDeckName(pickableDecks[1]?.name ?? pickableDecks[0]?.name ?? '')
@@ -523,6 +526,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
           </button>
         )}
         <h3>Resume a saved game</h3>
+        {versionWarning && <div role="alert" data-testid="replay-version-warning"><p>{versionWarning.name} has missing or different rules, engine or card-data metadata. Replaying under current rules can change the game or fail. Its original save stays intact.</p><button data-testid="replay-current-rules" onClick={() => { game.load(versionWarning.record); setVersionWarning(null); setSetupOpen(false) }}>Attempt replay with current rules</button><button onClick={() => setVersionWarning(null)}>Cancel replay</button></div>}
         {records.length === 0 && <p data-testid="no-saves">No saved games.</p>}
         <ul className="play-setup__saves">
           {records.map((entry) => (
@@ -534,6 +538,8 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
                 data-name={entry.name}
                 onClick={() => {
                   setResumeAttempt(entry.name)
+                  if (!currentGameRecord(db, entry.record)) { setVersionWarning(entry); return }
+                  setVersionWarning(null)
                   game.load(entry.record)
                   setSetupOpen(false)
                 }}

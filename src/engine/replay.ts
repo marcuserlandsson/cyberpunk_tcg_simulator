@@ -18,6 +18,7 @@
 // PURITY. This is engine code: no React, no UI imports, no `Math.random`, no
 // `Date.now` (guarded by tests/engine/purity.test.ts).
 
+import { ENGINE_VERSION, RULES_VERSION, cardDataFingerprint } from './version'
 import { newGame, type NewGameConfig } from './game'
 import { actingPlayer } from './query'
 import { applyAction } from './reduce'
@@ -29,9 +30,13 @@ import type { Action, CardDb, GameState, PlayerId } from './types'
  * `Action` variant holds only primitives and arrays of primitives.
  */
 export interface GameRecord {
+  provenance?: { engine: string; rules: string; cards: string }
   config: NewGameConfig
   actions: Action[]
 }
+
+export function gameProvenance(db: CardDb): NonNullable<GameRecord["provenance"]> { return { engine: ENGINE_VERSION, rules: RULES_VERSION, cards: cardDataFingerprint(db) } }
+export function currentGameRecord(db: CardDb, record: GameRecord): boolean { const expected = gameProvenance(db); return record.provenance?.engine === expected.engine && record.provenance.rules === expected.rules && record.provenance.cards === expected.cards }
 
 /**
  * Folds a record back into the state it describes. Throws (via `applyAction`'s
@@ -90,7 +95,7 @@ export function undoToLastDecisionOf(
   const owners = actionOwners(db, record)
   const lastOwn = owners.lastIndexOf(player)
   if (lastOwn === -1) return record
-  return { config: record.config, actions: record.actions.slice(0, lastOwn) }
+  return { ...record, actions: record.actions.slice(0, lastOwn) }
 }
 
 /** True when `player` has an action in `record` that `undoToLastDecisionOf` would strip. */

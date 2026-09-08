@@ -14,10 +14,12 @@
 import { useMemo, useState, type ReactElement } from 'react'
 import type { CardDb } from '../engine/types'
 import type { DeckList } from '../engine/deck'
+import { listDeckVersions, saveDeckVersion } from './deckVersions'
+import { isDeckPickable } from './deckPicker'
 import { CardBrowser, isArtOnlyPromo } from './CardBrowser'
 import { DeckPanel } from './DeckPanel'
 import { CardFrame } from './CardFrame'
-import { deleteDeck, isReadOnlyDeck, listDecks, saveDeck, buildDisplayNames, useDecks } from './storage'
+import { deleteDeck, isReadOnlyDeck, listDecks, buildDisplayNames, useDecks } from './storage'
 import { ownershipAvailable, useSyncStatus } from './collectionSync'
 import { useCollection, ownedByCard } from './collection'
 import { loadPrintings } from './printings'
@@ -25,13 +27,14 @@ import { loadPrintings } from './printings'
 export interface DeckBuilderViewProps {
   db: CardDb
   useOfficialImages: boolean
+  onPlayDeck?: (name: string) => void
 }
 
 function blankDeck(): DeckList {
-  return { name: 'New Deck', legends: ['', '', ''], cards: {} }
+  return { name: 'New Deck', legends: ['', '', ''], cards: {}, format: 'constructed' }
 }
 
-export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps): ReactElement {
+export function DeckBuilderView({ db, useOfficialImages, onPlayDeck }: DeckBuilderViewProps): ReactElement {
   const [deck, setDeck] = useState<DeckList>(blankDeck)
   const decks = useDecks()
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -111,9 +114,7 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
 
   function handleSave(name: string): void {
     const toSave: DeckList = { ...deck, name }
-    saveDeck(toSave)
-    setDeck(toSave)
-    setDeleteError(null)
+    try { setDeck(saveDeckVersion(toSave)); setDeleteError(null) } catch (error) { setDeleteError(`Save failed; the edited deck is still here. ${String(error)}`) }
   }
 
   function handleLoad(name: string): void {
@@ -147,6 +148,10 @@ export function DeckBuilderView({ db, useOfficialImages }: DeckBuilderViewProps)
   // from this column wrapper rather than by teaching that row to wrap.
   return (
     <div className="deck-builder-view">
+      <div className="panel">
+        {onPlayDeck && <button data-testid="play-this-deck" disabled={!isDeckPickable(db, deck)} onClick={() => { try { const saved = saveDeckVersion(deck); setDeck(saved); setDeleteError(null); onPlayDeck(saved.name) } catch (error) { setDeleteError(String(error)) } }}>Save and play this deck</button>}
+        <details data-testid="deck-versions"><summary>Saved versions of {deck.name}</summary>{(() => { try { return listDeckVersions(deck.name).map(version => <button key={version.revisionId} onClick={() => setDeck(structuredClone(version))}>{version.versionLabel || 'Untitled version'} · {version.updatedAt} · Restore in editor</button>) } catch { return <p>Version history cannot be read.</p> } })()}</details>
+      </div>
       <div className="deck-builder" data-testid="deck-builder">
         <CardBrowser
           db={db}

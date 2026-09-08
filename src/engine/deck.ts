@@ -5,7 +5,14 @@ export interface DeckList {
   legends: [string, string, string]
   cards: Record<string, number>
   demo?: boolean
+  format?: 'constructed' | 'demo'
+  notes?: string
+  revisionId?: string
+  versionLabel?: string
+  updatedAt?: string
 }
+
+export function deckFormat(deck: DeckList): 'constructed' | 'demo' { return deck.format ?? (deck.demo ? 'demo' : 'constructed') }
 
 /** CR 7.3.3 groups functional copies by name and subtitle, independent of card number. */
 export function cardIdentity(def: CardDef): string {
@@ -116,7 +123,7 @@ export function validateDeck(db: CardDb, deck: DeckList): string[] {
     }
   }
 
-  if (!deck.demo) {
+  if (deckFormat(deck) !== 'demo') {
     const size = deckSize(deck)
     if (size < MIN_DECK_SIZE) {
       errors.push(`Deck has ${size} non-legend cards; the minimum is ${MIN_DECK_SIZE}.`)
@@ -142,5 +149,5 @@ export function validateDeck(db: CardDb, deck: DeckList): string[] {
  * what that function considers a size error vs. anything else.
  */
 export function validateDeckIgnoringSize(db: CardDb, deck: DeckList): string[] {
-  return validateDeck(db, { ...deck, demo: true })
+  return validateDeck(db, { ...deck, demo: true, format: 'demo' })
 }

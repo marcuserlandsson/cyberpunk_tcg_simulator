@@ -14,7 +14,7 @@ export function benchmarkPlan(baseline: DeckList, candidate: DeckList, opponents
 /** Only compare matched samples, versions, policies and opponent snapshots. */
 export function compatibleComparison(a: SimRun, b: SimRun): boolean {
   const signature = (r: SimRun) => JSON.stringify([r.engineVersion, r.rulesVersion, r.cardData, r.options.agentA, r.options.agentB,
-    r.options.seed, r.options.games, r.options.deckB.legends, Object.entries(r.options.deckB.cards).sort(), r.options.deckB.demo,
+    r.options.seed, r.options.games, r.options.deckB.legends, Object.entries(r.options.deckB.cards).sort(), r.options.deckB.demo, r.options.deckB.format,
     r.result.games.map(g => g.seed)])
   return signature(a) === signature(b)
 }

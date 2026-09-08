@@ -5,7 +5,8 @@
 
 import type { CardDb } from '../engine/types'
 import { useSyncExternalStore } from 'react'
-import type { DeckList } from '../engine/deck'
+import { deckMetadataSchema } from './deckSchema'
+import { deckFormat, type DeckList } from '../engine/deck'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import mercsDeck from '../../data/decks/mercs-the-heist.json'
 
@@ -185,8 +186,10 @@ export function buildDisplayNames(db: CardDb): Map<string, string> {
 export function exportDeckText(db: CardDb, deck: DeckList): string {
   const nameIndex = buildNameIndex(db)
   const lines: string[] = []
-  lines.push(`# ${deck.name}${deck.demo ? ' [demo]' : ''}`)
+  lines.push(`# ${deck.name}${deckFormat(deck) === 'demo' ? ' [demo]' : ''}`)
   lines.push('')
+  const metadata = deckMetadataSchema.parse(deck)
+  if (Object.keys(metadata).length) lines.push('#@metadata ' + JSON.stringify(metadata))
   lines.push('## Legends')
   for (const id of deck.legends) lines.push(cardDisplayName(db, nameIndex, id))
   lines.push('')
@@ -226,6 +229,7 @@ export function importDeckText(db: CardDb, text: string): DeckList {
 
   let name = ''
   let demo = false
+  let metadata: Partial<DeckList> = {}
   let section: 'legends' | 'cards' | null = null
   const legendLines: string[] = []
   const cardLines: { count: number; name: string }[] = []
@@ -233,6 +237,7 @@ export function importDeckText(db: CardDb, text: string): DeckList {
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim()
     if (line === '') continue
+    if (line.startsWith('#@metadata ')) { metadata = deckMetadataSchema.parse(JSON.parse(line.slice(11))); continue }
     if (line.startsWith('# ')) {
       const header = line.slice(2).trim()
       const demoMatch = header.match(/^(.*)\s+\[demo\]$/)
@@ -291,7 +296,7 @@ export function importDeckText(db: CardDb, text: string): DeckList {
     cards,
   }
   if (demo) deck.demo = true
-  return deck
+  return { ...deck, ...metadata }
 }
 
 // ---------------------------------------------------------------------------

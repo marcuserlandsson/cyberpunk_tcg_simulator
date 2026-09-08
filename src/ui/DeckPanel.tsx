@@ -13,7 +13,7 @@
 
 import { useEffect, useState, type CSSProperties, type ReactElement } from 'react'
 import type { CardDb, CardType } from '../engine/types'
-import { deckSize, validateDeck, type DeckList } from '../engine/deck'
+import { deckFormat, deckSize, validateDeck, type DeckList } from '../engine/deck'
 import { exportDeckText, importDeckText } from './storage'
 import { CardFrame, ramColorVar } from './CardFrame'
 
@@ -177,7 +177,7 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
           value={deck.name}
           onChange={(event) => onChangeDeck({ ...deck, name: event.target.value })}
         />
-        {deck.demo && (
+        {deckFormat(deck) === 'demo' && (
           <span className="deck-panel__badge" data-testid="demo-badge">
             Demo (size limits relaxed)
           </span>
@@ -189,6 +189,9 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
         )}
       </div>
 
+      <label>Format<select data-testid="deck-format" value={deckFormat(deck)} onChange={e => onChangeDeck({ ...deck, format: e.target.value as DeckList['format'], demo: e.target.value === 'demo' })}><option value="constructed">Constructed · 40–50 cards</option><option value="demo">Demo · practice size</option></select></label>
+      <label>Version label<input data-testid="deck-version-label" value={deck.versionLabel ?? ''} onChange={e => onChangeDeck({ ...deck, versionLabel: e.target.value })} /></label>
+      <label>Deck notes<textarea data-testid="deck-notes" value={deck.notes ?? ''} onChange={e => onChangeDeck({ ...deck, notes: e.target.value })} /></label>
       <div className="deck-panel__legends" data-testid="legend-slots">
         {[0, 1, 2].map((index) => {
           const id = deck.legends[index]
@@ -268,7 +271,7 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
           <div className="deck-size-meter__fill" style={{ width: `${sizeMeterPercent}%` }} />
         </div>
         <div className="deck-panel__counter" data-testid="deck-size-counter">
-          Cards: {size}/40–50
+          Cards: {size}/{deckFormat(deck) === 'demo' ? 'practice' : '40–50'}
         </div>
       </div>
 

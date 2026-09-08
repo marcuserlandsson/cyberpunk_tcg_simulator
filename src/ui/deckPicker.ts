@@ -17,7 +17,7 @@
 // with one, and the waiver was never meant to cover that (final-review
 // item 4; docs/rulings.md §153).
 
-import { validateDeck, validateDeckIgnoringSize, type DeckList } from '../engine/deck'
+import { validateDeck, deckFormat, type DeckList } from '../engine/deck'
 import type { CardDb } from '../engine/types'
 
 /**
@@ -26,11 +26,10 @@ import type { CardDb } from '../engine/types'
  * deck with zero `validateDeck` errors outright.
  */
 export function isDeckPickable(db: CardDb, deck: DeckList): boolean {
-  if (deck.demo === true) return validateDeckIgnoringSize(db, deck).length === 0
   return validateDeck(db, deck).length === 0
 }
 
 /** `deck.name`, with an "⚠ invalid" suffix when `isDeckPickable` is false. */
 export function deckPickerLabel(db: CardDb, deck: DeckList): string {
-  return isDeckPickable(db, deck) ? deck.name : `${deck.name} ⚠ invalid`
+  return `${deck.name} [${deckFormat(deck)}]${isDeckPickable(db, deck) ? "" : " ⚠ invalid"}`
 }

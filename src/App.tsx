@@ -32,6 +32,7 @@ function aiDelayFromUrl(): number | undefined {
 }
 
 export default function App() {
+  const [playDeckRequest, setPlayDeckRequest] = useState<{ name: string; id: number } | undefined>()
   const [view, setView] = useState<View>('play')
   const [useOfficialImages, setUseOfficialImages] = useState(
     () => getSettings().useOfficialImages
@@ -83,13 +84,13 @@ export default function App() {
         {/* Kept mounted, only hidden: unmounting PlayView would throw away an
             in-progress game every time the player glanced at another tab. */}
         <div hidden={view !== 'play'}>
-          <PlayView db={db} useOfficialImages={useOfficialImages} aiDelayMs={aiDelayMs} />
+          <PlayView requestedDeck={playDeckRequest} db={db} useOfficialImages={useOfficialImages} aiDelayMs={aiDelayMs} />
         </div>
         {/* Kept mounted, only hidden: matches the Play tab's pattern (Task
             13) so a deck under construction survives a glance at another
             tab instead of being discarded. */}
         <div hidden={view !== 'deckBuilder'}>
-          <DeckBuilderView db={db} useOfficialImages={useOfficialImages} />
+          <DeckBuilderView onPlayDeck={name => { setPlayDeckRequest({ name, id: Date.now() }); setView("play") }} db={db} useOfficialImages={useOfficialImages} />
         </div>
         {/* Keep the run and its worker alive during navigation; Cancel remains explicit. */}
         <div hidden={view !== 'simulate'}><SimulateView db={db} /></div>

@@ -15,7 +15,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 09. Model unique artwork independently of printings; separate playset/artwork targets, filters, progress, and buy-lists.
 - [x] 10. Persist complete simulation runs and deck snapshots; retain runs during navigation and support history/reopening/exports.
 - [x] 11. Clarify simulation identities/metrics, add uncertainty and controlled matchup comparisons.
-- [ ] 12. Add explicit deck formats, deck versions/notes, and direct Play this deck.
+- [x] 12. Add explicit deck formats, deck versions/notes, and direct Play this deck.
 - [ ] 13. Add deck diagnostics, legal-RAM filtering, opening-hand sampling, and manual practice scenarios.
 - [ ] 14. Add multi-deck acquisition planning with shared/assembled inventories and optional binder reservations.
 - [ ] 15. Add compact collection search, collector numbers, artwork previews, bulk entry, and scoped filters.
@@ -159,3 +159,7 @@ Each completed run now has independent browser persistence, exact deck snapshots
 ### 11 — interpretable statistics and matched comparisons
 
 Card tables include subtitles, games-played labels, explicit conditional-correlation guidance, sample counts and 95% Wilson intervals. Zero samples have no reported rate. A sequential benchmark compares baseline/candidate snapshots against multiple opponents using the same seeds, alternating seats and fixed agents; compatible pairs reopen from history. Cancellation/failure stops queued runs while preserving completed ones. Game and card CSVs carry provenance and safe spreadsheet text. Verified 42 focused checks, TypeScript/build and two real-worker browser workflows, including a four-run comparison and reload.
+
+### 12 — explicit formats, deck versions and direct Play
+
+Constructed/Demo format choices control validation even when a legacy demo flag remains. Builder and gameplay pickers label formats; starter conversions expose size errors. Saves preserve independent immutable versions, labels and notes; older versions restore into the editor, and text exports round-trip metadata. Save failures retain edits. Direct Play saves the selected snapshot and opens the setup without discarding an existing game. New game records include rules/engine/card provenance, preserved through actions/undo; legacy/different-version replays require an explicit current-rules attempt. Sealed is the remaining dedicated format in step 17. Verified 365 UI/deck/replay/purity checks, TypeScript/build and five browser workflows including version restore, full gameplay and saved-game resume.

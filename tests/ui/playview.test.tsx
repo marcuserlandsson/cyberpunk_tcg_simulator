@@ -16,14 +16,15 @@ import { legalActions } from '../../src/engine/legal'
 import { actingPlayer, effectivePower } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
 import { AI, HUMAN, describeEvent } from '../../src/ui/useGame'
-import { listGameRecords, saveGameRecord } from '../../src/ui/storage'
+import { listGameRecords, saveGameRecord as persistRecord } from '../../src/ui/storage'
 import type { DeckList } from '../../src/engine/deck'
-import type { GameRecord } from '../../src/engine/replay'
+import { gameProvenance, type GameRecord } from '../../src/engine/replay'
 import type { Action, GameEvent, GameState } from '../../src/engine/types'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import mercsDeck from '../../data/decks/mercs-the-heist.json'
 
 const db = loadCardDb()
+function saveGameRecord(name: string, record: GameRecord) { persistRecord(name, { ...record, provenance: gameProvenance(db) }) }
 const arasaka = arasakaDeck as unknown as DeckList
 const mercs = mercsDeck as unknown as DeckList
 
@@ -396,4 +397,15 @@ describe('endReasonLabel / lastGameEnded (pure — the game-over overlay reason 
     )
     expect(endReasonLabel({ type: 'gameEnded', winner: HUMAN, reason: 'concede' })).toBe('Conceded')
   })
+})
+
+it('requires an explicit current-rules attempt for a legacy replay and preserves the stored record', () => {
+  persistRecord('legacy', GOOD_RECORD)
+  render(<PlayView db={db} useOfficialImages={false} aiDelayMs={60000} />)
+  fireEvent.click(screen.getByTestId('resume-game'))
+  expect(screen.getByTestId('replay-version-warning').textContent).toContain('missing or different')
+  expect(screen.getByTestId('play-setup')).toBeTruthy()
+  fireEvent.click(screen.getByTestId('replay-current-rules'))
+  expect(screen.queryByTestId('play-setup')).toBeNull()
+  expect(listGameRecords()[0].record).toEqual(GOOD_RECORD)
 })
