@@ -47,6 +47,7 @@ import { nextInt, rollDie } from '../engine/rng'
 import { stopAtHiddenInformation } from '../engine/preview'
 import { PRIVATE_INFORMATION_SCRIPTS } from './scripted/index'
 import { chooseEffectOption } from '../engine/choices'
+import { chooseAndStealGigs } from '../engine/stealing'
 import { scriptedCards } from './scripted/index'
 import {
   filterTargets,
@@ -840,63 +841,10 @@ function applyNode(
     }
 
     case 'stealGig': {
-      // Which dice are stolen is a real decision — it moves street cred and the
-      // win condition — so an effect steal routes through the same
-      // pendingSteal/chooseGig machinery as an attack steal, with this effect's
-      // controller as the thief (docs/rulings.md §32).
-      // How many dice this steal could actually take — not merely how many
-      // exist: a `rivalStealCappedByPower` restriction (chrome-fang,
-      // docs/rulings.md §141) can put some of them out of reach.
-      const available = stealableDieIndexes(
-        db,
-        draft,
-        ctx.player,
-        ctx.sourceUid,
-        node.distinctValueOnly === true
-      ).length
-      const count = Math.min(node.count, available)
-      if (count <= 0) return
-      const head = draft.pendingSteal
-      // An attack-driven steal leaves `thief` undefined, meaning "the active
-      // player" (docs/rulings.md §32) — compare against the EFFECTIVE thief so
-      // a bonus `stealGig` firing mid-attack (gorilla-arms) merges into it
-      // instead of being mistaken for a different thief's steal.
-      const headThief = head === null ? null : head.thief ?? draft.activePlayer
-      if (head === null) {
-        draft.pendingSteal = {
-          attacker: ctx.sourceUid,
-          remaining: count,
-          thief: ctx.player,
-          resumePhase: draft.phase === 'chooseGig' ? 'main' : draft.phase,
-          ...(node.distinctValueOnly === true ? { distinctValueOnly: true } : {}),
-        }
-        draft.phase = 'chooseGig'
-      } else if (headThief === ctx.player && (head.queue ?? []).length === 0) {
-        // Same controller, nothing queued behind: one longer choice sequence.
-        head.remaining += count
-        // A filtered bonus steal merging into an already-pending one applies
-        // its filter to the whole remaining choice (a documented
-        // simplification, docs/rulings.md §68 ff.).
-        if (node.distinctValueOnly === true) head.distinctValueOnly = true
-      } else {
-        // A steal for a *different* thief (a tied fight defeating two stealing
-        // Units) waits its turn instead of overwriting — docs/rulings.md §32.
-        const queue = head.queue ?? []
-        const last = queue[queue.length - 1]
-        if (last !== undefined && last.thief === ctx.player) {
-          last.remaining += count
-          if (node.distinctValueOnly === true) last.distinctValueOnly = true
-        } else {
-          queue.push({
-            attacker: ctx.sourceUid,
-            remaining: count,
-            thief: ctx.player,
-            ...(node.distinctValueOnly === true ? { distinctValueOnly: true } : {}),
-          })
-        }
-        head.queue = queue
-      }
-      note(draft, ctx.sourceUid, `steal ${count} gig(s)`)
+      const sourceUid = ctx.context?.equipHostUid ?? ctx.sourceUid
+      const eligible = stealableDieIndexes(db, draft, ctx.player, sourceUid, node.distinctValueOnly === true)
+      chooseAndStealGigs(db, draft, sourceUid, ctx.player, node.count, eligible)
+      if (draft.winner === null) note(draft, ctx.sourceUid, `steal ${Math.min(node.count, eligible.length)} gig(s)`)
       return
     }
 
@@ -1286,7 +1234,7 @@ export function fireTriggerOnDraft(
 
   if (!GEAR_PROPAGATED_TRIGGERS.includes(trigger)) return
   for (const gearUid of [...card.attachedGear]) {
-    fireCardTrigger(db, draft, trigger, gearUid, [], controller, context)
+    fireCardTrigger(db, draft, trigger, gearUid, [], controller, { ...context, equipHostUid: sourceUid })
     if (draft.winner !== null) return
   }
 }

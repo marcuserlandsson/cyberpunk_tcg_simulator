@@ -1383,10 +1383,9 @@ describe('appetite-for-destruction', () => {
     expect(next.floatingEffects).toHaveLength(1)
 
     next = passReact(db, startAttack(db, next, attacker, victim))
-    // The fight is won by 10, so the delayed steal fires and asks for a die.
-    expect(next.phase).toBe('chooseGig')
+    // Only one die qualifies, so the effect takes it and finishes the fight.
+    expect(next.phase).toBe('main')
     expect(next.floatingEffects).toEqual([]) // one-shot: consumed
-    next = chooseGig(db, next, 0)
     expect(gigValues(next, 0)).toContain(4)
   })
 

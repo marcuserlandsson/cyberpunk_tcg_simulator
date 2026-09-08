@@ -817,6 +817,8 @@ export type Phase =
  * choice, and neither may be dropped.
  */
 export interface PendingSteal {
+  /** Original area indexes selected for one simultaneous transfer. */
+  selected?: number[]
   attacker: number
   remaining: number
   thief?: PlayerId

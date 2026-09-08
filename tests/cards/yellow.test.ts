@@ -459,8 +459,7 @@ describe('gorilla-arms', () => {
 
     let after = passReact(db, startAttack(db, next, host, 'gigArea'))
     after = applyAction(db, after, actionsOfType(db, after, 'chooseGig')[0])
-    expect(after.phase).toBe('chooseGig') // the bonus die is still owed
-    after = applyAction(db, after, actionsOfType(db, after, 'chooseGig')[0])
+    // The bonus effect has one qualifying die; it finishes before the attack ends.
     expect(after.phase).toBe('main')
     expect(after.players[0].gigArea).toHaveLength(3) // the original + 2 stolen dice
   })

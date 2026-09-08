@@ -203,6 +203,7 @@ function clonePlayer(player: PlayerState): PlayerState {
 function clonePendingSteal(steal: PendingSteal | null): PendingSteal | null {
   if (steal === null) return null
   const copy: PendingSteal = { ...steal }
+  if (steal.selected) copy.selected = [...steal.selected]
   if (steal.queue !== undefined) copy.queue = steal.queue.map((queued) => ({ ...queued }))
   return copy
 }

@@ -400,7 +400,9 @@ export function attackAndSteal(
   let next = passReact(db, startAttack(db, state, attackerUid, target))
   for (const dieIndex of dieIndexes) {
     if (next.phase !== 'chooseGig') break
-    next = chooseGig(db, next, dieIndex)
+    // Existing scenarios specify ordinal choices among the dice still offered.
+    const choices = legalActions(db, next).filter(a => a.type === 'chooseGig')
+    next = chooseGig(db, next, choices[dieIndex]?.dieIndex ?? choices[0].dieIndex)
   }
   return next
 }

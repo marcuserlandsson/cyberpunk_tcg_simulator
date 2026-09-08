@@ -481,24 +481,18 @@ describe('EffectNode: gig manipulation', () => {
       def('thief', 'program', { effects: [onPlay({ kind: 'stealGig', count: 2 })] }),
     ])
     const s = scenario()
-    const src = mint(s, 0, 'trash', 'thief')
+    const src = mint(s, 0, 'hand', 'thief')
     gigs(s, 1, [3, 4, 5])
 
-    let next = fire(db, s, src)
-    expect(next.phase).toBe('chooseGig')
-    expect(next.pendingSteal).toEqual({
-      attacker: src,
-      remaining: 2,
-      thief: 0,
-      resumePhase: 'main',
-    })
+    let next = applyAction(db, s, { type: 'playCard', card: src, payment: [], targets: [] })
+    expect(next.pendingIntercept).toMatchObject({ kind: 'effectChoice', player: 0, options: [0, 1, 2] })
     expect(actingPlayer(next)).toBe(0)
     expect(next.players[0].gigArea).toEqual([]) // nothing moves until it is chosen
 
     // The controller picks each die, exactly like an attack steal.
-    expect(gigChoices(db, next)).toEqual([0, 1, 2])
-    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 2 }) // the 5
-    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 }) // the 3
+    expect(next.pendingIntercept?.options).toEqual([0, 1, 2])
+    next = applyAction(db, next, { type: 'answerIntercept', answer: 2 }) // the 5
+    next = applyAction(db, next, { type: 'answerIntercept', answer: 0 }) // the 3
     expect(next.phase).toBe('main')
     expect(next.pendingSteal).toBeNull()
     expect(next.players[0].gigArea.map((d) => d.value)).toEqual([5, 3])
@@ -1040,9 +1034,9 @@ describe('trigger: onAttack — game-ending and steal effects', () => {
     gigs(s, 1, [2, 6])
 
     let next = applyAction(db, s, { type: 'attack', attacker, target: victim })
-    expect(next.phase).toBe('chooseGig')
+    expect(next.phase).toBe('intercept')
     expect(actingPlayer(next)).toBe(0)
-    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 1 }) // take the 6
+    next = applyAction(db, next, { type: 'answerIntercept', answer: 1 }) // take the 6
     // The steal resolved; only now does the react window open.
     expect(next.phase).toBe('react')
     expect(next.pendingAttack).toEqual({ attacker, target: victim })
@@ -1088,12 +1082,10 @@ describe('trigger: onDefeat', () => {
     let next = applyAction(db, s, { type: 'attack', attacker, target: victim })
     next = applyAction(db, next, { type: 'react', reaction: pass })
     expect(next.players[1].trash).toContain(victim)
-    // The defeated unit's controller owes a die choice; the attack is over.
-    expect(next.phase).toBe('chooseGig')
+    // The sole valid die is stolen while resolving the defeated trigger.
+    expect(next.phase).toBe('main')
     expect(next.pendingAttack).toBeNull()
-    expect(actingPlayer(next)).toBe(1)
 
-    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
     expect(next.players[1].gigArea).toHaveLength(1)
     expect(next.players[0].gigArea).toEqual([])
     expect(next.phase).toBe('main')
@@ -1117,19 +1109,19 @@ describe('trigger: onDefeat', () => {
     next = applyAction(db, next, { type: 'react', reaction: pass })
     // A tie defeats both; each casualty owes its own controller a die choice,
     // resolved with the turn player's pending effects first (CR 10.13).
-    expect(next.players[0].trash).toContain(attacker)
-    expect(next.players[1].trash).toContain(victim)
-    expect(next.phase).toBe('chooseGig')
+    expect(next.phase).toBe('intercept')
     expect(actingPlayer(next)).toBe(0)
 
-    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 1 }) // p0 takes p1's 6
+    next = applyAction(db, next, { type: 'answerIntercept', answer: 1 }) // p0 takes p1's 6
     // The second steal is still owed, now to player 1.
-    expect(next.phase).toBe('chooseGig')
+    expect(next.phase).toBe('intercept')
     expect(actingPlayer(next)).toBe(1)
     // Player 0's area is now 1, 2 and the die they just took.
-    expect(gigChoices(db, next)).toEqual([0, 1, 2])
+    expect(next.pendingIntercept?.options).toEqual([0, 1, 2])
 
-    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 }) // p1 takes p0's 1
+    next = applyAction(db, next, { type: 'answerIntercept', answer: 0 }) // p1 takes p0's 1
+    expect(next.players[0].trash).toContain(attacker)
+    expect(next.players[1].trash).toContain(victim)
     expect(next.phase).toBe('main')
     expect(next.pendingSteal).toBeNull()
     expect(next.pendingAttack).toBeNull()
@@ -1508,11 +1500,11 @@ describe('quick', () => {
       type: 'react',
       reaction: { type: 'quick', card: quick, payment: [eddie], targets: [] },
     })
-    expect(next.phase).toBe('chooseGig')
+    expect(next.phase).toBe('intercept')
     expect(actingPlayer(next)).toBe(1) // the *defender* picks their own steal
-    expect(gigChoices(stealer, next)).toEqual([0, 1])
+    expect(next.pendingIntercept?.options).toEqual([0, 1])
 
-    next = applyAction(stealer, next, { type: 'chooseGig', dieIndex: 1 })
+    next = applyAction(stealer, next, { type: 'answerIntercept', answer: 1 })
     expect(next.players[1].gigArea.map((d) => d.value)).toEqual([5])
     expect(next.players[0].gigArea.map((d) => d.value)).toEqual([3])
     // Back into the react window, with the attack still pending.
@@ -3162,12 +3154,7 @@ describe('EffectNode: stealGig with distinctValueOnly (docs/rulings.md §68 ff.)
     expect(gigChoices(db, next)).toEqual([0, 1, 2])
 
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 }) // take the d20
-    expect(next.phase).toBe('chooseGig') // the watcher's bonus die is still owed
-    // Now filtered: friendly values are {2, 9}; the remaining d6=2 is excluded,
-    // leaving only the d8=5 (now at index 1, after the d20 left).
-    expect(gigChoices(db, next)).toEqual([1])
-
-    next = applyAction(db, next, { type: 'chooseGig', dieIndex: 1 })
+    expect(next.phase).toBe('main') // the only qualifying bonus die was taken
     expect(next.players[1].gigArea).toEqual([{ size: 6, value: 2 }])
     expect(next.players[0].gigArea).toHaveLength(3)
   })
@@ -3349,8 +3336,8 @@ describe('floatingEffects: rivalStealCappedByPower (chrome-fang, §141)', () => 
     s.players[1].gigArea = [{ size: 6, value: 6 }]
 
     const next = fire(db, s, src)
-    expect(next.phase).toBe('chooseGig')
-    expect(gigChoices(db, next)).toEqual([0])
+    expect(next.phase).toBe('main')
+    expect(next.players[0].gigArea).toHaveLength(1)
   })
 
   it('caps at the power the Unit is ATTACKING with, bonuses included (§145)', () => {
@@ -3405,7 +3392,8 @@ describe('floatingEffects: fight consequences (§141)', () => {
 
     let next = applyAction(db, s, { type: 'attack', attacker, target: defender })
     next = applyAction(db, next, { type: 'react', reaction: pass })
-    expect(next.phase).toBe('chooseGig')
+    expect(next.phase).toBe('main')
+    expect(next.players[0].gigArea).toHaveLength(1)
     expect(next.floatingEffects).toEqual([])
   })
 
@@ -3730,9 +3718,8 @@ describe('gig-roll seam: onGigRoll + gigRerollOption (kerry-eurodyne, §143)', (
       type: 'chooseGigDie',
       size: 4,
     })
-    expect(plain.phase).toBe('chooseGig')
-    expect(plain.pendingSteal).toMatchObject({ remaining: 1, thief: 0, resumePhase: 'main' })
-    plain = applyAction(stealer, plain, { type: 'chooseGig', dieIndex: 0 })
+    expect(plain.phase).toBe('intercept')
+    plain = applyAction(stealer, plain, { type: 'answerIntercept', answer: 0 })
     expect(plain.phase).toBe('main')
     expect(plain.pendingSteal).toBeNull()
 
@@ -3742,16 +3729,13 @@ describe('gig-roll seam: onGigRoll + gigRerollOption (kerry-eurodyne, §143)', (
       type: 'chooseGigDie',
       size: 4,
     })
-    expect(both.phase).toBe('chooseGig')
-    expect(both.pendingSteal).toMatchObject({ resumePhase: 'gigReroll' })
-    both = applyAction(stealer, both, { type: 'chooseGig', dieIndex: 0 })
+    expect(both.phase).toBe('intercept')
+    both = applyAction(stealer, both, { type: 'answerIntercept', answer: 0 })
     expect(both.phase).toBe('gigReroll')
 
     // And the reroll's own trigger firing gets the same treatment.
     both = applyAction(stealer, both, { type: 'chooseGigReroll', reroll: true })
-    expect(both.phase).toBe('chooseGig')
-    expect(both.pendingSteal).toMatchObject({ resumePhase: 'main' })
-    both = applyAction(stealer, both, { type: 'chooseGig', dieIndex: 0 })
+    // The reroll's remaining single die needs no further choice.
     expect(both.phase).toBe('main')
     expect(both.players[0].gigArea).toHaveLength(3) // the rolled die + 2 stolen
   })

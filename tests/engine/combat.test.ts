@@ -444,7 +444,7 @@ describe('gig-area attacks', () => {
       for (let taken = 0; taken < steals; taken++) {
         expect(next.phase).toBe('chooseGig')
         expect(actingPlayer(next)).toBe(0) // the attacker picks
-        next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
+        next = applyAction(db, next, { type: 'chooseGig', dieIndex: taken })
       }
       expect(next.phase).toBe('main')
       expect(next.pendingAttack).toBeNull()
@@ -483,7 +483,7 @@ describe('gig-area attacks', () => {
     expect(next.players[1].gigArea).toEqual([])
   })
 
-  it('lets the attacker choose which die to take, one at a time', () => {
+  it('selects the entire batch before moving any die', () => {
     const s = base()
     const attacker = putUnit(s, 0, 'animals-wrecker') // power 10 -> 2 steals
     s.players[1].gigArea = [
@@ -497,16 +497,17 @@ describe('gig-area attacks', () => {
 
     // Take the d8 first, then the d4 — order and identity must be respected.
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 2 })
-    expect(next.players[0].gigArea).toEqual([{ size: 8, value: 8 }])
+    expect(next.players[0].gigArea).toEqual([])
     expect(next.players[1].gigArea).toEqual([
       { size: 4, value: 1 },
       { size: 6, value: 5 },
+      { size: 8, value: 8 },
     ])
     // `taken` counts the dice that actually MOVED, so an episode whose steals
     // were all intercepted knows it stole nothing (docs/rulings.md §144).
-    expect(next.pendingSteal).toEqual({ attacker, remaining: 1, taken: 1 })
+    expect(next.pendingSteal).toEqual({ attacker, remaining: 1, selected: [2] })
     expect(gigOptions(next)).toEqual([0, 1])
-    expect(next.events.at(-1)).toEqual({ type: 'gigStolen', from: 1, die: { size: 8, value: 8 } })
+    expect(next.events.some(e => e.type === 'gigStolen')).toBe(false)
 
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
     expect(next.players[0].gigArea).toEqual([
@@ -581,7 +582,7 @@ describe('gig-area attacks', () => {
     let next = react(declare(s, attacker, 'gigArea'), passReaction)
     while (next.phase === 'chooseGig') {
       expect(totalDice(next)).toBe(12)
-      next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
+      next = applyAction(db, next, { type: 'chooseGig', dieIndex: gigOptions(next)[0] })
     }
     expect(totalDice(next)).toBe(12)
     expect(next.players[0].gigArea).toHaveLength(9)

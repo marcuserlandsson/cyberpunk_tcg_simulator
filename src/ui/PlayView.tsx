@@ -54,6 +54,7 @@ import {
   type BoardHandlers,
 } from './playAffordances'
 import type { GameRecord } from '../engine/replay'
+import { opponentOf } from '../engine/query'
 import type { DeckList } from '../engine/deck'
 import type { Action, CardDb, DieSize, GameEvent, GameState } from '../engine/types'
 
@@ -811,7 +812,14 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
         {state.phase === 'chooseGig' && legal.length > 0 && (
           <div className="prompt-bar" data-testid="choose-gig-bar">
             <span className="prompt-bar__label">
-              Choose a rival Gig to steal (the glowing dice above).
+              Choose {state.pendingSteal?.remaining ?? 1} more rival Gig{(state.pendingSteal?.remaining ?? 1) === 1 ? '' : 's'} to steal using the glowing dice above. Selected Gigs move together after all choices.
+              {(state.pendingSteal?.selected?.length ?? 0) > 0 && (
+                <span data-testid="steal-selection"> Selected: {state.pendingSteal!.selected!.map(index => {
+                  const victim = opponentOf(state.pendingSteal!.thief ?? state.activePlayer)
+                  const die = state.players[victim].gigArea[index]
+                  return `d${die.size}: ${die.value}`
+                }).join(', ')}.</span>
+              )}
             </span>
           </div>
         )}

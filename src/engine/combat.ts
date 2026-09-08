@@ -40,6 +40,7 @@ import { canonicalPayment, legendCallPayment } from './economy'
 import { askIntercept, DECLINE } from './intercept'
 import { shuffle } from './rng'
 import { flushPendingEffects } from './resolution'
+import { transferStolenGigs } from './stealing'
 import {
   attackableReadyKeyword,
   ATTACK_READY,
@@ -57,7 +58,6 @@ import {
   hasKeyword,
   opponentOf,
   rivalDeniesFreshAttacks,
-  stealInterceptorFor,
   stealValueCap,
   winsFightRegardless,
 } from './query'
@@ -283,7 +283,7 @@ export function stealableDieIndexes(
   if (distinctValueOnly) {
     const friendlyValues = new Set(state.players[thief].gigArea.map((die) => die.value))
     const qualifying = indexes.filter((dieIndex) => !friendlyValues.has(dice[dieIndex].value))
-    if (qualifying.length > 0) return qualifying
+    return qualifying
   }
   return indexes
 }
@@ -294,6 +294,7 @@ function pendingStealableIndexes(db: CardDb, state: GameState): number[] {
   if (steal === null) return []
   const thief = steal.thief ?? state.activePlayer
   return stealableDieIndexes(db, state, thief, steal.attacker, steal.distinctValueOnly === true)
+    .filter(index => !(steal.selected ?? []).includes(index))
 }
 
 /**
@@ -878,100 +879,12 @@ export function resolveAttack(draft: GameState, db: CardDb): void {
  */
 export function takeStolenGig(draft: GameState, db: CardDb, dieIndex: number): void {
   const steal = draft.pendingSteal
-  // Unreachable: `legalActions` only offers `chooseGig` with a pending steal.
-  if (steal === null) return
-
-  // The thief is the attacking active player, except for an effect-driven steal,
-  // which names its own controller (docs/rulings.md §32).
-  const thief = steal.thief ?? draft.activePlayer
-  const victim = opponentOf(thief)
-  const chosen = draft.players[victim].gigArea[dieIndex]
-  // Unreachable: `legalActions` only offers indexes the victim's area holds.
-  if (chosen === undefined) return
-
-  // [interception seam] "When a rival Unit would steal a Gig, you may discard 1
-  // with cost equal to that Gig's value. If you do, the Gig isn't stolen."
-  // (alt-cunningham-mother-of-daemons, docs/rulings.md §72/§144) — asked
-  // BEFORE the die moves, and the die then stays where it is.
-  let prevented = false
-  const intercept = stealInterceptorFor(db, draft, victim, steal.attacker, chosen.value)
-  if (intercept !== null) {
-    const answer = askIntercept(draft, {
-      kind: 'steal',
-      player: victim,
-      protector: intercept.protector,
-      subject: dieIndex,
-      options: [DECLINE, ...intercept.candidates],
-    })
-    if (answer !== DECLINE && intercept.candidates.includes(answer)) {
-      const p = draft.players[victim]
-      p.hand = p.hand.filter((uid) => uid !== answer)
-      p.trash.push(answer)
-      draft.events.push({ type: 'cardTrashed', uid: answer })
-      draft.events.push({
-        type: 'effectResolved',
-        sourceUid: intercept.protector,
-        description: `prevents the steal of d${chosen.size}:${chosen.value}`,
-      })
-      prevented = true
-    }
-  }
-
-  if (!prevented) {
-    const [die] = draft.players[victim].gigArea.splice(dieIndex, 1)
-    draft.players[thief].gigArea.push(die)
-    draft.events.push({ type: 'gigStolen', from: victim, die: { ...die } })
-    steal.taken = (steal.taken ?? 0) + 1
-
-    // "if this Unit stole a Gig this turn" (delamain-cab, docs/rulings.md §120
-    // ff.) — set on the card that actually did the stealing, attack- or
-    // effect-driven alike; cleared alongside `tempPower` in `clearTurnBuffs`.
-    if (draft.cards[steal.attacker]) draft.cards[steal.attacker].stoleGigThisTurn = true
-
-    // "If that Unit steals or fights, defeat it at the end of this turn."
-    // (cyberpsychosis, docs/rulings.md §141) — *stealing* is the other
-    // qualifying act (the fight one is marked inside `fight`).
-    for (const entry of draft.floatingEffects) {
-      if (entry.kind === 'defeatIfActed' && entry.unitUid === steal.attacker) entry.acted = true
-    }
-
-    // [trigger seam] "When a friendly Unit steals a d6, ..." — a watcher trigger,
-    // fired on every in-play card of the thief (docs/rulings.md §42), ONCE PER
-    // DIE. `stealerUid` answers "When THIS Unit steals a Gig" (docs/rulings.md
-    // §55 ff.). `stolenDieValue`/`stealerIsLegend` answer "if its value is
-    // even/odd" and "a friendly LEGEND steals" (rogue-amendiares-preem-solo,
-    // docs/rulings.md §81 ff.).
-    fireWatcherTrigger(db, draft, 'onFriendlyStealDie', thief, {
-      stolenDieSize: die.size,
-      stolenDieValue: die.value,
-      stealerUid: steal.attacker,
-      stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
-    })
-  }
-
+  if (!steal || (steal.selected ?? []).includes(dieIndex)) return
+  steal.selected = [...(steal.selected ?? []), dieIndex]
   steal.remaining -= 1
-  // The episode continues only while there is still something this steal may
-  // legally take — the victim's area running dry, or a `rivalStealCappedByPower`
-  // restriction putting every remaining die out of reach (docs/rulings.md
-  // §141), both end it here rather than leaving `chooseGig` with no choice.
   if (steal.remaining > 0 && pendingStealableIndexes(db, draft).length > 0) return
-
-  // [trigger seam] "When a friendly Unit steals 1 or more Gigs, ..." — a
-  // watcher trigger fired ONCE, when the whole steal EPISODE this
-  // `takeStolenGig` call is resolving finishes (however many dice it took),
-  // unlike `onFriendlyStealDie` above (docs/rulings.md §133 — batch 7 fix
-  // round 1, evelyn-parker-beautiful-enigma). `stealerTags` answers "a
-  // CORPO or GANGER Unit steals." An episode whose every die was intercepted
-  // (docs/rulings.md §144) stole nothing, so "1 or more Gigs" is false and it
-  // does not fire at all.
-  if ((steal.taken ?? 0) > 0) {
-    fireWatcherTrigger(db, draft, 'onFriendlyStealComplete', thief, {
-      stealerUid: steal.attacker,
-      stealerIsLegend: db[draft.cards[steal.attacker].defId]?.type === 'legend',
-      stealerTags: db[draft.cards[steal.attacker].defId] ? cardTags(db[draft.cards[steal.attacker].defId]) : [],
-    })
-  }
-
+  steal.taken = transferStolenGigs(db, draft, steal.attacker, steal.thief ?? draft.activePlayer, steal.selected)
+  flushPendingEffects(db, draft)
   finishSteal(draft, steal)
 }
 
