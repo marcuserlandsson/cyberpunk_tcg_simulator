@@ -46,6 +46,7 @@ import {
 import { nextInt, rollDie } from '../engine/rng'
 import { stopAtHiddenInformation } from '../engine/preview'
 import { PRIVATE_INFORMATION_SCRIPTS } from './scripted/index'
+import { chooseEffectOption } from '../engine/choices'
 import { scriptedCards } from './scripted/index'
 import {
   filterTargets,
@@ -65,6 +66,7 @@ import type {
   FloatingEffect,
   FloatingSpec,
   GameState,
+  GigDieSpec,
   PlayerId,
   PlayerState,
   TargetFilter,
@@ -439,8 +441,8 @@ interface Slots {
 
 /**
  * Reserve slot positions up front, but bind each slot when its instruction is
- * reached. Unsupplied slots retain the legacy seeded fallback until the
- * explicit-choice migration (rules audit R11).
+ * reached. Gameplay asks the appropriate controller for unsupplied targets,
+ * modes and amounts; unchosen branches never consume choices.
  */
 function bindSlots(
   db: CardDb,
@@ -457,12 +459,29 @@ function bindSlots(
     // Resolve later clauses against the board when those instructions are reached.
     // This also lets a "trash, then retrieve" effect see the cards it just trashed.
     assigned.push(() => {
-      const candidates = candidatesFor(db, draft, slot.slot, sourceUid, controller)
+      const rivalChooses = slot.slot.kind === 'mode' && slot.slot.chooser !== 'controller'
+        && behindOnStreetCred(draft, controller)
+      const candidates = rivalChooses && slot.slot.kind === 'mode'
+        ? Array.from({ length: slot.slot.count }, (_, index) => index)
+        : candidatesFor(db, draft, slot.slot, sourceUid, controller)
       if (offered !== undefined) return candidates.includes(offered) ? offered : null
       if (candidates.length === 0) return null
-      const [index, rng] = nextInt(draft.rng, candidates.length)
-      draft.rng = rng
-      return candidates[index]
+      const name = db[draft.cards[sourceUid].defId].name
+      const labels = Object.fromEntries(candidates.map(value => {
+        if (slot.slot.kind === 'mode') return [value, `Effect ${value + 1}`]
+        if (slot.slot.kind === 'amount') return [value, String(slot.slot.options[value])]
+        if (isGigDieSpec(slot.slot.spec)) {
+          const die = gigDieAt(draft, slot.slot.spec as GigDieSpec, value, controller)
+          const owner = gigDieOwner(draft, slot.slot.spec as GigDieSpec, value, controller)
+          return [value, `${owner === controller ? 'Friendly' : 'Rival'} d${die?.size}: ${die?.value}`]
+        }
+        return [value, `${db[draft.cards[value].defId].name} #${value}`]
+      }))
+      const prompt = slot.slot.kind === 'mode'
+        ? `${name}: choose an effect. ${db[draft.cards[sourceUid].defId].text}`
+        : `${name}: choose ${slot.slot.kind === 'amount' ? 'an amount' : 'a target'}`
+      return chooseEffectOption(draft, rivalChooses ? opponentOf(controller) : controller, sourceUid, prompt, candidates, labels,
+        slot.slot.kind === 'target' && !isGigDieSpec(slot.slot.spec))
     })
   }
   return { assigned, next: 0 }
@@ -589,8 +608,11 @@ function applyNode(
       // consumed whether or not the die slot was filled, or the nodes after
       // this one would read the wrong slots (docs/rulings.md §39).
       const options = node.adjust === true ? adjustOptions(node.amount) : null
+      if (index === null) {
+        if (options !== null) slots.next += 1
+        return
+      }
       const pick = options === null ? null : takeSlot(slots)
-      if (index === null) return
       const die = gigDieAt(draft, node.target, index, ctx.player)
       if (die === null) return
       const amount =
@@ -745,7 +767,7 @@ function applyNode(
         return
       }
 
-      applyMode(chosen ?? randomIndex(draft, node.modes.length))
+      if (chosen !== null) applyMode(chosen)
       slots.next = end
       return
     }

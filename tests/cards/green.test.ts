@@ -1,3 +1,4 @@
+import { resolveEffectChoices } from './fixtures'
 // Task 8 — Green cards, batches 5-6.
 //
 // Batch 5: the first 17 Green cards assigned to this file (see the header
@@ -549,10 +550,10 @@ describe('padre-man-of-the-cross', () => {
     const rival = fieldCard(state, 1, 'riding-nomad')
     const handBefore = state.players[0].hand.length
 
-    const next = applyAction(db, state, {
+    const next = resolveEffectChoices(db, applyAction(db, state, {
       type: 'callLegend',
       payment: [state.players[0].eddies[0]],
-    })
+    }))
     expect(next.cards[padre].faceUp).toBe(true)
     const spent = !next.cards[rival].ready
     const drew = next.players[0].hand.length === handBefore + 1

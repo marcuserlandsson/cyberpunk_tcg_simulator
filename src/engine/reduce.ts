@@ -501,7 +501,7 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
     resumed.phase = pending.resumePhase
     resumed.pendingIntercept = null
     resumed.interceptAnswers = []
-    return runAction(db, resumed, pending.action, [...pending.answers, action.answer])
+    return runAction(db, resumed, pending.action, [...pending.answers, action.answer], pending.knownCards)
   }
 
   return runAction(db, state, action, [])
@@ -522,7 +522,8 @@ function runAction(
   db: CardDb,
   state: GameState,
   action: Action,
-  answers: number[]
+  answers: number[],
+  knownCards: NonNullable<GameState['pendingIntercept']>['knownCards'] = [],
 ): GameState {
   const draft = draftState(state)
   draft.interceptAnswers = [...answers]
@@ -539,6 +540,7 @@ function runAction(
       const paused = draftState(state)
       paused.pendingIntercept = {
         ...error.ask,
+        knownCards: [...knownCards, ...(error.ask.knownCards ?? [])],
         action,
         answers: [...answers],
         resumePhase: state.phase,

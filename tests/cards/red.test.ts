@@ -1,3 +1,4 @@
+import { resolveEffectChoices } from './fixtures'
 // Task 8 — Red cards, batch 1: the 19 Red cards assigned to this batch (the
 // pool holds 37 Red cards in all; the rest belong to later batches).
 //
@@ -401,10 +402,10 @@ describe('dexter-deshawn-off-the-grid', () => {
     const unit = fieldCard(state, 0, 'japantown-jonin')
     const handBefore = state.players[0].hand.length
 
-    const next = applyAction(db, state, {
+    const next = resolveEffectChoices(db, applyAction(db, state, {
       type: 'callLegend',
       payment: [state.players[0].eddies[0]],
-    })
+    }))
     expect(next.cards[dexter].faceUp).toBe(true)
     const buffed = next.cards[unit].tempPower === 2
     const drew = next.players[0].hand.length === handBefore + 1
@@ -538,7 +539,9 @@ describe('gunpoint-diplomacy', () => {
     const plays = actionsOfType(db, state, 'playCard').filter((a) => a.card === card)
     expect(plays.map((a) => a.targets)).toEqual([[mine]]) // still only the Unit
 
-    const next = applyAction(db, state, plays[0])
+    const pending = applyAction(db, state, plays[0])
+    expect(pending.pendingIntercept?.player).toBe(1)
+    const next = applyAction(db, pending, { type: 'answerIntercept', answer: 0 })
     const granted = next.cards[mine].tempKeywords.includes('attack-ready')
     const buffed = next.cards[mine].tempPower === 3
     expect(granted !== buffed).toBe(true) // exactly one effect, the rival's pick
@@ -1128,10 +1131,10 @@ describe('v-streetkid', () => {
     const rest = state.players[0].deck.filter((uid) => ![bd, f1, f2].includes(uid))
     state.players[0].deck = [bd, f1, f2, ...rest]
 
-    const next = applyAction(db, state, {
+    const next = resolveEffectChoices(db, applyAction(db, state, {
       type: 'callLegend',
       payment: [state.players[0].eddies[0]],
-    })
+    }))
     expect(next.cards[v].faceUp).toBe(true)
     expect(next.players[0].hand).toContain(bd)
     expect(next.players[0].trash).toContain(f1)

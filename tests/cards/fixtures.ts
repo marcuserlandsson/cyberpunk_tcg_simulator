@@ -37,15 +37,16 @@ import mercsDeck from '../../data/decks/mercs-the-heist.json'
 
 export const db: CardDb = loadCardDb()
 
-/** Legacy card scenarios use printed order unless the test is specifically about ordering. */
-export function resolvePendingOrder(db: CardDb, initial: GameState): GameState {
+/** Existing card scenarios choose the first legal effect option; choice tests use applyAction directly. */
+export function resolveEffectChoices(db: CardDb, initial: GameState): GameState {
   let state = initial
-  for (let count = 0; state.pendingIntercept?.kind === 'effectOrder'; count++) {
+  for (let count = 0; state.pendingIntercept?.kind === 'effectOrder' || state.pendingIntercept?.kind === 'effectChoice'; count++) {
     if (count > 100) throw new Error('Pending effects did not settle')
     state = applyAction(db, state, { type: 'answerIntercept', answer: state.pendingIntercept.options[0] })
   }
   return state
 }
+export const resolvePendingOrder = resolveEffectChoices
 
 const decks: [DeckList, DeckList] = [
   arasakaDeck as unknown as DeckList,
@@ -76,7 +77,7 @@ function applyOfType(db: CardDb, state: GameState, type: Action['type']): GameSt
       `No legal "${type}" action in phase "${state.phase}" (legal: ${JSON.stringify(actions)}).`
     )
   }
-  return applyAction(db, state, action)
+  return resolveEffectChoices(db, applyAction(db, state, action))
 }
 
 /**
@@ -267,7 +268,7 @@ export function playCardByDef(
         )
     )
   }
-  return applyAction(db, state, action)
+  return resolveEffectChoices(db, applyAction(db, state, action))
 }
 
 /** Activates the `abilityIndex`th EffectDef of a card in play. */
@@ -293,7 +294,7 @@ export function activate(
         JSON.stringify(legalActions(db, state).filter((a) => a.type === 'activateAbility'))
     )
   }
-  return applyAction(db, state, action)
+  return resolveEffectChoices(db, applyAction(db, state, action))
 }
 
 /**
@@ -352,7 +353,7 @@ export function quickPlay(
         JSON.stringify(actionsOfType(db, state, 'react'))
     )
   }
-  return applyAction(db, state, action)
+  return resolveEffectChoices(db, applyAction(db, state, action))
 }
 
 /**
@@ -360,7 +361,7 @@ export function quickPlay(
  * (docs/rulings.md §144): `-1` declines, anything else accepts.
  */
 export function answerIntercept(db: CardDb, state: GameState, answer: number): GameState {
-  return applyAction(db, state, { type: 'answerIntercept', answer })
+  return resolveEffectChoices(db, applyAction(db, state, { type: 'answerIntercept', answer }))
 }
 
 /** Declares an attack; the react window is left open for the defender. */
@@ -370,22 +371,22 @@ export function startAttack(
   attackerUid: number,
   target: number | 'gigArea'
 ): GameState {
-  return applyAction(db, state, { type: 'attack', attacker: attackerUid, target })
+  return resolveEffectChoices(db, applyAction(db, state, { type: 'attack', attacker: attackerUid, target }))
 }
 
 /** The defender passes, resolving the attack (fight, or the Gig-steal window). */
 export function passReact(db: CardDb, state: GameState): GameState {
-  return applyAction(db, state, { type: 'react', reaction: { type: 'pass' } })
+  return resolveEffectChoices(db, applyAction(db, state, { type: 'react', reaction: { type: 'pass' } }))
 }
 
 /** The defender redirects with `blockerUid`; reactions remain open until pass. */
 export function blockWith(db: CardDb, state: GameState, blockerUid: number): GameState {
-  return applyAction(db, state, { type: 'react', reaction: { type: 'block', blocker: blockerUid } })
+  return resolveEffectChoices(db, applyAction(db, state, { type: 'react', reaction: { type: 'block', blocker: blockerUid } }))
 }
 
 /** Takes the Gig die at `dieIndex` of a pending steal. */
 export function chooseGig(db: CardDb, state: GameState, dieIndex: number): GameState {
-  return applyAction(db, state, { type: 'chooseGig', dieIndex })
+  return resolveEffectChoices(db, applyAction(db, state, { type: 'chooseGig', dieIndex }))
 }
 
 /** An un-blocked attack driven all the way through: declare, pass, take dice. */

@@ -272,20 +272,23 @@ function shuffleHiddenInfo(state: GameState, perspective: PlayerId, seed: number
   const next = draftState(state)
   const rival = opponentOf(perspective)
   let rng = createRng(seed)
+  // A paused choice may already have drawn/revealed cards, even though the
+  // reducer keeps the pre-action state for deterministic replay. Those known
+  // cards are no longer valid candidates for a hidden-information permutation.
+  const known = new Set((state.pendingIntercept?.knownCards ?? [])
+    .filter(card => card.viewer === 'all' || card.viewer === perspective).map(card => card.uid))
+  const shuffleUnknown = (uids: number[]): number[] => {
+    const [unknown, after] = shuffle(rng, uids.filter(uid => !known.has(uid)))
+    rng = after
+    let index = 0
+    return uids.map(uid => known.has(uid) ? uid : unknown[index++])
+  }
 
-  const [hand, afterHand] = shuffle(rng, next.players[rival].hand)
-  next.players[rival].hand = hand
-  rng = afterHand
+  next.players[rival].hand = shuffleUnknown(next.players[rival].hand)
+  next.players[rival].deck = shuffleUnknown(next.players[rival].deck)
+  next.players[perspective].deck = shuffleUnknown(next.players[perspective].deck)
 
-  const [rivalDeck, afterRivalDeck] = shuffle(rng, next.players[rival].deck)
-  next.players[rival].deck = rivalDeck
-  rng = afterRivalDeck
-
-  const [ownDeck, afterOwnDeck] = shuffle(rng, next.players[perspective].deck)
-  next.players[perspective].deck = ownDeck
-  rng = afterOwnDeck
-
-  const faceDown = next.players[rival].legends.filter((uid) => !next.cards[uid].faceUp)
+  const faceDown = next.players[rival].legends.filter((uid) => !next.cards[uid].faceUp && !known.has(uid))
   const [permuted] = shuffle(rng, faceDown.map((uid) => next.cards[uid].defId))
   faceDown.forEach((uid, index) => {
     next.cards[uid] = { ...next.cards[uid], defId: permuted[index] }

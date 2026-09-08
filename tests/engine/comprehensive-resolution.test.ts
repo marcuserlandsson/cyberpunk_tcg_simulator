@@ -20,6 +20,21 @@ function mintInto(...args: Parameters<typeof mintKnown>): number {
 }
 
 describe('comprehensive rules: pending resolution', () => {
+  it('offers a later target choice from cards revealed by the preceding instruction', () => {
+    const cards = { ...db, ...rulesDb({ program: [{ trigger: 'onPlay', effect: { kind: 'sequence', effects: [
+      { kind: 'trashFromDeck', whose: 'friendly', count: 2 },
+      { kind: 'retrieveFromTrash', target: 'friendlyTrashCard' },
+    ] } }] }) }
+    cards.program = { ...cards.program, type: 'program', power: null }
+    const state = startedGame(0)
+    const program = mintInto(state, 0, 'hand', 'program')
+    const [first, second] = state.players[0].deck
+    const pending = applyAction(cards, state, { type: 'playCard', card: program, payment: [], targets: [] })
+    expect(pending.pendingIntercept).toMatchObject({ kind: 'effectChoice', player: 0, options: [first, second] })
+    const next = applyAction(cards, pending, { type: 'answerIntercept', answer: second })
+    expect(next.players[0].hand).toContain(second)
+    expect(next.players[0].trash).toEqual([first, program])
+  })
   it('cannot retrieve a resolving Program from the trash', () => {
     const cards = { ...db, ...rulesDb({ program: [
       { trigger: 'onPlay', effect: { kind: 'retrieveFromTrash', target: 'friendlyTrashCard' } },

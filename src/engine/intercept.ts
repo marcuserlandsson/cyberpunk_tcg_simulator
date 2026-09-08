@@ -32,7 +32,7 @@ import type { GameState, PendingIntercept } from './types'
 /** The question an interception point asks, minus the replay bookkeeping. */
 export type InterceptAsk = Pick<
   PendingIntercept,
-  'kind' | 'player' | 'protector' | 'subject' | 'options' | 'prompt' | 'optionLabels'
+  'kind' | 'player' | 'protector' | 'subject' | 'options' | 'prompt' | 'optionLabels' | 'knownCards'
 >
 
 /**

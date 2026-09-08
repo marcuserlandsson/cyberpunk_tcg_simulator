@@ -1,3 +1,4 @@
+import { resolveEffectChoices } from './fixtures'
 // Task 8 — Yellow cards, batch 3: the first 19 Yellow cards assigned to this
 // batch.
 //
@@ -880,10 +881,10 @@ describe('muamar-reyes-el-capita-n', () => {
     const unit = fieldCard(state, 0, 'japantown-jonin')
     const handBefore = state.players[0].hand.length
 
-    const next = applyAction(db, state, {
+    const next = resolveEffectChoices(db, applyAction(db, state, {
       type: 'callLegend',
       payment: [state.players[0].eddies[0]],
-    })
+    }))
     expect(next.cards[muamar].faceUp).toBe(true)
     const granted = next.cards[unit].tempKeywords.includes('fight-immune')
     const drew = next.players[0].hand.length === handBefore + 1
@@ -1285,10 +1286,10 @@ describe('viktor-vektor-sit-down-and-relax', () => {
     const five = [gearA, gearB, expensiveGear, nonGear, filler]
     state.players[0].deck = [...five, ...state.players[0].deck.filter((u) => !five.includes(u))]
 
-    const next = applyAction(db, state, {
+    const next = resolveEffectChoices(db, applyAction(db, state, {
       type: 'callLegend',
       payment: [state.players[0].eddies[0]],
-    })
+    }))
     expect(next.players[0].hand).toEqual(expect.arrayContaining([gearA, gearB]))
     expect(next.players[0].hand).not.toContain(expensiveGear)
     expect(next.players[0].hand).not.toContain(nonGear)

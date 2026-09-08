@@ -1,3 +1,4 @@
+import { resolveEffectChoices } from './fixtures'
 // Task 8 — Blue cards, batches 7 and 8 (the full Blue color, 33 cards).
 //
 // Batch 7 cards covered, in card-id order:
@@ -73,7 +74,7 @@ import {
  * the ordinary "ready every spent card" step every turn start does anyway.
  */
 function endOneTurn(db: CardDb, state: GameState): GameState {
-  let next = applyAction(db, state, { type: 'endTurn' })
+  let next = resolveEffectChoices(db, applyAction(db, state, { type: 'endTurn' }))
   if (next.phase === 'start') {
     const die = legalActions(db, next).find((action) => action.type === 'chooseGigDie')
     if (die) next = applyAction(db, next, die)
@@ -526,7 +527,10 @@ describe('jackie-welles-pour-one-out-for-me', () => {
     ])
     const deckBefore = state.players[0].deck.length
 
-    const s = playCardByDef(db, state, 0, 'jacked-in-voodoo-boy')
+    const action = actionsOfType(db, state, 'playCard').find(a => db[state.cards[a.card].defId].id === 'jacked-in-voodoo-boy')!
+    const pending = applyAction(db, state, action)
+    expect(pending.pendingIntercept?.kind).toBe('effectChoice')
+    const s = applyAction(db, pending, { type: 'answerIntercept', answer: 1 })
 
     expect(gigValues(s, 0)).toEqual([1, 3])
     expect(s.players[0].deck.length).toBe(deckBefore) // no draw
@@ -1015,6 +1019,8 @@ describe('placide-voodoo-sentinel', () => {
     const placide = findFielded(s, 0, 'placide-voodoo-sentinel')
     const rival = fieldCard(s, 1, 'animals-wrecker')
     setGigs(s, 1, [{ size: 6, value: 3 }])
+    s.players[0].trash.push(...s.players[0].hand)
+    s.players[0].hand = []
 
     // No Program is in hand, so — whichever mode the rng-picked {Attack}
     // trigger resolves (docs/rulings.md §134 ff.: an onAttack effect fires
@@ -1337,10 +1343,10 @@ describe('wakako-okada-peace-and-harmony', () => {
     const rival = fieldCard(state, 1, 'animals-wrecker')
     const deckBefore = state.players[0].deck.length
 
-    const s = applyAction(db, state, {
+    const s = resolveEffectChoices(db, applyAction(db, state, {
       type: 'callLegend',
       payment: [state.players[0].eddies[0]],
-    })
+    }))
 
     expect(s.cards[wakako].faceUp).toBe(true)
     const debuffed = effectivePower(db, s, rival) === 8

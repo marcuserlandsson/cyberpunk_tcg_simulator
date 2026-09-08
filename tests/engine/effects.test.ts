@@ -1158,8 +1158,8 @@ describe('trigger: onDefeat', () => {
   })
 })
 
-describe('auto-targeting (docs/rulings.md §32)', () => {
-  it('picks uniformly through state.rng, so the same state always resolves the same way', () => {
+describe('resolution-time target choice (CR 10.31)', () => {
+  it('asks the controller and deterministically applies their selected target without RNG', () => {
     const db = makeDb([
       def('sniper', 'unit', {
         power: 3,
@@ -1175,11 +1175,13 @@ describe('auto-targeting (docs/rulings.md §32)', () => {
 
     const first = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
     const again = applyAction(db, s, { type: 'attack', attacker, target: 'gigArea' })
-    expect(again.players[1].trash).toEqual(first.players[1].trash)
-    expect(first.players[1].trash).toHaveLength(1)
-    expect([a, b]).toContain(first.players[1].trash[0])
-    // The pick came off the rng, so the rng advanced.
-    expect(first.rng).not.toEqual(s.rng)
+    expect(again).toEqual(first)
+    expect(first.pendingIntercept).toMatchObject({ kind: 'effectChoice', player: 0, options: [a, b] })
+    const chosen = applyAction(db, first, { type: 'answerIntercept', answer: b })
+    expect(chosen.players[1].trash).toEqual([b])
+    expect(chosen.players[1].field).toContain(a)
+    expect(chosen.rng).toEqual(s.rng)
+    expect(applyAction(db, first, { type: 'answerIntercept', answer: b })).toEqual(chosen)
   })
 })
 
@@ -2039,7 +2041,7 @@ describe('EffectNode: chooseOne (docs/rulings.md §45)', () => {
     expect(drawn.players[0].hand).toHaveLength(1)
   })
 
-  it('offers no mode choice while the rival chooses, and still resolves one', () => {
+  it('offers the resolution-time mode choice to the rival', () => {
     const s = scenario()
     const card = mint(s, 0, 'hand', 'forced')
     const unit = mint(s, 0, 'field', 'grunt')
@@ -2049,11 +2051,13 @@ describe('EffectNode: chooseOne (docs/rulings.md §45)', () => {
     const actions = playActions(db, s).filter((a) => a.card === card)
     expect(actions.map((a) => a.targets)).toEqual([[unit]]) // no mode entry
 
-    const next = applyAction(db, s, actions[0])
+    const pending = applyAction(db, s, actions[0])
+    expect(pending.pendingIntercept).toMatchObject({ kind: 'effectChoice', player: 1, options: [0, 1] })
+    const next = applyAction(db, pending, { type: 'answerIntercept', answer: 1 })
     const buffed = next.cards[unit].tempPower === 2
     const drew = next.players[0].hand.length === 1
     expect(buffed !== drew).toBe(true) // exactly one mode resolved
-    expect(next.rng).not.toEqual(s.rng) // ... chosen off the seeded rng
+    expect(next.rng).toEqual(s.rng)
   })
 
   it('lets the controller choose while they are not behind on street cred', () => {
@@ -2519,6 +2523,8 @@ describe('watcher trigger: onFriendlyStealDie (docs/rulings.md §42)', () => {
     next = applyAction(db, next, { type: 'react', reaction: pass })
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
     // The d12 the watcher increased, plus the stolen d6.
+    expect(next.pendingIntercept?.kind).toBe('effectChoice')
+    next = applyAction(db, next, { type: 'answerIntercept', answer: 0 })
     expect(next.players[0].gigArea.map((d) => 'd' + d.size + '=' + d.value).sort()).toEqual([
       'd12=7',
       'd6=2',
@@ -2919,7 +2925,9 @@ describe("chooseOne chooser 'allUnlessBehindStreetCred' (docs/rulings.md §45)",
     const actions = playActions(db, s).filter((a) => a.card === card)
     expect(actions.map((a) => a.targets)).toEqual([[unit]])
 
-    const next = applyAction(db, s, actions[0])
+    const pending = applyAction(db, s, actions[0])
+    expect(pending.pendingIntercept?.player).toBe(1)
+    const next = applyAction(db, pending, { type: 'answerIntercept', answer: 1 })
     const buffed = next.cards[unit].tempPower === 3
     const blocker = next.cards[unit].tempKeywords.includes('blocker')
     expect(buffed !== blocker).toBe(true)

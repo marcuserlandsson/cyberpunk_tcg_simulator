@@ -854,6 +854,8 @@ export interface PendingIntercept {
   kind: 'defeat' | 'steal' | 'effectOrder' | 'effectChoice'
   prompt?: string
   optionLabels?: Record<number, string>
+  /** Identities disclosed while resolving the replayed action, scoped to the entitled viewer. */
+  knownCards?: { uid: number; viewer: PlayerId | 'all' }[]
   /** Who answers — the controller of the intercepting card. */
   player: PlayerId
   /** The in-play card whose printed text offers the interception. */
