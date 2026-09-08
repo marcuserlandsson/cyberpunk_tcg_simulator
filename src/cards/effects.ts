@@ -1096,7 +1096,7 @@ function payTriggerCost(
   if (def.cost?.selfSpend) spendOnDraft(db, draft, [host])
   const eddies = abilityEddieCost(db, draft, player, def)
   if (eddies > 0) {
-    const payment = canonicalPayment(draft, player, eddies, def.cost?.selfSpend ? host : undefined)
+    const payment = canonicalPayment(db, draft, player, eddies, def.cost?.selfSpend ? host : undefined)
     if (payment === null) return false
     spendOnDraft(db, draft, payment)
   }
@@ -1498,7 +1498,7 @@ function canPayAbility(
   const eddies = abilityEddieCost(db, state, player, def)
   if (eddies <= 0) return true
   const exclude = def.cost?.selfSpend ? host : undefined
-  return canonicalPayment(state, player, eddies, exclude) !== null
+  return canonicalPayment(db, state, player, eddies, exclude) !== null
 }
 
 /**
@@ -1557,7 +1557,7 @@ export function quickReactionActions(db: CardDb, state: GameState, defender: Pla
   for (const uid of state.players[defender].hand) {
     const def = defOf(db, state, uid)
     if (!def || !isQuickPlayable(def)) continue
-    const payment = canonicalPayment(state, defender, effectiveCardCost(db, state, defender, uid))
+    const payment = canonicalPayment(db, state, defender, effectiveCardCost(db, state, defender, uid))
     if (payment === null) continue
     for (const targets of triggerTargetChoices(db, state, uid, 'onPlay')) {
       actions.push({ type: 'react', reaction: { type: 'quick', card: uid, payment, targets } })
@@ -1607,7 +1607,7 @@ export function goSoloPayment(
   // plus a RIVAL's "Rivals must pay +N €$ to use {Go Solo}" tax if active
   // (riot-shield, docs/rulings.md §107 ff.).
   const cost = effectiveCardCost(db, state, player, uid) + rivalGoSoloTax(db, state, player)
-  return canonicalPayment(state, player, cost, uid)
+  return canonicalPayment(db, state, player, cost, uid)
 }
 
 /**
@@ -1811,7 +1811,7 @@ export function activateAbilityOnDraft(
   const host = abilityHost(draft, cardUid)
   const eddies = abilityEddieCost(db, draft, player, effect)
   const payment = eddies > 0
-    ? canonicalPayment(draft, player, eddies, effect.cost?.selfSpend ? host : undefined)
+    ? canonicalPayment(db, draft, player, eddies, effect.cost?.selfSpend ? host : undefined)
     : []
 
   draft.events.push({ type: 'abilityActivated', player, uid: cardUid, abilityIndex })

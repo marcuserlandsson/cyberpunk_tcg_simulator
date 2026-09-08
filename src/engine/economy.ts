@@ -28,9 +28,10 @@ export function legendCallCost(db: CardDb, state: GameState, player: PlayerId): 
 }
 
 /** The payer's own ready eddies + legends — every uid worth 1 €$ right now. */
-function readyPaymentUids(state: GameState, player: PlayerId): number[] {
+export function readyPaymentUids(db: CardDb, state: GameState, player: PlayerId): number[] {
   const p = state.players[player]
-  return [...p.eddies, ...p.legends].filter((uid) => state.cards[uid].ready)
+  return [...p.eddies, ...p.legends.filter(uid => !state.cards[uid].faceUp || db[state.cards[uid].defId]?.sellTag === true)]
+    .filter((uid) => state.cards[uid].ready)
 }
 
 /**
@@ -40,6 +41,7 @@ function readyPaymentUids(state: GameState, player: PlayerId): number[] {
  * payment) to accept any valid payment the caller supplies.
  */
 export function canPayWith(
+  db: CardDb,
   state: GameState,
   player: PlayerId,
   payment: number[],
@@ -48,7 +50,7 @@ export function canPayWith(
 ): boolean {
   if (payment.length !== cost) return false
   if (exclude !== undefined && payment.includes(exclude)) return false
-  const eligible = new Set(readyPaymentUids(state, player))
+  const eligible = new Set(readyPaymentUids(db, state, player))
   const seen = new Set<number>()
   for (const uid of payment) {
     if (seen.has(uid)) return false
@@ -66,15 +68,13 @@ export function canPayWith(
  * bars one uid from paying — see `canPayWith`.
  */
 export function canonicalPayment(
+  db: CardDb,
   state: GameState,
   player: PlayerId,
   cost: number,
   exclude?: number
 ): number[] | null {
-  const p = state.players[player]
-  const readyEddies = p.eddies.filter((uid) => state.cards[uid].ready)
-  const readyLegends = p.legends.filter((uid) => state.cards[uid].ready)
-  const combined = [...readyEddies, ...readyLegends].filter((uid) => uid !== exclude)
+  const combined = readyPaymentUids(db, state, player).filter((uid) => uid !== exclude)
   if (combined.length < cost) return null
   return combined.slice(0, cost)
 }
@@ -92,7 +92,7 @@ export function legendCallPayment(db: CardDb, state: GameState, player: PlayerId
   const p = state.players[player]
   if (p.calledLegendThisTurn) return null
   if (!p.legends.some((uid) => !state.cards[uid].faceUp)) return null
-  return canonicalPayment(state, player, legendCallCost(db, state, player))
+  return canonicalPayment(db, state, player, legendCallCost(db, state, player))
 }
 
 /**

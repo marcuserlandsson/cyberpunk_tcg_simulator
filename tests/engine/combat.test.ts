@@ -838,7 +838,7 @@ describe('the Call-a-Legend allowance refreshes every game turn', () => {
 
     // Player 1 attacks, and player 0 may call again — as a reaction this time.
     const window = declare(next, raider, 'gigArea')
-    expect(canonicalPayment(window, 0, 1)).not.toBeNull() // affordability is not the question
+    expect(canonicalPayment(db, window, 0, 1)).not.toBeNull() // affordability is not the question
     const reaction = reactionOptions(window).find(
       (r): r is Extract<Reaction, { type: 'callLegend' }> => r.type === 'callLegend'
     )
@@ -892,7 +892,7 @@ describe('the Call-a-Legend allowance refreshes every game turn', () => {
 
     // Attack 2, same turn: still affordable, but the allowance is used up.
     window = declare(next, raiderB, victimB)
-    expect(canonicalPayment(window, 0, 1)).not.toBeNull()
+    expect(canonicalPayment(db, window, 0, 1)).not.toBeNull()
     expect(reactionOptions(window).some((r) => r.type === 'callLegend')).toBe(false)
     expect(() => react(window, call!)).toThrow(IllegalActionError)
     next = react(window, passReaction)
@@ -1000,14 +1000,15 @@ describe('win conditions', () => {
     const attacker = putUnit(s, 0, 'pacifica-netrunner')
     s.players[0].gigArea = dice(4, 6, 8, 10, 12, 20)
     s.players[1].gigArea = dice(4, 6, 8, 10, 12, 20)
-    s.turnNumber = 8 // overtime (both players have completed 7 turns)
+    s.turnNumber = 8
+    s.overtime = true // CR 1.11: entered after consecutive empty-fixer starts.
 
     let next = react(declare(s, attacker, 'gigArea'), passReaction)
     expect(next.winner).toBeNull() // 6-6 is still a tie
     next = applyAction(db, next, { type: 'chooseGig', dieIndex: 0 })
     expect(next.winner).toBe(0)
     expect(next.phase).toBe('gameOver')
-    expect(next.events.some((e) => e.type === 'gameEnded' && e.reason === 'overtimeMajority')).toBe(
+    expect(next.events.some((e) => e.type === 'gameEnded' && e.reason === 'overtimeSevenGigs')).toBe(
       true
     )
     expect(legalActions(db, next)).toEqual([])

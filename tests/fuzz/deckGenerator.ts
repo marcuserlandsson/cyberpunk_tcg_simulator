@@ -98,7 +98,7 @@ export function generateDeck(
     const pool = ramPool(db, legendIds)
 
     const eligible = Object.values(db).filter(
-      (def) => def.type !== 'legend' && def.ram !== null && (pool[def.ram.color] ?? 0) >= def.ram.value
+      (def) => def.implementation !== 'pending' && def.type !== 'legend' && def.ram !== null && (pool[def.ram.color] ?? 0) >= def.ram.value
     )
     const capacity = eligible.length * MAX_COPIES
     if (capacity < MIN_CARDS) continue // this trio can't reach a legal deck; reshuffle and retry

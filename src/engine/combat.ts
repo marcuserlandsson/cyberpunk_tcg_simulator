@@ -517,7 +517,7 @@ export function defeatUnit(
         options: [DECLINE, intercept.protector],
       })
       if (answer !== DECLINE) {
-        const payment = canonicalPayment(draft, owner, intercept.eddies, intercept.protector)
+        const payment = canonicalPayment(db, draft, owner, intercept.eddies, intercept.protector)
         if (payment !== null) {
           spendOnDraft(db, draft, payment)
           draft.events.push({

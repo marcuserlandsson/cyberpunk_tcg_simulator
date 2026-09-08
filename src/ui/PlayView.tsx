@@ -151,6 +151,8 @@ export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> 
       return '7 Gigs at the start of turn'
     case 'overtimeMajority':
       return 'Overtime majority'
+    case 'overtimeSevenGigs':
+      return '7 Gigs in overtime'
     case 'deckout':
       return event.winner === HUMAN ? 'Rival deck ran out' : 'You ran out of cards'
     case 'concede':

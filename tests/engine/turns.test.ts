@@ -307,12 +307,8 @@ describe('overtime', () => {
     })
     const state = applyAction(db, staged, { type: 'endTurn' })
     expect(state.turnNumber).toBe(8)
-    expect(state.winner).toBe(first)
-    expect(state.events.at(-1)).toEqual({
-      type: 'gameEnded',
-      winner: first,
-      reason: 'overtimeMajority',
-    })
+    expect(state.overtime).toBe(true)
+    expect(state.winner).toBeNull() // Six vs five is not a win under CR 1.11.
   })
 
   it('does not fire while the gig dice are tied in overtime', () => {
@@ -326,18 +322,13 @@ describe('overtime', () => {
     expect(state.winner).toBeNull()
   })
 
-  it('fires immediately after the action that breaks the tie', () => {
+  it('does not award a six-vs-five majority in overtime', () => {
     const start = startedGame(37)
     const base = atMainPhase(start, start.firstPlayer, 9)
     // 6 vs 5 (not 7) so this can only be an overtime win, never sevenGigs.
     const staged = withDice(base, { gig: [6, 5], fixer: [1, 0] })
     const state = applyAction(db, staged, { type: 'endTurn' })
-    expect(state.winner).toBe(0)
-    expect(state.events.at(-1)).toEqual({
-      type: 'gameEnded',
-      winner: 0,
-      reason: 'overtimeMajority',
-    })
+    expect(state.winner).toBeNull()
   })
 })
 

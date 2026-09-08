@@ -60,7 +60,7 @@ describe('runGames: shape and counts', () => {
   })
 
   it('reasons tally matches the games array and only uses recognized end reasons', () => {
-    const VALID_END_REASONS = new Set(['sevenGigs', 'overtimeMajority', 'deckout', 'concede'])
+    const VALID_END_REASONS = new Set(['sevenGigs', 'overtimeMajority', 'overtimeSevenGigs', 'deckout', 'concede'])
     const result = runGames(db, baseOpts({ games: 20 }))
     const tally: Record<string, number> = {}
     for (const g of result.games) tally[g.reason] = (tally[g.reason] ?? 0) + 1

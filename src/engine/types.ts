@@ -867,6 +867,9 @@ export interface PendingIntercept {
 }
 
 export interface GameState {
+  /** Consecutive turns whose active player began with an empty fixer. */
+  emptyFixerStarts?: number
+  overtime?: boolean
   players: [PlayerState, PlayerState]
   cards: Record<number, CardInstance>
   nextUid: number
@@ -983,4 +986,4 @@ export type GameEvent =
   | { type: 'cardRemoved'; uid: number }
   | { type: 'abilityActivated'; player: PlayerId; uid: number; abilityIndex: number }
   | { type: 'turnEnded'; player: PlayerId }
-  | { type: 'gameEnded'; winner: PlayerId; reason: 'sevenGigs' | 'overtimeMajority' | 'deckout' | 'concede' }
+  | { type: 'gameEnded'; winner: PlayerId; reason: 'sevenGigs' | 'overtimeMajority' | 'overtimeSevenGigs' | 'deckout' | 'concede' }

@@ -44,6 +44,7 @@
 // tie-break is a real tie-break rather than float noise.
 
 import { GIGS_TO_WIN, isOvertime } from '../engine/game'
+import { readyPaymentUids } from '../engine/economy'
 import { effectiveKeywords, effectivePower, opponentOf, streetCred } from '../engine/query'
 import type { CardDb, GameState, PlayerId } from '../engine/types'
 
@@ -135,12 +136,8 @@ function fieldPower(db: CardDb, state: GameState, player: PlayerId): number {
  * legends zones (economy.ts prices each at 1 €$). Counts only readiness, never
  * which card it is.
  */
-function readyPayers(state: GameState, player: PlayerId): number {
-  const p = state.players[player]
-  let count = 0
-  for (const uid of p.eddies) if (state.cards[uid].ready) count += 1
-  for (const uid of p.legends) if (state.cards[uid].ready) count += 1
-  return count
+function readyPayers(db: CardDb, state: GameState, player: PlayerId): number {
+  return readyPaymentUids(db, state, player).length
 }
 
 function faceUpLegends(state: GameState, player: PlayerId): number {
@@ -189,11 +186,8 @@ export function evaluate(
   if (myGigs >= GIGS_TO_WIN) score += weights.sevenGigs
   if (theirGigs >= GIGS_TO_WIN) score -= weights.sevenGigs
 
-  // In overtime any strict Gig majority ends the game immediately
-  // (`game.checkOvertimeWin`), so a non-terminal overtime state always has
-  // equal counts — this term therefore only ever fires on a state whose
-  // majority the engine has not yet checked, where it is worth a lot.
-  if (isOvertime(state)) score += Math.sign(myGigs - theirGigs) * weights.overtimeMajority
+  // CR 1.11: overtime requires seven Gigs, even if six would be a majority.
+  if (isOvertime(state)) score += ((myGigs >= GIGS_TO_WIN ? 1 : 0) - (theirGigs >= GIGS_TO_WIN ? 1 : 0)) * weights.overtimeMajority
 
   score += (streetCred(state, perspective) - streetCred(state, rival)) * weights.streetCred
 
@@ -203,7 +197,7 @@ export function evaluate(
   score += (mine.hand.length - theirs.hand.length) * weights.handCard
 
   score += mine.eddies.length * weights.eddie
-  score += readyPayers(state, perspective) * weights.readyPayer
+  score += readyPayers(db, state, perspective) * weights.readyPayer
   score += faceUpLegends(state, perspective) * weights.faceUpLegend
 
   score += readyBlockers(db, state, perspective) * weights.readyBlocker

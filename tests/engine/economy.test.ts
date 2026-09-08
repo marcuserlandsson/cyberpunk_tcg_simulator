@@ -159,7 +159,7 @@ describe('playCard: units', () => {
     ).toThrow(IllegalActionError)
   })
 
-  it('lag clears at the owner\'s next turn start, not the same turn', () => {
+  it('lag clears at the end of the turn the Unit entered', () => {
     let state = setHand(mainPhaseP0(107), 0, ['corpo-security'])
     state = giveEddies(state, 0, 2)
     const [uid] = state.players[0].hand
@@ -170,7 +170,7 @@ describe('playCard: units', () => {
     // End player 0's turn 1 -> player 1's turn 1 begins.
     state = applyAction(db, state, { type: 'endTurn' })
     expect(state.activePlayer).toBe(1)
-    expect(state.cards[uid].lag).toBe(true) // still lagged through the rival's turn
+    expect(state.cards[uid].lag).toBe(false) // CR 11.3.2: Lag expires at each turn end.
 
     // Drive player 1's entire turn 1 (gig die, then end turn) to reach player 0's turn 2 start.
     const gigChoice = legalActions(db, state).find((a) => a.type === 'chooseGigDie')
@@ -258,7 +258,7 @@ describe('playCard: payment flexibility', () => {
     const readyLegend = state.players[0].legends.find((u) => state.cards[u].ready)
     if (readyLegend === undefined) throw new Error('expected a ready legend on turn 1')
 
-    expect(canonicalPayment(state, 0, 1)).toEqual([eddieUid]) // eddies come first, canonically
+    expect(canonicalPayment(db, state, 0, 1)).toEqual([eddieUid]) // eddies come first, canonically
 
     // The card's own effect targets are whatever legalActions offers (since
     // Task 8 the card has an effect); only the *payment* is being varied here.
@@ -392,14 +392,14 @@ describe('economy primitives', () => {
     const state = giveEddies(mainPhaseP0(127), 0, 2)
     const [e1, e2] = state.players[0].eddies
 
-    expect(canPayWith(state, 0, [e1, e2], 2)).toBe(true)
-    expect(canPayWith(state, 0, [e1], 2)).toBe(false) // wrong total
-    expect(canPayWith(state, 0, [e1, e1], 2)).toBe(false) // duplicate uid
-    expect(canPayWith(state, 1, [e1, e2], 2)).toBe(false) // not player 1's cards
+    expect(canPayWith(db, state, 0, [e1, e2], 2)).toBe(true)
+    expect(canPayWith(db, state, 0, [e1], 2)).toBe(false) // wrong total
+    expect(canPayWith(db, state, 0, [e1, e1], 2)).toBe(false) // duplicate uid
+    expect(canPayWith(db, state, 1, [e1, e2], 2)).toBe(false) // not player 1's cards
 
     const spent = structuredClone(state)
     spent.cards[e1].ready = false
-    expect(canPayWith(spent, 0, [e1, e2], 2)).toBe(false) // e1 no longer ready
+    expect(canPayWith(db, spent, 0, [e1, e2], 2)).toBe(false) // e1 no longer ready
   })
 
   it('canonicalPayment spends ready eddies before legends, left to right, or null if unaffordable', () => {
@@ -408,10 +408,10 @@ describe('economy primitives', () => {
     const readyLegends = state.players[0].legends.filter((u) => state.cards[u].ready)
     expect(readyLegends).toHaveLength(1) // turn 1 going-first penalty
 
-    expect(canonicalPayment(state, 0, 0)).toEqual([])
-    expect(canonicalPayment(state, 0, 1)).toEqual([eddieUid])
-    expect(canonicalPayment(state, 0, 2)).toEqual([eddieUid, readyLegends[0]])
-    expect(canonicalPayment(state, 0, 99)).toBeNull()
+    expect(canonicalPayment(db, state, 0, 0)).toEqual([])
+    expect(canonicalPayment(db, state, 0, 1)).toEqual([eddieUid])
+    expect(canonicalPayment(db, state, 0, 2)).toEqual([eddieUid, readyLegends[0]])
+    expect(canonicalPayment(db, state, 0, 99)).toBeNull()
   })
 
   it('pay mutates the given draft in place and returns it, leaving other states untouched', () => {

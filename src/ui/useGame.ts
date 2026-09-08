@@ -312,6 +312,7 @@ function dieText(size: number, value: number): string {
 const END_REASONS: Record<string, string> = {
   sevenGigs: '7 Gigs at the start of a turn',
   overtimeMajority: 'Gig majority in overtime',
+  overtimeSevenGigs: '7 Gigs in overtime',
   deckout: 'ran out of cards',
   concede: 'conceded',
 }

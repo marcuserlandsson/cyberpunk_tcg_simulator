@@ -62,7 +62,7 @@ function mainPhaseActions(db: CardDb, state: GameState): Action[] {
   for (const uid of p.hand) {
     // "Play this Program for -1 €$ for each friendly Gig with 8+ value" — the
     // cost a play actually asks for is the reduced one (docs/rulings.md §44).
-    const payment = canonicalPayment(state, player, effectiveCardCost(db, state, player, uid))
+    const payment = canonicalPayment(db, state, player, effectiveCardCost(db, state, player, uid))
     if (payment === null) continue
     for (const targets of playCardTargetChoices(db, state, uid)) {
       actions.push({ type: 'playCard', card: uid, payment, targets })

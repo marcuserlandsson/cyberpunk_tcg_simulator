@@ -101,7 +101,7 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     // The payer is the defender, not the active player.
     const payer = actingPlayer(state)
     const cost = effectiveCardCost(db, state, payer, reaction.card)
-    return canPayWith(state, payer, reaction.payment, cost)
+    return canPayWith(db, state, payer, reaction.payment, cost)
   }
 
   if (action.type === 'react' && action.reaction.type === 'callLegend') {
@@ -112,7 +112,7 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     // The payer is the defender, not the active player (guide p11: Call a
     // Legend is one of the attacked Rival's reactions).
     const payer = actingPlayer(state)
-    return canPayWith(state, payer, action.reaction.payment, legendCallCost(db, state, payer))
+    return canPayWith(db, state, payer, action.reaction.payment, legendCallCost(db, state, payer))
   }
 
   if (action.type === 'playCard') {
@@ -130,13 +130,13 @@ function isLegal(db: CardDb, state: GameState, legal: Action[], action: Action):
     // use {Go Solo}" tax if active (riot-shield, docs/rulings.md §107 ff.).
     const tax = def.type === 'legend' ? rivalGoSoloTax(db, state, state.activePlayer) : 0
     const cost = effectiveCardCost(db, state, state.activePlayer, action.card) + tax
-    return canPayWith(state, state.activePlayer, action.payment, cost, exclude)
+    return canPayWith(db, state, state.activePlayer, action.payment, cost, exclude)
   }
 
   if (action.type === 'callLegend') {
     const shapeMatches = legal.some((candidate) => candidate.type === 'callLegend')
     if (!shapeMatches) return false
-    return canPayWith(
+    return canPayWith(db, 
       state,
       state.activePlayer,
       action.payment,
@@ -215,9 +215,7 @@ function keepHand(draft: GameState, db: CardDb): void {
  * 7-Gigs win check, or a deckout on the automatic draw).
  */
 function startTurn(draft: GameState, db: CardDb, player: PlayerId, turnNumber: number): void {
-  beginTurn(draft, player, turnNumber)
-  if (draft.winner !== null) return
-  fireWatcherTrigger(db, draft, 'onStartTurn', player, {})
+  beginTurn(draft, player, turnNumber, () => fireWatcherTrigger(db, draft, 'onStartTurn', player, {}))
 }
 
 /**
@@ -461,6 +459,9 @@ function endTurn(draft: GameState, db: CardDb): void {
   resolveEndOfTurnFloating(draft, db)
   if (draft.winner !== null) return
   clearTurnBuffs(draft)
+  if ((draft.emptyFixerStarts ?? 0) >= 2) draft.overtime = true
+  checkOvertimeWin(draft)
+  if (draft.winner !== null) return
   const next = opponentOf(player)
   // turnNumber counts each player's own turns and advances when the first
   // player begins a turn — see the comment at the top of game.ts.

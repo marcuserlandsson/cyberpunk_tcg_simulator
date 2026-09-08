@@ -28,7 +28,7 @@ import type { Action, CardDb, GameState } from '../../src/engine/types'
 // task-9-report.md's "turn-bound" section.)
 export const MAX_TURN_NUMBER = 50
 
-export const VALID_END_REASONS = new Set(['sevenGigs', 'overtimeMajority', 'deckout', 'concede'])
+export const VALID_END_REASONS = new Set(['sevenGigs', 'overtimeMajority', 'overtimeSevenGigs', 'deckout', 'concede'])
 
 type ZoneName = 'deck' | 'hand' | 'field' | 'legends' | 'eddies' | 'trash' | 'removed'
 const ZONE_NAMES: readonly ZoneName[] = ['deck', 'hand', 'field', 'legends', 'eddies', 'trash', 'removed']

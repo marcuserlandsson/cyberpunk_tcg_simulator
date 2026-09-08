@@ -13,13 +13,8 @@
 //   turnNumber 2: first player's 2nd turn, then second player's 2nd turn
 //   ...
 //
-// Consequences used below:
-//   * "a player's Nth turn" is exactly `turnNumber === N`;
-//   * when the active player is the first player on turn N, both players have
-//     completed N-1 turns; when it is the second player on turn N, the first
-//     player has completed N turns and the second N-1. So *both* players have
-//     completed 7 turns exactly when `turnNumber >= 8`, which is the overtime
-//     trigger (`isOvertime`).
+// Overtime is tracked independently: CR 1.11 uses consecutive empty-fixer
+// starts, which card effects can move earlier or later than the usual round 8.
 
 import { createRng, rollDie, shuffle, type RngState } from './rng'
 import type { DeckList } from './deck'
@@ -46,8 +41,6 @@ export const FIXER_DICE: readonly DieSize[] = [4, 6, 8, 10, 12, 20]
 export const OPENING_HAND_SIZE = 6
 /** Start your turn with this many gig dice and you win outright. */
 export const GIGS_TO_WIN = 7
-/** Overtime begins once both players have completed this many turns. */
-export const OVERTIME_AFTER_TURNS = 7
 
 // ---------------------------------------------------------------------------
 // newGame
@@ -161,6 +154,8 @@ export function newGame(db: CardDb, config: NewGameConfig): GameState {
   const events: GameEvent[] = [{ type: 'gameStarted', seed: config.seed, orderRolls }]
 
   return {
+    emptyFixerStarts: 0,
+    overtime: false,
     players: [players[0], players[1]],
     cards: built.cards,
     nextUid: built.nextUid,
@@ -292,7 +287,7 @@ export function stillLive(state: GameState): boolean {
 export function endGame(
   draft: GameState,
   winner: PlayerId,
-  reason: 'sevenGigs' | 'overtimeMajority' | 'deckout' | 'concede'
+  reason: 'sevenGigs' | 'overtimeMajority' | 'overtimeSevenGigs' | 'deckout' | 'concede'
 ): void {
   if (draft.winner !== null) return
   draft.winner = winner
@@ -349,7 +344,10 @@ function readySpentCards(draft: GameState, player: PlayerId, turnNumber: number)
  * 'permanent') is deliberately untouched.
  */
 export function clearTurnBuffs(draft: GameState): void {
+  for (const player of draft.players) player.playedProgramThisTurn = false
   for (const key of Object.keys(draft.cards)) {
+    draft.cards[Number(key)].lag = false
+    draft.cards[Number(key)].playedThisTurn = false
     draft.cards[Number(key)].tempPower = 0
     // Granted keywords have exactly the same lifetime as a turn power buff
     // (docs/rulings.md §43), and "the first time ... each turn" allowances
@@ -427,11 +425,12 @@ function resetTurnState(draft: GameState, player: PlayerId): void {
  *      `start` phase; when the fixer is empty (from turn 7 on) it goes
  *      straight to `main`.
  */
-export function beginTurn(draft: GameState, player: PlayerId, turnNumber: number): void {
+export function beginTurn(draft: GameState, player: PlayerId, turnNumber: number, beforeReady?: () => void): void {
   draft.activePlayer = player
   draft.turnNumber = turnNumber
   draft.phase = 'start'
   draft.events.push({ type: 'turnStarted', player, turn: turnNumber })
+  draft.emptyFixerStarts = draft.players[player].fixer.length === 0 ? (draft.emptyFixerStarts ?? 0) + 1 : 0
 
   if (draft.players[player].gigArea.length >= GIGS_TO_WIN) {
     endGame(draft, player, 'sevenGigs')
@@ -446,8 +445,10 @@ export function beginTurn(draft: GameState, player: PlayerId, turnNumber: number
     (entry) => !(entry.expiry === 'ownerNextTurnStart' && entry.controller === player)
   )
 
-  readySpentCards(draft, player, turnNumber)
   resetTurnState(draft, player)
+  beforeReady?.()
+  if (draft.winner !== null) return
+  readySpentCards(draft, player, turnNumber)
 
   if (!drawCards(draft, player, 1)) {
     endGame(draft, opponentOf(player), 'deckout')
@@ -462,23 +463,21 @@ export function beginTurn(draft: GameState, player: PlayerId, turnNumber: number
 // ---------------------------------------------------------------------------
 
 /**
- * Overtime starts "after the last player's 7th turn" (guide p3) — i.e. once
- * BOTH players have completed 7 turns, which under this file's turn numbering
- * is `turnNumber >= 8`. See docs/rulings.md for the majority interpretation.
+ * CR 1.11 and 8.17: enter overtime at the end of the second consecutive turn
+ * that began with an empty fixer. Once entered, overtime does not end.
  */
 export function isOvertime(state: GameState): boolean {
-  return state.turnNumber > OVERTIME_AFTER_TURNS
+  return state.overtime === true
 }
 
 /**
- * Sudden death: in overtime, the moment one player holds strictly more gig
- * dice than the other, they win. Called after every applied action.
+ * CR 1.11: in overtime, seven or more Gigs wins immediately.
  */
 export function checkOvertimeWin(draft: GameState): void {
   if (draft.winner !== null) return
   if (!isOvertime(draft)) return
   const mine = draft.players[0].gigArea.length
   const theirs = draft.players[1].gigArea.length
-  if (mine === theirs) return
-  endGame(draft, mine > theirs ? 0 : 1, 'overtimeMajority')
+  if (mine < GIGS_TO_WIN && theirs < GIGS_TO_WIN) return
+  endGame(draft, mine >= GIGS_TO_WIN ? 0 : 1, 'overtimeSevenGigs')
 }

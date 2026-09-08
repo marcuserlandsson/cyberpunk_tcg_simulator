@@ -183,7 +183,7 @@ export function StreetStrip(props: StreetStripProps): ReactElement {
           {state.activePlayer === HUMAN ? 'Your turn' : "Rival's turn"}
         </div>
         <div className="street__win-condition">
-          {isOvertime(state) ? 'OVERTIME — majority wins' : `first to ${GIGS_TO_WIN} gigs wins`}
+          {isOvertime(state) ? 'OVERTIME — 7 gigs wins immediately' : `first to ${GIGS_TO_WIN} gigs wins`}
         </div>
       </div>
 

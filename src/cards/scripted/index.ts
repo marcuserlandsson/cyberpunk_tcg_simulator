@@ -1051,7 +1051,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const p = state.players[ctx.player]
     if (!p.trash.includes(program)) return state
     const cost = effectiveCardCost(db, state, ctx.player, program)
-    const payment = canonicalPayment(state, ctx.player, cost)
+    const payment = canonicalPayment(db, state, ctx.player, cost)
     if (payment === null) return state
     spendOnDraft(db, state, payment)
     // The payment's own {Spend} trigger can end the game outright — bail
