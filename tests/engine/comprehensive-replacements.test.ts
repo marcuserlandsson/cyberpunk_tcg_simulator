@@ -38,7 +38,7 @@ describe('CR 10.28–10.29: replacement ordering and chains', () => {
     let next = applyAction(db, state, { type: 'attack', attacker, target: victim })
     next = applyAction(db, next, { type: 'react', reaction: { type: 'pass' } })
     expect(next.pendingIntercept?.options).toEqual([-1, jackie, other])
-    next = applyAction(db, next, { type: 'answerIntercept', answer: jackie })
+    next = resolveEffectChoices(db, applyAction(db, next, { type: 'answerIntercept', answer: jackie }))
     expect(next.pendingIntercept?.options).toEqual([-1, other])
     next = resolveEffectChoices(db, applyAction(db, next, { type: 'answerIntercept', answer: other }))
     expect(next.players[1].field).toEqual(expect.arrayContaining([victim, jackie]))

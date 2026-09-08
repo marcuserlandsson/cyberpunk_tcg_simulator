@@ -1,3 +1,5 @@
+import { actionPayment, withPayment } from './payments'
+import { paymentLabel, readyPaymentUids } from '../engine/economy'
 // The playmat.
 //
 // LAYOUT follows the official playmat (docs/rules/gameplay-guide-extracted.txt,
@@ -9,9 +11,8 @@
 // INTERACTION comes from ONE place: the `legal` list. `playAffordances.ts`
 // projects it into glows and clickable targets, so a highlighted thing and a
 // legal action are literally the same fact — the view cannot offer a move the
-// engine would reject, and cannot hide one it would allow. Payments are never
-// asked about: each legal entry already carries the canonical payment, which is
-// passed straight back (a documented UI simplification — see docs/rulings.md).
+// engine would reject. Paid plays and Calls allow editing the proposed payment
+// before committing; costs inside effects use replayable engine decisions.
 //
 // DISAMBIGUATION is progressive. Clicking a card with several legal variants
 // (different targets, or an attack with and without an optional cost) opens a
@@ -76,6 +77,7 @@ type Targeted = Action & { targets: number[] }
  * target (docs/rulings.md §49).
  */
 type Pending =
+  | { kind: 'payment'; action: Action; selected: number[]; cost: number }
   | { kind: 'targets'; title: string; variants: Targeted[] }
   | { kind: 'playMode'; title: string; variants: Targeted[] }
   | { kind: 'attackTarget'; attacker: number }
@@ -183,7 +185,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
   const [pending, setPending] = useState<Pending | null>(null)
   // The uid the board/hand is currently hovering (or focused on, for
   // keyboard parity) — drives the zoom panel (Task 6). Not reset by the
-  // `actionCount` effect below: leaving a hover open across an action is
+  // record-change effect below: leaving a hover open across an action is
   // harmless (the next mouseleave/blur clears it), and resetting it there
   // would fight a hover that's still genuinely live.
   const [zoomUid, setZoomUid] = useState<number | null>(null)
@@ -196,15 +198,24 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
   // `game.load` only ever sees the record, never its name.
   const [resumeAttempt, setResumeAttempt] = useState<string | null>(null)
 
-  const actionCount = record?.actions.length ?? -1
   // Any change to the record (an action, or an undo) invalidates a half-made
   // choice: the variants it was narrowing came from a `legal` list that no
   // longer describes the game.
   useEffect(() => {
     setPending(null)
-  }, [actionCount])
+  }, [record])
 
   // ---- committing a choice ------------------------------------------------
+
+  function commitAction(action: Action): void {
+    const payment = actionPayment(action)
+    if (state !== null && payment !== null && payment.length > 0 && readyPaymentUids(db, state, HUMAN).length > payment.length) {
+      setPending({ kind: 'payment', action, selected: [...payment], cost: payment.length })
+      return
+    }
+    game.act(action)
+  }
+
 
   /**
    * Narrows a set of target variants and either fires the action or asks about
@@ -220,7 +231,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     }
     if (firstDivergentSlot(variants) === -1) {
       setPending(null)
-      game.act(variants[0])
+      commitAction(variants[0])
       return
     }
     setPending({ kind: 'targets', title, variants })
@@ -231,7 +242,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     if (variants.length === 0) return
     if (variants.length === 1) {
       setPending(null)
-      game.act(variants[0])
+      commitAction(variants[0])
       return
     }
     setPending({ kind: 'attackVariant', attacker, variants })
@@ -242,6 +253,19 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
   const options: Option[] = useMemo(() => {
     if (state === null || pending === null) return []
     switch (pending.kind) {
+      case 'payment': {
+        const confirm: Option[] = pending.selected.length === pending.cost ? [{
+          key: 'pay', label: 'Pay ' + pending.cost + ' €$ with selected cards',
+          pick: () => { setPending(null); game.act(withPayment(pending.action, pending.selected)) },
+        }] : []
+        return [...confirm, ...readyPaymentUids(db, state, HUMAN).map(uid => ({
+          key: 'pay-' + uid, uid,
+          label: (pending.selected.includes(uid) ? '✓ ' : '') + paymentLabel(db, state, HUMAN, uid),
+          pick: () => setPending({ ...pending, selected: pending.selected.includes(uid)
+            ? pending.selected.filter(selected => selected !== uid)
+            : pending.selected.length < pending.cost ? [...pending.selected, uid] : [...pending.selected.slice(1), uid] }),
+        }))]
+      }
       case 'playMode':
         return [true, false].map(solo => {
           const variants = pending.variants.filter((a): a is Extract<Action, { type: 'playCard' }> => a.type === 'playCard' && (a.goSolo !== false) === solo)
@@ -295,7 +319,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               : 'Attack without paying the optional cost',
           pick: () => {
             setPending(null)
-            game.act(action)
+            commitAction(action)
           },
         }))
     }
@@ -309,7 +333,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     for (const option of options) if (option.uid !== undefined) targets.add(option.uid)
     const gigAreaTarget = options.some((option) => option.gigArea === true)
     const selected =
-      pending !== null && pending.kind !== 'targets' && pending.kind !== 'playMode' ? pending.attacker : null
+      pending !== null && (pending.kind === 'attackTarget' || pending.kind === 'attackVariant') ? pending.attacker : null
 
     // While a choice is open, only its candidates are live: leaving the
     // ordinary glows on would offer moves that would silently abandon the
@@ -360,7 +384,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
       const action = legal.find(
         (candidate) => candidate.type === 'sellCard' && candidate.card === uid
       )
-      if (action !== undefined) game.act(action)
+      if (action !== undefined) commitAction(action)
     },
     onAbility: (uid) => {
       if (state === null) return
@@ -373,13 +397,13 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
       const action = legal.find(
         (candidate) => candidate.type === 'chooseGigDie' && candidate.size === size
       )
-      if (action !== undefined) game.act(action)
+      if (action !== undefined) commitAction(action)
     },
     onGigDie: (index) => {
       const action = legal.find(
         (candidate) => candidate.type === 'chooseGig' && candidate.dieIndex === index
       )
-      if (action !== undefined) game.act(action)
+      if (action !== undefined) commitAction(action)
     },
     onGigArea: () => {
       const option = options.find((candidate) => candidate.gigArea === true)
@@ -716,7 +740,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               className="btn--ghost"
               data-testid="call-legend"
               disabled={callLegend === undefined}
-              onClick={() => callLegend !== undefined && game.act(callLegend)}
+              onClick={() => callLegend !== undefined && commitAction(callLegend)}
             >
               Call Legend
             </button>
@@ -730,7 +754,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
                   ? 'You cannot end your turn right now (a Unit may be forced to attack).'
                   : undefined
               }
-              onClick={() => endTurn !== undefined && game.act(endTurn)}
+              onClick={() => endTurn !== undefined && commitAction(endTurn)}
             >
               End Turn
             </button>
@@ -781,14 +805,14 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               <button
                 type="button"
                 data-testid="choose-order-first"
-                onClick={() => game.act({ type: 'choosePlayOrder', goFirst: true })}
+                onClick={() => commitAction({ type: 'choosePlayOrder', goFirst: true })}
               >
                 Go first
               </button>
               <button
                 type="button"
                 data-testid="choose-order-second"
-                onClick={() => game.act({ type: 'choosePlayOrder', goFirst: false })}
+                onClick={() => commitAction({ type: 'choosePlayOrder', goFirst: false })}
               >
                 Go second
               </button>
@@ -804,7 +828,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
                 <button
                   type="button"
                   data-testid="mulligan"
-                  onClick={() => game.act({ type: 'mulligan' })}
+                  onClick={() => commitAction({ type: 'mulligan' })}
                 >
                   Mulligan
                 </button>
@@ -812,7 +836,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               <button
                 type="button"
                 data-testid="keep-hand"
-                onClick={() => game.act({ type: 'keepHand' })}
+                onClick={() => commitAction({ type: 'keepHand' })}
               >
                 Keep hand
               </button>
@@ -850,14 +874,14 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
               <button
                 type="button"
                 data-testid="gig-reroll-yes"
-                onClick={() => game.act({ type: 'chooseGigReroll', reroll: true })}
+                onClick={() => commitAction({ type: 'chooseGigReroll', reroll: true })}
               >
                 Reroll
               </button>
               <button
                 type="button"
                 data-testid="gig-reroll-no"
-                onClick={() => game.act({ type: 'chooseGigReroll', reroll: false })}
+                onClick={() => commitAction({ type: 'chooseGigReroll', reroll: false })}
               >
                 Keep the roll
               </button>
@@ -879,7 +903,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
                     type="button"
                     key={index}
                     data-testid={action.answer === -1 ? 'intercept-decline' : 'intercept-option'}
-                    onClick={() => game.act(action)}
+                    onClick={() => commitAction(action)}
                   >
                     {state.pendingIntercept!.optionLabels?.[action.answer] ?? (action.answer === -1
                       ? 'Decline'
@@ -898,14 +922,14 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
             db={db}
             state={state}
             reactions={reactions}
-            onPick={(action) => game.act(action)}
+            onPick={(action) => commitAction(action)}
           />
         )}
 
         {pending !== null && options.length > 0 && (
           <div className="prompt-bar prompt-bar--choice" data-testid="choice-bar">
             <span className="prompt-bar__label">
-              {pending.kind === 'targets' || pending.kind === 'playMode'
+              {pending.kind === 'payment' ? `Choose payment: ${pending.selected.length} / ${pending.cost} €$` : pending.kind === 'targets' || pending.kind === 'playMode'
                 ? pending.title
                 : pending.kind === 'attackTarget'
                   ? `Choose what ${nameOf(db, state, pending.attacker)} attacks`

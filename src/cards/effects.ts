@@ -29,7 +29,7 @@ import { stillLive } from '../engine/game'
 // use, exactly like game.ts's `drawCards`.
 
 import { defeatGear, defeatUnit, leaveField, stealableDieIndexes } from '../engine/combat'
-import { canonicalPayment, pay } from '../engine/economy'
+import { canonicalPayment, choosePayment, pay } from '../engine/economy'
 import { readyCardOnDraft, draftState, drawCards, endGame } from '../engine/game'
 import {
   cardTags,
@@ -99,8 +99,8 @@ export interface EffectCtx {
  * Facts a trigger firing carries that no read of the state can supply: the size
  * of the Gig die that was just stolen (docs/rulings.md §42) and the answer to a
  * "You may pay N €$" optional cost (docs/rulings.md §49). Absent
- * `payOptionalCosts` means *declined*, so a costed trigger fired from a path
- * that cannot offer the choice never spends the player's €$.
+ * `payOptionalCosts` asks the controller during resolution; an explicit
+ * boolean retains a choice already made when declaring the action.
  */
 export interface TriggerContext extends ConditionContext {
   payOptionalCosts?: boolean
@@ -1075,7 +1075,10 @@ export function applyEffectDefOnDraft(
   // def does not resolve (docs/rulings.md §49). An activated ability's cost is
   // mandatory and paid by `activateAbilityOnDraft` before this runs.
   if (def.trigger !== 'activated' && def.cost !== undefined) {
-    if (context.payOptionalCosts !== true) return
+    if (!canPayAbility(db, draft, player, def, sourceUid)) return
+    const accept = context.payOptionalCosts ?? (chooseEffectOption(draft, player, sourceUid,
+      'Pay the optional triggered cost?', [1, -1], { 1: 'Pay cost', [-1]: 'Decline' }) === 1)
+    if (!accept) return
     if (!payTriggerCost(db, draft, def, sourceUid, player)) return
   }
   const inheritedHost = context.equipHostUid ?? context.defeatedHostUid ?? abilityHost(draft, sourceUid)
@@ -1111,7 +1114,7 @@ function payTriggerCost(
   if (def.cost?.selfSpend) spendOnDraft(db, draft, [host])
   const eddies = abilityEddieCost(db, draft, player, def)
   if (eddies > 0) {
-    const payment = canonicalPayment(db, draft, player, eddies, def.cost?.selfSpend ? host : undefined)
+    const payment = choosePayment(db, draft, player, eddies, sourceUid, def.cost?.selfSpend ? host : undefined)
     if (payment === null) return false
     spendOnDraft(db, draft, payment)
   }
@@ -1565,8 +1568,7 @@ export function activatedAbilityActions(
       if (oncePerTurnSpent(state, uid, abilityIndex, effect)) continue
       if (!conditionMet(state, player, effect, {}, uid)) continue
       if (!canPayAbility(db, state, player, effect, uid)) continue
-      // A costed ability with a dead target is never worth offering.
-      if (hasUnfillableSlot(db, state, uid, effect)) continue
+      // CR 10.19: a missing effect target does not prevent paying its activation cost.
       for (const targets of effectTargetChoices(db, state, uid, effect)) {
         actions.push({ type: 'activateAbility', card: uid, abilityIndex, targets })
       }
@@ -1839,8 +1841,7 @@ export function playCardOnDraft(
 
 /**
  * Activates an ability on a draft: pay (self-spend first, then €$ from the
- * canonical payment — the action carries no payment field, so the engine picks
- * it), log it, resolve it.
+ * controller-selected payment), log it, resolve it.
  */
 export function activateAbilityOnDraft(
   db: CardDb,
@@ -1857,7 +1858,7 @@ export function activateAbilityOnDraft(
   const host = abilityHost(draft, cardUid)
   const eddies = abilityEddieCost(db, draft, player, effect)
   const payment = eddies > 0
-    ? canonicalPayment(db, draft, player, eddies, effect.cost?.selfSpend ? host : undefined)
+    ? choosePayment(db, draft, player, eddies, cardUid, effect.cost?.selfSpend ? host : undefined)
     : []
 
   draft.events.push({ type: 'abilityActivated', player, uid: cardUid, abilityIndex })

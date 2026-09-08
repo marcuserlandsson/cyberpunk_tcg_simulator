@@ -122,7 +122,7 @@ describe('new persistent restrictions and modifiers', () => {
     expect(db['rogue-amendiares-queen-of-the-afterlife'].keywords).not.toContain('quick')
     expect(db['rogue-amendiares-queen-of-the-afterlife'].effects[1].quick).toBe(true)
     const action = actionsOfType(db, state, 'activateAbility').find(a => a.card === rogue && a.targets.includes(target))!
-    const next = applyAction(db, state, action)
+    const next = resolveEffectChoices(db, applyAction(db, state, action))
     expect(effectivePower(db, next, target)).toBe(3)
     expect(next.cards[rogue].ready).toBe(false)
   })

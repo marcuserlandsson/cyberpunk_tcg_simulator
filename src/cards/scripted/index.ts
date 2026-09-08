@@ -26,7 +26,7 @@ import { callChosenLegend, chooseFaceDownLegend, peekLegends } from '../../engin
 // documented at the top of ../effects.ts.
 
 import { bottomDeckCards, defeatGear, defeatUnit, leaveField } from '../../engine/combat'
-import { canonicalPayment } from '../../engine/economy'
+import { choosePayment } from '../../engine/economy'
 import { readyCardOnDraft, endGame, drawCards, stillLive } from '../../engine/game'
 import {
   cardTags,
@@ -1039,7 +1039,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
   'alt-cunningham-soulkiller-architect': (db, state, ctx) => {
     const program = ctx.targets[0]
     if (program === undefined || !state.players[ctx.player].trash.includes(program)) return state
-    const payment = canonicalPayment(db, state, ctx.player, effectiveCardCost(db, state, ctx.player, program))
+    const payment = choosePayment(db, state, ctx.player, effectiveCardCost(db, state, ctx.player, program), ctx.sourceUid)
     if (payment === null) return state
     playCardOnDraft(db, state, ctx.player, program, payment, [], undefined, 'deckBottom')
     return state

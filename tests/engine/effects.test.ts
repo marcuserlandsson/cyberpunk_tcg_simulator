@@ -1336,7 +1336,7 @@ describe('activated abilities', () => {
     expect(next.cards[sniper].ready).toBe(false)
   })
 
-  it('is not offered when its only target spec has no candidate', () => {
+  it('allows paying its cost when the effect has no target', () => {
     const targeted = makeDb([
       def('sniper', 'unit', {
         power: 1,
@@ -1350,8 +1350,10 @@ describe('activated abilities', () => {
       }),
     ])
     const s = scenario()
-    mint(s, 0, 'field', 'sniper')
-    expect(abilityActions(targeted, s)).toEqual([])
+    const source = mint(s, 0, 'field', 'sniper')
+    const action = abilityActions(targeted, s)[0]
+    expect(action).toBeDefined()
+    expect(applyAction(targeted, s, action).cards[source].ready).toBe(false)
   })
 
   it('an ability on attached gear spends its host, not the gear', () => {

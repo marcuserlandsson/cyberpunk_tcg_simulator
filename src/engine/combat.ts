@@ -38,7 +38,7 @@ import {
   resolveNodeOnDraft,
   spendOnDraft,
 } from '../cards/effects'
-import { canonicalPayment, legendCallPayment } from './economy'
+import { choosePayment, legendCallPayment } from './economy'
 import { askIntercept, DECLINE } from './intercept'
 import { shuffle } from './rng'
 import { flushPendingEffects } from './resolution'
@@ -563,7 +563,7 @@ export function defeatUnit(
     })
     const intercept = intercepts.find(effect => effect.protector === answer)
     if (intercept) {
-      const payment = canonicalPayment(db, draft, player, intercept.eddies)
+      const payment = choosePayment(db, draft, player, intercept.eddies, intercept.protector)
       if (payment !== null) {
         spendOnDraft(db, draft, payment)
         draft.events.push({ type: 'effectResolved', sourceUid: intercept.protector, description: `intercepts the defeat of ${uid}` })

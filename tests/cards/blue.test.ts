@@ -112,13 +112,15 @@ describe('alt-cunningham-soulkiller-architect', () => {
     expect(s.cards[alt].ready).toBe(false)
   })
 
-  it('does not offer the ability with no Program in trash', () => {
+  it('allows spending the source even with no Program in trash', () => {
     const { state } = fixtureWithHand(0, [])
     const alt = mintInto(state, 0, 'legends', 'alt-cunningham-soulkiller-architect', {
       faceUp: true,
       ready: true,
     })
-    expect(actionsOfType(db, state, 'activateAbility').some((a) => a.card === alt)).toBe(false)
+    const action = actionsOfType(db, state, 'activateAbility').find(a => a.card === alt)!
+    expect(action).toBeDefined()
+    expect(resolveEffectChoices(db, applyAction(db, state, action)).cards[alt].ready).toBe(false)
   })
 
   // Regression (found by task review of the Task 9 fuzz harness's fix round

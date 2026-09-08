@@ -131,3 +131,8 @@ Implemented We Gotta Live Together's conditional price and zero-to-two distinct 
 ### 08s — final imported cards and persistent restrictions
 
 Implemented Memory Relapse, Westbrook Netrunner, Nocturne OP55 N1 and Rogue Queen of the Afterlife. Readying restrictions now apply to natural steps and card effects, and targeted duration effects end on field exit. Legend-steal floors use current contextual power. Nocturne can grant temporary discounted Go Solo (including a face-down position without exposing identity), respects null/unpayable costs and floors discounts at one. Rogue's once-per-turn trigger checks another Unit's event-time power; its Quick Spend ability uses its own current power. All 151 cards now have implementations; rules corrections remain provisional. Verified 732 engine/card/data tests, 415 AI/fuzz checks, TypeScript/build and five production-preview browser workflows.
+
+### 08t — explicit payments and targetless activations
+
+Paid plays and Calls now have an editable payment selection. Costs inside activated, triggered and replacement effects also ask for the payment cards, with safe positional labels for hidden Legends and no duplicate spending. Optional trigger costs can be declined. Abilities remain available when their effect has no target, as required by partial resolution; stale UI choices clear when loading another record. Verified 1,031 engine/card/UI tests, 415 AI/fuzz checks, TypeScript/build and four production-preview browser checks.
+

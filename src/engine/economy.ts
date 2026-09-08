@@ -1,3 +1,4 @@
+import { chooseEffectOption } from './choices'
 // Payment primitives shared by every cost-paying action (playCard,
 // callLegend now; combat/effect costs in later tasks). See docs/rulings.md
 // §21+ for the sell/play/call-a-legend semantics this file implements.
@@ -109,4 +110,31 @@ export function pay(state: GameState, payment: number[]): GameState {
     state.cards[uid].ready = false
   }
   return state
+}
+
+/** A payment label never reveals the identity of a face-down card. */
+export function paymentLabel(db: CardDb, state: GameState, player: PlayerId, uid: number): string {
+  const p = state.players[player]
+  const eddie = p.eddies.indexOf(uid)
+  if (eddie >= 0) return 'Eddie ' + (eddie + 1)
+  const position = p.legends.indexOf(uid) + 1
+  return state.cards[uid].faceUp ? 'Legend ' + position + ': ' + db[state.cards[uid].defId].name : 'Face-down Legend ' + position
+}
+
+/** Costs arising inside a resolution use the same explicit replayable choices. */
+export function choosePayment(db: CardDb, state: GameState, player: PlayerId, cost: number, sourceUid: number, exclude?: number): number[] | null {
+  const canonical = canonicalPayment(db, state, player, cost, exclude)
+  if (canonical === null || cost === 0) return canonical
+  const eligible = readyPaymentUids(db, state, player).filter(uid => uid !== exclude)
+  if (eligible.length === cost) return eligible
+  const chosen: number[] = []
+  while (chosen.length < cost) {
+    const options = eligible.filter(uid => !chosen.includes(uid))
+    if (options.length === cost - chosen.length) return [...chosen, ...options]
+    const uid = chooseEffectOption(state, player, sourceUid, 'Choose payment ' + (chosen.length + 1) + ' of ' + cost + ' €$', options,
+      Object.fromEntries(options.map(uid => [uid, paymentLabel(db, state, player, uid)])))
+    if (uid === null) return null
+    chosen.push(uid)
+  }
+  return chosen
 }
