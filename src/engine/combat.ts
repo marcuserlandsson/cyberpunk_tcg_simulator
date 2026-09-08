@@ -1,3 +1,4 @@
+import { chooseEffectOption } from './choices'
 // Combat: declaring an attack, the react window, blocks, fights and Gig
 // stealing. The rules authority is the gameplay guide's ATTACK (p10) and
 // ATTACKING (p10-11) sections plus the glossary entries SPEND/READY, LAG,
@@ -52,8 +53,8 @@ import {
   cantBeBlocked,
   cardTags,
   controllerOf,
-  defeatInterceptorFor,
-  defeatShieldOf,
+  defeatInterceptorsFor,
+  defeatShieldsOf,
   effectivePower,
   signedPower,
   fightPowerBonus,
@@ -503,19 +504,12 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
   }
 }
 
-/**
- * Defeats a Unit: `unitDefeated`, then the field exit to the trash, then its
- * on-defeat effects.
- *
- * `allowIntercept: false` skips the would-be-defeated interception
- * (docs/rulings.md §144) — used for the substitute defeat an interception
- * itself applies, so a chain of interceptors can never recurse.
- */
+/** Defeat replacements: mandatory first, controller order, each effect once per chain. */
 export function defeatUnit(
   draft: GameState,
   db: CardDb,
   uid: number,
-  opts: { allowIntercept?: boolean } = {}
+  opts: { usedReplacements?: number[] } = {}
 ): void {
   // Entry guard (docs/rulings.md §147 — Task 9 fuzz harness, fix round 2):
   // `defeatUnit` is called in loops (a tied `fight`, a mass-`defeat` effect
@@ -525,47 +519,30 @@ export function defeatUnit(
   // over, and every OTHER choke point (`endGame`, the trigger wrappers)
   // already stopped for the same reason.
   if (draft.winner !== null) return
-  // "If this Unit would be defeated, defeat its DEADMAN TRANSMITTER instead":
-  // the Gear soaks the hit and the Unit stays put (docs/rulings.md §46). An
-  // unconditional, costless substitution, so it settles the question before
-  // any *decision* is offered — nothing is "would be defeated" any more.
-  const shield = defeatShieldOf(db, draft, uid)
-  if (shield !== null) {
-    const host = draft.cards[uid]
-    host.attachedGear = host.attachedGear.filter((gearUid) => gearUid !== shield)
-    draft.players[draft.cards[shield].owner].trash.push(shield)
-    draft.events.push({ type: 'cardTrashed', uid: shield })
+  const used = opts.usedReplacements ?? []
+  const shields = defeatShieldsOf(db, draft, uid).filter(source => !used.includes(source))
+  if (shields.length) {
+    const shield = chooseEffectOption(draft, controllerOf(draft, uid), uid, 'Choose the mandatory defeat replacement', shields,
+      Object.fromEntries(shields.map(source => [source, `Defeat ${db[draft.cards[source].defId].name} #${source} instead`])), true)
+    if (shield !== null) defeatGear(draft, db, shield)
     return
   }
 
-  // [interception seam] "If a friendly Unit would be defeated, you may spend
-  // 1 €$ to defeat this Legend instead." (jackie-welles-mama-s-favorite,
-  // docs/rulings.md §144). Every defeat path in the engine funnels through
-  // here — fights, effect nodes, mass-defeat scripts — so this one seam covers
-  // all of them.
-  if (opts.allowIntercept !== false) {
-    const intercept = defeatInterceptorFor(db, draft, uid)
-    if (intercept !== null) {
-      const owner = draft.cards[intercept.protector].owner
-      const answer = askIntercept(draft, {
-        kind: 'defeat',
-        player: owner,
-        protector: intercept.protector,
-        subject: uid,
-        options: [DECLINE, intercept.protector],
-      })
-      if (answer !== DECLINE) {
-        const payment = canonicalPayment(db, draft, owner, intercept.eddies, intercept.protector)
-        if (payment !== null) {
-          spendOnDraft(db, draft, payment)
-          draft.events.push({
-            type: 'effectResolved',
-            sourceUid: intercept.protector,
-            description: `intercepts the defeat of ${uid}`,
-          })
-          defeatUnit(draft, db, intercept.protector, { allowIntercept: false })
-          return
-        }
+  const intercepts = defeatInterceptorsFor(db, draft, uid).filter(effect => !used.includes(effect.protector))
+  if (intercepts.length) {
+    const player = controllerOf(draft, uid)
+    const answer = askIntercept(draft, {
+      kind: 'defeat', player, protector: intercepts[0].protector, subject: uid,
+      options: [DECLINE, ...intercepts.map(effect => effect.protector)],
+    })
+    const intercept = intercepts.find(effect => effect.protector === answer)
+    if (intercept) {
+      const payment = canonicalPayment(db, draft, player, intercept.eddies)
+      if (payment !== null) {
+        spendOnDraft(db, draft, payment)
+        draft.events.push({ type: 'effectResolved', sourceUid: intercept.protector, description: `intercepts the defeat of ${uid}` })
+        defeatUnit(draft, db, intercept.protector, { usedReplacements: [...used, intercept.protector] })
+        return
       }
     }
   }

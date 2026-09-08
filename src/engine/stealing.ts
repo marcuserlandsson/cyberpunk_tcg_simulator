@@ -2,7 +2,7 @@ import { fireWatcherTrigger } from '../cards/effects'
 import { chooseEffectOption } from './choices'
 import { checkOvertimeWin } from './game'
 import { askIntercept, DECLINE } from './intercept'
-import { cardTags, opponentOf, stealInterceptorFor } from './query'
+import { cardTags, opponentOf, stealInterceptorsFor } from './query'
 import type { CardDb, GameState, PlayerId } from './types'
 
 /** CR 6.7/9.23: all choices precede prevention; all transfers precede triggers. */
@@ -13,7 +13,10 @@ export function transferStolenGigs(db: CardDb, draft: GameState, sourceUid: numb
   for (const index of [...new Set(selected)]) {
     const die = area[index]
     if (!die) continue
-    const intercept = stealInterceptorFor(db, draft, victim, sourceUid, die.value)
+    const intercepts = stealInterceptorsFor(db, draft, victim, sourceUid, die.value)
+    const protector = chooseEffectOption(draft, victim, sourceUid, 'Choose the steal-prevention effect to use', intercepts.map(effect => effect.protector),
+      Object.fromEntries(intercepts.map(effect => [effect.protector, `${db[draft.cards[effect.protector].defId].name} #${effect.protector}`])), true)
+    const intercept = intercepts.find(effect => effect.protector === protector)
     if (intercept) {
       const answer = askIntercept(draft, {
         kind: 'steal', player: victim, protector: intercept.protector, subject: index,

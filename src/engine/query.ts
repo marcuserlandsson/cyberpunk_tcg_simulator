@@ -991,37 +991,36 @@ export function friendlyGigRerollOption(db: CardDb, state: GameState, player: Pl
  * only interceptor IS that card, or its controller cannot pay right now
  * (an unaffordable option is never offered as a decision).
  */
-export function defeatInterceptorFor(
+export function defeatInterceptorsFor(
   db: CardDb,
   state: GameState,
   uid: number
-): { protector: number; eddies: number } | null {
+): { protector: number; eddies: number }[] {
   const card = state.cards[uid]
-  if (!card) return null
+  if (!card) return []
   const player = controllerOf(state, uid)
-  if (!state.players[player].field.includes(uid)) return null
+  if (!state.players[player].field.includes(uid)) return []
   const hosts = [
     ...state.players[player].field,
     ...state.players[player].legends.filter((u) => state.cards[u].faceUp),
   ]
+  const found: { protector: number; eddies: number }[] = []
   for (const host of hosts) {
     if (host === uid) continue
     for (const node of activeStaticNodes(db, state, host)) {
       if (node.kind !== 'defeatInterceptSelf') continue
-      // The interceptor is about to be destroyed, so it may never help pay
-      // its own cost — the same rule §31 gives a {Go Solo} Legend's play.
-      if (payableUids(state, player, host).length < node.eddies) continue
-      return { protector: host, eddies: node.eddies }
+      if (payableUids(db, state, player).length < node.eddies) continue
+      found.push({ protector: host, eddies: node.eddies })
     }
   }
-  return null
+  return found
 }
 
 /** Ready cards in `player`'s eddies/legends zones that could pay 1 €$ each. */
-function payableUids(state: GameState, player: PlayerId, exclude: number): number[] {
+function payableUids(db: CardDb, state: GameState, player: PlayerId): number[] {
   const p = state.players[player]
   return [...p.eddies, ...p.legends].filter(
-    (uid) => state.cards[uid].ready && uid !== exclude
+    (uid) => state.cards[uid].ready && (p.eddies.includes(uid) || !state.cards[uid].faceUp || db[state.cards[uid].defId].sellTag)
   )
 }
 
@@ -1033,19 +1032,20 @@ function payableUids(state: GameState, player: PlayerId, exclude: number): numbe
  * clause, docs/rulings.md §144). Null unless the stealing card is a rival
  * **Unit** and at least one hand card's printed cost matches exactly.
  */
-export function stealInterceptorFor(
+export function stealInterceptorsFor(
   db: CardDb,
   state: GameState,
   victim: PlayerId,
   stealerUid: number,
   dieValue: number
-): { protector: number; candidates: number[] } | null {
-  if (!isUnitStealer(db, state, stealerUid)) return null
-  if (controllerOf(state, stealerUid) === victim) return null
+): { protector: number; candidates: number[] }[] {
+  if (!isUnitStealer(db, state, stealerUid)) return []
+  if (controllerOf(state, stealerUid) === victim) return []
   const hosts = [
     ...state.players[victim].field,
     ...state.players[victim].legends.filter((u) => state.cards[u].faceUp),
   ]
+  const found: { protector: number; candidates: number[] }[] = []
   for (const host of hosts) {
     const offers = activeStaticNodes(db, state, host).some(
       (node) => node.kind === 'stealInterceptByDiscard'
@@ -1055,9 +1055,9 @@ export function stealInterceptorFor(
       (uid) => db[state.cards[uid].defId]?.cost === dieValue
     )
     if (candidates.length === 0) continue
-    return { protector: host, candidates }
+    found.push({ protector: host, candidates })
   }
-  return null
+  return found
 }
 
 /**
@@ -1076,9 +1076,10 @@ export function cantBeBlocked(db: CardDb, state: GameState, uid: number): boolea
  * null when nothing is protecting it. The *first* such Gear (in attach order)
  * takes the hit.
  */
-export function defeatShieldOf(db: CardDb, state: GameState, uid: number): number | null {
+export function defeatShieldsOf(db: CardDb, state: GameState, uid: number): number[] {
   const card = state.cards[uid]
-  if (!card) return null
+  if (!card) return []
+  const found: number[] = []
   for (const gearUid of card.attachedGear) {
     const gear = state.cards[gearUid]
     const gearDef = gear ? db[gear.defId] : undefined
@@ -1086,9 +1087,9 @@ export function defeatShieldOf(db: CardDb, state: GameState, uid: number): numbe
     const shields = staticNodes(state, gearDef, controllerOf(state, uid)).some(
       (node) => node.kind === 'defeatShield'
     )
-    if (shields) return gearUid
+    if (shields) found.push(gearUid)
   }
-  return null
+  return found
 }
 
 /**

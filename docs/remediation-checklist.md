@@ -99,3 +99,7 @@ Call a Legend now selects a face-down position without exposing its identity. Ki
 ### 08k — control and inherited Gear effects
 
 Derived control now follows the public play area, including attached Gear, while ownership governs exit destinations. Inherited self targets, source conditions and other-unit filters refer to the host. Host/gear statics evaluate the controller's board. Leaving play removes the card from the controller's zone and moves it to its owner; defeating Gear alone does not fire its inherited host Defeated text. Verified 673 engine/card tests and TypeScript, including targeted foreign-control and Gear regressions.
+
+### 08l — replacement choices and chains
+
+Multiple mandatory defeat shields and optional protectors are now selectable. Mandatory effects precede optional ones; substitute defeats are checked again for applicable replacements, with each replacement excluded after its first application in that chain. Optional prevention affordability respects face-up Legend Sell tags and permits eligible self-payment. Multiple steal-prevention sources are also selectable. Verified 676 engine/card tests and TypeScript, including two-shield ordering, chained Jackies and a shield on a substitute casualty.
