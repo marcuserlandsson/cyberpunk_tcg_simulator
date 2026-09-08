@@ -12,6 +12,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { SimulateView, type SimWorkerLike } from '../../src/ui/SimulateView'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { saveDeck, saveSimResult } from '../../src/ui/storage'
+import { readSimRuns } from '../../src/ui/simHistory'
 import { toCsv, type SimResult } from '../../src/sim/runner'
 import type { SimWorkerMessage } from '../../src/sim/worker'
 import type { DeckList } from '../../src/engine/deck'
@@ -242,7 +243,7 @@ describe('SimulateView — export', () => {
     await waitFor(() => expect(revokeUrl).toHaveBeenCalledWith('blob:mock-csv'))
   })
 
-  it('exports JSON as JSON.stringify(result, null, 2) via a Blob download', async () => {
+  it('exports the complete run with result, deck snapshots and settings', async () => {
     runResultAndCapture()
     const blobSpy = vi.spyOn(globalThis, 'Blob')
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-json')
@@ -252,7 +253,11 @@ describe('SimulateView — export', () => {
     fireEvent.click(screen.getByTestId('sim-export-json'))
 
     const [parts, options] = blobSpy.mock.calls[0] as [BlobPart[], { type: string }]
-    expect(parts[0]).toBe(JSON.stringify(CANNED_RESULT, null, 2))
+    const run = JSON.parse(String(parts[0]))
+    expect(run.result).toEqual(CANNED_RESULT)
+    expect(run.options.deckA.legends).toHaveLength(3)
+    expect(run.options.seed).toBe(42)
+    expect(run.engineVersion).toBeTruthy()
     expect(options.type).toBe('application/json')
     await waitFor(() => expect(revokeUrl).toHaveBeenCalledWith('blob:mock-json'))
   })
@@ -310,5 +315,48 @@ describe('SimulateView — last-result banner', () => {
 
     act(() => worker().emit({ type: 'result', result: CANNED_RESULT }))
     expect(screen.queryByTestId('sim-last-result-banner')).toBeNull()
+  })
+})
+
+
+describe('SimulateView — durable history', () => {
+  it('reopens the complete result after remount', () => {
+    const { worker } = renderView()
+    fireEvent.click(screen.getByTestId('sim-run'))
+    act(() => worker().emit({ type: 'result', result: CANNED_RESULT }))
+    const name = screen.getByTestId('sim-winrate-a').textContent
+    cleanup(); renderView()
+    expect(screen.getByTestId('sim-results')).toBeTruthy()
+    expect(screen.getByTestId('sim-winrate-a').textContent).toBe(name)
+    expect(screen.getByTestId('sim-provenance').textContent).toContain('seed 42')
+  })
+  it('keeps a completed result exportable if storage refuses the write', () => {
+    const { worker } = renderView()
+    fireEvent.click(screen.getByTestId('sim-run'))
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
+    act(() => worker().emit({ type: 'result', result: CANNED_RESULT }))
+    expect(screen.getByTestId('sim-history-error').textContent).toContain('export JSON')
+    expect(screen.getByTestId('sim-results')).toBeTruthy()
+    expect(screen.getByTestId('sim-export-json')).toBeTruthy()
+    expect((screen.getByTestId('sim-run') as HTMLButtonElement).disabled).toBe(false)
+    expect(worker().terminate).toHaveBeenCalledTimes(1)
+  })
+  it('ignores a cancelled worker result after another run starts', () => {
+    const { worker } = renderView()
+    fireEvent.click(screen.getByTestId('sim-run'))
+    const old = worker()
+    fireEvent.click(screen.getByTestId('sim-cancel'))
+    fireEvent.click(screen.getByTestId('sim-run'))
+    act(() => old.emit({ type: 'result', result: CANNED_RESULT }))
+    expect(screen.queryByTestId('sim-results')).toBeNull()
+    expect(readSimRuns().runs).toHaveLength(0)
+    act(() => worker().emit({ type: 'result', result: CANNED_RESULT }))
+    expect(readSimRuns().runs).toHaveLength(1)
+  })
+  it('handles Worker construction failure without leaving Run disabled', () => {
+    render(<SimulateView db={db} createWorker={() => { throw new Error('Worker blocked') }} />)
+    fireEvent.click(screen.getByTestId('sim-run'))
+    expect(screen.getByTestId('sim-error').textContent).toContain('Worker blocked')
+    expect((screen.getByTestId('sim-run') as HTMLButtonElement).disabled).toBe(false)
   })
 })

@@ -91,10 +91,8 @@ export default function App() {
         <div hidden={view !== 'deckBuilder'}>
           <DeckBuilderView db={db} useOfficialImages={useOfficialImages} />
         </div>
-        {/* Unmounted (not hidden) while not the active tab: a real Worker left
-            running in the background would otherwise keep spinning
-            invisibly, and SimulateView's own unmount effect terminates it. */}
-        {view === 'simulate' && <SimulateView db={db} />}
+        {/* Keep the run and its worker alive during navigation; Cancel remains explicit. */}
+        <div hidden={view !== 'simulate'}><SimulateView db={db} /></div>
         {/* Kept mounted, only hidden: same pattern as Play/Deck Builder so
             filter state and an in-progress quick-add session survive a
             glance at another tab. */}

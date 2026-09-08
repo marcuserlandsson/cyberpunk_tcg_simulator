@@ -13,7 +13,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 07. Discover/import current cards and printings, track data freshness and implementation coverage, and correct errata.
 - [x] 08. Implement rules-audit corrections, explicit effect/player choices, private knowledge, and payment choices, with card/engine regressions.
 - [x] 09. Model unique artwork independently of printings; separate playset/artwork targets, filters, progress, and buy-lists.
-- [ ] 10. Persist complete simulation runs and deck snapshots; retain runs during navigation and support history/reopening/exports.
+- [x] 10. Persist complete simulation runs and deck snapshots; retain runs during navigation and support history/reopening/exports.
 - [ ] 11. Clarify simulation identities/metrics, add uncertainty and controlled matchup comparisons.
 - [ ] 12. Add explicit deck formats, deck versions/notes, and direct Play this deck.
 - [ ] 13. Add deck diagnostics, legal-RAM filtering, opening-hand sampling, and manual practice scenarios.
@@ -151,3 +151,7 @@ Fight protection, delayed consequences, Block watchers and UI ownership cues now
 
 Reviewed all 460 printing images and mapped them to 192 illustrations, including four manually checked Edgerunner crop variants. Stable artwork IDs and image provenance/hashes are independent of printing keys and finishes. Playset totals group distinct card identities, exclude collection-only promos, and show owned/target counts separately from artwork totals. Filters, row labels and independent/combined buy-lists use those same goals; duplicate reprints cannot inflate artwork completion and incomplete percentages never round to 100. Printing refreshers preserve reviewed mappings and flag changed/unknown images for review. Downloaded the printing thumbnails locally; exact inventory counts and keys are unchanged. Verified 88 focused checks, all 319 UI/data tests, TypeScript/build, a catalog reimport preserving metadata, and three production-preview browser checks for goal arithmetic, persistence and phone/desktop layout.
 
+
+### 10 — durable simulation runs
+
+Each completed run now has independent browser persistence, exact deck snapshots, seeds/agents, engine/rules/card-data versions, all game outcomes and card statistics. History supports reopening, JSON import/export and explicit removal without evicting older runs. Navigation keeps active workers alive; cancelled/stale workers cannot overwrite results. Storage failures preserve the in-memory export and prior saved runs. Legacy results remain readable with missing-provenance labels. Verified 43 focused history/UI/runner/purity tests, TypeScript/build and a real-worker browser check covering navigation and reload with unchanged snapshots.

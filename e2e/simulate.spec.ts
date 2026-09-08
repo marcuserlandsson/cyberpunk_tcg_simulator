@@ -25,6 +25,9 @@ test.describe('Simulate view', () => {
 
     await page.getByTestId('sim-run').click()
 
+    await page.getByTestId('tab-deckBuilder').click()
+    await page.getByTestId('tab-simulate').click()
+
     // The real worker is doing the work here (no mock): allow it real time,
     // but a 20-game random-vs-random run should land in well under 5s.
     await expect(page.getByTestId('sim-results')).toBeVisible({ timeout: 5_000 })
@@ -35,6 +38,18 @@ test.describe('Simulate view', () => {
     // The progress UI is gone once the result has landed.
     await expect(page.getByTestId('sim-progress')).toHaveCount(0)
 
+    await expect(page.getByTestId('sim-provenance')).toContainText('42')
+    const provenance = await page.getByTestId('sim-provenance').locator('p').allTextContents()
+    const snapshots = JSON.parse((await page.getByTestId('sim-provenance').locator('pre').textContent())!)
+    await page.reload()
+    await page.getByTestId('tab-simulate').click()
+    await expect(page.getByTestId('sim-results')).toBeVisible()
+    await expect(page.getByTestId('sim-provenance').locator('p')).toHaveText(provenance)
+    expect(JSON.parse((await page.getByTestId('sim-provenance').locator('pre').textContent())!)).toEqual(snapshots)
+    await page.getByTestId('sim-history').locator('summary').click()
+    await expect(page.getByTestId('sim-open-run')).toHaveCount(1)
     expect(pageErrors, 'no uncaught page errors').toEqual([])
   })
 })
+
+
