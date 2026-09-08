@@ -25,7 +25,7 @@ import { callChosenLegend, chooseFaceDownLegend, peekLegends } from '../../engin
 // runs at module evaluation), exactly like the engine <-> cards cycle
 // documented at the top of ../effects.ts.
 
-import { defeatGear, defeatUnit, leaveField } from '../../engine/combat'
+import { bottomDeckCards, defeatGear, defeatUnit, leaveField } from '../../engine/combat'
 import { canonicalPayment } from '../../engine/economy'
 import { endGame, drawCards, stillLive } from '../../engine/game'
 import {
@@ -43,7 +43,7 @@ import { playCardOnDraft, readyFriendlyEddies, spendOnDraft, type EffectCtx } fr
 
 /** Scripts that inspect/reveal previously unknown cards. AI previews stop before entry. */
 export const PRIVATE_INFORMATION_SCRIPTS = new Set([
-  'optional-free-call', 'all-is-lost', 'arasaka-emergency-radioport', 'shattered-memories',
+  'three-mouths-one-desire', 'optional-free-call', 'all-is-lost', 'arasaka-emergency-radioport', 'shattered-memories',
   'hanako-arasaka-in-a-gilded-cage', 'kiroshi-optics', 'sketchy-ripper',
   't-bug-amateur-philosopher', 'the-heist', 'viktor-vektor-sit-down-and-relax',
   'river-ward-detective-on-the-hunt:defeat-search', 'fool-on-the-hill',
@@ -123,6 +123,41 @@ function mistyReveal(cardType: 'unit' | 'gear' | 'program'): ScriptedCard {
 }
 
 export const scriptedCards: Record<string, ScriptedCard> = {
+  'we-gotta-live-together': (db, state, ctx) => {
+    const eligible = state.players[ctx.player].trash.filter(uid => {
+      const def = db[state.cards[uid].defId]
+      return def.type === 'unit' && def.cost <= 3
+    })
+    const chosen = pickN(db, state, ctx, eligible, 2)
+    for (const uid of chosen) {
+      if (!stillLive(state)) break
+      if (state.players[ctx.player].trash.includes(uid)) playCardOnDraft(db, state, ctx.player, uid, [], [])
+    }
+    return state
+  },
+  'three-mouths-one-desire': (db, state, ctx) => {
+    const p = state.players[ctx.player]
+    const top = p.deck.slice(0, 3)
+    const first = pick(db, state, ctx, top)
+    const taken = first === undefined ? [] : [first]
+    const extra = p.gigArea.filter(die => die.value === 1).length
+    taken.push(...pickN(db, state, ctx, top.filter(uid => uid !== first), extra))
+    p.deck = p.deck.filter(uid => !top.includes(uid))
+    p.hand.push(...taken)
+    const [rest, rng] = shuffle(state.rng, top.filter(uid => !taken.includes(uid)))
+    state.rng = rng
+    p.deck.push(...rest)
+    return state
+  },
+  'towerfall:weaken': (_db, state, ctx) => {
+    for (const uid of state.players[opponentOf(ctx.player)].field) state.cards[uid].tempPower -= 5
+    return state
+  },
+  'towerfall:bottom-deck': (db, state, ctx) => {
+    const targets = state.players[opponentOf(ctx.player)].field.filter(uid => effectivePower(db, state, uid) === 0)
+    bottomDeckCards(state, db, targets)
+    return state
+  },
   'optional-free-call': (db, state, ctx) => {
     callChosenLegend(db, state, ctx.player, ctx.sourceUid, true)
     return state

@@ -217,6 +217,7 @@ export const effectNodeSchema: z.ZodType<EffectNode> = z.lazy(() =>
     z.strictObject({ kind: z.literal('draw'), count: powerAmountSchema }),
     z.strictObject({ kind: z.literal('discardRandomRival'), count: z.number() }),
     z.strictObject({ kind: z.literal('discardRival'), count: z.number() }),
+    z.strictObject({ kind: z.literal('playCost'), amount: z.number() }),
     z.strictObject({
       kind: z.literal('buffPower'),
       amount: powerAmountSchema,

@@ -5,8 +5,8 @@ Cyberpunk Trading Card Game** (Cyberpunk 2077 license), built against the
 public card pool ahead of the game's retail launch. The game runs
 in your browser: build a deck from the 151-card catalog, then play a
 complete game against a heuristic AI opponent, or batch-simulate thousands of
-AI-vs-AI games to see how decks and cards perform. Ten newly discovered cards
-are available for collection/planning with gameplay implementation pending.
+AI-vs-AI games to see how decks and cards perform. Cards marked pending
+are available for collection/planning while their gameplay implementation is completed.
 The comprehensive rules audit identified corrections still being implemented;
 see [the checklist](docs/remediation-checklist.md) before treating results as rules-accurate.
 

@@ -123,3 +123,7 @@ Printed rival-discard instructions now ask that rival which card to discard. Cal
 ### 08q — first new catalog cards
 
 Enabled Detonate, Tyger's Whisper and MaxTac Heavy after implementing rival-Gear targeting/defeat, an optional free Call, and the rival-Unit cost reduction. Quick reactions, target power limits, Call allowance and minimum payment have focused regressions. Reimported status from the preserved source snapshot; 151 cards/460 printing keys remain unchanged and seven cards remain pending. Verified 712 engine/card/data tests, 311 fuzz checks and TypeScript.
+
+### 08r — new search, revival and modal Programs
+
+Implemented We Gotta Live Together's conditional price and zero-to-two distinct free Unit plays, Three Mouths One Desire's mandatory first selection and optional min-Gig extras, and both Towerfall modes including their ordered combined resolution when behind on Street Cred. Search selections keep the searched cards in the deck until moved; bottom-deck groups include attached Gear. Four imported cards remain pending. Verified 1,033 engine/card/data/fuzz checks, three AI hidden-information checks and TypeScript.

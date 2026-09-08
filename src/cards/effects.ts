@@ -1023,6 +1023,7 @@ function applyNode(
     case 'cantAttack':
     case 'defeatShield':
     case 'winsFightVsKeyword':
+    case 'playCost':
     case 'costReduction':
     case 'powerVsCardType':
     case 'attackReadyWithKeyword':

@@ -4625,8 +4625,15 @@
       "doll"
     ],
     "text": "Search the top 3 cards of your deck. Add 1 to your hand. You may add 1 more for each friendly min Gig. Bottom-deck the rest.",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "three-mouths-one-desire"
+        }
+      }
+    ],
     "printedCost": 2
   },
   {
@@ -4646,8 +4653,27 @@
       "braindance"
     ],
     "text": "Choose one effect. If you have less ☆ (Street Cred) than a Rival, choose both instead.\nGive all rival Units -5 power this turn. // Bottom-deck all rival Units with power 0.",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "chooseOne",
+          "allIf": {
+            "streetCredBehindRival": true
+          },
+          "modes": [
+            {
+              "kind": "scripted",
+              "name": "towerfall:weaken"
+            },
+            {
+              "kind": "scripted",
+              "name": "towerfall:bottom-deck"
+            }
+          ]
+        }
+      }
+    ],
     "printedCost": 6
   },
   {
@@ -5158,8 +5184,25 @@
       "nomad"
     ],
     "text": "If a Rival controls at least 2 more Gigs than you, play this Program for 3 €$.\nPlay up to 2 Units with cost 3 or less from your trash for free.",
-    "effects": [],
-    "implementation": "pending",
+    "effects": [
+      {
+        "trigger": "static",
+        "condition": {
+          "rivalGigLeadAtLeast": 2
+        },
+        "effect": {
+          "kind": "playCost",
+          "amount": 3
+        }
+      },
+      {
+        "trigger": "onPlay",
+        "effect": {
+          "kind": "scripted",
+          "name": "we-gotta-live-together"
+        }
+      }
+    ],
     "printedCost": 5
   },
   {

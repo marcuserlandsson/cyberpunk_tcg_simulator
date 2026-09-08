@@ -477,6 +477,7 @@ export function effectiveCardCost(
     if (effect.trigger !== 'static') continue
     if (!conditionMet(state, player, effect)) continue
     for (const node of flattenNodes(effect.effect)) {
+      if (node.kind === 'playCost') cost = node.amount
       if (node.kind === 'costReduction') cost = reducedCost(db, state, player, cost, node.reduction)
     }
   }

@@ -335,6 +335,7 @@ export type EffectNode =
   | { kind: 'winsFightVsKeyword'; keyword: string }
   // Static: this card's own play cost is reduced (docs/rulings.md §44).
   | { kind: 'costReduction'; reduction: CostReduction }
+  | { kind: 'playCost'; amount: number }
   // Batch 2 additions (docs/rulings.md §55 ff.):
   // Static: "+N power while fighting a [cardType]" (meredith-stout). Only
   // consulted by combat.ts's `fight()`, never by the generic `effectivePower`
