@@ -29,6 +29,9 @@
 // crash from a slow run.
 
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { intervalLabel } from '../sim/statistics'
+import { SimBenchmark, benchmarkPlan } from './SimBenchmark'
+import { cardStatsCsv, runGamesCsv } from './simCsv'
 import { isDeckPickable, deckPickerLabel } from './deckPicker'
 import { createSimRun, parseSimRun, readSimRuns, saveSimRun, removeSimRun, runUsesCurrentRules, simResultSchema, type SimRun } from './simHistory'
 import { useDecks, getLastSimResult } from './storage'
@@ -128,7 +131,7 @@ function CardStatsTable({ db, title, stats, minGamesSeen, testId }: CardStatsTab
   const rows = useMemo(() => {
     const withName = stats
       .filter((stat) => stat.gamesSeen >= minGamesSeen)
-      .map((stat) => ({ ...stat, name: db[stat.defId]?.name ?? stat.defId }))
+      .map((stat) => ({ ...stat, name: db[stat.defId] ? [db[stat.defId].name, db[stat.defId].subtitle].filter(Boolean).join(' — ') : stat.defId }))
     const dir = sortDir === 'asc' ? 1 : -1
     return withName.sort((a, b) => {
       switch (sortKey) {
@@ -147,7 +150,7 @@ function CardStatsTable({ db, title, stats, minGamesSeen, testId }: CardStatsTab
   const columns: { key: SortKey; label: string }[] = [
     { key: 'name', label: 'Card' },
     { key: 'timesPlayed', label: 'Times played' },
-    { key: 'gamesSeen', label: 'Games seen' },
+    { key: 'gamesSeen', label: 'Games played' },
     { key: 'winRate', label: 'Win % when played' },
   ]
 
@@ -168,6 +171,7 @@ function CardStatsTable({ db, title, stats, minGamesSeen, testId }: CardStatsTab
               </button>
             </th>
           ))}
+          <th>95% interval</th>
         </tr>
       </thead>
       <tbody>
@@ -176,7 +180,8 @@ function CardStatsTable({ db, title, stats, minGamesSeen, testId }: CardStatsTab
             <td>{row.name}</td>
             <td data-testid={`${testId}-row-timesPlayed`}>{row.timesPlayed}</td>
             <td data-testid={`${testId}-row-gamesSeen`}>{row.gamesSeen}</td>
-            <td data-testid={`${testId}-row-winRate`}>{pct(row.winRateWhenPlayed)}</td>
+            <td data-testid={`${testId}-row-winRate`}>{row.gamesSeen ? pct(row.winRateWhenPlayed) : "—"}</td>
+            <td>{intervalLabel(Math.round(row.winRateWhenPlayed * row.gamesSeen), row.gamesSeen)}</td>
           </tr>
         ))}
       </tbody>
@@ -215,6 +220,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
     () => { try { const parsed = simResultSchema.safeParse(getLastSimResult()); return parsed.success ? parsed.data : null } catch { return null } }
   )
 
+  const queueRef = useRef<SimOptions[]>([])
   const workerRef = useRef<SimWorkerLike | null>(null)
   useEffect(() => {
     if (!decks.some((d) => d.name === deckAName)) setDeckAName(pickableDecks[0]?.name ?? '')
@@ -229,6 +235,10 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
       workerRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    if (!running && queueRef.current.length) { const next = queueRef.current.shift()!; startRun(next) }
+  }, [running, history])
 
   function deckByName(name: string): DeckList | undefined {
     return decks.find((deck) => deck.name === name)
@@ -255,7 +265,8 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
   }
 
   function startRun(options: SimOptions): void {
-    if (running || !isDeckPickable(db, options.deckA) || !isDeckPickable(db, options.deckB)) return
+    if (running) return
+    if (!isDeckPickable(db, options.deckA) || !isDeckPickable(db, options.deckB)) { queueRef.current = []; setError("A queued deck is no longer playable."); return }
     const opts = structuredClone(options)
     const games = opts.games
     setSelectedRun(null)
@@ -304,6 +315,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
    * dead worker can't still be `postMessage`d or leaked.
    */
   function handleWorkerFailure(message: string): void {
+    queueRef.current = []
     setError(message)
     setRunning(false)
     setProgress(null)
@@ -312,6 +324,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
   }
 
   function handleCancel(): void {
+    queueRef.current = []
     workerRef.current?.terminate()
     workerRef.current = null
     setRunning(false)
@@ -325,7 +338,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
 
   function handleExportCsv(): void {
     if (result === null) return
-    download('sim-result.csv', toCsv(result), 'text/csv')
+    download('sim-result.csv', selectedRun ? runGamesCsv(selectedRun) : toCsv(result), 'text/csv')
   }
 
   function openRun(run: SimRun): void {
@@ -467,6 +480,11 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
         </button>
       </div>
 
+      <SimBenchmark decks={pickableDecks} runs={history.runs} busy={running} start={(baseline, candidate, opponents) => {
+        const seed = Number(seedText)
+        const plan = benchmarkPlan(baseline, candidate, opponents, { games: clampGames(Number(gamesText)), seed: Number.isSafeInteger(seed) ? seed : DEFAULT_SEED, agentA, agentB })
+        const first = plan.shift()!; queueRef.current = plan; startRun(first)
+      }} />
       {running && progress !== null && (
         <div className="sim-progress panel" data-testid="sim-progress">
           <progress
@@ -476,7 +494,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
             max={progress.total}
           />
           <span className="sim-progress__text" data-testid="sim-progress-text">
-            {progress.done} / {progress.total}
+            {progress.done} / {progress.total} · {queueRef.current.length} queued runs
           </span>
           <button type="button" className="btn--danger" data-testid="sim-cancel" onClick={handleCancel}>
             Cancel
@@ -492,7 +510,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
             <p>Rules {selectedRun.rulesVersion.slice(0, 10)} · engine {selectedRun.engineVersion} · card data {selectedRun.cardData}</p>
             {!runUsesCurrentRules(db, selectedRun) && <p role="status">Historical result uses different rules, engine or card data. A new run will use the current version.</p>}
             <details><summary>Exact deck snapshots</summary><pre>{JSON.stringify({ A: selectedRun.options.deckA, B: selectedRun.options.deckB }, null, 2)}</pre></details>
-            <button type="button" disabled={running} onClick={() => startRun(selectedRun.options)}>Run these snapshots with current rules</button>
+            <button type="button" disabled={running} onClick={() => startRun({ ...selectedRun.options, benchmark: undefined })}>Run these snapshots with current rules</button>
           </div>}
 
           <div className="sim-winrates" data-testid="sim-winrates">
@@ -513,10 +531,10 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
               </div>
             </div>
             <div className="sim-winrates__row sim-winrates__row--a" data-testid="sim-winrate-a">
-              {ranNames.a}: {winsA} wins ({pct(result.winRateA)})
+              {ranNames.a}: {winsA} wins ({pct(result.winRateA)}) · 95% interval {intervalLabel(winsA, result.games.length)}
             </div>
             <div className="sim-winrates__row sim-winrates__row--b" data-testid="sim-winrate-b">
-              {ranNames.b}: {winsB} wins ({pct(winRateB)})
+              {ranNames.b}: {winsB} wins ({pct(winRateB)}) · 95% interval {intervalLabel(winsB, result.games.length)}
             </div>
           </div>
 
@@ -538,8 +556,9 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
             </div>
           </div>
 
+          <p>{result.games.length} games. Wins use all games as the denominator, including draws. Games played counts games where a card was played, not drawn. Conditional card win rates show correlation, not the benefit of adding that card. The 95% Wilson intervals reflect sample size, not AI quality or rules certainty.</p>
           <label className="sim-setup__field sim-min-games">
-            <span className="sim-setup__field-label">Min games seen</span>
+            <span className="sim-setup__field-label">Min games played</span>
             <input
               data-testid="sim-min-games-seen"
               type="number"
@@ -571,6 +590,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
           </div>
 
           <div className="sim-export">
+            {selectedRun && <button type="button" data-testid="sim-export-card-csv" onClick={() => download("sim-card-statistics.csv", cardStatsCsv(db, selectedRun), "text/csv")}>Export card statistics CSV</button>}
             <button
               type="button"
               className="btn--ghost"

@@ -20,7 +20,7 @@ const stat = z.object({ defId: z.string(), timesPlayed: count, gamesSeen: count,
 export const simResultSchema = z.object({ games: z.array(z.object({ winner: z.union([z.literal(0), z.literal(1), z.null()]), turns: count, seed: z.number().int(), reason: z.string() })).min(1),
   winRateA: z.number().min(0).max(1), avgTurns: z.number().nonnegative(), cardStatsA: z.array(stat), cardStatsB: z.array(stat), reasons: z.record(z.string(), count) })
 const runSchema = z.object({ version: z.literal(1), id: z.string().min(1), createdAt: z.iso.datetime(), engineVersion: z.string(), rulesVersion: z.string(), cardData: z.string(),
-  options: z.object({ deckA: deck, deckB: deck, games: count.positive(), seed: z.number().int(), agentA: z.enum(['heuristic', 'random']), agentB: z.enum(['heuristic', 'random']) }), result: simResultSchema })
+  options: z.object({ benchmark: z.object({ id: z.string(), opponent: count, role: z.enum(['baseline','candidate']) }).optional(), deckA: deck, deckB: deck, games: count.positive(), seed: z.number().int(), agentA: z.enum(['heuristic', 'random']), agentB: z.enum(['heuristic', 'random']) }), result: simResultSchema })
 
 export function createSimRun(db: CardDb, options: SimOptions, result: SimResult): SimRun {
   return structuredClone({ version: 1, id: crypto.randomUUID(), createdAt: new Date().toISOString(),

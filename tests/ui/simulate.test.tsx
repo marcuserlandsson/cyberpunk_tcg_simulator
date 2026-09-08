@@ -13,7 +13,7 @@ import { SimulateView, type SimWorkerLike } from '../../src/ui/SimulateView'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { saveDeck, saveSimResult } from '../../src/ui/storage'
 import { readSimRuns } from '../../src/ui/simHistory'
-import { toCsv, type SimResult } from '../../src/sim/runner'
+import { type SimResult } from '../../src/sim/runner'
 import type { SimWorkerMessage } from '../../src/sim/worker'
 import type { DeckList } from '../../src/engine/deck'
 
@@ -222,7 +222,7 @@ describe('SimulateView — card table: sort and filter', () => {
 })
 
 describe('SimulateView — export', () => {
-  it('exports CSV as toCsv(result) via a Blob download', async () => {
+  it('exports CSV with run provenance and game identities', async () => {
     runResultAndCapture()
     const blobSpy = vi.spyOn(globalThis, 'Blob')
     const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-csv')
@@ -233,7 +233,9 @@ describe('SimulateView — export', () => {
 
     expect(blobSpy).toHaveBeenCalledTimes(1)
     const [parts, options] = blobSpy.mock.calls[0] as [BlobPart[], { type: string }]
-    expect(parts[0]).toBe(toCsv(CANNED_RESULT))
+    expect(parts[0]).toContain('"run_id","created_at","engine"')
+    expect(parts[0]).toContain('"winner_deck"')
+    expect(parts[0]).toContain('"A","10","sevenGigs"')
     expect(options.type).toBe('text/csv')
     expect(createUrl).toHaveBeenCalledTimes(1)
     expect(clickSpy).toHaveBeenCalledTimes(1)
@@ -358,5 +360,30 @@ describe('SimulateView — durable history', () => {
     fireEvent.click(screen.getByTestId('sim-run'))
     expect(screen.getByTestId('sim-error').textContent).toContain('Worker blocked')
     expect((screen.getByTestId('sim-run') as HTMLButtonElement).disabled).toBe(false)
+  })
+})
+
+describe('controlled benchmark queue', () => {
+  it('runs paired immutable snapshots sequentially and stops remaining work on cancel', async () => {
+    const workers: FakeWorker[] = []
+    render(<SimulateView db={db} createWorker={() => { const w = new FakeWorker(); workers.push(w); return w }} />)
+    const panel = screen.getByTestId('sim-benchmark')
+    const checkbox = panel.querySelector('input[type="checkbox"]')!
+    fireEvent.click(checkbox)
+    fireEvent.click(screen.getByTestId('benchmark-start'))
+    expect(workers).toHaveLength(1)
+    const first = workers[0].postMessage.mock.calls[0][0]
+    act(() => workers[0].emit({ type: 'result', result: CANNED_RESULT }))
+    await waitFor(() => expect(workers).toHaveLength(2))
+    const second = workers[1].postMessage.mock.calls[0][0]
+    expect(second.deckB).toEqual(first.deckB)
+    expect(second.seed).toBe(first.seed)
+    expect(second.benchmark.id).toBe(first.benchmark.id)
+    expect(second.benchmark.role).toBe('candidate')
+    expect(first.benchmark.role).toBe('baseline')
+    fireEvent.click(screen.getByTestId('sim-cancel'))
+    act(() => workers[1].emit({ type: 'result', result: CANNED_RESULT }))
+    expect(readSimRuns().runs).toHaveLength(1)
+    expect(workers).toHaveLength(2)
   })
 })

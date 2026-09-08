@@ -53,3 +53,23 @@ test.describe('Simulate view', () => {
 })
 
 
+
+test('compares two versions against two opponents and retains the matched results', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('tab-simulate').click()
+  await page.getByTestId('sim-agent-a').selectOption('random')
+  await page.getByTestId('sim-agent-b').selectOption('random')
+  await page.getByTestId('sim-games').fill('2')
+  await page.getByTestId('sim-benchmark').locator('summary').click()
+  const opponents = page.getByTestId('sim-benchmark').locator('input[type="checkbox"]')
+  await opponents.nth(0).check(); await opponents.nth(1).check()
+  await page.getByTestId('benchmark-start').click()
+  await expect(page.getByTestId('benchmark-result')).toHaveCount(2)
+  await expect(page.getByTestId('benchmark-start')).toBeEnabled()
+  await expect(page.getByTestId('sim-benchmark')).toContainText('percentage points')
+  await page.reload()
+  await page.getByTestId('tab-simulate').click()
+  await page.getByTestId('sim-benchmark').locator('summary').click()
+  await expect(page.getByTestId('benchmark-result')).toHaveCount(2)
+  await expect(page.getByTestId('sim-history').locator('summary')).toContainText('(4)')
+})

@@ -42,6 +42,7 @@ import type { CardDb, GameState, PlayerId } from '../engine/types'
 export type AgentKind = 'heuristic' | 'random'
 
 export interface SimOptions {
+  benchmark?: { id: string; opponent: number; role: 'baseline' | 'candidate' }
   deckA: DeckList
   deckB: DeckList
   games: number

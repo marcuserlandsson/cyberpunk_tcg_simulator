@@ -14,7 +14,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 08. Implement rules-audit corrections, explicit effect/player choices, private knowledge, and payment choices, with card/engine regressions.
 - [x] 09. Model unique artwork independently of printings; separate playset/artwork targets, filters, progress, and buy-lists.
 - [x] 10. Persist complete simulation runs and deck snapshots; retain runs during navigation and support history/reopening/exports.
-- [ ] 11. Clarify simulation identities/metrics, add uncertainty and controlled matchup comparisons.
+- [x] 11. Clarify simulation identities/metrics, add uncertainty and controlled matchup comparisons.
 - [ ] 12. Add explicit deck formats, deck versions/notes, and direct Play this deck.
 - [ ] 13. Add deck diagnostics, legal-RAM filtering, opening-hand sampling, and manual practice scenarios.
 - [ ] 14. Add multi-deck acquisition planning with shared/assembled inventories and optional binder reservations.
@@ -155,3 +155,7 @@ Reviewed all 460 printing images and mapped them to 192 illustrations, including
 ### 10 — durable simulation runs
 
 Each completed run now has independent browser persistence, exact deck snapshots, seeds/agents, engine/rules/card-data versions, all game outcomes and card statistics. History supports reopening, JSON import/export and explicit removal without evicting older runs. Navigation keeps active workers alive; cancelled/stale workers cannot overwrite results. Storage failures preserve the in-memory export and prior saved runs. Legacy results remain readable with missing-provenance labels. Verified 43 focused history/UI/runner/purity tests, TypeScript/build and a real-worker browser check covering navigation and reload with unchanged snapshots.
+
+### 11 — interpretable statistics and matched comparisons
+
+Card tables include subtitles, games-played labels, explicit conditional-correlation guidance, sample counts and 95% Wilson intervals. Zero samples have no reported rate. A sequential benchmark compares baseline/candidate snapshots against multiple opponents using the same seeds, alternating seats and fixed agents; compatible pairs reopen from history. Cancellation/failure stops queued runs while preserving completed ones. Game and card CSVs carry provenance and safe spreadsheet text. Verified 42 focused checks, TypeScript/build and two real-worker browser workflows, including a four-run comparison and reload.
