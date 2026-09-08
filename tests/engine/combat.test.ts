@@ -834,7 +834,7 @@ describe('the Call-a-Legend allowance refreshes every game turn', () => {
     // Player 0 calls a legend during their own main phase.
     const mainCall = legalActions(db, s).find((a) => a.type === 'callLegend')
     expect(mainCall).toBeDefined()
-    let next = applyAction(db, s, mainCall!)
+    let next = resolveEffectChoices(db, applyAction(db, s, mainCall!))
     expect(next.players[0].calledLegendThisTurn).toBe(true)
 
     // Player 1's turn begins: the allowance refreshes for BOTH players.
@@ -909,7 +909,7 @@ describe('the Call-a-Legend allowance refreshes every game turn', () => {
     expect(next.phase).toBe('main')
     const ownCall = legalActions(db, next).find((a) => a.type === 'callLegend')
     expect(ownCall).toBeDefined()
-    next = applyAction(db, next, ownCall!)
+    next = resolveEffectChoices(db, applyAction(db, next, ownCall!))
     expect(next.players[1].calledLegendThisTurn).toBe(true)
     expect(legalActions(db, next).some((a) => a.type === 'callLegend')).toBe(false)
   })

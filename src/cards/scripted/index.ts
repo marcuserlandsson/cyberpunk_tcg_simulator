@@ -1,3 +1,4 @@
+import { callChosenLegend, chooseFaceDownLegend, peekLegends } from '../../engine/knowledge'
 // Escape hatch for the handful of cards whose text no reasonable data
 // vocabulary will ever express (multi-step searches, "choose one" modes,
 // look-at-a-face-down-Legend, and so on). A card reaches it via the
@@ -76,14 +77,6 @@ function pickN(db: CardDb, state: GameState, ctx: EffectCtx, items: number[], n:
   return taken
 }
 
-/** Face-down Legend selection will be migrated with private knowledge handling. */
-function randomLegend(state: GameState, items: number[]): number | undefined {
-  if (!items.length) return undefined
-  const [index, rng] = nextInt(state.rng, items.length)
-  state.rng = rng
-  return items[index]
-}
-
 /** Every Gear card attached anywhere on `player`'s side (field + legends). */
 function friendlyGearUids(state: GameState, player: PlayerId): number[] {
   const p = state.players[player]
@@ -147,31 +140,16 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     return state
   },
 
-  /**
-   * `arasaka-emergency-radioport` — "When this Unit or Legend is spent, you may
-   * look at a friendly face-down Legend. If that Legend is ARASAKA or has
-   * {Go Solo}, you may Call it for free. (You may only Call a Legend once per
-   * turn.)"
-   *
-   * The Legend looked at is picked through the rng (docs/rulings.md §32); both
-   * "you may"s are taken whenever they are available (docs/rulings.md §50), and
-   * the free Call still respects the once-per-turn gate and fires the Legend's
-   * {Call} trigger, exactly like the paid action.
-   */
+  /** Optionally inspect a Legend, then optionally Call it if it qualifies. */
   'arasaka-emergency-radioport': (db, state, ctx) => {
-    const p = state.players[ctx.player]
-    const legend = randomLegend(
-      state,
-      p.legends.filter((uid) => !state.cards[uid].faceUp)
-    )
-    if (legend === undefined) return state
+    const legend = chooseFaceDownLegend(state, ctx.player, ctx.sourceUid, true)
+    if (legend === null) return state
+    peekLegends(db, state, ctx.player, [legend], ctx.sourceUid)
     const def = db[state.cards[legend].defId]
-    const callable = def.faction === 'Arasaka' || def.keywords.includes('go-solo')
-    if (!callable || p.calledLegendThisTurn) return state
-    state.cards[legend].faceUp = true
-    p.calledLegendThisTurn = true
-    state.events.push({ type: 'legendCalled', player: ctx.player, uid: legend })
-    fireTriggerOnDraft(db, state, 'onCall', legend, [])
+    if ((def.faction === 'Arasaka' || def.keywords.includes('go-solo')) && !state.players[ctx.player].calledLegendThisTurn) {
+      const yes = chooseEffectOption(state, ctx.player, ctx.sourceUid, 'Call the inspected Legend for free?', [1, 0], { 1: 'Call', 0: 'Decline' })
+      if (yes === 1) callChosenLegend(db, state, ctx.player, ctx.sourceUid, false, legend)
+    }
     return state
   },
 
@@ -416,18 +394,12 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     return state
   },
 
-  /**
-   * `kiroshi-optics` — "{Attack} Look at a friendly face-down Legend. (Don't
-   * reveal it.)" A private-information peek with no representable
-   * game-state effect: this engine models full state visibility (no
-   * separate per-player knowledge layer, unlike a physical table), so
-   * "looking" changes nothing. The EffectDef exists to prove the {Attack}
-   * gear-trigger propagation (docs/rulings.md §37/§38) actually reaches
-   * Kiroshi Optics's own effect — exercised through the host's attack by
-   * asserting the `effectResolved` event the interpreter always logs after a
-   * scripted node runs (docs/rulings.md §68 ff.).
-   */
-  'kiroshi-optics': (_db, state, _ctx) => state,
+  /** Privately inspect one friendly face-down Legend. */
+  'kiroshi-optics': (db, state, ctx) => {
+    const legend = chooseFaceDownLegend(state, ctx.player, ctx.sourceUid)
+    if (legend !== null) peekLegends(db, state, ctx.player, [legend], ctx.sourceUid)
+    return state
+  },
 
   /**
    * `live-with-the-aftermath` — "Each player defeats one of their Units."
@@ -478,28 +450,11 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     return state
   },
 
-  /**
-   * `t-bug-amateur-philosopher` — "{Defeated} Look at all friendly face-down
-   * Legends. Then, you may Call a Legend for free. (You can only Call a
-   * Legend once per turn.)" "Look" is a no-op under this engine's
-   * full-visibility model (docs/rulings.md §77 — kiroshi-optics); the free
-   * Call is taken whenever available (docs/rulings.md §50), and which Legend
-   * flips is picked through the rng exactly like the paid action
-   * (docs/rulings.md §23) — there is no "which Legend" decision printed here
-   * at all, unlike `arasaka-emergency-radioport`'s gated version.
-   */
+  /** Privately inspect all friendly face-down Legends, then optionally Call one for free. */
   't-bug-amateur-philosopher': (db, state, ctx) => {
-    const p = state.players[ctx.player]
-    if (p.calledLegendThisTurn) return state
-    const legend = randomLegend(
-      state,
-      p.legends.filter((uid) => !state.cards[uid].faceUp)
-    )
-    if (legend === undefined) return state
-    state.cards[legend].faceUp = true
-    p.calledLegendThisTurn = true
-    state.events.push({ type: 'legendCalled', player: ctx.player, uid: legend })
-    fireTriggerOnDraft(db, state, 'onCall', legend, [])
+    const hidden = state.players[ctx.player].legends.filter(uid => !state.cards[uid].faceUp)
+    peekLegends(db, state, ctx.player, hidden, ctx.sourceUid)
+    callChosenLegend(db, state, ctx.player, ctx.sourceUid, true)
     return state
   },
 
@@ -1087,27 +1042,9 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     return state
   },
 
-  /**
-   * `chrome-reverie` — "... If you control a min Gig, you may Call a Legend
-   * for free. (You can only Call a Legend once per turn.)" Reuses
-   * `t-bug-amateur-philosopher`'s free-Call shape, gated by this def's own
-   * `condition.friendlyGigValueEquals: 1` ("a min Gig" — a Gig die showing
-   * its floor face of 1, docs/rulings.md §120 ff.) rather than firing
-   * unconditionally. The card's first clause ("A rival Unit can't attack
-   * until your next turn") is deferred — see docs/rulings.md §120 ff.
-   */
+  /** Optionally Call a Legend for free when the enclosing condition holds. */
   'chrome-reverie': (db, state, ctx) => {
-    const p = state.players[ctx.player]
-    if (p.calledLegendThisTurn) return state
-    const legend = randomLegend(
-      state,
-      p.legends.filter((uid) => !state.cards[uid].faceUp)
-    )
-    if (legend === undefined) return state
-    state.cards[legend].faceUp = true
-    p.calledLegendThisTurn = true
-    state.events.push({ type: 'legendCalled', player: ctx.player, uid: legend })
-    fireTriggerOnDraft(db, state, 'onCall', legend, [])
+    callChosenLegend(db, state, ctx.player, ctx.sourceUid, true)
     return state
   },
 

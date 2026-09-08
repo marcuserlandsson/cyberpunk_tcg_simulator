@@ -110,6 +110,9 @@ export function BoardCard(props: {
       data-attacker={attacker ? 'true' : undefined}
       data-target={target ? 'true' : undefined}
     >
+      {faceDown && instance.knownTo?.length ? (
+        <span className="chip" data-testid="known-legend-marker">Previously seen by {instance.knownTo.map(player => player === AI ? 'rival' : 'you').join(' and ')}</span>
+      ) : null}
       {/* A `div role="button"` rather than a real <button>: CardFrame's root is
           a <div> (flow content), which a <button> may not legally contain. */}
       <div

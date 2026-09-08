@@ -1,3 +1,4 @@
+import { callChosenLegend } from './knowledge'
 // The reducer: `applyAction(db, state, action) -> newState`.
 //
 // Contract:
@@ -370,45 +371,12 @@ function activateAbility(
   activateAbilityOnDraft(db, draft, player, cardUid, abilityIndex, targets)
 }
 
-/**
- * Call a Legend (guide p10/p11/glossary; docs/rulings.md §23): spend 1 €$,
- * then flip a uniformly random face-down legend of `player`'s own face up, via
- * the seeded RNG so the choice is deterministic and replayable. `player` is
- * the active player in the main phase and the *defender* when this runs as a
- * reaction (guide p11), and the once-per-turn gate is the same
- * `calledLegendThisTurn` flag either way (docs/rulings.md §26).
- */
+/** Pay, choose a face-down position, and Call it (CR 11.11). */
 function callLegend(draft: GameState, db: CardDb, player: PlayerId, payment: number[]): void {
   const p = draft.players[player]
   spendOnDraft(db, draft, payment)
 
-  // A card spent to pay for THIS call can itself be wearing
-  // `arasaka-emergency-radioport` ("When this Unit or Legend is spent, you
-  // may ... Call it for free"): spending it above already fired that nested
-  // free Call, which can beat this call to the punch — flipping the very
-  // last face-down Legend and/or using up the once-per-turn allowance before
-  // this call's own resolution runs. When that happens this call has been
-  // outrun: the €$/spent-Legend cost already paid stands, but the call
-  // itself does nothing further — the same "a vanished target simply
-  // fizzles the resolution, cost already spent" shape `resolveAttack` uses
-  // when a quick effect defeats or bounces a combatant mid-react (that one
-  // is a code comment there, not its own numbered rulings.md entry).
-  if (p.calledLegendThisTurn) return
-  const faceDown = p.legends.filter((uid) => !draft.cards[uid].faceUp)
-  if (faceDown.length === 0) return
-  stopAtHiddenInformation(draft)
-  const [index, rng] = nextInt(draft.rng, faceDown.length)
-  draft.rng = rng
-  const target = faceDown[index]
-  draft.cards[target].faceUp = true
-  p.calledLegendThisTurn = true
-  draft.events.push({ type: 'legendCalled', player, uid: target })
-
-  // [trigger] on-call effects resolve as the Legend turns face-up, in the main
-  // phase and in the react window alike. The flip is random, so the action
-  // carries no targets — any the effect needs are auto-chosen
-  // (docs/rulings.md §32).
-  fireTriggerOnDraft(db, draft, 'onCall', target, [])
+  callChosenLegend(db, draft, player)
 }
 
 /**

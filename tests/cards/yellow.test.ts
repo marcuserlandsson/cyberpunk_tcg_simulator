@@ -585,7 +585,7 @@ describe('jackie-welles-ride-or-die-choom', () => {
 // ---------------------------------------------------------------------------
 
 describe('kiroshi-optics', () => {
-  it("fires its {Attack} effect through its host's attack (no state change)", () => {
+  it("fires its private peek through its host's attack", () => {
     const { state } = fixtureWithHand(0, ['kiroshi-optics'])
     const host = fieldCard(state, 0, 'japantown-jonin')
     const next = playCardByDef(db, state, 0, 'kiroshi-optics', { targetDef: 'japantown-jonin' })

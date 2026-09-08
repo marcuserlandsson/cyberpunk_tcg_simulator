@@ -706,6 +706,8 @@ export interface CardDef {
 export type CardDb = Record<string, CardDef>
 
 export interface CardInstance {
+  /** Public marker of which players previously saw this face-down Legend. */
+  knownTo?: PlayerId[]
   uid: number
   defId: string
   owner: PlayerId

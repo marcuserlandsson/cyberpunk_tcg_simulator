@@ -1,9 +1,9 @@
+import { resolveEffectChoices } from '../cards/fixtures'
 import { describe, expect, it } from 'vitest'
 import { canPayWith, canonicalPayment, pay } from '../../src/engine/economy'
 import { draftState, newGame } from '../../src/engine/game'
 import { legalActions } from '../../src/engine/legal'
 import { applyAction, IllegalActionError } from '../../src/engine/reduce'
-import { nextInt } from '../../src/engine/rng'
 import type { Action, GameState, PlayerId } from '../../src/engine/types'
 import { db, decks } from './gameHelpers'
 
@@ -295,7 +295,7 @@ describe('playCard: payment flexibility', () => {
 })
 
 describe('callLegend', () => {
-  it('flips exactly one face-down legend chosen uniformly at random via the seeded RNG', () => {
+  it('flips the chosen face-down Legend position', () => {
     const state = giveEddies(mainPhaseP0(119), 0, 1)
     const callAction = legalActions(db, state).find((a) => a.type === 'callLegend')
     expect(callAction).toBeDefined()
@@ -303,10 +303,11 @@ describe('callLegend', () => {
 
     const faceDownBefore = state.players[0].legends.filter((u) => !state.cards[u].faceUp)
     expect(faceDownBefore).toHaveLength(3)
-    const [expectedIndex] = nextInt(state.rng, faceDownBefore.length)
-    const expectedUid = faceDownBefore[expectedIndex]
+    const expectedUid = faceDownBefore[1]
 
-    const next = applyAction(db, state, callAction!)
+    const pending = applyAction(db, state, callAction!)
+    expect(pending.pendingIntercept?.options).toEqual(faceDownBefore)
+    const next = resolveEffectChoices(db, applyAction(db, pending, { type: 'answerIntercept', answer: expectedUid }))
     const faceDownAfter = next.players[0].legends.filter((u) => !next.cards[u].faceUp)
     expect(faceDownAfter).toHaveLength(2)
     expect(next.cards[expectedUid].faceUp).toBe(true)
@@ -314,7 +315,7 @@ describe('callLegend', () => {
     expect(next.events.some((e) => e.type === 'legendCalled' && e.uid === expectedUid)).toBe(true)
 
     // Determinism: replaying from the identical starting state flips the same legend.
-    const replay = applyAction(db, state, callAction!)
+    const replay = resolveEffectChoices(db, applyAction(db, applyAction(db, state, callAction!), { type: 'answerIntercept', answer: expectedUid }))
     expect(replay.cards[expectedUid].faceUp).toBe(true)
   })
 

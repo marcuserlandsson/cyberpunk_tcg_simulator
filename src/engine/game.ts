@@ -222,6 +222,7 @@ export function draftState(state: GameState): GameState {
       ...card,
       attachedGear: card.attachedGear.slice(),
       tempKeywords: card.tempKeywords.slice(),
+      ...(card.knownTo ? { knownTo: [...card.knownTo] } : {}),
     }
   }
   return {

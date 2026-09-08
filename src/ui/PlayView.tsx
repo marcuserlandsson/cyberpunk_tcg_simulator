@@ -562,7 +562,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs }: PlayViewProps): R
     (state.phase === 'start' && legal.length > 0) ||
     (state.phase === 'chooseGig' && legal.length > 0) ||
     (state.phase === 'gigReroll' && legal.length > 0) ||
-    (state.phase === 'intercept' && legal.length > 0 && state.pendingIntercept !== null) ||
+    (state.phase === 'intercept' && legal.length > 0 && state.pendingIntercept?.player === HUMAN) ||
     reactions.length > 0 ||
     (pending !== null && options.length > 0)
 

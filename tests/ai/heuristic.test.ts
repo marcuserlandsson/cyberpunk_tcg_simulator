@@ -275,7 +275,7 @@ function shuffleHiddenInfo(state: GameState, perspective: PlayerId, seed: number
   // A paused choice may already have drawn/revealed cards, even though the
   // reducer keeps the pre-action state for deterministic replay. Those known
   // cards are no longer valid candidates for a hidden-information permutation.
-  const known = new Set((state.pendingIntercept?.knownCards ?? [])
+  const known = new Set([...(state.pendingIntercept?.knownCards ?? []), ...Object.values(state.cards).filter(card => card.knownTo?.includes(perspective)).map(card => ({ uid: card.uid, viewer: perspective }))]
     .filter(card => card.viewer === 'all' || card.viewer === perspective).map(card => card.uid))
   const shuffleUnknown = (uids: number[]): number[] => {
     const [unknown, after] = shuffle(rng, uids.filter(uid => !known.has(uid)))

@@ -84,15 +84,12 @@ function isSafeFollowUp(index: number): boolean {
 // order — kept here (not just in the doc) so a NEW call site changes this
 // list's length and forces a deliberate update, not a silent pass.
 const EXPECTED_SITES = [
-  'arasaka-emergency-radioport',
   'yorinobu-arasaka-steel-dragon',
-  't-bug-amateur-philosopher',
   'the-heist',
   'the-relic-experimental-biochip',
   'river-ward-detective-on-the-hunt:free-gear',
   'viktor-vektor-you-might-feel-a-little-pinch',
   'alt-cunningham-soulkiller-architect',
-  'chrome-reverie',
   'judy-a-lvarez-nothing-to-doubt',
   'lizzy-wizzy-delicate-weapon',
 ]

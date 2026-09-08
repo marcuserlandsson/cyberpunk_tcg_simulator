@@ -91,3 +91,7 @@ Face-up Legends with numeric costs now offer ordinary play (preserve post-paymen
 ### 08i — script-internal choices
 
 Scripted searches, secondary targets, rival-selected casualties/destinations, optional discard/defeat, and multi-card up-to selections now use explicit replayable player decisions instead of RNG. Hanako's unselected searched cards are bottom-decked randomly. Fool on the Hill discloses its revealed cards to both players before the rival chooses; Tetratronic asks whether to trash the privately inspected card. Verified 670 engine/card tests, TypeScript, and the AI hidden-information checks. Legend-position selection/private peeks and additional optional/card-entry scripts remain open in step 8.
+
+### 08j — private Legend peeks and chosen Calls
+
+Call a Legend now selects a face-down position without exposing its identity. Kiroshi, Radioport and T-Bug implement private peeks with an explicit finish-looking step, viewer-scoped replay knowledge and persistent public previously-seen markers. Hovering marked face-down Legends still shows only the card back. Optional free Calls can be declined; T-Bug still looks even after the Call allowance is used. The human UI explicitly excludes rival-only prompts. Verified 676 engine/card/knowledge/zoom tests, TypeScript, and three AI hidden-information checks. Transient public reveals and source-lifetime snapshots remain within the open resolution audit.
