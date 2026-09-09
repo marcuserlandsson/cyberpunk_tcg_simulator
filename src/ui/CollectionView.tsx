@@ -24,8 +24,8 @@ function readMode(): CollectionMode {
   try { const saved = sessionStorage.getItem(MODE_KEY); return MODES.includes(saved as CollectionMode) ? (saved as CollectionMode) : 'browse' } catch { return 'browse' }
 }
 function useNarrow(): boolean {
-  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < NARROW)
-  useEffect(() => { const on = () => setNarrow(window.innerWidth < NARROW); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on) }, [])
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth <= NARROW)
+  useEffect(() => { const on = () => setNarrow(window.innerWidth <= NARROW); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on) }, [])
   return narrow
 }
 

@@ -92,7 +92,7 @@ export function AddCardsMode({ db, printings, known }: { db: CardDb; printings: 
                 <button type="button" data-testid="session-mode-exact" aria-pressed={draft.mode === 'exact'} disabled={draft.lines.length > 0 && draft.mode !== 'exact'} title={draft.lines.length > 0 ? 'Apply or clear the draft to change mode' : undefined} onClick={() => setMode('exact')}>Set exact counts</button>
               </div></div>
               <p className="tool-note">One <code>printing-key,{draft.mode === 'signed' ? '±count' : 'count'}</code> per line, e.g. <code>arasakademodeck/006,{draft.mode === 'signed' ? '+3' : '3'}</code>. Lines join the table above.</p>
-              <label className="field field--wide"><span className="field__label">Lines</span><textarea data-testid="session-input" value={paste} placeholder={`arasakademodeck/006,${draft.mode === 'signed' ? '+3' : '3'}`} onChange={e => setPaste(e.target.value)} /></label>
+              <label className="field field--wide"><span className="field__label">Lines</span><textarea data-testid="session-input" value={paste} placeholder={`arasakademodeck/006,${draft.mode === 'signed' ? '+3' : '3'}`} onChange={e => { setPaste(e.target.value); if (draft.legacyText !== undefined) updateDraft({ legacyText: e.target.value }) }} /></label>
               <div className="tool-actions"><button type="button" data-testid="session-paste-add" disabled={!paste.trim()} onClick={() => { try { stageLines(parseDraftLines(paste, draft.mode)); setPaste(''); if (draft.legacyText) updateDraft({ legacyText: undefined }); setError('') } catch (e) { setError(String(e)) } }}>Add lines to the session</button></div>
             </div>
           </details>
@@ -118,8 +118,8 @@ export function AddCardsMode({ db, printings, known }: { db: CardDb; printings: 
             </>
           )}
           <div className="tool-actions">
-            <button type="button" className="btn--primary" data-testid="session-apply" disabled={!known || !review || !!review.error} onClick={() => { try { applyDraft(printings); setConfirmClear(false); setError('') } catch (e) { setError(String(e)) } }}>Apply session{review?.summary ? ` · ${review.summary.copies >= 0 ? '+' : ''}${review.summary.copies}` : ''}</button>
-            <button type="button" className={confirmClear ? 'btn--danger' : ''} data-testid="session-clear" disabled={draft.lines.length === 0} onClick={() => { if (confirmClear) { clearDraft(); setConfirmClear(false) } else setConfirmClear(true) }}>{confirmClear ? `Clear ${draft.lines.length} line${draft.lines.length === 1 ? '' : 's'}?` : 'Clear draft'}</button>
+            <button type="button" className="btn--primary" data-testid="session-apply" disabled={!known || !review || !!review.error} onClick={() => { try { applyDraft(printings, review?.before); setConfirmClear(false); setError('') } catch (e) { setError(String(e)) } }}>Apply session{review?.summary ? ` · ${review.summary.copies >= 0 ? '+' : ''}${review.summary.copies}` : ''}</button>
+            <button type="button" className={confirmClear ? 'btn--danger' : ''} data-testid="session-clear" disabled={draft.lines.length === 0 && draft.legacyText === undefined} onClick={() => { if (confirmClear) { clearDraft(); setConfirmClear(false) } else setConfirmClear(true) }}>{confirmClear ? `Clear ${draft.lines.length} line${draft.lines.length === 1 ? '' : 's'}?` : 'Clear draft'}</button>
           </div>
         </div>
       </section>

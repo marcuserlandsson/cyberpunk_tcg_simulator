@@ -164,6 +164,7 @@
 .browse--narrow .browse__main { padding: 0; }
 .browse__toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
 .browse--narrow .browse__toolbar { grid-template-columns: 1fr; }
+.browse--narrow .browse__count { white-space: normal; }
 .browse__view { display: flex; align-items: center; gap: 12px; }
 .browse__count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
 .browse__count b { color: var(--text); font-weight: 500; }

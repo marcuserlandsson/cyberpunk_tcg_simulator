@@ -29,6 +29,7 @@ export function PlanPurchasesMode({ db, printings, known }: { db: CardDb; printi
   const text = missing.map(r => `${r.missing}x ${names.get(r.id) ?? r.id}${!reserve && r.missingArts.length ? ' — a missing artwork would also count' : ''}`).join('\n')
   const gaps = useMemo(() => playsetGaps(db, printings, collection).reduce((n, g) => n + g.missing, 0), [db, printings, collection])
   const arts = useMemo(() => missingArtworks(printings, collection.counts).length, [printings, collection])
+  const both = useMemo(() => buildBuyList(db, printings, collection, { playset: true, arts: true }).split('\n').filter(l => l.trim() && !l.startsWith('#')).length, [db, printings, collection])
   const copy = (what: string, value: string) => navigator.clipboard.writeText(value).then(() => setStatus({ kind: 'ok', text: `Copied ${what} ${new Date().toLocaleTimeString()}` })).catch(err => setStatus({ kind: 'error', text: `Could not copy to clipboard: ${err instanceof Error ? err.message : String(err)}` }))
 
   return (
@@ -78,7 +79,7 @@ export function PlanPurchasesMode({ db, printings, known }: { db: CardDb; printi
             <div className="plan__lists">
               <div className="lst"><span className="goal__k">Playset gaps</span><span className="goal__v">{known ? gaps : '?'}<small>copies</small></span><button type="button" data-testid="copy-playset-list" disabled={!known} onClick={() => copy('the playset list', buildBuyList(db, printings, collection, { playset: true, arts: false }))}>Copy list</button></div>
               <div className="lst"><span className="goal__k">Missing artworks</span><span className="goal__v">{known ? arts : '?'}<small>arts</small></span><button type="button" data-testid="copy-artwork-list" disabled={!known} onClick={() => copy('the artwork list', buildBuyList(db, printings, collection, { playset: false, arts: true }))}>Copy list</button></div>
-              <div className="lst"><span className="goal__k">Both goals</span><span className="goal__v">1<small>combined list</small></span><button type="button" data-testid="copy-buylist" disabled={!known} onClick={() => copy('both lists', buildBuyList(db, printings, collection, { playset: true, arts: true }))}>Copy list</button></div>
+              <div className="lst"><span className="goal__k">Both goals</span><span className="goal__v">{known ? both : '?'}<small>cards</small></span><button type="button" data-testid="copy-buylist" disabled={!known} onClick={() => copy('both lists', buildBuyList(db, printings, collection, { playset: true, arts: true }))}>Copy list</button></div>
             </div>
             <p className="tool-note">One purchase can close a playset gap and a missing artwork at once; the combined list says which.</p>
             {status && <p className={status.kind === 'error' ? 'tool-error' : 'tool-status'} role="status" data-testid={status.kind === 'error' ? 'copy-error' : 'copy-status'}>{status.text}</p>}

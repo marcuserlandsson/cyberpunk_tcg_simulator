@@ -176,10 +176,16 @@ export function rarityBreakdown(changes: Record<string, { before: number; after:
 }
 
 /** One write, one journal entry, then the draft is emptied. Throws (and
- *  leaves the draft alone) when the computation refuses. */
-export function applyDraft(printings: Printing[]): void {
+ *  leaves the draft alone) when the computation refuses.
+ *
+ *  When `expectedBefore` is given (the counts the review was computed
+ *  against), Apply refuses if the collection has changed since — "the
+ *  collection unchanged since the preview was computed" — rather than
+ *  silently writing on top of a write from another tab. */
+export function applyDraft(printings: Printing[], expectedBefore?: Record<string, number>): void {
   const draft = getDraft()
   const before = getCollection().counts
+  if (expectedBefore !== undefined && JSON.stringify(before) !== JSON.stringify(expectedBefore)) throw new Error('Collection changed; review again.')
   const after = draftCounts(draft, printings, before)
   replaceCollection({ counts: after }, { kind: draft.mode === 'exact' ? 'Bulk counts' : draft.kind, date: draft.date, source: draft.source, cost: draft.cost })
   clearDraft()

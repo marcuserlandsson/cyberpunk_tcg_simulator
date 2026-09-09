@@ -14,7 +14,7 @@ import { getPrintingImageUrl } from './images'
 import { ramColorVar } from './CardFrame'
 import { PrintingCount } from './PrintingCount'
 
-export function CardDrawer({ def, printings, collection, known, useOfficialImages: _useOfficialImages, onClose }: { def: CardDef; printings: Printing[]; collection: Collection; known: boolean; useOfficialImages: boolean; onClose: () => void }): ReactElement {
+export function CardDrawer({ def, printings, collection, known, onClose }: { def: CardDef; printings: Printing[]; collection: Collection; known: boolean; onClose: () => void }): ReactElement {
   const target = playsetTarget(def)
   const owned = printings.filter(p => p.playable !== false).reduce((n, p) => n + (collection.counts[p.key] ?? 0), 0)
   const groups = artworkGroups(printings)

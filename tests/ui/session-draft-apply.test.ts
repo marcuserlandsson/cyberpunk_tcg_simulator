@@ -77,5 +77,13 @@ describe('applyDraft', () => {
     stageLine({ key: 'nope/1', delta: 1 })
     expect(() => applyDraft(printings)).toThrow()
     expect(getDraft().lines).toHaveLength(1)
+    expect(getCollection().counts).toEqual({})
+  })
+  it('refuses to apply when the collection changed since the preview', () => {
+    stageLine({ key: demo.key, delta: 1 })
+    setCount(beta.key, 5)
+    expect(() => applyDraft(printings, {})).toThrow(/Collection changed/)
+    expect(getDraft().lines).toEqual([{ key: demo.key, delta: 1 }])
+    expect(getCollection().counts).toEqual({ [beta.key]: 5 })
   })
 })

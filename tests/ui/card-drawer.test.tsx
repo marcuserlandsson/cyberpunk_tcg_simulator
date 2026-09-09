@@ -15,7 +15,7 @@ beforeEach(() => { localStorage.clear(); _resetCollectionCacheForTests() })
 afterEach(cleanup)
 
 function mount(onClose = vi.fn()) {
-  render(<CardDrawer def={db[cardId]} printings={prints} collection={getCollection()} known useOfficialImages={false} onClose={onClose} />)
+  render(<CardDrawer def={db[cardId]} printings={prints} collection={getCollection()} known onClose={onClose} />)
   return onClose
 }
 
@@ -33,10 +33,10 @@ describe('CardDrawer', () => {
   })
   it('names a printing row "Artwork n · owned/missing" and tags collection-only printings', () => {
     setCount('arasakademodeck/006', 1)
-    render(<CardDrawer def={db[cardId]} printings={prints} collection={getCollection()} known useOfficialImages={false} onClose={() => {}} />)
+    render(<CardDrawer def={db[cardId]} printings={prints} collection={getCollection()} known onClose={() => {}} />)
     expect(screen.getByTestId('printing-row-arasakademodeck/006').textContent).toMatch(/Artwork 1 · owned/)
     const only = printings.find(p => p.playable === false)
-    if (only) { cleanup(); render(<CardDrawer def={db[only.cardId]} printings={byCard.get(only.cardId)!} collection={getCollection()} known useOfficialImages={false} onClose={() => {}} />); expect(screen.getByTestId(`printing-row-${only.key}`).textContent).toMatch(/Collection only/) }
+    if (only) { cleanup(); render(<CardDrawer def={db[only.cardId]} printings={byCard.get(only.cardId)!} collection={getCollection()} known onClose={() => {}} />); expect(screen.getByTestId(`printing-row-${only.key}`).textContent).toMatch(/Collection only/) }
   })
   it('close calls back', () => {
     const onClose = mount()

@@ -66,12 +66,12 @@ export function CollectionBrowse({ db, printings, byCard, known, useOfficialImag
               <div key={r.def.id} className={`tile${expanded === r.def.id ? ' tile--open' : ''}${r.target === 0 ? ' tile--only' : ''}`} data-testid="collection-cell" data-card-id={r.def.id} style={{ '--c': ramColorVar(r.def.color) } as CSSProperties}>
                 <button type="button" className="tile__hit" data-testid={`expand-${r.def.id}`} aria-expanded={expanded === r.def.id} onClick={() => setExpanded(expanded === r.def.id ? null : r.def.id)}>
                   <CardFrame def={r.def} size="zoom" useOfficialImages={useOfficialImages} />
+                  <span className="tile__ring" aria-hidden="true"><i style={{ width: `${r.target ? Math.min(100, 100 * r.owned / r.target) : 0}%` }} /></span>
+                  <span className="tile__own" data-testid={`collection-count-${r.def.id}`}>
+                    <span className={`tile__ps${r.target === 0 ? ' tile__ps--only' : known && r.playsetDone ? ' tile__ps--done' : known && r.owned === 0 ? ' tile__ps--zero' : ''}`}>{r.target === 0 ? 'Collection only' : `${known ? r.owned : '?'}/${r.target}`}{known && r.playsetDone && <span title="Playset complete"> ✓</span>}</span>
+                    <span className={`tile__art${known && r.artsDone ? ' tile__art--done' : ''}`}>{' · '}Art {known ? r.artOwned : '?'}/{r.artTarget}{known && r.artsDone && <span title="All arts owned"> ★</span>}</span>
+                  </span>
                 </button>
-                <span className="tile__ring" aria-hidden="true"><i style={{ width: `${r.target ? Math.min(100, 100 * r.owned / r.target) : 0}%` }} /></span>
-                <span className="tile__own" data-testid={`collection-count-${r.def.id}`}>
-                  <span className={`tile__ps${r.target === 0 ? ' tile__ps--only' : known && r.playsetDone ? ' tile__ps--done' : known && r.owned === 0 ? ' tile__ps--zero' : ''}`}>{r.target === 0 ? 'Collection only' : `${known ? r.owned : '?'}/${r.target}`}{known && r.playsetDone && <span title="Playset complete"> ✓</span>}</span>
-                  <span className={`tile__art${known && r.artsDone ? ' tile__art--done' : ''}`}>{' · '}Art {known ? r.artOwned : '?'}/{r.artTarget}{known && r.artsDone && <span title="All arts owned"> ★</span>}</span>
-                </span>
               </div>
             ))}
           </div>
@@ -96,7 +96,7 @@ export function CollectionBrowse({ db, printings, byCard, known, useOfficialImag
           </div>
         )}
       </div>
-      {open && <CardDrawer def={open.def} printings={open.printings} collection={collection} known={known} useOfficialImages={useOfficialImages} onClose={() => setExpanded(null)} />}
+      {open && <CardDrawer def={open.def} printings={open.printings} collection={collection} known={known} onClose={() => setExpanded(null)} />}
     </div>
   )
 }
