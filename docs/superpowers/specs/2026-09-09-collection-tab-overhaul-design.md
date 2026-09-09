@@ -98,7 +98,7 @@ Groups in order, each with a small uppercase label; multi-select groups get a
 
 | Group | Control | Notes |
 |---|---|---|
-| Search | text input | matches name, subtitle, collector number, set, artist — the existing `matchesPrinting` behaviour, plus `#` prefix forcing number-only match |
+| Search | text input | matches name, subtitle, collector number, set, artist — the existing `matchesPrinting` behaviour, a leading `#` is ignored, so `#006` finds collector number 006 |
 | Goal | 4-way segmented | All · Need copies · Need art · Complete (today's goal filter, renamed) |
 | Color | 4 RAM chips | unchanged `filter-chip--ram` |
 | Type | 4 chips | Legend Unit Program Gear |
@@ -156,7 +156,6 @@ Body:
    (opens the source image in a new tab), set name, collector number, rarity,
    finish tag, printing key in mono, and the stepper. Collection-only printings
    are dimmed and tagged "Collection only".
-3. Footer: "View card" (opens the existing zoom overlay) and "Open image".
 
 Steppers in the drawer and list write immediately through `adjustCount` /
 `setCount` exactly as today; they are the one direct-edit path that remains.
