@@ -11,47 +11,6 @@
 
 .collection-editor { border: 0; padding: 0; margin: 0; min-width: 0; }
 
-.collection-view__filters {
-  margin-bottom: 0.6em;
-}
-
-/* Key to the two tile badges. The badges' own `title` tooltips are dead —
-   `.collection-view__count` is `pointer-events: none` so it never steals
-   CardFrame's click target — so the glyphs are explained here instead. */
-.collection-view__legend {
-  margin: 0.4em 0 0;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--muted);
-}
-
-/* ---------------------------------------------------------------------- */
-/* Header: stats, buy-list copy, export/import (Task 9)                  */
-/* ---------------------------------------------------------------------- */
-
-.collection-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6em;
-  margin-bottom: 0.8em;
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-}
-
-/* Closed: just its summary, a ghost button among the export buttons. Open:
-   takes a full row of its own with the button on top of the body (rules at
-   the end of this file). */
-.collection-header__import {
-  display: inline-flex;
-}
-
-.collection-header__error {
-  flex: 1 1 100%;
-  color: var(--rival);
-  white-space: pre-wrap;
-}
-
 /* ---------------------------------------------------------------------- */
 /* Header: sync status, retry, conflict resolution (Task 7)              */
 /* ---------------------------------------------------------------------- */
@@ -90,78 +49,6 @@
   width: 100%;
 }
 
-/* ---------------------------------------------------------------------- */
-/* Quick-add bar (Task 8)                                                 */
-/* ---------------------------------------------------------------------- */
-
-.quick-add {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-  margin-bottom: 0.8em;
-}
-
-.quick-add input[type='text'] {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-family: var(--font-mono);
-}
-
-.quick-add__matches {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 5;
-  margin: 2px 0 0;
-  padding: 0.3em;
-  list-style: none;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  max-height: 16em;
-  overflow-y: auto;
-}
-
-.quick-add__matches li {
-  padding: 0.2em 0.3em;
-  font-size: 0.9em;
-}
-
-/* Disambiguation row: the card has 0 — or 2+ — printings in the session set,
-   so Enter refuses to guess and the candidates are offered as buttons. They
-   wrap rather than overflow: an Iconic-variant card can list half a dozen. */
-.quick-add__choices {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3em;
-}
-
-.quick-add__choices button {
-  font-size: 10px;
-  padding: 2px 7px;
-  clip-path: none;
-  border-radius: 3px;
-}
-
-.quick-add__matches li[aria-selected='true'] {
-  background: var(--panel);
-  outline: 1px solid var(--act);
-}
-
-.quick-add__toast {
-  display: flex;
-  align-items: center;
-  gap: 0.6em;
-  margin-top: 0.4em;
-  padding: 0.35em 0.6em;
-  font-size: 0.85em;
-  font-family: var(--font-mono);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-}
-
 /* Same responsive grid as `.card-browser__grid` (deckbuilder.css) — a
    zoom-rendition tile per card, sized to stay legible while filling the
    available width. */
@@ -170,69 +57,6 @@
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 0.8em;
   padding: 0.2em;
-}
-
-.collection-view__cell {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  min-width: 0;
-}
-
-.collection-view__cell .card-frame--zoom { width: 100%; box-sizing: border-box; }
-.collection-view__printing-row { min-width: 0; overflow-wrap: anywhere; }
-
-@media (max-width: 600px) {
-  .quick-add { flex-wrap: wrap; }
-  .quick-add input[type='text'], .quick-add select { width: 100%; max-width: 100%; }
-  .collection-view__grid { grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); }
-}
-
-/* Corner owned/target badge, matching `.card-browser__count`'s placement
-   and look. */
-.collection-view__count {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 2;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 11px;
-  padding: 2px 7px;
-  background: var(--act);
-  color: #131200;
-  border-radius: 3px;
-  pointer-events: none;
-}
-
-.collection-view__expand {
-  font-size: 10px;
-  padding: 3px 9px;
-  clip-path: none;
-  border-radius: 3px;
-  margin-top: 0.35em;
-}
-
-/* Panel of per-printing rows, under the expanded cell (the cell itself is
-   the grid's sizing unit, so this panel simply fills the cell's width
-   rather than spanning the whole grid). */
-.collection-view__printings {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3em;
-  margin-top: 0.4em;
-  padding: 0.4em;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-}
-
-.collection-view__printing-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-  justify-content: space-between;
-  font-size: 0.85em;
 }
 
 .collection-view__stepper {
@@ -249,74 +73,6 @@
 }
 
 .printing-count { width: 4.5em; max-width: 100%; }
-.compact-printings { display: grid; gap: 0.35rem; }
-.compact-printing { display: grid; grid-template-columns: 48px minmax(0,1fr) 6em; gap: 0.6rem; align-items: center; border-bottom: 1px solid var(--line); padding: 0.35rem; overflow-wrap: anywhere; }
-.compact-printing > span:first-of-type { grid-column: 2; }
-.compact-printing > span:last-child { grid-column: 3; }
-.collection-view__stepper { flex-wrap: wrap; }
-.collection-view__filters input[type='text'], .collection-view__filters input:not([type]) { max-width: 100%; }
-
-/* ---------------------------------------------------------------------- */
-/* Header import: the summary reads as a ghost button in the export row;   */
-/* the body opens onto its own full-width row beneath the header strip.    */
-/* ---------------------------------------------------------------------- */
-
-.collection-header__import[open] {
-  flex: 1 1 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.6em;
-}
-
-.collection-header__import > summary {
-  list-style: none;
-  cursor: pointer;
-  font-family: var(--font-display); font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.12em; font-size: 12px; padding: 8px 16px;
-  color: var(--you); box-shadow: inset 0 0 0 1.5px var(--you);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-}
-
-.collection-header__import > summary::-webkit-details-marker { display: none; }
-.collection-header__import > summary:hover { background: rgba(0, 229, 255, 0.12); }
-.collection-header__import[open] > summary { background: var(--you); color: var(--void); }
-
-.collection-header__import-body {
-  flex: 1 1 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.6em;
-  padding: 0.8em 1em 1em;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  font-family: var(--font-body);
-  font-size: 15px;
-}
-
-.collection-header__import-body textarea { min-height: 5em; }
-
-/* Search row above the filter chips: a wide search box and the compact-list
-   toggle chip. */
-.collection-view__search {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6em;
-  margin-bottom: 0.6em;
-}
-
-.collection-view__search input[type='text'],
-.collection-view__search input:not([type]) {
-  flex: 1 1 24em;
-  min-width: 0;
-}
-
-.compact-printings__more {
-  justify-self: start;
-  margin-top: 0.4em;
-}
 
 /* Same page gutter as `.simulate-view`, so the tab content never touches the
    viewport edge. */
