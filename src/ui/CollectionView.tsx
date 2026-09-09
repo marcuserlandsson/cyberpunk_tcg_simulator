@@ -1,7 +1,6 @@
 import { CollectionSessions } from './CollectionSessions'
 import { PrintingCount } from './PrintingCount'
 import { matchesPrinting } from './collectionEntry'
-import { AcquisitionPlanner } from './AcquisitionPlanner'
 import { artworkGroups, ownedArtworkIds } from './artworks'
 // The Collection tab: every card in the pool as a tile (CardFrame + owned/
 // target badge), expandable into per-printing rows with +/− steppers.
@@ -170,7 +169,6 @@ export function CollectionView({
           page: staging a session, pasting bulk counts, planning purchases. */}
       <div className="tool-rack">
         <CollectionSessions printings={loadResult.printings} known={known} />
-        <AcquisitionPlanner db={db} printings={loadResult.printings} counts={collection.counts} known={known} />
       </div>
       <div className="collection-view__filters">
         <div className="collection-view__search">
