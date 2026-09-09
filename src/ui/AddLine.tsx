@@ -10,7 +10,7 @@ import { useMemo, useState, type KeyboardEvent, type ReactElement } from 'react'
 import type { CardDb } from '../engine/types'
 import { printingsByCard, listSets, type Printing } from './printings'
 import { buildDisplayNames } from './storage'
-import { stageLine, useDraft } from './sessionDraft'
+import { stageLine, useDraft, getDraft } from './sessionDraft'
 
 const SESSION_SET_KEY = 'ctcg:quickAddSet:v1'
 const MAX_MATCHES = 8
@@ -60,8 +60,9 @@ export function AddLine({ db, printings, testIdPrefix, autoFocus }: { db: CardDb
   function stage(printing: Printing, name: string, remove: boolean): void {
     const line = draft.mode === 'signed' ? { key: printing.key, delta: remove ? -1 : 1 } : { key: printing.key, exact: remove ? 0 : 1 }
     stageLine(line)
-    const staged = draft.lines.length + 1
-    setToast(`${draft.mode === 'signed' ? (remove ? '−1' : '+1') : (remove ? 'set 0' : 'set 1')} ${name} · ${printing.setName} ${printing.collectorNumber} → ${staged} staged`)
+    const staged = getDraft().lines.length
+    const lineWord = staged === 1 ? 'line' : 'lines'
+    setToast(`${draft.mode === 'signed' ? (remove ? '−1' : '+1') : (remove ? 'set 0' : 'set 1')} ${name} · ${printing.setName} ${printing.collectorNumber} → ${staged} ${lineWord} staged`)
     setQuery(''); setSelected(0)
   }
 

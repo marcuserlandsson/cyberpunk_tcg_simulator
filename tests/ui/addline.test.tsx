@@ -94,4 +94,16 @@ describe('AddLine', () => {
     render(<AddLine db={db} printings={printings} testIdPrefix="add-line" />)
     expect(screen.getByTestId('add-line-input')).toBeTruthy()
   })
+
+  it('toast shows correct line count after merging/cancelling lines', async () => {
+    const user = userEvent.setup()
+    render(<AddLine db={db} printings={printings} testIdPrefix="quick-add" />)
+    await typeMantis(user)
+    await user.keyboard('{Enter}')
+    expect(screen.getByTestId('quick-add-toast').textContent).toContain('1 line staged')
+    await typeMantis(user)
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
+    expect(getDraft().lines).toEqual([])
+    expect(screen.getByTestId('quick-add-toast').textContent).toContain('0 lines staged')
+  })
 })
