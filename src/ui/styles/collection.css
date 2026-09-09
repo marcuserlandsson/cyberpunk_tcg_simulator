@@ -162,14 +162,25 @@
 .browse--narrow, .browse--narrow.browse--drawer { grid-template-columns: 1fr; margin: 0; }
 .browse__main { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 24px; min-width: 0; }
 .browse--narrow .browse__main { padding: 0; }
-.browse__toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
-.browse--narrow .browse__toolbar { grid-template-columns: 1fr; }
+/* Flex + wrap rather than a two-column grid: the count row cannot shrink
+   (it is one nowrap line), so on a mid-width window — the rail up, the main
+   column ~800px — a fixed `1fr auto` grid squeezed the add line to nothing
+   and let the two overlap. Wrapping drops the count row under the add line
+   instead. */
+.browse__toolbar { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; }
+.browse__toolbar > .collection-editor { flex: 1 1 420px; min-width: 0; }
+.browse__view { margin-left: auto; }
 .browse--narrow .browse__count { white-space: normal; }
 .browse__view { display: flex; align-items: center; gap: 12px; }
 .browse__count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
 .browse__count b { color: var(--text); font-weight: 500; }
 .tile { position: relative; display: flex; flex-direction: column; min-width: 0; }
 .tile__hit { padding: 0; border: 0; background: transparent; box-shadow: none; clip-path: none; text-align: left; display: block; width: 100%; }
+/* The tile is a <button> so the whole card is one click target, but the
+   global button rule (chrome.css) sets the display face, uppercase and
+   letter-spacing — which the CardFrame's rules text would otherwise inherit.
+   Restore the body-text context a card normally sits in. */
+.tile__hit { font-family: var(--font-body); font-weight: 400; font-size: 15px; letter-spacing: normal; text-transform: none; color: var(--text); cursor: pointer; }
 .tile__hit .card-frame--zoom { width: 100%; box-sizing: border-box; }
 .tile__hit:hover .card-frame { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0, 0, 0, .65); }
 .tile--open .tile__hit .card-frame { outline: 2px solid var(--act); outline-offset: 2px; }
