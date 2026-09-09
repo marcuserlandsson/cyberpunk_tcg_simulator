@@ -176,7 +176,7 @@
 .tile--only .tile__hit { opacity: .55; }
 .tile__ring { display: block; height: 3px; margin-top: 4px; background: var(--panel-2); }
 .tile__ring i { display: block; height: 100%; background: var(--you); }
-.tile__own { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 5px 2px 0; font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text); }
+.tile__own { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 5px 2px 0; font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; font-variant-numeric: tabular-nums; color: var(--text); }
 .tile__ps--done { color: var(--ram-green); }
 .tile__ps--zero, .tile__ps--only { color: var(--muted); }
 .tile__art { color: var(--muted); }
