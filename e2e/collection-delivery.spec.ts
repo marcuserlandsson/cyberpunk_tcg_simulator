@@ -38,7 +38,9 @@ test('records a booster box and a demo deck as one undoable acquisition', async 
   await page.getByTestId('session-apply').click()
   await expect(page.getByTestId('staged-pill')).toHaveCount(0)
   await page.getByTestId('collection-mode-browse').click()
-  await expect(page.getByTestId('collection-count-mantis-blades')).toContainText('3/3')
+  // 3 quick-added from the beta booster plus 3 bundled in the Arasaka Demo
+  // Deck itself (data/decks/arasaka-embracing-power.json) = 6 owned.
+  await expect(page.getByTestId('collection-count-mantis-blades')).toContainText('6/3')
   await page.getByTestId('collection-mode-history').click()
   const entry = page.getByTestId('collection-history-entry').first()
   await expect(entry).toContainText('Acquisition')
