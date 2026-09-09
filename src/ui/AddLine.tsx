@@ -6,7 +6,7 @@
 // EXACTLY ONE printing of the matched card; 0 or 2+ printings show the card's
 // printings as chips so the keystroke never guesses which art got the copy
 // (31 card+set combinations hold 2-3 printings each).
-import { useMemo, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactElement } from 'react'
 import type { CardDb } from '../engine/types'
 import { printingsByCard, listSets, type Printing } from './printings'
 import { buildDisplayNames } from './storage'
@@ -60,11 +60,16 @@ export function AddLine({ db, printings, testIdPrefix, autoFocus }: { db: CardDb
   function stage(printing: Printing, name: string, remove: boolean): void {
     const line = draft.mode === 'signed' ? { key: printing.key, delta: remove ? -1 : 1 } : { key: printing.key, exact: remove ? 0 : 1 }
     stageLine(line)
-    const staged = getDraft().lines.length
-    const lineWord = staged === 1 ? 'line' : 'lines'
-    setToast(`${draft.mode === 'signed' ? (remove ? '−1' : '+1') : (remove ? 'set 0' : 'set 1')} ${name} · ${printing.setName} ${printing.collectorNumber} → ${staged} ${lineWord} staged`)
+    const staged = getDraft().lines.reduce((n, l) => n + Math.abs(l.delta ?? (l.exact !== undefined ? 1 : 0)), 0)
+    setToast(`${draft.mode === 'signed' ? (remove ? '−1' : '+1') : (remove ? 'set 0' : 'set 1')} ${name} · ${printing.setName} ${printing.collectorNumber} → ${staged} staged`)
     setQuery(''); setSelected(0)
   }
+
+  useEffect(() => {
+    if (toast === null) return
+    const id = setTimeout(() => setToast(null), 2000)
+    return () => clearTimeout(id)
+  }, [toast])
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.key === 'ArrowDown') { event.preventDefault(); setSelected(Math.min(clamped + 1, matches.length - 1)) }
@@ -85,7 +90,7 @@ export function AddLine({ db, printings, testIdPrefix, autoFocus }: { db: CardDb
             {sets.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}
           </select>
         </label>
-        <span className="add-line__hint"><kbd>Enter</kbd> +1 · <kbd>Shift</kbd><kbd>Enter</kbd> −1</span>
+        <span className="add-line__hint">{draft.mode === 'exact' ? <><kbd>Enter</kbd> set 1 · <kbd>Shift</kbd><kbd>Enter</kbd> set 0</> : <><kbd>Enter</kbd> +1 · <kbd>Shift</kbd><kbd>Enter</kbd> −1</>}</span>
       </div>
       {matches.length > 0 && (
         <ul className="add-line__matches" role="listbox">
