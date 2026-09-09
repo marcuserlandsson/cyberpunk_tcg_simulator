@@ -12,6 +12,13 @@ test('records a booster box and a demo deck as one undoable acquisition', async 
   await page.getByTestId('tab-collection').click()
   await expect(page.getByTestId('sync-status')).toContainText('Saved to disk')
 
+  // Seed one unrelated card first: undoing the whole acquisition later must
+  // not empty the collection, which the server refuses to save.
+  await page.getByTestId('expand-animals-wrecker').click()
+  await page.getByTestId('printing-inc-welcometonightcitybeta/β007').click()
+  await page.getByTestId('drawer-close').click()
+  await expect(page.getByTestId('collection-count-animals-wrecker')).toContainText('1/3')
+
   // Quick add in Browse stages into a session that starts by itself.
   await page.getByTestId('quick-add-set').selectOption('welcometonightcitybeta')
   for (let i = 0; i < 3; i++) { await page.getByTestId('quick-add-input').fill('mantis'); await page.getByTestId('quick-add-input').press('Enter') }
