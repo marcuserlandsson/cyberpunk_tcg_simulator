@@ -278,3 +278,23 @@
   display: flex;
   gap: 0.6em;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Run provenance (which saved run these results are)                     */
+/* ---------------------------------------------------------------------- */
+
+.sim-provenance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5em;
+  padding: 0.6em 0.8em;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.sim-provenance__versions { color: var(--muted); }
+
+/* Yellow per the token semantics: a decision is needed (rerun or not), but
+   nothing has failed. */
+.sim-provenance__stale { color: var(--act); }

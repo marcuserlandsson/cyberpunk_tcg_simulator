@@ -149,9 +149,20 @@ export function DeckBuilderView({ db, useOfficialImages, onPlayDeck }: DeckBuild
   // from this column wrapper rather than by teaching that row to wrap.
   return (
     <div className="deck-builder-view">
-      <div className="panel">
-        {onPlayDeck && <button data-testid="play-this-deck" disabled={!isDeckPickable(db, deck)} onClick={() => { try { const saved = saveDeckVersion(deck); setDeck(saved); setDeleteError(null); onPlayDeck(saved.name) } catch (error) { setDeleteError(String(error)) } }}>Save and play this deck</button>}
-        <details data-testid="deck-versions"><summary>Saved versions of {deck.name}</summary>{(() => { try { return listDeckVersions(deck.name).map(version => <button key={version.revisionId} onClick={() => setDeck(structuredClone(version))}>{version.versionLabel || 'Untitled version'} · {version.updatedAt} · Restore in editor</button>) } catch { return <p>Version history cannot be read.</p> } })()}</details>
+      <div className="panel deck-builder__toolbar">
+        {onPlayDeck && <div className="deck-builder__toolbar-row">
+          <button type="button" className="btn--primary" data-testid="play-this-deck" disabled={!isDeckPickable(db, deck)} onClick={() => { try { const saved = saveDeckVersion(deck); setDeck(saved); setDeleteError(null); onPlayDeck(saved.name) } catch (error) { setDeleteError(String(error)) } }}>Save and play this deck</button>
+          <span className="deck-builder__toolbar-hint">{isDeckPickable(db, deck) ? 'Saves a version and opens Play with this deck selected.' : 'Fix the deck errors listed in the deck pane before playing it.'}</span>
+        </div>}
+        <details className="tool-panel tool-panel--nested" data-testid="deck-versions"><summary>Saved versions of {deck.name}</summary>
+          <div className="tool-panel__body">{(() => {
+            try {
+              const versions = listDeckVersions(deck.name)
+              if (versions.length === 0) return <p className="tool-note">No saved versions yet — Save records one.</p>
+              return <div className="tool-list">{versions.map(version => <div key={version.revisionId} className="tool-list__row"><button type="button" onClick={() => setDeck(structuredClone(version))}><span className="tool-list__label">{version.versionLabel || 'Untitled version'}</span> · <span className="tool-list__when">{version.updatedAt}</span> · Restore in editor</button></div>)}</div>
+            } catch { return <p className="tool-error">Version history cannot be read.</p> }
+          })()}</div>
+        </details>
       </div>
       <div className="deck-builder" data-testid="deck-builder">
         <CardBrowser pool={deckFormat(deck)==="sealed"?deck.sealedPool:undefined} ignoreRam={deckFormat(deck)==="sealed"}

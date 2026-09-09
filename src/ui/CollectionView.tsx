@@ -163,16 +163,22 @@ export function CollectionView({
         </div>
       )}
       <CollectionHeader db={db} printings={loadResult.printings} />
-      <AcquisitionPlanner db={db} printings={loadResult.printings} counts={collection.counts} known={known} />
       <fieldset disabled={!known} className="collection-editor">
         <QuickAddBar db={db} printings={loadResult.printings} />
       </fieldset>
 
-      <CollectionSessions printings={loadResult.printings} known={known} />
-      <BulkCollectionEntry printings={loadResult.printings} known={known} />
+      {/* Occasional-use tools, collapsed by default so the grid stays the
+          page: staging a session, pasting bulk counts, planning purchases. */}
+      <div className="tool-rack">
+        <CollectionSessions printings={loadResult.printings} known={known} />
+        <BulkCollectionEntry printings={loadResult.printings} known={known} />
+        <AcquisitionPlanner db={db} printings={loadResult.printings} counts={collection.counts} known={known} />
+      </div>
       <div className="collection-view__filters">
-        <label>Search cards or printing numbers<input data-testid="collection-search" value={search} onChange={e=>{setSearch(e.target.value);setRowLimit(60)}} placeholder="Name, subtitle, collector number, set, artist…" /></label>
-        <label><input data-testid="collection-compact" type="checkbox" checked={compact} onChange={e=>setCompact(e.target.checked)} />Compact printing list</label>
+        <div className="collection-view__search">
+          <input data-testid="collection-search" aria-label="Search cards or printing numbers" value={search} onChange={e=>{setSearch(e.target.value);setRowLimit(60)}} placeholder="Search cards or printing numbers — name, subtitle, collector number, set, artist…" />
+          <label className="check-chip"><input data-testid="collection-compact" type="checkbox" checked={compact} onChange={e=>setCompact(e.target.checked)} />Compact printing list</label>
+        </div>
         <div className="card-browser__chips">
           {COLORS.map((color) => (
             <button type="button" key={color} data-testid={`collection-color-${color}`}
@@ -221,14 +227,14 @@ export function CollectionView({
         </p>
       </div>
 
-      <p data-testid="collection-scope">Matching scope: {rollups.reduce((n,r)=>n+r.matchingPrintings.length,0)} printing rows · {known ? rollups.reduce((n,r)=>n+r.matchingPrintings.reduce((a,p)=>a+(collection.counts[p.key]??0),0),0) : '?'} physical copies owned</p>
+      <p className="collection-view__legend" data-testid="collection-scope">Matching scope: {rollups.reduce((n,r)=>n+r.matchingPrintings.length,0)} printing rows · {known ? rollups.reduce((n,r)=>n+r.matchingPrintings.reduce((a,p)=>a+(collection.counts[p.key]??0),0),0) : '?'} physical copies owned</p>
       {compact ? <div className="compact-printings" data-testid="compact-printings">
         {rollups.flatMap(r=>r.matchingPrintings.map(p=>({r,p}))).slice(0,rowLimit).map(({r,p})=><div key={p.key} className="compact-printing" data-testid="compact-printing" data-printing-key={p.key}>
           {getPrintingImageUrl(p.key) && <a href={getPrintingImageUrl(p.key)} target="_blank" rel="noreferrer"><img src={getPrintingImageUrl(p.key)} alt={p.collectorNumber} width={48} loading="lazy" /></a>}
           <span><strong>{r.def.name}{r.def.subtitle ? ' — '+r.def.subtitle : ''}</strong><br />{p.setName} · {p.collectorNumber} · {p.rarity}{p.finish ? ' · '+p.finish : ''}<br /><small>{p.key} · {p.playable===false ? 'Collection only' : 'Playable printing'} · {p.artworkId ? 'Reviewed artwork' : 'Artwork unreviewed'}</small></span>
           <PrintingCount printingKey={p.key} count={collection.counts[p.key]??0} known={known} />
         </div>)}
-        {rollups.reduce((n,r)=>n+r.matchingPrintings.length,0)>rowLimit && <button onClick={()=>setRowLimit(n=>n+60)}>Show 60 more printings</button>}
+        {rollups.reduce((n,r)=>n+r.matchingPrintings.length,0)>rowLimit && <button type="button" className="compact-printings__more" onClick={()=>setRowLimit(n=>n+60)}>Show 60 more printings</button>}
       </div> : <div className="collection-view__grid" data-testid="collection-grid">
         {rollups.map((r) => (
           <div key={r.def.id} className="collection-view__cell" data-testid="collection-cell"

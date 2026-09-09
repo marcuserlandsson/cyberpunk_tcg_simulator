@@ -100,8 +100,8 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
   return (
     <div className="card-browser" data-testid="card-browser">
       <div className="card-browser__filters">
-        <label><input data-testid="filter-legal-ram" disabled={props.ignoreRam} type="checkbox" checked={legalRamOnly} onChange={e=>setLegalRamOnly(e.target.checked)} />Fits selected Legends’ RAM{props.ignoreRam ? " (ignored in sealed)" : ""}</label>
-        {props.pool && <label><input data-testid="filter-pool" type="checkbox" checked={poolOnly} onChange={e=>setPoolOnly(e.target.checked)} />Show only opened pool cards</label>}
+        <label className="check-chip"><input data-testid="filter-legal-ram" disabled={props.ignoreRam} type="checkbox" checked={legalRamOnly} onChange={e=>setLegalRamOnly(e.target.checked)} />Fits selected Legends’ RAM{props.ignoreRam ? " (ignored in sealed)" : ""}</label>
+        {props.pool && <label className="check-chip"><input data-testid="filter-pool" type="checkbox" checked={poolOnly} onChange={e=>setPoolOnly(e.target.checked)} />Show only opened pool cards</label>}
         <input
           type="text"
           data-testid="search-input"

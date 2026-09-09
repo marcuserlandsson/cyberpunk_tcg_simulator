@@ -16,6 +16,7 @@
   display: flex;
   flex-direction: column;
   gap: 1em;
+  padding: 0.8em 12px 1.2em;
 }
 
 /* Unchanged from before the collection feature: the two-pane row only. */

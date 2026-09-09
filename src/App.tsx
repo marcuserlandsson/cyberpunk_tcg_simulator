@@ -75,20 +75,28 @@ export default function App() {
           />
           Use official card images
         </label>
+        {/* A header chip rather than a banner in `main`: the playmat is sized
+            to the viewport minus the header, so anything stacked above it in
+            flow pushes the hand off the bottom of the screen. The details
+            drop down over the page instead. */}
+        <details className="catalog-status">
+          <summary>Card data: {catalogStatus.cardCount} cards · checked {catalogStatus.retrievedAt.slice(0, 10)} · {catalogStatus.pendingCards.length} awaiting implementation</summary>
+          <div className="catalog-status__panel">
+            <p className="tool-note">Comprehensive rules updated {catalogStatus.rulesUpdatedAt.slice(0, 10)}. Audited gameplay corrections are implemented. Official ambiguities and AI-policy limits still apply; results are practice estimates.</p>
+            {catalogStatus.pendingCards.length > 0 && <p className="tool-note">Available for collecting and deck planning; gameplay support pending: {catalogStatus.pendingCards.map(id => db[id]?.name ?? id).join(', ')}.</p>}
+            <p className="tool-note"><a href="https://cyberpunktcg.com/cards" target="_blank" rel="noreferrer">Official card catalog</a></p>
+          </div>
+        </details>
       </header>
       <main>
         {storageNotice && <p role="alert" data-testid="app-storage-notice">{storageNotice}</p>}
-        <details className="catalog-status">
-          <summary>Card data: {catalogStatus.cardCount} cards · checked {catalogStatus.retrievedAt.slice(0, 10)} · {catalogStatus.pendingCards.length} awaiting implementation</summary>
-          <p>Comprehensive rules updated {catalogStatus.rulesUpdatedAt.slice(0, 10)}. Audited gameplay corrections are implemented. Official ambiguities and AI-policy limits still apply; results are practice estimates.</p>
-          {catalogStatus.pendingCards.length > 0 && <p>Available for collecting and deck planning; gameplay support pending: {catalogStatus.pendingCards.map(id => db[id]?.name ?? id).join(', ')}.</p>}
-          <a href="https://cyberpunktcg.com/cards" target="_blank" rel="noreferrer">Official card catalog</a>
-        </details>
         {/* Kept mounted, only hidden: unmounting PlayView would throw away an
-            in-progress game every time the player glanced at another tab. */}
+            in-progress game every time the player glanced at another tab.
+            The match tracker sits under the playmat (same reason as the
+            catalog chip above: the board owns the first viewport). */}
         <div hidden={view !== 'play'}>
-          <MatchTracker />
           <PlayView requestedDeck={playDeckRequest} db={db} useOfficialImages={useOfficialImages} aiDelayMs={aiDelayMs} />
+          <div className="play-tab__below"><MatchTracker /></div>
         </div>
         {/* Kept mounted, only hidden: matches the Play tab's pattern (Task
             13) so a deck under construction survives a glance at another

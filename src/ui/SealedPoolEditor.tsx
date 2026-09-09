@@ -18,9 +18,14 @@ export function parseSealedPool(db:CardDb,text:string):Record<string,number>{
 export function SealedPoolEditor({db,deck,onChange}:{db:CardDb;deck:DeckList;onChange:(deck:DeckList)=>void}){
   const [text,setText]=useState(''),[error,setError]=useState('')
   useEffect(()=>setText(Object.entries(deck.sealedPool??{}).map(([id,n])=>`${id},${n}`).join('\n')),[deck.sealedPool])
-  return <details open className="panel"><summary>Opened sealed pool</summary><p>30+ main-deck cards, up to three main-deck colors, no RAM or copy limit. Exactly three distinct-name Legends from this pool; their colors are unrestricted. Unused pool cards remain available between matches.</p>
-    <label>Pool counts<textarea data-testid="sealed-pool-input" value={text} onChange={e=>setText(e.target.value)} placeholder="card-id,count or printing-key,count" /></label><button data-testid="sealed-pool-apply" onClick={()=>{try{onChange({...deck,sealedPool:parseSealedPool(db,text)});setError('')}catch(e){setError(String(e))}}}>Set opened pool</button>
-    <p>{Object.values(deck.sealedPool??{}).reduce((sum,n)=>sum+n,0)} pool copies recorded. Card rows outside or beyond this pool are flagged by validation; inventory ownership is separate.</p>{error&&<p role="alert">{error}</p>}
-    <a href="https://cyberpunktcg.com/beta-event-guide" target="_blank" rel="noreferrer">Official Beta sealed rules</a>
+  const poolSize=Object.values(deck.sealedPool??{}).reduce((sum,n)=>sum+n,0)
+  return <details open className="tool-panel tool-panel--nested"><summary>Opened sealed pool<span className="tool-panel__meta">{poolSize} copies</span></summary>
+    <div className="tool-panel__body">
+      <p className="tool-note">30+ main-deck cards, up to three main-deck colors, no RAM or copy limit. Exactly three distinct-name Legends from this pool; their colors are unrestricted. Unused pool cards remain available between matches.</p>
+      <label className="field field--wide"><span className="field__label">Pool counts</span><textarea data-testid="sealed-pool-input" value={text} onChange={e=>setText(e.target.value)} placeholder="card-id,count or printing-key,count" /></label>
+      <div className="tool-actions"><button type="button" data-testid="sealed-pool-apply" onClick={()=>{try{onChange({...deck,sealedPool:parseSealedPool(db,text)});setError('')}catch(e){setError(String(e))}}}>Set opened pool</button><span className="tool-status">{poolSize} pool copies recorded</span></div>
+      <p className="tool-note">Card rows outside or beyond this pool are flagged by validation; inventory ownership is separate. <a href="https://cyberpunktcg.com/beta-event-guide" target="_blank" rel="noreferrer">Official Beta sealed rules</a></p>
+      {error&&<p className="tool-error" role="alert">{error}</p>}
+    </div>
   </details>
 }

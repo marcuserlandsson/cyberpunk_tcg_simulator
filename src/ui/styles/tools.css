@@ -1,0 +1,618 @@
+/* ---------------------------------------------------------------------- */
+/* Tool panels — the shared chrome for the utility sections added around   */
+/* the four views (acquisition planner, sessions & history, bulk counts,   */
+/* deck diagnostics, match tracker, sealed pool, sim benchmark, history).  */
+/*                                                                        */
+/* They stay <details>/<summary> — collapsible is right for tools that are */
+/* used occasionally and would otherwise bury the grid, deck or board they */
+/* sit next to — but the native disclosure widget is gone: the summary is  */
+/* a panel header bar in the display face, the marker a small chevron, and */
+/* the body a padded stack laid out with the same field/chip/table         */
+/* vocabulary the Simulate config row and the Deck Builder already use.    */
+/* ---------------------------------------------------------------------- */
+
+.tool-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.tool-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 9px 14px;
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+  user-select: none;
+}
+
+.tool-panel > summary::-webkit-details-marker { display: none; }
+
+/* The chevron: a rotated square outline, so it is drawn in the same 1.5px
+   stroke as the ghost buttons rather than as a glyph in a fallback font. */
+.tool-panel > summary::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--you);
+  border-bottom: 1.5px solid var(--you);
+  transform: rotate(-45deg);
+  margin-left: 2px;
+  transition: transform 140ms ease;
+}
+
+.tool-panel[open] > summary::before { transform: rotate(45deg); }
+
+.tool-panel > summary:hover { background: rgba(0, 229, 255, 0.08); }
+.tool-panel > summary:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+
+.tool-panel[open] > summary { border-bottom: 1px solid var(--line); }
+
+/* A trailing count / status on the header ("Run history (4)") in mono so it
+   reads as data, not as part of the title. */
+.tool-panel__meta {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.tool-panel__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.8em;
+  padding: 0.9em 1em 1em;
+}
+
+.tool-panel__body > * { max-width: 100%; }
+.tool-panel__body > .field,
+.tool-panel__body > .field-row,
+.tool-panel__body > .tool-panel,
+.tool-panel__body > .tool-preview { align-self: stretch; }
+
+/* Nested inside another panel (the sealed pool editor lives in the deck
+   pane; a history entry lives in the sessions panel): one shade lighter so
+   it reads as a sub-section, and a smaller header. */
+.tool-panel--nested { background: var(--panel-2); }
+.tool-panel--nested > summary { font-size: 12px; padding: 7px 12px; }
+.tool-panel--nested > .tool-panel__body { padding: 0.7em 0.8em 0.8em; gap: 0.6em; }
+
+/* A stack of tool panels (the Collection tab's tool rack). */
+.tool-rack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  margin-bottom: 0.8em;
+}
+
+/* ---- body copy ------------------------------------------------------- */
+
+.tool-note {
+  margin: 0;
+  font-size: 0.85em;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.tool-note a { color: var(--you); }
+
+.tool-status {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.tool-error {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--rival);
+  white-space: pre-wrap;
+}
+
+/* A highlighted measurement ("4 copies needed across 2 cards"): display
+   face, the same cyan the win-rate row uses for "seat A / the reading". */
+.tool-figure {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--you);
+}
+
+/* ---- fields ---------------------------------------------------------- */
+
+/* Stacked label-over-control, identical to `.sim-setup__field` — the app's
+   one existing labelled-control pattern. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  min-width: 0;
+}
+
+.field__label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field select, .field input:not([type='checkbox']):not([type='radio']) { min-width: 9em; }
+.field input[type='number'] { min-width: 6em; width: 7em; }
+.field textarea { width: 100%; min-height: 6em; resize: vertical; }
+.field--wide { align-self: stretch; }
+.field--wide textarea, .field--wide input { width: 100%; }
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1em;
+}
+
+/* Inline checkbox/radio labelled as a chip, so a boolean option sits in the
+   same visual family as the filter chips instead of as a bare browser
+   checkbox floating in body text. */
+.check-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 10px 3px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.check-chip:has(input:checked) { color: var(--text); border-color: var(--line-bright); }
+.check-chip:has(input:disabled) { opacity: 0.5; cursor: default; }
+.check-chip input { margin: 0; }
+
+.check-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.check-list legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 0.4em;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.check-list--empty {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---- actions --------------------------------------------------------- */
+
+.tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+}
+
+/* Full-width list of selectable entries (deck versions, past runs, past
+   matches): ghost buttons squared off and left-aligned, mono, one per row. */
+.tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  width: 100%;
+}
+
+.tool-list__row {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.tool-list__row > button:first-child { flex: 1 1 auto; text-align: left; }
+
+.tool-list button {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: 5px 10px;
+  clip-path: none;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line-bright);
+}
+
+.tool-list button:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--you); }
+.tool-list button.tool-list__remove { flex: none; color: var(--rival); box-shadow: inset 0 0 0 1px var(--line); }
+.tool-list button.tool-list__remove:hover:not(:disabled) { background: rgba(255, 61, 90, 0.12); box-shadow: inset 0 0 0 1px var(--rival); }
+
+/* ---- data ------------------------------------------------------------ */
+
+/* Same rules as `.sim-table` (simulate.css), for the tables outside the
+   Simulate view. */
+.tool-table-wrap { width: 100%; overflow-x: auto; }
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.data-table caption {
+  text-align: left;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0 0.4em;
+}
+
+.data-table th, .data-table td {
+  padding: 0.3em 0.6em;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table th {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.data-table td.num, .data-table th.num { text-align: right; white-space: nowrap; }
+.data-table tbody tr:hover { background: var(--panel-2); }
+
+/* The in-table bar (cost curve share): the progress-bar look from Simulate. */
+.data-table meter {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 6em;
+  height: 8px;
+  vertical-align: middle;
+  margin-right: 0.5em;
+  border: 1px solid var(--line-bright);
+  background: var(--panel-2);
+}
+.data-table meter::-webkit-meter-bar { background: var(--panel-2); border: 0; border-radius: 0; }
+.data-table meter::-webkit-meter-optimum-value { background: var(--you); }
+.data-table meter::-moz-meter-bar { background: var(--you); }
+
+/* "key: before → after" change lists (import preview, bulk preview,
+   session preview, history entries). */
+.change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  max-height: 14em;
+  overflow-y: auto;
+  padding: 0.4em;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.change-list p { margin: 0; display: flex; gap: 0.6em; }
+.change-list p > span:first-child { flex: 1 1 auto; overflow-wrap: anywhere; }
+.change-list p > span:last-child { color: var(--you); white-space: nowrap; }
+
+/* A previewed result block (pending import/session/bulk changes, sampled
+   hand): a stacked group inside the body. */
+.tool-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6em;
+  width: 100%;
+}
+
+/* Chips summarizing a set of facts (type counts, match score). */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.chip--accent { color: var(--act); border-color: var(--act); }
+
+.tool-panel pre,
+.tool-pre {
+  width: 100%;
+  max-height: 18em;
+  overflow: auto;
+  margin: 0;
+  padding: 0.5em 0.7em;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* A row of small card renditions (the sampled opening hand). */
+.tool-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* A numbered result list (recorded games). */
+.tool-ol {
+  margin: 0;
+  padding-left: 1.4em;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Large live readout (match clock). */
+.tool-clock {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Header catalog status: a mono chip in the app header whose details drop */
+/* down as a panel, so it costs the fixed-height playmat no vertical space. */
+/* ---------------------------------------------------------------------- */
+
+.catalog-status {
+  position: relative;
+  margin-left: auto;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+/* Shrinks (with an ellipsis) before the header is allowed to wrap onto a
+   second row — a taller header would push the viewport-sized playmat off
+   the bottom of the screen. */
+.catalog-status > summary {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  list-style: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.catalog-status > summary::-webkit-details-marker { display: none; }
+.catalog-status > summary:hover { color: var(--text); border-color: var(--line-bright); }
+
+.catalog-status__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: min(34em, calc(100vw - 40px));
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  padding: 0.9em 1em;
+  background: var(--panel);
+  border: 1px solid var(--line-bright);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 900px) {
+  .catalog-status { margin-left: 0; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Play tab: the match tracker sits under the fixed-height playmat, and the */
+/* public-areas inspector lives in the rail's action column.               */
+/* ---------------------------------------------------------------------- */
+
+.play-tab__below {
+  padding: 0.8em 12px 1.2em;
+}
+
+/* Inside `.action-rail` (a 290px column): a compact nested panel whose body
+   lists card-name buttons per zone. */
+.public-areas {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.public-areas > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 6px 10px;
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.public-areas > summary::-webkit-details-marker { display: none; }
+.public-areas > summary:hover { color: var(--text); }
+.public-areas > summary::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 140ms ease;
+}
+.public-areas[open] > summary::before { transform: rotate(45deg); }
+
+.public-areas__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  padding: 0 10px 8px;
+  max-height: 14em;
+  overflow-y: auto;
+}
+
+.public-areas__side {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.public-areas__owner {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-areas__owner--you { color: var(--you); }
+.public-areas__owner--rival { color: var(--rival); }
+
+.public-areas__zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.public-areas__zone-name { text-transform: capitalize; margin-right: 0.2em; }
+
+.public-areas__zone button {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: 1px 6px;
+  clip-path: none;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line-bright);
+}
+
+/* Play setup additions. */
+.play-setup__note {
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--muted);
+  max-width: 60em;
+}
+
+.play-setup__warning {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  padding: 0.7em 0.9em;
+  border: 1px solid var(--act);
+  background: rgba(252, 238, 10, 0.06);
+  max-width: 44em;
+}
+
+.play-setup__warning p { margin: 0; font-size: 0.9em; }
+.play-setup__warning-actions { display: flex; gap: 0.5em; flex-wrap: wrap; }
+
+.practice-seat {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  margin: 0;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Deck Builder additions                                                  */
+/* ---------------------------------------------------------------------- */
+
+.deck-builder__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7em;
+  padding: 0.8em;
+}
+
+.deck-builder__toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7em;
+}
+
+.deck-builder__toolbar-hint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* The deck pane's format/version/notes controls: two fields side by side,
+   notes full width beneath. */
+.deck-panel__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6em;
+}
+
+.deck-panel__meta .field--wide { grid-column: 1 / -1; }
+.deck-panel__meta textarea { min-height: 3.5em; }
+.deck-panel__meta select, .deck-panel__meta input { width: 100%; min-width: 0; }
+
+/* Version restore rows carry a label, a timestamp, and an action. */
+.tool-list__label { flex: 1 1 auto; }
+.tool-list__when { color: var(--muted); }

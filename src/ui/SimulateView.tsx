@@ -366,16 +366,8 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
   return (
     <section aria-label="Simulate" className="simulate-view" data-testid="simulate-view">
       <h2>Simulate</h2>
-      <p>Completed runs save in this browser. Navigation keeps a run going; keep the tab open until it finishes.</p>
-      {historyError && <p role="alert" data-testid="sim-history-error">{historyError}</p>}
-      <details className="panel" data-testid="sim-history"><summary>Run history ({history.runs.length})</summary>
-        {history.runs.map(run => <div key={run.id}>
-          <button type="button" disabled={running} onClick={() => openRun(run)} data-testid="sim-open-run">{new Date(run.createdAt).toLocaleString()} · A: {run.options.deckA.name} / B: {run.options.deckB.name} · {run.result.games.length} games · seed {run.options.seed}</button>
-          <button type="button" disabled={running} onClick={() => { const error = removeSimRun(run.id); setHistoryError(error); if (!error) setHistory(previous => ({ ...previous, runs: previous.runs.filter(r => r.id !== run.id) })) }}>Remove from history</button>
-        </div>)}
-        <label>Import a complete run JSON<textarea data-testid="sim-import-json" value={importRunText} onChange={e => setImportRunText(e.target.value)} /></label>
-        <button type="button" data-testid="sim-import-run" disabled={running || !importRunText.trim()} onClick={importRun}>Import run</button>
-      </details>
+      <p className="tool-note">Completed runs save in this browser. Navigation keeps a run going; keep the tab open until it finishes.</p>
+      {historyError && <p className="tool-error" role="alert" data-testid="sim-history-error">{historyError}</p>}
 
       {lastResult !== null && result === null && !running && (
         <div className="sim-banner panel" data-testid="sim-last-result-banner">
@@ -505,12 +497,12 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
       {result !== null && ranNames !== null && (
         <section className="sim-results panel clip-corners" data-testid="sim-results">
           <h3>Results</h3>
-          {selectedRun && <div data-testid="sim-provenance">
-            <p>{new Date(selectedRun.createdAt).toLocaleString()} · seed {selectedRun.options.seed} · {selectedRun.options.agentA} vs {selectedRun.options.agentB}</p>
-            <p>Rules {selectedRun.rulesVersion.slice(0, 10)} · engine {selectedRun.engineVersion} · card data {selectedRun.cardData}</p>
-            {!runUsesCurrentRules(db, selectedRun) && <p role="status">Historical result uses different rules, engine or card data. A new run will use the current version.</p>}
-            <details><summary>Exact deck snapshots</summary><pre>{JSON.stringify({ A: selectedRun.options.deckA, B: selectedRun.options.deckB }, null, 2)}</pre></details>
-            <button type="button" disabled={running} onClick={() => startRun({ ...selectedRun.options, benchmark: undefined })}>Run these snapshots with current rules</button>
+          {selectedRun && <div className="sim-provenance" data-testid="sim-provenance">
+            <p className="tool-status">{new Date(selectedRun.createdAt).toLocaleString()} · seed {selectedRun.options.seed} · {selectedRun.options.agentA} vs {selectedRun.options.agentB}</p>
+            <p className="tool-status sim-provenance__versions">Rules {selectedRun.rulesVersion.slice(0, 10)} · engine {selectedRun.engineVersion} · card data {selectedRun.cardData}</p>
+            {!runUsesCurrentRules(db, selectedRun) && <p className="tool-status sim-provenance__stale" role="status">Historical result uses different rules, engine or card data. A new run will use the current version.</p>}
+            <details className="tool-panel tool-panel--nested"><summary>Exact deck snapshots</summary><div className="tool-panel__body"><pre>{JSON.stringify({ A: selectedRun.options.deckA, B: selectedRun.options.deckB }, null, 2)}</pre></div></details>
+            <div className="tool-actions"><button type="button" className="btn--ghost" disabled={running} onClick={() => startRun({ ...selectedRun.options, benchmark: undefined })}>Run these snapshots with current rules</button></div>
           </div>}
 
           <div className="sim-winrates" data-testid="sim-winrates">
@@ -610,6 +602,20 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
           </div>
         </section>
       )}
+
+      {/* Below the results: past runs are reference material, not the reason
+          you opened the tab. */}
+      <details className="tool-panel" data-testid="sim-history"><summary>Run history ({history.runs.length})</summary>
+        <div className="tool-panel__body">
+          {history.runs.length === 0 && <p className="tool-note">No completed runs saved in this browser yet.</p>}
+          <div className="tool-list">{history.runs.map(run => <div key={run.id} className="tool-list__row">
+            <button type="button" disabled={running} onClick={() => openRun(run)} data-testid="sim-open-run">{new Date(run.createdAt).toLocaleString()} · A: {run.options.deckA.name} / B: {run.options.deckB.name} · {run.result.games.length} games · seed {run.options.seed}</button>
+            <button type="button" className="tool-list__remove" disabled={running} onClick={() => { const error = removeSimRun(run.id); setHistoryError(error); if (!error) setHistory(previous => ({ ...previous, runs: previous.runs.filter(r => r.id !== run.id) })) }}>Remove</button>
+          </div>)}</div>
+          <label className="field field--wide"><span className="field__label">Import a complete run JSON</span><textarea data-testid="sim-import-json" value={importRunText} onChange={e => setImportRunText(e.target.value)} /></label>
+          <div className="tool-actions"><button type="button" data-testid="sim-import-run" disabled={running || !importRunText.trim()} onClick={importRun}>Import run</button></div>
+        </div>
+      </details>
     </section>
   )
 }

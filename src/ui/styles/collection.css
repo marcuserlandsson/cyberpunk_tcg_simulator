@@ -39,18 +39,11 @@
   font-size: 0.85em;
 }
 
+/* Closed: just its summary, a ghost button among the export buttons. Open:
+   takes a full row of its own with the button on top of the body (rules at
+   the end of this file). */
 .collection-header__import {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5em;
-  width: 100%;
-}
-
-.collection-header__import textarea {
-  flex: 1 1 100%;
-  min-height: 4em;
-  font-family: var(--font-mono);
+  display: inline-flex;
 }
 
 .collection-header__error {
@@ -262,3 +255,71 @@
 .compact-printing > span:last-child { grid-column: 3; }
 .collection-view__stepper { flex-wrap: wrap; }
 .collection-view__filters input[type='text'], .collection-view__filters input:not([type]) { max-width: 100%; }
+
+/* ---------------------------------------------------------------------- */
+/* Header import: the summary reads as a ghost button in the export row;   */
+/* the body opens onto its own full-width row beneath the header strip.    */
+/* ---------------------------------------------------------------------- */
+
+.collection-header__import[open] {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6em;
+}
+
+.collection-header__import > summary {
+  list-style: none;
+  cursor: pointer;
+  font-family: var(--font-display); font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.12em; font-size: 12px; padding: 8px 16px;
+  color: var(--you); box-shadow: inset 0 0 0 1.5px var(--you);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+.collection-header__import > summary::-webkit-details-marker { display: none; }
+.collection-header__import > summary:hover { background: rgba(0, 229, 255, 0.12); }
+.collection-header__import[open] > summary { background: var(--you); color: var(--void); }
+
+.collection-header__import-body {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6em;
+  padding: 0.8em 1em 1em;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+.collection-header__import-body textarea { min-height: 5em; }
+
+/* Search row above the filter chips: a wide search box and the compact-list
+   toggle chip. */
+.collection-view__search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6em;
+  margin-bottom: 0.6em;
+}
+
+.collection-view__search input[type='text'],
+.collection-view__search input:not([type]) {
+  flex: 1 1 24em;
+  min-width: 0;
+}
+
+.compact-printings__more {
+  justify-self: start;
+  margin-top: 0.4em;
+}
+
+/* Same page gutter as `.simulate-view`, so the tab content never touches the
+   viewport edge. */
+.collection-view {
+  padding: 0.8em 12px 1.2em;
+}

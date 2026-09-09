@@ -476,8 +476,8 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
         data-testid="play-setup"
       >
         <h2>New game</h2>
-        <label><input data-testid="manual-practice" type="checkbox" checked={manual} onChange={e=>setManual(e.target.checked)} />Manual practice · control both sides</label>
-        <p>In manual practice the board follows the player making each decision. Save a named position to revisit a scenario; Undo takes back one decision.</p>
+        <label className="check-chip"><input data-testid="manual-practice" type="checkbox" checked={manual} onChange={e=>setManual(e.target.checked)} />Manual practice · control both sides</label>
+        <p className="play-setup__note">In manual practice the board follows the player making each decision. Save a named position to revisit a scenario; Undo takes back one decision.</p>
         <label className="play-setup__field">
           Your deck
           <select
@@ -530,7 +530,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
           </button>
         )}
         <h3>Resume a saved game</h3>
-        {versionWarning && <div role="alert" data-testid="replay-version-warning"><p>{versionWarning.name} has missing or different rules, engine or card-data metadata. Replaying under current rules can change the game or fail. Its original save stays intact.</p><button data-testid="replay-current-rules" onClick={() => { game.load(versionWarning.record); setVersionWarning(null); setSetupOpen(false) }}>Attempt replay with current rules</button><button onClick={() => setVersionWarning(null)}>Cancel replay</button></div>}
+        {versionWarning && <div className="play-setup__warning" role="alert" data-testid="replay-version-warning"><p>{versionWarning.name} has missing or different rules, engine or card-data metadata. Replaying under current rules can change the game or fail. Its original save stays intact.</p><div className="play-setup__warning-actions"><button type="button" data-testid="replay-current-rules" onClick={() => { game.load(versionWarning.record); setVersionWarning(null); setSetupOpen(false) }}>Attempt replay with current rules</button><button type="button" className="btn--ghost" onClick={() => setVersionWarning(null)}>Cancel replay</button></div></div>}
         {records.length === 0 && <p data-testid="no-saves">No saved games.</p>}
         <ul className="play-setup__saves">
           {records.map((entry) => (
@@ -619,15 +619,11 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
       data-turn={state.turnNumber}
       data-phase={state.phase}
     >
-      {record?.practiceMode && <p data-testid="practice-seat">Manual practice · controlling player {HUMAN + 1} · log labels remain relative to player 1</p>}
+      {/* Floats over the top of the board (absolute, prompts.css-style) so
+          the four-row board grid keeps its rows. */}
+      {record?.practiceMode && <p className="chip practice-seat" data-testid="practice-seat">Manual practice · controlling player {HUMAN + 1} · log labels remain relative to player 1</p>}
       <div className="playmat__body">
         <div className="playmat__board">
-          {!!state.resolvingPrograms?.length && <div className="prompt-bar" data-testid="resolving-programs">Resolving: {state.resolvingPrograms.map(uid => nameOf(db, state, uid)).join(', ')}</div>}
-          <details className="public-areas"><summary>Inspect trash and removed cards</summary>
-            {([HUMAN, AI] as const).map(player => <div key={player}><strong>{player === HUMAN ? 'Your' : 'Rival'} public areas</strong>
-              {(['trash', 'removed'] as const).map(zone => <div key={zone}>{zone}: {state.players[player][zone].length === 0 ? 'Empty' : state.players[player][zone].map(uid => <button type="button" key={uid} onMouseEnter={() => setZoomUid(uid)} onMouseLeave={() => setZoomUid(null)} onFocus={() => setZoomUid(uid)} onBlur={() => setZoomUid(null)}>{nameOf(db, state, uid)}</button>)}</div>)}
-            </div>)}
-          </details>
           <div className="rival-strip" data-testid="rival-side">
             {/* Turn/phase/whose-turn already read prominently off `StreetStrip`'s
                 vs-block below; these stay tiny and muted so nothing is said
@@ -809,11 +805,27 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
                 {savedNote}
               </span>
             )}
+            {/* Public zones the board does not lay out as piles: lives in the
+                rail so the board grid's four rows stay exactly four. Hovering
+                a name drives the same zoom panel a board card does. */}
+            <details className="public-areas"><summary>Inspect trash and removed cards</summary>
+              <div className="public-areas__body">
+                {([HUMAN, AI] as const).map(player => <div key={player} className="public-areas__side">
+                  <strong className={`public-areas__owner public-areas__owner--${player === HUMAN ? 'you' : 'rival'}`}>{player === HUMAN ? 'Your' : 'Rival'} public areas</strong>
+                  {(['trash', 'removed'] as const).map(zone => <div key={zone} className="public-areas__zone"><span className="public-areas__zone-name">{zone}:</span>{state.players[player][zone].length === 0 ? 'Empty' : state.players[player][zone].map(uid => <button type="button" key={uid} onMouseEnter={() => setZoomUid(uid)} onMouseLeave={() => setZoomUid(null)} onFocus={() => setZoomUid(uid)} onBlur={() => setZoomUid(null)}>{nameOf(db, state, uid)}</button>)}</div>)}
+                </div>)}
+              </div>
+            </details>
           </div>
         </div>
       </div>
 
       <div className="playmat__prompts">
+        {!!state.resolvingPrograms?.length && (
+          <div className="prompt-bar" data-testid="resolving-programs">
+            <span className="prompt-bar__label">Resolving: {state.resolvingPrograms.map(uid => nameOf(db, state, uid)).join(', ')}</span>
+          </div>
+        )}
         {chooseOrder && legal.length > 0 && (
           <div className="prompt-bar" data-testid="choose-order-bar">
             <span className="prompt-bar__label">

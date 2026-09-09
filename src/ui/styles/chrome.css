@@ -61,12 +61,14 @@ input, select, textarea {
   background: var(--panel-2); border: 1px solid var(--line-bright); padding: 6px 10px;
 }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--you); outline-offset: 1px; }
+input[type='checkbox'], input[type='radio'] { accent-color: var(--you); }
 
 /* ---------------------------------------------------------------------- */
 /* App shell: header + nav                                                */
 /* ---------------------------------------------------------------------- */
 
 header {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 24px;

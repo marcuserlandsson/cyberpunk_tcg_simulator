@@ -233,48 +233,61 @@ export function CollectionHeader({ db, printings }: { db: CardDb; printings: Pri
       >
         Export text
       </button>
+      {/* The summary is styled as a ghost button so it sits in the export
+          button row; the open body drops to its own full-width row below. */}
       <details className="collection-header__import" data-testid="import-panel">
         <summary>Import</summary>
-        <textarea
-          data-testid="import-input"
-          value={importText}
-          placeholder="Paste a collection JSON or text export…"
-          onChange={(event) => {setImportText(event.target.value);setPreview(null)}}
-        />
-        <label>
-          <input
-            type="radio"
-            name="import-mode"
-            data-testid="import-mode-replace"
-            checked={mode === 'replace'}
-            onChange={() => {setMode('replace');setPreview(null)}}
-          />
-          Replace
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="import-mode"
-            data-testid="import-mode-merge"
-            checked={mode === 'merge'}
-            onChange={() => {setMode('merge');setPreview(null)}}
-          />
-          Merge (add counts)
-        </label>
-        <button
-          type="button"
-          data-testid="import-submit"
-          disabled={derivedUnavailable || importText.trim() === ''}
-          onClick={runImport}
-        >
-          Preview import
-        </button>
-        {preview && <div data-testid="import-preview"><p>{mode} import: {Object.keys(collectionChanges(preview.before,preview.after)).length} changed printing rows · total {totalCount(preview.before)} → {totalCount(preview.after)}</p><details><summary>Changed counts</summary>{Object.entries(collectionChanges(preview.before,preview.after)).map(([key,c])=><p key={key}>{key}: {c.before} → {c.after}</p>)}</details><button disabled={derivedUnavailable} data-testid="import-apply" onClick={()=>{try{if(JSON.stringify(getCollection().counts)!==JSON.stringify(preview.before))throw new Error("Collection changed; preview again.");replaceCollection({counts:preview.after},{kind:mode+" import"});setPreview(null);setImportText("");setError("")}catch(e){setError(String(e))}}}>Apply reviewed import</button></div>}
-        {error !== '' && (
-          <div data-testid="import-error" className="collection-header__error">
-            {error}
+        <div className="collection-header__import-body">
+          <label className="field field--wide">
+            <span className="field__label">Collection export to import</span>
+            <textarea
+              data-testid="import-input"
+              value={importText}
+              placeholder="Paste a collection JSON or text export…"
+              onChange={(event) => {setImportText(event.target.value);setPreview(null)}}
+            />
+          </label>
+          <div className="tool-actions">
+            <label className="check-chip">
+              <input
+                type="radio"
+                name="import-mode"
+                data-testid="import-mode-replace"
+                checked={mode === 'replace'}
+                onChange={() => {setMode('replace');setPreview(null)}}
+              />
+              Replace
+            </label>
+            <label className="check-chip">
+              <input
+                type="radio"
+                name="import-mode"
+                data-testid="import-mode-merge"
+                checked={mode === 'merge'}
+                onChange={() => {setMode('merge');setPreview(null)}}
+              />
+              Merge (add counts)
+            </label>
+            <button
+              type="button"
+              data-testid="import-submit"
+              disabled={derivedUnavailable || importText.trim() === ''}
+              onClick={runImport}
+            >
+              Preview import
+            </button>
           </div>
-        )}
+          {preview && <div className="tool-preview" data-testid="import-preview">
+            <p className="tool-figure">{mode} import: {Object.keys(collectionChanges(preview.before,preview.after)).length} changed printing rows · total {totalCount(preview.before)} → {totalCount(preview.after)}</p>
+            <details className="tool-panel tool-panel--nested"><summary>Changed counts</summary><div className="tool-panel__body"><div className="change-list">{Object.entries(collectionChanges(preview.before,preview.after)).map(([key,c])=><p key={key}><span>{key}</span><span>{c.before} → {c.after}</span></p>)}</div></div></details>
+            <div className="tool-actions"><button type="button" className="btn--primary" disabled={derivedUnavailable} data-testid="import-apply" onClick={()=>{try{if(JSON.stringify(getCollection().counts)!==JSON.stringify(preview.before))throw new Error("Collection changed; preview again.");replaceCollection({counts:preview.after},{kind:mode+" import"});setPreview(null);setImportText("");setError("")}catch(e){setError(String(e))}}}>Apply reviewed import</button></div>
+          </div>}
+          {error !== '' && (
+            <div data-testid="import-error" className="collection-header__error">
+              {error}
+            </div>
+          )}
+        </div>
       </details>
     </div>
   )

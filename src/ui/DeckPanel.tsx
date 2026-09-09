@@ -190,10 +190,12 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
         )}
       </div>
 
-      <label>Format<select data-testid="deck-format" value={deckFormat(deck)} onChange={e => onChangeDeck({ ...deck, format: e.target.value as DeckList['format'], demo: e.target.value === 'demo' })}><option value="constructed">Constructed · 40–50 cards</option><option value="demo">Demo · practice size</option><option value="sealed">Sealed · 30+ cards from opened pool</option></select></label>
+      <div className="deck-panel__meta">
+        <label className="field"><span className="field__label">Format</span><select data-testid="deck-format" value={deckFormat(deck)} onChange={e => onChangeDeck({ ...deck, format: e.target.value as DeckList['format'], demo: e.target.value === 'demo' })}><option value="constructed">Constructed · 40–50 cards</option><option value="demo">Demo · practice size</option><option value="sealed">Sealed · 30+ cards from opened pool</option></select></label>
+        <label className="field"><span className="field__label">Version label</span><input data-testid="deck-version-label" value={deck.versionLabel ?? ''} onChange={e => onChangeDeck({ ...deck, versionLabel: e.target.value })} /></label>
+        <label className="field field--wide"><span className="field__label">Deck notes</span><textarea data-testid="deck-notes" value={deck.notes ?? ''} onChange={e => onChangeDeck({ ...deck, notes: e.target.value })} /></label>
+      </div>
       {deckFormat(deck)==='sealed' && <SealedPoolEditor db={db} deck={deck} onChange={onChangeDeck} />}
-      <label>Version label<input data-testid="deck-version-label" value={deck.versionLabel ?? ''} onChange={e => onChangeDeck({ ...deck, versionLabel: e.target.value })} /></label>
-      <label>Deck notes<textarea data-testid="deck-notes" value={deck.notes ?? ''} onChange={e => onChangeDeck({ ...deck, notes: e.target.value })} /></label>
       <div className="deck-panel__legends" data-testid="legend-slots">
         {[0, 1, 2].map((index) => {
           const id = deck.legends[index]
