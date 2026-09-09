@@ -1,7 +1,7 @@
 # Collection Tab Overhaul — Design
 
 **Date:** 2026-09-09
-**Status:** Draft for review (design agreed in brainstorming; spec awaiting sign-off)
+**Status:** Implemented on branch feat/collection-overhaul (2026-09-09)
 **Mockup:** `2026-09-09-collection-tab-overhaul-mockup.html` (same folder; draft 3, the
 version agreed in brainstorming). Where this document and the mockup disagree, this
 document wins; the mockup is the visual reference, not a pixel contract.
