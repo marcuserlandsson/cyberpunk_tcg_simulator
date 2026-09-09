@@ -1,0 +1,733 @@
+<title>Collection Tab Overhaul</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Chakra+Petch:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Single-theme mockup: the app itself is dark-only, so the page commits to
+     the app's own tokens (src/ui/styles/tokens.css) on both host grounds. */
+  :root {
+    --void: #07070d; --panel: #10101a; --panel-2: #161624; --panel-3: #1c1c2c;
+    --line: #262638; --line-bright: #3a3a52;
+    --text: #e8ecf2; --muted: #8b94a8;
+    --you: #00e5ff; --rival: #ff3d5a; --act: #fcee0a;
+    --ram-red: #ff4655; --ram-yellow: #fcee0a; --ram-green: #2dff87; --ram-blue: #38a8ff;
+    --display: 'Rajdhani', 'Arial Narrow', sans-serif;
+    --body: 'Chakra Petch', 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--void); color: var(--text); font-family: var(--body); font-size: 14px; }
+  button { font: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--you); outline-offset: 2px; }
+  h1, h2, h3, h4 { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
+
+  /* ---- mockup framing (not part of the design) ---- */
+  .note {
+    max-width: 1500px; margin: 0 auto; padding: 14px 20px 0;
+    display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+  .note strong { color: var(--act); font-weight: 500; }
+  .note kbd { border: 1px solid var(--line-bright); padding: 0 5px; border-radius: 2px; color: var(--text); }
+
+  /* ---- app header replica ---- */
+  .app { max-width: 1500px; margin: 12px auto 40px; border: 1px solid var(--line); background: var(--void); }
+  .apphead { display: flex; align-items: center; gap: 24px; padding: 10px 20px; border-bottom: 1px solid var(--line); }
+  .apphead h1 { font-size: 20px; text-shadow: 2px 0 0 rgba(255,61,90,.5), -2px 0 0 rgba(0,229,255,.45); }
+  .apphead nav { display: flex; gap: 8px; }
+  .ghost, .apphead nav button {
+    font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; font-size: 12px;
+    padding: 8px 16px; border: none; background: transparent; color: var(--you); box-shadow: inset 0 0 0 1.5px var(--you);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  .ghost:hover, .apphead nav button:hover { background: rgba(0,229,255,.12); }
+  .apphead nav button.on { background: var(--you); color: var(--void); box-shadow: none; }
+  .primary { font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; font-size: 12px; padding: 8px 16px; border: none; background: var(--act); color: #131200; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+  .primary:disabled { background: var(--line-bright); color: var(--muted); cursor: default; }
+  .danger { color: var(--rival); box-shadow: inset 0 0 0 1.5px var(--rival); }
+  .chip { display: inline-flex; align-items: center; gap: .35em; font-family: var(--mono); font-size: 11px; padding: 3px 10px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
+  .chip--sync { color: var(--text); }
+  .chip--sync::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ram-green); box-shadow: 0 0 6px var(--ram-green); }
+  /* Staged-but-unapplied pill: yellow = actionable now (token rule), visible
+     in every mode so a forgotten draft cannot go unnoticed. */
+  .staged { display: inline-flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; padding: 5px 10px 5px 12px; border: 1.5px solid var(--act); color: var(--act); background: rgba(252,238,10,.06); cursor: pointer; }
+  .staged b { font-family: var(--mono); font-weight: 500; letter-spacing: 0; font-size: 12px; color: var(--text); }
+  .staged .go { font-family: var(--mono); font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 10px; color: var(--muted); }
+  .staged:hover { background: rgba(252,238,10,.14); }
+
+  /* =====================================================================
+     1. Collection page header: mode tabs + progress at a glance
+     ===================================================================== */
+  .colhead { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px 24px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .modes { display: inline-flex; border: 1px solid var(--line-bright); }
+  .modes button {
+    font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-size: 12px;
+    padding: 8px 18px; border: 0; background: transparent; color: var(--muted); border-right: 1px solid var(--line-bright);
+  }
+  .modes button:last-child { border-right: 0; }
+  .modes button:hover { color: var(--text); background: rgba(0,229,255,.06); }
+  .modes button.on { background: var(--you); color: var(--void); }
+  .modes button .n { font-family: var(--mono); font-weight: 400; letter-spacing: 0; font-size: 10px; margin-left: .5em; opacity: .8; }
+
+  .stats { display: flex; align-items: center; gap: 14px; }
+  .stat { display: grid; grid-template-columns: auto auto; gap: 2px 10px; align-items: baseline; min-width: 150px; }
+  .stat .k { grid-column: 1; font-family: var(--display); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .stat .v { grid-column: 2; justify-self: end; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .stat .track { grid-column: 1 / -1; height: 4px; background: var(--panel-2); border: 1px solid var(--line); }
+  .stat .fill { height: 100%; background: var(--you); }
+  .stat--art .fill { background: var(--act); }
+  .stat--phys { min-width: 0; }
+  .stat--phys .v { font-size: 18px; font-family: var(--display); font-weight: 700; color: var(--text); }
+
+  /* =====================================================================
+     2. Browse: filter rail | grid | card drawer
+     ===================================================================== */
+  .mode { display: none; }
+  .mode.on { display: block; }
+  .browse { display: grid; grid-template-columns: 236px minmax(0, 1fr) 0; transition: grid-template-columns 160ms ease; min-height: 720px; }
+  .browse.drawer-open { grid-template-columns: 236px minmax(0, 1fr) 340px; }
+  @media (prefers-reduced-motion: reduce) { .browse { transition: none; } }
+
+  .rail { border-right: 1px solid var(--line); background: var(--panel); padding: 14px 14px 20px; display: flex; flex-direction: column; gap: 18px; }
+  .rail .group { display: flex; flex-direction: column; gap: 8px; }
+  .rail .group > h4 { font-size: 11px; color: var(--muted); letter-spacing: .12em; display: flex; justify-content: space-between; align-items: baseline; }
+  .rail .group > h4 .reset { font-family: var(--mono); font-size: 10px; text-transform: none; letter-spacing: 0; color: var(--you); background: none; border: 0; padding: 0; }
+  .rail input[type=search] { width: 100%; font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line-bright); padding: 8px 10px; }
+  .rail input[type=search]::placeholder { color: var(--muted); }
+
+  .seg { display: grid; grid-auto-flow: column; border: 1px solid var(--line); }
+  .seg button { font-family: var(--mono); font-size: 11px; padding: 6px 4px; border: 0; background: var(--panel-2); color: var(--muted); border-right: 1px solid var(--line); }
+  .seg button:last-child { border-right: 0; }
+  .seg button.on { background: var(--you); color: var(--void); }
+  .seg--goal button { padding: 7px 4px; font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .fchip { display: inline-flex; align-items: center; gap: .4em; font-family: var(--mono); font-size: 11px; padding: 3px 9px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
+  .fchip.on { background: var(--you); color: var(--void); border-color: var(--you); }
+  .fchip .sw { width: 8px; height: 8px; border-radius: 2px; background: var(--c, var(--muted)); }
+  .fchip--ram.on { background: var(--c); border-color: var(--c); }
+  .fchip--rar { text-transform: none; }
+
+  .sets { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+  .setrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 5px 8px; border: 1px solid transparent; background: transparent; color: var(--text); text-align: left; font-family: var(--body); font-size: 12px; }
+  .setrow:hover { background: var(--panel-2); }
+  .setrow.on { border-color: var(--you); background: rgba(0,229,255,.08); }
+  .setrow .n { font-family: var(--mono); font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .setrow .bar { grid-column: 1 / -1; height: 2px; background: var(--panel-2); }
+  .setrow .bar i { display: block; height: 100%; background: var(--you); }
+  .rail .foot { font-family: var(--mono); font-size: 10px; color: var(--muted); line-height: 1.5; }
+
+  .main { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 24px; min-width: 0; }
+  .toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+  .quick { display: flex; align-items: stretch; border: 1px solid var(--line-bright); background: var(--panel-2); }
+  .quick input { flex: 1 1 auto; min-width: 0; font-family: var(--mono); font-size: 13px; color: var(--text); background: transparent; border: 0; padding: 9px 12px; }
+  .quick input::placeholder { color: var(--muted); }
+  .quick .to { display: flex; align-items: center; gap: 8px; padding: 0 10px; border-left: 1px solid var(--line-bright); font-family: var(--display); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .quick select { font-family: var(--mono); font-size: 12px; color: var(--text); background: transparent; border: 0; padding: 6px 0; }
+  .quick .hint { display: flex; align-items: center; padding: 0 12px; font-family: var(--mono); font-size: 10px; color: var(--muted); border-left: 1px solid var(--line-bright); white-space: nowrap; }
+  .quick .hint kbd { border: 1px solid var(--line-bright); padding: 0 4px; margin: 0 3px; color: var(--text); }
+  .view { display: flex; align-items: center; gap: 12px; }
+  .count { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .count b { color: var(--text); font-weight: 500; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+  .tile { position: relative; display: flex; flex-direction: column; text-align: left; background: var(--panel); border: 0; padding: 0; color: var(--text); cursor: pointer; }
+  .tile .frame { position: relative; aspect-ratio: 5 / 7; border: 2px solid var(--c); background: linear-gradient(180deg, var(--panel-2), var(--panel)); display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; gap: 3px; }
+  .tile .frame::before { content: ''; position: absolute; inset: 26px 10px 62px; background: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 2px, transparent 2px 8px); border: 1px solid var(--line); }
+  .tile .cost { position: absolute; top: 6px; left: 6px; width: 24px; height: 27px; display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 13px; background: #0c0c14; border: 1.5px solid var(--c); clip-path: polygon(50% 0, 100% 26%, 100% 74%, 50% 100%, 0 74%, 0 26%); }
+  .tile .type { position: absolute; top: 8px; right: 6px; font-family: var(--display); font-weight: 700; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; padding: 1px 7px; background: var(--c); color: #0c0c14; clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%); }
+  .tile .name { font-family: var(--display); font-weight: 700; font-size: 13px; line-height: 1.05; text-transform: uppercase; }
+  .tile .sub { font-family: var(--display); font-weight: 600; font-size: 10px; letter-spacing: .08em; color: var(--c); text-transform: uppercase; }
+  .tile .own { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 6px 2px 2px; font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .tile .own .ps { color: var(--text); }
+  .tile .own .ps.done { color: var(--ram-green); }
+  .tile .own .ps.zero { color: var(--muted); }
+  .tile .own .art { color: var(--muted); }
+  .tile .own .art.done { color: var(--act); }
+  .tile .ring { position: absolute; left: 0; right: 0; bottom: 34px; height: 3px; background: var(--panel-2); }
+  .tile .ring i { display: block; height: 100%; background: var(--you); }
+  .tile:hover .frame { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0,0,0,.65); }
+  .tile.sel .frame { outline: 2px solid var(--act); outline-offset: 2px; }
+  .tile.only .frame { opacity: .55; }
+  .tile.only .own .ps { color: var(--muted); }
+
+  /* list view */
+  .list { display: none; border: 1px solid var(--line); background: var(--panel); }
+  .browse.list-view .grid { display: none; }
+  .browse.list-view .list { display: block; }
+  .list table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  .list th { text-align: left; font-family: var(--display); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .list td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .list tr:hover td { background: var(--panel-2); }
+  .list .thumb { width: 28px; height: 40px; border: 1px solid var(--c); background: var(--panel-2); }
+  .list .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .list .nm { font-family: var(--body); font-weight: 600; }
+  .list .dim { color: var(--muted); }
+  .stepper { display: inline-flex; align-items: center; gap: 4px; }
+  .stepper button { width: 24px; height: 22px; padding: 0; border: 0; background: transparent; color: var(--you); box-shadow: inset 0 0 0 1.5px var(--you); border-radius: 3px; font-family: var(--display); font-weight: 700; }
+  .stepper input { width: 40px; text-align: center; font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line-bright); padding: 3px; }
+  .stepper button:disabled { color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-bright); }
+
+  /* card drawer */
+  .drawer { border-left: 1px solid var(--line); background: var(--panel); overflow: hidden; display: flex; flex-direction: column; }
+  .browse:not(.drawer-open) .drawer { visibility: hidden; }
+  .drawer .dh { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+  .drawer .dh h3 { font-size: 16px; line-height: 1.05; }
+  .drawer .dh .sub { display: block; font-size: 11px; letter-spacing: .1em; color: var(--c); }
+  .drawer .close { border: 0; background: transparent; color: var(--muted); font-family: var(--mono); font-size: 12px; padding: 4px 6px; }
+  .drawer .close:hover { color: var(--text); }
+  .drawer .body { padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+  .goals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .goal { border: 1px solid var(--line); background: var(--panel-2); padding: 8px 10px; display: grid; gap: 4px; }
+  .goal .k { font-family: var(--display); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .goal .v { font-family: var(--display); font-weight: 700; font-size: 18px; }
+  .goal .v small { font-family: var(--mono); font-size: 10px; font-weight: 400; color: var(--muted); margin-left: .4em; }
+  .goal.done .v { color: var(--ram-green); }
+  .goal.art.done .v { color: var(--act); }
+  .arts { display: flex; flex-direction: column; gap: 10px; }
+  .artgrp { border: 1px solid var(--line); }
+  .artgrp .ah { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--panel-2); font-family: var(--display); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .artgrp .ah .st { font-family: var(--mono); letter-spacing: 0; text-transform: none; }
+  .artgrp .ah .st.own { color: var(--act); }
+  .artgrp .ah .st.miss { color: var(--muted); }
+  .prow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); }
+  .prow .img { width: 34px; height: 48px; background: var(--panel-2); border: 1px solid var(--line-bright); }
+  .prow .meta { display: grid; gap: 2px; min-width: 0; }
+  .prow .meta b { font-weight: 600; font-size: 12px; }
+  .prow .meta span { font-family: var(--mono); font-size: 10px; color: var(--muted); overflow-wrap: anywhere; }
+  .prow.only { opacity: .6; }
+  .tag { font-family: var(--display); font-weight: 700; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; padding: 1px 6px; border: 1px solid var(--line-bright); color: var(--muted); }
+  .tag--foil { border-color: var(--act); color: var(--act); }
+  .dfoot { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dfoot .ghost { font-size: 11px; padding: 6px 12px; }
+
+  /* =====================================================================
+     3. Add cards
+     ===================================================================== */
+  .page { padding: 16px 20px 28px; display: grid; gap: 16px; }
+  .two { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+  .card { background: var(--panel); border: 1px solid var(--line); }
+  .card > h3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; letter-spacing: .1em; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .card > h3 .m { font-family: var(--mono); font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11px; color: var(--muted); }
+  .card .in { padding: 14px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+  .card .in > .wide, .card .in > table, .card .in > .fields { align-self: stretch; }
+  .hint { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .hint a { color: var(--you); }
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .field { display: grid; gap: 4px; }
+  .field label { font-family: var(--display); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .field input, .field select, .field textarea { font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line-bright); padding: 7px 9px; width: 100%; }
+  .field textarea { min-height: 90px; resize: vertical; }
+  .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .actions .ghost, .actions .primary { font-size: 11px; padding: 7px 14px; }
+  .dt { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  .dt th { text-align: left; font-family: var(--display); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .dt td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .dt .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .dt .plus { color: var(--ram-green); }
+  .dt .minus { color: var(--rival); }
+  .dt .set { color: var(--muted); }
+  .dt .x { border: 0; background: transparent; color: var(--muted); font-family: var(--mono); padding: 0 6px; }
+  .dt .x:hover { color: var(--rival); }
+  .dt .nmb { font-family: var(--body); font-weight: 600; }
+  .addrow { display: flex; border: 1px solid var(--line-bright); background: var(--panel-2); }
+  .addrow input { flex: 1; min-width: 0; border: 0; background: transparent; font-family: var(--mono); font-size: 12px; color: var(--text); padding: 8px 10px; }
+  .addrow input::placeholder { color: var(--muted); }
+  .addrow .qty { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-left: 1px solid var(--line-bright); font-family: var(--display); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .addrow .qty input { width: 44px; text-align: center; padding: 4px; background: var(--panel); border: 1px solid var(--line-bright); flex: none; }
+  .sum { display: flex; gap: 14px; align-items: baseline; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .sum b { font-family: var(--display); font-size: 16px; color: var(--you); font-weight: 700; }
+  details.fold { align-self: stretch; border: 1px solid var(--line); background: var(--panel-2); }
+  details.fold summary { list-style: none; cursor: pointer; font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 8px 12px; display: flex; gap: 8px; align-items: center; }
+  details.fold summary::-webkit-details-marker { display: none; }
+  details.fold summary::before { content: ''; width: 6px; height: 6px; border-right: 1.5px solid var(--you); border-bottom: 1.5px solid var(--you); transform: rotate(-45deg); }
+  details.fold[open] summary::before { transform: rotate(45deg); }
+  details.fold .in { padding-top: 0; }
+
+  /* =====================================================================
+     4. Plan purchases
+     ===================================================================== */
+  .figure { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
+  .figure .big { font-family: var(--display); font-weight: 700; font-size: 26px; color: var(--you); line-height: 1; }
+  .figure .big small { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .08em; margin-left: .4em; }
+  .decks { display: flex; flex-wrap: wrap; gap: 6px; }
+  .deckchip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-family: var(--body); font-size: 12px; }
+  .deckchip.on { border-color: var(--you); background: rgba(0,229,255,.08); }
+  .deckchip .st { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .deckchip .st.bad { color: var(--rival); }
+  .opt { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text); }
+  .switch i { width: 30px; height: 16px; border: 1px solid var(--line-bright); background: var(--panel-2); position: relative; }
+  .switch i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; background: var(--muted); }
+  .switch.on i { border-color: var(--you); }
+  .switch.on i::after { left: 16px; background: var(--you); }
+  .why { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .buy { color: var(--act); font-weight: 500; }
+  .gap { color: var(--muted); }
+  .lists { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-self: stretch; }
+  .lst { border: 1px solid var(--line); background: var(--panel-2); padding: 10px; display: grid; gap: 6px; }
+  .lst .k { font-family: var(--display); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .lst .v { font-family: var(--display); font-weight: 700; font-size: 18px; }
+  .lst .v small { font-family: var(--mono); font-size: 10px; font-weight: 400; color: var(--muted); }
+  .lst .ghost { font-size: 10px; padding: 5px 10px; justify-self: start; }
+  .shop { font-family: var(--mono); font-size: 12px; background: var(--panel-2); border: 1px solid var(--line); padding: 10px 12px; margin: 0; white-space: pre-wrap; color: var(--text); width: 100%; }
+
+  /* =====================================================================
+     5. History & backup
+     ===================================================================== */
+  .tl { display: flex; flex-direction: column; align-self: stretch; }
+  .ev { display: grid; grid-template-columns: 96px 1fr auto; gap: 12px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .ev .when { font-family: var(--mono); font-size: 11px; color: var(--muted); padding-top: 3px; }
+  .ev .what { display: grid; gap: 4px; }
+  .ev .what .t { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 13px; }
+  .ev .what .d { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .kind { font-family: var(--display); font-weight: 700; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; padding: 1px 7px; clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%); }
+  .kind--acq { background: var(--ram-green); color: #06140b; }
+  .kind--trade { background: var(--ram-blue); color: #061019; }
+  .kind--bulk, .kind--imp { background: var(--line-bright); color: var(--text); }
+  .kind--undo { background: var(--rival); color: #1a0509; }
+  .ev .ops { display: flex; gap: 6px; }
+  .ev .ops .ghost { font-size: 10px; padding: 5px 10px; }
+  .ev .ops .ghost.quiet { color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-bright); }
+  .ev.undone .what .t { text-decoration: line-through; color: var(--muted); }
+  .bk { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-self: stretch; }
+  .bk .b { border: 1px solid var(--line); background: var(--panel-2); padding: 12px; display: grid; gap: 8px; align-content: start; }
+  .bk .b .k { font-family: var(--display); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+  .bk .b .hint { font-size: 11px; }
+  .bk .b .actions .ghost { font-size: 10px; padding: 5px 10px; }
+  .status { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .browse, .browse.drawer-open { grid-template-columns: 1fr; }
+    .rail { border-right: 0; border-bottom: 1px solid var(--line); }
+    .two, .bk, .lists { grid-template-columns: 1fr; }
+    .colhead { grid-template-columns: 1fr; }
+    .stats { flex-wrap: wrap; }
+  }
+</style>
+
+<div class="note">
+  <strong>Mockup — Collection tab overhaul, draft 3.</strong>
+  <span>Click the mode tabs, the filter chips, a card tile, and Grid / List. Numbers are illustrative.</span>
+  <span>Built on the app's own tokens and faces so it can be compared 1:1 with the live page.</span>
+</div>
+
+<div class="app">
+  <div class="apphead">
+    <h1>Cyberpunk TCG Simulator</h1>
+    <nav><button>Play</button><button>Deck Builder</button><button>Simulate</button><button class="on">Collection</button></nav>
+    <span class="chip" style="margin-left:auto">Use official card images</span>
+    <span class="chip">Card data: 151 cards · checked 2026-09-08</span>
+  </div>
+
+  <!-- 1. Collection header ------------------------------------------- -->
+  <div class="colhead">
+    <div class="modes" role="tablist" aria-label="Collection modes">
+      <button class="on" data-mode="browse" role="tab">Browse</button>
+      <button data-mode="add" role="tab">Add cards</button>
+      <button data-mode="plan" role="tab">Plan purchases</button>
+      <button data-mode="history" role="tab">History &amp; backup<span class="n">14</span></button>
+    </div>
+    <div class="stats">
+      <span class="chip chip--sync">Saved to disk · 11:42</span>
+      <button class="staged" data-mode="add" title="Open the draft session"><b>187</b> staged <span class="go">review →</span></button>
+      <div class="stat"><span class="k">Playset</span><span class="v">128 / 398 · 32%</span><div class="track"><div class="fill" style="width:32%"></div></div></div>
+      <div class="stat stat--art"><span class="k">Artwork</span><span class="v">60 / 192 · 31%</span><div class="track"><div class="fill" style="width:31%"></div></div></div>
+      <div class="stat stat--phys"><span class="k">Cards owned</span><span class="v">341</span></div>
+    </div>
+  </div>
+
+  <!-- 2. Browse ------------------------------------------------------ -->
+  <section class="mode on browse drawer-open" id="mode-browse">
+    <aside class="rail" aria-label="Filters">
+      <div class="group">
+        <input type="search" placeholder="Search name, subtitle, #number, artist…">
+      </div>
+      <div class="group">
+        <h4>Goal</h4>
+        <div class="seg seg--goal" data-single>
+          <button class="on">All</button><button>Need copies</button><button>Need art</button><button>Complete</button>
+        </div>
+      </div>
+      <div class="group">
+        <h4>Color <button class="reset">clear</button></h4>
+        <div class="chips">
+          <button class="fchip fchip--ram" style="--c:var(--ram-red)"><i class="sw"></i>Red</button>
+          <button class="fchip fchip--ram" style="--c:var(--ram-yellow)"><i class="sw"></i>Yellow</button>
+          <button class="fchip fchip--ram" style="--c:var(--ram-green)"><i class="sw"></i>Green</button>
+          <button class="fchip fchip--ram" style="--c:var(--ram-blue)"><i class="sw"></i>Blue</button>
+        </div>
+      </div>
+      <div class="group">
+        <h4>Type</h4>
+        <div class="chips">
+          <button class="fchip">Legend</button><button class="fchip">Unit</button><button class="fchip">Program</button><button class="fchip">Gear</button>
+        </div>
+      </div>
+      <div class="group">
+        <h4>Rarity</h4>
+        <div class="chips">
+          <button class="fchip fchip--rar">Common</button><button class="fchip fchip--rar">Uncommon</button><button class="fchip fchip--rar">Rare</button><button class="fchip fchip--rar">Epic</button><button class="fchip fchip--rar">Nova Rare</button><button class="fchip fchip--rar">Secret</button>
+        </div>
+        <div class="chips">
+          <button class="fchip fchip--rar">Iconic Legend</button><button class="fchip fchip--rar">Iconic Other</button><button class="fchip fchip--rar">Iconic Secret</button>
+        </div>
+      </div>
+      <div class="group">
+        <h4>Set <button class="reset">all sets</button></h4>
+        <div class="sets" data-single>
+          <button class="setrow on"><span>All sets</span><span class="n">341 / 1,380</span></button>
+          <button class="setrow"><span>Welcome to Night City — Beta</span><span class="n">171 / 516</span><span class="bar"><i style="width:33%"></i></span></button>
+          <button class="setrow"><span>Welcome to Night City — Retail</span><span class="n">92 / 426</span><span class="bar"><i style="width:22%"></i></span></button>
+          <button class="setrow"><span>Embracing Power — Beta Starter</span><span class="n">20 / 20</span><span class="bar"><i style="width:100%"></i></span></button>
+          <button class="setrow"><span>The Heist — Beta Starter</span><span class="n">20 / 20</span><span class="bar"><i style="width:100%"></i></span></button>
+          <button class="setrow"><span>Embracing Power — Retail Starter</span><span class="n">0 / 20</span><span class="bar"><i style="width:0"></i></span></button>
+          <button class="setrow"><span>The Heist — Retail Starter</span><span class="n">0 / 20</span><span class="bar"><i style="width:0"></i></span></button>
+          <button class="setrow"><span>Arasaka Demo Deck</span><span class="n">14 / 14</span><span class="bar"><i style="width:100%"></i></span></button>
+          <button class="setrow"><span>Merc Demo Deck</span><span class="n">15 / 15</span><span class="bar"><i style="width:100%"></i></span></button>
+          <button class="setrow"><span>Pre-Release Beta</span><span class="n">4 / 11</span><span class="bar"><i style="width:36%"></i></span></button>
+          <button class="setrow"><span>Edgerunner Open S1</span><span class="n">2 / 11</span><span class="bar"><i style="width:18%"></i></span></button>
+          <button class="setrow"><span>Box Toppers — Beta</span><span class="n">2 / 6</span><span class="bar"><i style="width:33%"></i></span></button>
+          <button class="setrow"><span>Box Toppers — Retail</span><span class="n">1 / 6</span><span class="bar"><i style="width:17%"></i></span></button>
+          <button class="setrow"><span>Set 1 Promos</span><span class="n">0 / 3</span><span class="bar"><i style="width:0"></i></span></button>
+        </div>
+      </div>
+      <p class="foot">Goal and totals always cover the whole collection. Set, rarity and search narrow which printings are shown.</p>
+    </aside>
+
+    <div class="main">
+      <div class="toolbar">
+        <div class="quick">
+          <input type="text" placeholder="Quick add — type a card name, Enter stages 1 copy in the open session">
+          <span class="to">to <select><option>Welcome to Night City — Beta</option><option>Welcome to Night City — Retail</option><option>Arasaka Demo Deck</option></select></span>
+          <span class="hint"><kbd>Enter</kbd> +1 · <kbd>Shift</kbd><kbd>Enter</kbd> −1 · no session open? one starts for today</span>
+        </div>
+        <div class="view">
+          <span class="count"><b>72</b> cards · <b>214</b> printings · <b>341</b> owned</span>
+          <div class="seg" id="viewseg"><button class="on" data-view="grid">Grid</button><button data-view="list">List</button></div>
+        </div>
+      </div>
+
+      <div class="grid" id="grid">
+        <button class="tile" style="--c:var(--ram-green)" data-name="(Don't Fear) The Reaper" data-sub="">
+          <div class="frame"><span class="cost">7</span><span class="type">Program</span><span class="name">(Don't Fear) The Reaper</span></div>
+          <span class="ring"><i style="width:0%"></i></span>
+          <span class="own"><span class="ps zero">0 / 3</span><span class="art">Art 0/1</span></span>
+        </button>
+        <button class="tile" style="--c:var(--ram-red)" data-name="6th Street Recruits">
+          <div class="frame"><span class="cost">4</span><span class="type">Unit</span><span class="name">6th Street Recruits</span></div>
+          <span class="ring"><i style="width:66%"></i></span>
+          <span class="own"><span class="ps">2 / 3</span><span class="art done">Art 1/1 ★</span></span>
+        </button>
+        <button class="tile sel" style="--c:var(--ram-red)" data-name="Adam Smasher" data-sub="Ender of Legends">
+          <div class="frame"><span class="cost">9</span><span class="type">Legend</span><span class="name">Adam Smasher</span><span class="sub">Ender of Legends</span></div>
+          <span class="ring"><i style="width:100%"></i></span>
+          <span class="own"><span class="ps done">1 / 1 ✓</span><span class="art">Art 1/3</span></span>
+        </button>
+        <button class="tile" style="--c:var(--ram-yellow)" data-name="Adam Smasher" data-sub="Metal Over Meat">
+          <div class="frame"><span class="cost">9</span><span class="type">Unit</span><span class="name">Adam Smasher</span><span class="sub">Metal Over Meat</span></div>
+          <span class="ring"><i style="width:100%"></i></span>
+          <span class="own"><span class="ps done">3 / 3 ✓</span><span class="art done">Art 2/2 ★</span></span>
+        </button>
+        <button class="tile" style="--c:var(--ram-yellow)" data-name="Adrenaline Converter">
+          <div class="frame"><span class="cost">2</span><span class="type">Gear</span><span class="name">Adrenaline Converter</span></div>
+          <span class="ring"><i style="width:33%"></i></span>
+          <span class="own"><span class="ps">1 / 3</span><span class="art">Art 1/2</span></span>
+        </button>
+        <button class="tile" style="--c:var(--ram-yellow)" data-name="Afterparty at Lizzie's">
+          <div class="frame"><span class="cost">1</span><span class="type">Program</span><span class="name">Afterparty at Lizzie's</span></div>
+          <span class="ring"><i style="width:100%"></i></span>
+          <span class="own"><span class="ps done">3 / 3 ✓</span><span class="art">Art 1/2</span></span>
+        </button>
+        <button class="tile" style="--c:var(--ram-red)" data-name="All Is Lost">
+          <div class="frame"><span class="cost">1</span><span class="type">Program</span><span class="name">All Is Lost</span></div>
+          <span class="ring"><i style="width:0"></i></span>
+          <span class="own"><span class="ps zero">0 / 3</span><span class="art">Art 0/1</span></span>
+        </button>
+        <button class="tile" style="--c:var(--ram-yellow)" data-name="Alt Cunningham" data-sub="Mother of Daemons">
+          <div class="frame"><span class="cost">7</span><span class="type">Unit</span><span class="name">Alt Cunningham</span><span class="sub">Mother of Daemons</span></div>
+          <span class="ring"><i style="width:66%"></i></span>
+          <span class="own"><span class="ps">2 / 3</span><span class="art">Art 1/2</span></span>
+        </button>
+        <button class="tile" style="--c:var(--ram-blue)" data-name="Alt Cunningham" data-sub="Soulkiller Architect">
+          <div class="frame"><span class="cost">0</span><span class="type">Legend</span><span class="name">Alt Cunningham</span><span class="sub">Soulkiller Architect</span></div>
+          <span class="ring"><i style="width:100%"></i></span>
+          <span class="own"><span class="ps done">1 / 1 ✓</span><span class="art done">Art 2/2 ★</span></span>
+        </button>
+        <button class="tile" style="--c:var(--ram-red)" data-name="Animals Wrecker">
+          <div class="frame"><span class="cost">6</span><span class="type">Unit</span><span class="name">Animals Wrecker</span></div>
+          <span class="ring"><i style="width:33%"></i></span>
+          <span class="own"><span class="ps">1 / 3</span><span class="art">Art 1/1 ★</span></span>
+        </button>
+        <button class="tile" style="--c:var(--ram-red)" data-name="Appetite for Destruction">
+          <div class="frame"><span class="cost">3</span><span class="type">Program</span><span class="name">Appetite for Destruction</span></div>
+          <span class="ring"><i style="width:100%"></i></span>
+          <span class="own"><span class="ps done">3 / 3 ✓</span><span class="art done">Art 1/1 ★</span></span>
+        </button>
+        <button class="tile only" style="--c:var(--ram-blue)" data-name="V" data-sub="Streetkid (box topper)">
+          <div class="frame"><span class="cost">–</span><span class="type">Promo</span><span class="name">V</span><span class="sub">Streetkid</span></div>
+          <span class="ring"><i style="width:0"></i></span>
+          <span class="own"><span class="ps">Collection only</span><span class="art">Art 0/2</span></span>
+        </button>
+      </div>
+
+      <div class="list">
+        <table>
+          <thead><tr><th></th><th>Card</th><th>Printing</th><th>Rarity</th><th>Artwork</th><th class="num">Owned</th></tr></thead>
+          <tbody>
+            <tr><td><div class="thumb" style="--c:var(--ram-red)"></div></td><td class="nm">Adam Smasher — Ender of Legends</td><td>WTNC Beta · <b>β001</b></td><td>Iconic Legend</td><td>Art 1 · <span class="dim">owned</span></td><td class="num"><span class="stepper"><button>−</button><input value="1"><button>+</button></span></td></tr>
+            <tr><td><div class="thumb" style="--c:var(--ram-red)"></div></td><td class="nm">Adam Smasher — Ender of Legends</td><td>WTNC Beta · <b>β001a</b> <span class="tag tag--foil">Foil</span></td><td>Iconic Legend</td><td>Art 2 · <span class="dim">missing</span></td><td class="num"><span class="stepper"><button disabled>−</button><input value="0"><button>+</button></span></td></tr>
+            <tr><td><div class="thumb" style="--c:var(--ram-red)"></div></td><td class="nm">Adam Smasher — Ender of Legends</td><td>Box Toppers Beta · <b>BT02</b></td><td>Secret</td><td>Art 3 · <span class="dim">missing</span></td><td class="num"><span class="stepper"><button disabled>−</button><input value="0"><button>+</button></span></td></tr>
+            <tr><td><div class="thumb" style="--c:var(--ram-yellow)"></div></td><td class="nm">Adam Smasher — Metal Over Meat</td><td>WTNC Beta · <b>β042</b></td><td>Rare</td><td>Art 1 · <span class="dim">owned</span></td><td class="num"><span class="stepper"><button>−</button><input value="3"><button>+</button></span></td></tr>
+            <tr><td><div class="thumb" style="--c:var(--ram-yellow)"></div></td><td class="nm">Adrenaline Converter</td><td>WTNC Beta · <b>β044</b></td><td>Common</td><td>Art 1 · <span class="dim">owned</span></td><td class="num"><span class="stepper"><button>−</button><input value="1"><button>+</button></span></td></tr>
+            <tr><td><div class="thumb" style="--c:var(--ram-yellow)"></div></td><td class="nm">Adrenaline Converter</td><td>WTNC Retail · <b>044</b></td><td>Common</td><td>Art 2 · <span class="dim">missing</span></td><td class="num"><span class="stepper"><button disabled>−</button><input value="0"><button>+</button></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <aside class="drawer" id="drawer" style="--c:var(--ram-red)" aria-label="Card printings">
+      <div class="dh">
+        <h3 id="dname">Adam Smasher<span class="sub" id="dsub">Ender of Legends</span></h3>
+        <button class="close" id="dclose" aria-label="Close">✕ close</button>
+      </div>
+      <div class="body">
+        <div class="goals">
+          <div class="goal done"><span class="k">Playset</span><span class="v">1 / 1<small>Legend · 1 copy</small></span></div>
+          <div class="goal art"><span class="k">Artworks</span><span class="v">1 / 3<small>any printing</small></span></div>
+        </div>
+        <div class="arts">
+          <div class="artgrp">
+            <div class="ah"><span>Artwork 1 · ADIA</span><span class="st own">owned</span></div>
+            <div class="prow"><div class="img"></div><div class="meta"><b>Welcome to Night City — Beta</b><span>β001 · Iconic Legend · welcometonightcitybeta/001</span></div><span class="stepper"><button>−</button><input value="1"><button>+</button></span></div>
+            <div class="prow"><div class="img"></div><div class="meta"><b>Welcome to Night City — Retail</b><span>001 · Iconic Legend</span></div><span class="stepper"><button disabled>−</button><input value="0"><button>+</button></span></div>
+          </div>
+          <div class="artgrp">
+            <div class="ah"><span>Artwork 2 · ADIA (alt)</span><span class="st miss">missing</span></div>
+            <div class="prow"><div class="img"></div><div class="meta"><b>Welcome to Night City — Beta <span class="tag tag--foil">Foil</span></b><span>β001a · Iconic Legend</span></div><span class="stepper"><button disabled>−</button><input value="0"><button>+</button></span></div>
+          </div>
+          <div class="artgrp">
+            <div class="ah"><span>Artwork 3 · Box topper</span><span class="st miss">missing</span></div>
+            <div class="prow only"><div class="img"></div><div class="meta"><b>Box Toppers — Beta <span class="tag">Collection only</span></b><span>BT02 · Secret · not deck-legal</span></div><span class="stepper"><button disabled>−</button><input value="0"><button>+</button></span></div>
+          </div>
+        </div>
+        <div class="dfoot">
+          <button class="ghost">View card</button>
+          <button class="ghost">Open image</button>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- 3. Add cards --------------------------------------------------- -->
+  <section class="mode page" id="mode-add">
+    <div class="two">
+      <div class="card">
+        <h3>Session <span class="m">draft saved in this browser · 14:05</span></h3>
+        <div class="in">
+          <div class="fields">
+            <div class="field"><label>Kind</label>
+              <div class="seg" data-single><button class="on">Acquisition</button><button>Trade</button><button>Correction</button></div>
+            </div>
+            <div class="field"><label>Date</label><input type="date" value="2026-09-09"></div>
+            <div class="field"><label>Source</label><input value="Beta booster box + Arasaka demo deck"></div>
+            <div class="field"><label>Total cost</label><input placeholder="e.g. 200 SEK" value="1 450 SEK"></div>
+          </div>
+
+          <div class="field wide"><label>Add a whole product</label>
+            <div class="actions">
+              <button class="ghost" disabled style="color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--line-bright)">Arasaka Demo Deck ✓ added</button>
+              <button class="ghost">Merc Demo Deck</button>
+              <button class="ghost">Embracing Power — Beta Starter</button>
+              <button class="ghost">The Heist — Beta Starter</button>
+              <span class="why">Fixed-content products only; boosters are entered card by card below.</span>
+            </div>
+          </div>
+
+          <div class="field wide"><label>Add cards one by one</label>
+            <div class="quick">
+              <input type="text" value="milit" placeholder="Type a card name — Enter adds 1 copy">
+              <span class="to">to <select><option>Welcome to Night City — Beta</option><option>Welcome to Night City — Retail</option><option>Arasaka Demo Deck</option></select></span>
+              <span class="hint"><kbd>Enter</kbd> +1 · <kbd>Shift</kbd><kbd>Enter</kbd> −1 · stays focused</span>
+            </div>
+            <div class="chips" style="margin-top:6px">
+              <button class="fchip on">Militech Enforcer · β087</button>
+              <button class="fchip">Militech Enforcer · β087a <span class="tag tag--foil" style="margin-left:4px">Foil</span></button>
+              <button class="fchip">Militech Drone Swarm · β089</button>
+            </div>
+          </div>
+
+          <table class="dt">
+            <thead><tr><th>Card</th><th>Printing</th><th class="num">Change</th><th class="num">Now → after</th><th></th></tr></thead>
+            <tbody>
+              <tr style="background:var(--panel-2)"><td class="nmb" colspan="2">▾ Arasaka Demo Deck <span class="set">· whole product · 14 printings</span></td><td class="num plus">+15</td><td class="num">0 → 15</td><td><button class="x">✕</button></td></tr>
+              <tr><td class="nmb">Militech Enforcer</td><td class="set">WTNC Beta · β087</td><td class="num plus">+4</td><td class="num">0 → 4</td><td><button class="x">✕</button></td></tr>
+              <tr><td class="nmb">Minotaur</td><td class="set">WTNC Beta · β118</td><td class="num plus">+3</td><td class="num">1 → 4</td><td><button class="x">✕</button></td></tr>
+              <tr><td class="nmb">Quickhack Overload</td><td class="set">WTNC Beta · β140</td><td class="num plus">+2</td><td class="num">0 → 2</td><td><button class="x">✕</button></td></tr>
+              <tr><td class="nmb">Adam Smasher — Ender of Legends</td><td class="set">WTNC Beta · β001a <span class="tag tag--foil">Foil</span></td><td class="num plus">+1</td><td class="num">0 → 1</td><td><button class="x">✕</button></td></tr>
+              <tr><td class="nmb">Afterparty at Lizzie's</td><td class="set">WTNC Beta · β003</td><td class="num plus">+2</td><td class="num">3 → 5</td><td><button class="x">✕</button></td></tr>
+              <tr><td class="set" colspan="5" style="text-align:center">… 61 more booster rows · newest at the top</td></tr>
+            </tbody>
+          </table>
+
+          <details class="fold"><summary>Paste lines or set exact counts instead</summary>
+            <div class="in">
+              <div class="seg" data-single style="max-width:420px"><button class="on">Add / remove copies (+3, −1)</button><button>Set exact counts</button></div>
+              <p class="hint">One <code>printing-key,±count</code> per line, e.g. <code>welcometonightcitybeta/118,+2</code>. Lines join the table above.</p>
+              <div class="field wide"><textarea placeholder="welcometonightcitybeta/118,+2"></textarea></div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Review &amp; apply <span class="m">live</span></h3>
+        <div class="in">
+          <div class="sum"><b>+187</b> copies <span>·</span> <b>71</b> printings <span>·</span> 341 → 528 owned</div>
+          <div class="lists" style="grid-template-columns:1fr 1fr">
+            <div class="lst"><span class="k">Playset</span><span class="v">128 → 191 <small>/ 398</small></span></div>
+            <div class="lst"><span class="k">Artwork</span><span class="v">60 → 84 <small>/ 192</small></span></div>
+          </div>
+          <div class="field wide"><label>Pulled by rarity</label>
+            <table class="dt">
+              <tbody>
+                <tr><td>Common</td><td class="num">112</td><td style="width:45%"><span class="stepper" style="display:block;height:6px;background:var(--panel-2)"><i style="display:block;height:100%;width:65%;background:var(--line-bright)"></i></span></td></tr>
+                <tr><td>Uncommon</td><td class="num">44</td><td><span style="display:block;height:6px;background:var(--panel-2)"><i style="display:block;height:100%;width:26%;background:var(--line-bright)"></i></span></td></tr>
+                <tr><td>Rare</td><td class="num">18</td><td><span style="display:block;height:6px;background:var(--panel-2)"><i style="display:block;height:100%;width:11%;background:var(--you)"></i></span></td></tr>
+                <tr><td>Epic</td><td class="num">8</td><td><span style="display:block;height:6px;background:var(--panel-2)"><i style="display:block;height:100%;width:5%;background:var(--you)"></i></span></td></tr>
+                <tr><td>Nova Rare</td><td class="num">3</td><td><span style="display:block;height:6px;background:var(--panel-2)"><i style="display:block;height:100%;width:2%;background:var(--act)"></i></span></td></tr>
+                <tr><td>Secret · foil</td><td class="num">2</td><td><span style="display:block;height:6px;background:var(--panel-2)"><i style="display:block;height:100%;width:1.5%;background:var(--act)"></i></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint">Applying writes the collection file once and records this delivery in History as one entry — undoable as one step, with these totals and the cost kept on it.</p>
+          <div class="actions"><button class="primary">Apply session · +187</button><button class="ghost">Clear draft</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+
+  <!-- 4. Plan purchases ---------------------------------------------- -->
+  <section class="mode page" id="mode-plan">
+    <div class="two">
+      <div class="card">
+        <h3>Decks to build <span class="m">pick the decks you want to own physically</span></h3>
+        <div class="in">
+          <div class="decks">
+            <button class="deckchip on">Arasaka Control <span class="st">45 cards</span></button>
+            <button class="deckchip on">Mercs Aggro v2 <span class="st">44 cards</span></button>
+            <button class="deckchip">Netrunner Tempo <span class="st bad">2 errors</span></button>
+            <button class="deckchip">Sealed fixture <span class="st">sealed</span></button>
+          </div>
+          <div class="opt">
+            <div class="field"><label>Cards are</label>
+              <div class="seg" data-single><button class="on">Shared between decks</button><button>Kept in every deck</button></div>
+            </div>
+            <button class="switch on"><i></i>Keep one of each artwork in the binder</button>
+          </div>
+          <p class="hint">Shared: buy the maximum any one deck needs. Kept: add every deck's requirement. Binder copies are taken out of what decks can use.</p>
+          <div class="figure"><span class="big">11 <small>copies to buy</small></span><span class="big">6 <small>distinct cards</small></span></div>
+          <table class="dt">
+            <thead><tr><th>Card</th><th class="num">Need</th><th class="num">Own</th><th class="num">Binder</th><th class="num">Buy</th><th>Also fills</th></tr></thead>
+            <tbody>
+              <tr><td class="nmb">Industrial Assembly</td><td class="num">3</td><td class="num">2</td><td class="num">1</td><td class="num buy">2</td><td class="gap">playset gap 1 · artwork 2 (β133a or 133)</td></tr>
+              <tr><td class="nmb">Minotaur</td><td class="num">3</td><td class="num">1</td><td class="num">0</td><td class="num buy">2</td><td class="gap">playset gap 2</td></tr>
+              <tr><td class="nmb">Militech Enforcer</td><td class="num">3</td><td class="num">0</td><td class="num">0</td><td class="num buy">3</td><td class="gap">playset gap 3</td></tr>
+              <tr><td class="nmb">Quickhack Overload</td><td class="num">2</td><td class="num">0</td><td class="num">0</td><td class="num buy">2</td><td class="gap">—</td></tr>
+              <tr><td class="nmb">Goro Takemura — Hands Unclean</td><td class="num">1</td><td class="num">0</td><td class="num">0</td><td class="num buy">1</td><td class="gap">artwork 1</td></tr>
+              <tr><td class="nmb">Rebecca — Having a Moment</td><td class="num">1</td><td class="num">0</td><td class="num">0</td><td class="num buy">1</td><td class="gap">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:grid;gap:16px">
+        <div class="card">
+          <h3>Shopping list</h3>
+          <div class="in">
+            <pre class="shop">2x Industrial Assembly — a missing artwork would also count
+2x Minotaur
+3x Militech Enforcer
+2x Quickhack Overload
+1x Goro Takemura — Hands Unclean
+1x Rebecca — Having a Moment</pre>
+            <div class="actions"><button class="primary">Copy list</button><span class="status">Copied 11:48</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Collection goals <span class="m">independent of decks</span></h3>
+          <div class="in">
+            <div class="lists">
+              <div class="lst"><span class="k">Playset gaps</span><span class="v">270 <small>copies</small></span><button class="ghost">Copy list</button></div>
+              <div class="lst"><span class="k">Missing artworks</span><span class="v">132 <small>arts</small></span><button class="ghost">Copy list</button></div>
+              <div class="lst"><span class="k">Both goals</span><span class="v">1 <small>combined list</small></span><button class="ghost">Copy list</button></div>
+            </div>
+            <p class="hint">One purchase can close a playset gap and a missing artwork at once; the combined list says which.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. History & backup -------------------------------------------- -->
+  <section class="mode page" id="mode-history">
+    <div class="two">
+      <div class="card">
+        <h3>Change history <span class="m">14 entries · newest first</span></h3>
+        <div class="in">
+          <div class="tl">
+            <div class="ev"><span class="when">Today 11:42</span><div class="what"><span class="t"><span class="kind kind--acq">Acquisition</span>Launch boosters, Gamestore Sthlm</span><span class="d">3 printings · +4 copies · 600 SEK</span></div><div class="ops"><button class="ghost quiet">Details</button><button class="ghost">Undo</button></div></div>
+            <div class="ev"><span class="when">Today 10:15</span><div class="what"><span class="t"><span class="kind kind--bulk">Bulk counts</span>Set exact counts</span><span class="d">12 printings · recount of binder page 3</span></div><div class="ops"><button class="ghost quiet">Details</button><button class="ghost">Undo</button></div></div>
+            <div class="ev undone"><span class="when">Sep 8 21:03</span><div class="what"><span class="t"><span class="kind kind--trade">Trade</span>Swap with Erik</span><span class="d">2 printings · −1 / +1 · undone 21:10</span></div><div class="ops"><button class="ghost quiet">Details</button><button class="ghost">Reapply</button></div></div>
+            <div class="ev"><span class="when">Sep 8 18:40</span><div class="what"><span class="t"><span class="kind kind--imp">Import</span>Merge · collection.json</span><span class="d">41 printings · +88 copies</span></div><div class="ops"><button class="ghost quiet">Details</button><button class="ghost">Undo</button></div></div>
+            <div class="ev"><span class="when">Sep 7 19:22</span><div class="what"><span class="t"><span class="kind kind--acq">Acquisition</span>Arasaka demo deck</span><span class="d">14 printings · +14 copies</span></div><div class="ops"><button class="ghost quiet">Details</button><button class="ghost">Undo</button></div></div>
+          </div>
+          <div class="actions"><button class="ghost">Show all 14</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Backup</h3>
+        <div class="in">
+          <div class="bk">
+            <div class="b"><span class="k">Export</span><p class="hint">Download what you own as JSON (exact, re-importable) or as a readable text list.</p><div class="actions"><button class="ghost">JSON</button><button class="ghost">Text</button><button class="ghost">JSON + history</button></div></div>
+            <div class="b"><span class="k">Import</span><p class="hint">Paste an export. Nothing changes until you apply the preview.</p><div class="field"><textarea placeholder="Paste collection JSON or text…" style="min-height:70px"></textarea></div><div class="actions"><div class="seg" data-single><button class="on">Replace</button><button>Merge</button></div><button class="ghost">Preview</button></div></div>
+            <div class="b"><span class="k">Restore history</span><p class="hint">Restores session notes and costs only; counts come from the collection import.</p><div class="actions"><button class="ghost">Paste history JSON</button></div></div>
+            <div class="b"><span class="k">On disk</span><p class="hint">data/collection.json · last write 11:42 · git backup pushed.</p><div class="actions"><button class="ghost quiet">Retry backup</button></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  // Mode tabs
+  const modeTabs = document.querySelectorAll('.modes [data-mode]');
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+    modeTabs.forEach(x => x.classList.toggle('on', x.dataset.mode === b.dataset.mode));
+    document.querySelectorAll('.mode').forEach(s => s.classList.toggle('on', s.id === 'mode-' + b.dataset.mode));
+  }));
+  // Single-select segments & set rows
+  document.querySelectorAll('[data-single]').forEach(g => g.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  })));
+  // Multi-select chips
+  document.querySelectorAll('.fchip').forEach(b => b.addEventListener('click', () => b.classList.toggle('on')));
+  // Grid / list
+  const browse = document.getElementById('mode-browse');
+  document.querySelectorAll('#viewseg button').forEach(b => b.addEventListener('click', () => browse.classList.toggle('list-view', b.dataset.view === 'list')));
+  // Drawer
+  document.querySelectorAll('.tile').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tile').forEach(x => x.classList.toggle('sel', x === t));
+    document.getElementById('dname').firstChild.textContent = t.dataset.name;
+    document.getElementById('dsub').textContent = t.dataset.sub || '';
+    document.getElementById('drawer').style.setProperty('--c', getComputedStyle(t).getPropertyValue('--c'));
+    browse.classList.add('drawer-open');
+  }));
+  document.getElementById('dclose').addEventListener('click', () => {
+    browse.classList.remove('drawer-open');
+    document.querySelectorAll('.tile').forEach(x => x.classList.remove('sel'));
+  });
+</script>
