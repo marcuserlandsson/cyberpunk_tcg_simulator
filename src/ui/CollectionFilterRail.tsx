@@ -1,3 +1,9 @@
+//
+// The Browse mode's left rail: six labelled filter groups. Stateless — the
+// shell owns the filter values so the toolbar's result count and the grid
+// read the same object. The set dropdown becomes a list with owned/total per
+// set, which doubles as a "where am I" view; goal is single-select, the rest
+// multi-select chips (the existing `filter-chip` look from deckbuilder.css).
 import type { CSSProperties, ReactElement } from 'react'
 import type { CardType } from '../engine/types'
 import { ramColorVar } from './CardFrame'
