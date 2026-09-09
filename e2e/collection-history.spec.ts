@@ -1,4 +1,4 @@
-import { test,expect } from '@playwright/test'
+import { test,expect } from './fixtures'
 test('recovers a draft acquisition, previews imports, and undoes collection changes',async({page})=>{
   await page.goto('/')
   await page.getByTestId('tab-collection').click()

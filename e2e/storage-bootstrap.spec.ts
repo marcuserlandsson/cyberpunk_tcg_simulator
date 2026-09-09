@@ -1,0 +1,20 @@
+import { test,expect } from './fixtures'
+test('starts with unavailable browser storage and keeps usable fallback decks',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
+  await page.addInitScript(()=>{Storage.prototype.getItem=function(){throw new Error('Storage unavailable')}})
+  const started=Date.now()
+  await page.goto('/')
+  await expect(page.getByTestId('app-storage-notice')).toContainText('could not be read')
+  await expect(page.getByTestId('deck-human').locator('option')).toHaveCount(2)
+  await page.getByTestId('tab-deckBuilder').click()
+  await expect(page.getByTestId('deck-builder')).toBeVisible()
+  console.log('Storage-fallback startup and navigation:',Date.now()-started,'ms')
+  expect(errors).toEqual([])
+})
+test('leaves malformed deck entries intact while healthy decks remain available',async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem('ctcg:decks:v1',JSON.stringify({'broken':null})))
+  await page.goto('/')
+  await expect(page.getByTestId('app-storage-notice')).toContainText('1 invalid deck records')
+  await expect(page.getByTestId('deck-human').locator('option')).toHaveCount(2)
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('ctcg:decks:v1')!).broken)).toBeNull()
+})

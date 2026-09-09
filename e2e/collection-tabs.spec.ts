@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import printings from '../data/printings.json' with { type: 'json' }
 
 test('only one tab edits the collection and a waiting tab takes over without losing cards', async ({ page, context }) => {

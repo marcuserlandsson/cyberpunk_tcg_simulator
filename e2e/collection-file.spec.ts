@@ -2,7 +2,7 @@
 // data/collection.json (here, a scratch file, see playwright.config.ts's
 // webServer.env.CTCG_COLLECTION_FILE) and comes back after browser storage is
 // wiped — which is only possible if it was read from disk.
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 
 const SCRATCH = 'test-results/e2e-collection.json'

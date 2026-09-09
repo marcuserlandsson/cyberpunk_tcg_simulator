@@ -1,4 +1,4 @@
-import { expect,test } from '@playwright/test'
+import { expect,test } from './fixtures'
 test('samples opening cards and follows both manual-practice seats',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
   await page.goto('/?aiDelay=0')

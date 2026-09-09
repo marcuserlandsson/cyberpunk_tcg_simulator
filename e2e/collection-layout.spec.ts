@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 
 test('collection cards and expanded printings fit at desktop and phone sizes', async ({ page }) => {
   await page.goto('/')

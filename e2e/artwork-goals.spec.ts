@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 
 test('artwork and playset goals advance independently across printings', async ({ page }) => {
   await page.goto('/')

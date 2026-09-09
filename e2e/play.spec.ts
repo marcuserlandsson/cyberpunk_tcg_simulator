@@ -10,7 +10,7 @@
 // The AI's pacing delay is turned off with `?aiDelay=0`; `data-awaiting` on the
 // playmat is the handshake that keeps the driver from racing the AI's timer.
 
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './fixtures'
 
 const HUMAN_DECK = 'Arasaka — Embracing Power'
 const AI_DECK = 'Mercs — The Heist'

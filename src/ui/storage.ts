@@ -5,7 +5,7 @@
 
 import type { CardDb } from '../engine/types'
 import { useSyncExternalStore } from 'react'
-import { deckMetadataSchema } from './deckSchema'
+import { deckMetadataSchema, deckSnapshotSchema } from './deckSchema'
 import { deckFormat, type DeckList } from '../engine/deck'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import mercsDeck from '../../data/decks/mercs-the-heist.json'
@@ -20,9 +20,9 @@ const GAME_RECORDS_KEY = 'ctcg:gameRecords:v1'
 const SIM_RESULT_KEY = 'ctcg:lastSimResult:v1'
 
 function readJson<T>(key: string, fallback: T): T {
-  const raw = localStorage.getItem(key)
-  if (raw === null) return fallback
   try {
+    const raw = localStorage.getItem(key)
+    if (raw === null) return fallback
     return JSON.parse(raw) as T
   } catch {
     return fallback
@@ -48,8 +48,9 @@ const STARTER_DECKS: DeckList[] = [
 ]
 const STARTER_DECK_NAMES = new Set(STARTER_DECKS.map((deck) => deck.name))
 
-function readLocalDecks(): Record<string, DeckList> {
-  return readJson<Record<string, DeckList>>(DECKS_KEY, {})
+function readLocalDecks(strict = false): Record<string, DeckList> {
+  try { const raw=localStorage.getItem(DECKS_KEY);const data=raw===null?{}:JSON.parse(raw);if(!data || typeof data!=='object' || Array.isArray(data))throw new Error('Saved deck library is malformed.');return data }
+  catch(error){if(strict)throw error;return {}}
 }
 
 function writeLocalDecks(decks: Record<string, DeckList>): void {
@@ -61,7 +62,8 @@ const deckListeners = new Set<() => void>()
 let deckSnapshot: DeckList[] = []
 let deckSnapshotRaw: string | null | undefined
 function getDeckSnapshot(): DeckList[] {
-  const raw = localStorage.getItem(DECKS_KEY)
+  let raw: string | null
+  try { raw=localStorage.getItem(DECKS_KEY) } catch { return deckSnapshot.length?deckSnapshot:STARTER_DECKS }
   if (raw !== deckSnapshotRaw) {
     deckSnapshotRaw = raw
     deckSnapshot = listDecks()
@@ -81,8 +83,7 @@ export function useDecks(): DeckList[] {
 
 /** Saves `deck` to localStorage, keyed by name (a second save overwrites). */
 export function saveDeck(deck: DeckList): void {
-  const decks = readLocalDecks()
-  decks[deck.name] = deck
+  const decks = { ...readLocalDecks(true), [deck.name]: deck }
   writeLocalDecks(decks)
 }
 
@@ -92,7 +93,7 @@ export function saveDeck(deck: DeckList): void {
  * list, mirroring `saveDeck`'s own overwrite-by-name behavior.
  */
 export function listDecks(): DeckList[] {
-  const local = readLocalDecks()
+  const local = Object.fromEntries(Object.entries(readLocalDecks()).filter(([,value])=>deckSnapshotSchema.safeParse(value).success))
   const localNames = new Set(Object.keys(local))
   const starters = STARTER_DECKS.filter((deck) => !localNames.has(deck.name))
   return [...starters, ...Object.values(local)]
@@ -310,7 +311,8 @@ export interface Settings {
 const DEFAULT_SETTINGS: Settings = { useOfficialImages: false }
 
 export function getSettings(): Settings {
-  return readJson(SETTINGS_KEY, DEFAULT_SETTINGS)
+  const value=readJson<unknown>(SETTINGS_KEY,DEFAULT_SETTINGS)
+  return value && typeof value==='object' && 'useOfficialImages' in value && typeof value.useOfficialImages==='boolean' ? {useOfficialImages:value.useOfficialImages} : DEFAULT_SETTINGS
 }
 
 export function saveSettings(settings: Settings): void {
@@ -330,7 +332,8 @@ export type { GameRecord } from '../engine/replay'
 import type { GameRecord } from '../engine/replay'
 
 function readGameRecords(): Record<string, GameRecord> {
-  return readJson<Record<string, GameRecord>>(GAME_RECORDS_KEY, {})
+  const value=readJson<unknown>(GAME_RECORDS_KEY,{})
+  return value && typeof value==='object' && !Array.isArray(value) ? value as Record<string,GameRecord> : {}
 }
 
 export function saveGameRecord(name: string, record: GameRecord): void {
@@ -375,4 +378,12 @@ export function saveSimResult(result: SimResult): void {
 
 export function getLastSimResult(): SimResult | undefined {
   return readJson<SimResult | undefined>(SIM_RESULT_KEY, undefined)
+}
+
+export function storageHealthMessage():string {
+  try {
+    const raw=localStorage.getItem(DECKS_KEY)
+    if(raw!==null){const data=JSON.parse(raw);if(!data || typeof data!=='object' || Array.isArray(data))return 'The saved deck library is unreadable and has been left untouched.';const invalid=Object.values(data).filter(v=>!deckSnapshotSchema.safeParse(v).success).length;if(invalid)return invalid+' invalid deck records were left untouched and excluded from deck pickers.'}
+    return ''
+  } catch {return 'Browser storage could not be read. Saved decks/settings may be unavailable; existing records were not removed.'}
 }

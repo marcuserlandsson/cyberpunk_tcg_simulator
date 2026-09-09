@@ -57,13 +57,12 @@ export function QuickAddBar({ db, printings }: { db: CardDb; printings: Printing
   const [selected, setSelected] = useState(0)
   const [lastAdd, setLastAdd] = useState<LastAdd | null>(null)
   const [sessionSet, setSessionSetState] = useState(() => {
-    const saved = localStorage.getItem(SESSION_SET_KEY)
-    return saved !== null && sets.some((s) => s.code === saved) ? saved : defaultSet
+    try {const saved = localStorage.getItem(SESSION_SET_KEY);return saved !== null && sets.some((s) => s.code === saved) ? saved : defaultSet} catch{return defaultSet}
   })
 
   function setSessionSet(code: string): void {
     setSessionSetState(code)
-    localStorage.setItem(SESSION_SET_KEY, code)
+    try {localStorage.setItem(SESSION_SET_KEY, code)} catch { /* The chosen set remains usable in this tab. */ }
   }
 
   const matches = useMemo(() => {

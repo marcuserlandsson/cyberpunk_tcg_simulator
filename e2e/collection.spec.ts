@@ -7,7 +7,7 @@
 // to that heuristic fails loudly here instead of silently changing what this
 // test exercises. The set is then selected explicitly before typing, so the
 // add itself is deterministic regardless of the default.
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { rm } from 'node:fs/promises'
 
 // Now that initCollectionSync (Task 8) is wired in, this test's count reaches

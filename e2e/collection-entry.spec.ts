@@ -1,4 +1,4 @@
-import { test,expect } from '@playwright/test'
+import { test,expect } from './fixtures'
 test('searches exact printings, edits counts, and previews bulk changes on mobile',async({page})=>{
   await page.setViewportSize({width:390,height:844})
   await page.goto('/')

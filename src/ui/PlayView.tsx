@@ -465,9 +465,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
 
   function doSave(): void {
     const name = saveName.trim() === '' ? `game-${Date.now()}` : saveName.trim()
-    game.save(name)
-    setRecords(listGameRecords())
-    setSavedNote(`Saved as "${name}".`)
+    try {game.save(name);setRecords(listGameRecords());setSavedNote(`Saved as "${name}".`)} catch(error){setSavedNote(`Save failed; the game is still open. ${String(error)}`)}
   }
 
   if (state === null || setupOpen) {

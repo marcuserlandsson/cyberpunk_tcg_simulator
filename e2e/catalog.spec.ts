@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import catalog from '../data/catalog-status.json' with { type: 'json' }
 
 test('newly discovered cards are visible in deck planning and collection', async ({ page }) => {

@@ -21,7 +21,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 15. Add compact collection search, collector numbers, artwork previews, bulk entry, and scoped filters.
 - [x] 16. Add recoverable acquisition/trade sessions, import previews/history, optional date/source/cost, and starter entry.
 - [x] 17. Add sealed pool validation/building and best-of-three/manual match tracking.
-- [ ] 18. Stabilize verification timeouts/cleanup, run final regression/build/browser checks, and reconcile documentation.
+- [x] 18. Stabilize verification timeouts/cleanup, run final regression/build/browser checks, and reconcile documentation.
 
 ## Completion log
 
@@ -183,3 +183,11 @@ Every collection edit now records affected before/after counts in independent br
 ### 17 — sealed pool building and manual match records
 
 Rechecked the official Beta event guide. Sealed decks require 30+ main cards, at most three main-deck colors and exactly three Legends, waive main-deck RAM/copy limits, and validate all used identities against an explicit opened pool. Pool entry accepts card IDs or exact printing keys, filters the browser to opened cards and persists with deck versions/exports. The standard distinct-Legend-name rule remains. Manual match records retain exact decks, notes, game outcomes, a reload-safe 50-minute clock and explicit current/final-turn tracking with the five-minute final-turn clock. Two wins or the round-end most-wins/tie procedure determines match results. Verified 379 passing broad UI/deck/replay checks before fixing a metadata round-trip assertion, 74 passing targeted checks afterward, TypeScript/build and two browser workflows for sealed limits, version restore and match timer/final-turn persistence.
+
+### 18 — final regression and documentation (9 September)
+
+Standardized per-test browser scratch inventory cleanup with verified workspace paths, limited Vitest to four workers, and assigned explicit deadlines to the two 200-game AI benchmarks without weakening their assertions. Startup now tolerates blocked browser storage and malformed deck entries, shows a notice, preserves unreadable deck libraries instead of overwriting them on save, and keeps image preferences usable in memory. Game-save failures leave the open game available. Added blocked-storage, malformed-library and special-name regressions. Reconciled README, the historical review, rules audit and source status with completed work.
+
+Final verification: **1,577 tests passed across 76 Vitest files** (107.45 seconds); **all 24 Chromium browser tests passed** against production preview (2 minutes), including complete gameplay, recovery, cross-tab collection safety, deck versions, simulation comparisons, sealed/match persistence, phone layout and storage-failure startup. TypeScript and production build passed. An earlier full run caught an obsolete test expecting corrupt deck data to be overwritten; it now checks preservation, and both targeted and complete reruns pass. The production main bundle is 880.87 kB (212.86 kB gzip), retaining Vite's chunk-size warning; blocked-storage startup plus navigation took 988 ms in the local browser check, not a general performance guarantee.
+
+All 18 steps are complete in sequential verified commits. `data/collection.json` is unchanged from the pre-remediation baseline. Browser verification used isolated scratch inventory with Git automation disabled. No commits were pushed. Three rules interpretations still await official clarification, simulation results remain dependent on AI policy, and deck/run/match/acquisition-history records remain browser-local with export support; see [current rules decisions](current-rules.md) and README for those boundaries.

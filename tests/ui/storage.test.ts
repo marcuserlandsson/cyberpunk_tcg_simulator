@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { loadCardDb } from '../../src/engine/cardDb'
 import type { DeckList } from '../../src/engine/deck'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
@@ -237,7 +237,7 @@ describe('corrupt localStorage', () => {
     expect(names).toContain(STARTER_DECK.name)
   })
 
-  it('saveDeck still works normally after a prior read tolerated corrupt JSON', () => {
+  it('does not overwrite an unreadable deck library when saving another deck', () => {
     localStorage.setItem('ctcg:decks:v1', 'garbage')
     listDecks() // tolerates the garbage, falling back to {}
     const deck: DeckList = {
@@ -249,8 +249,8 @@ describe('corrupt localStorage', () => {
       ],
       cards: { 'mantis-blades': 1 },
     }
-    saveDeck(deck)
-    expect(listDecks().find((d) => d.name === deck.name)).toEqual(deck)
+    expect(()=>saveDeck(deck)).toThrow()
+    expect(localStorage.getItem("ctcg:decks:v1")).toBe("garbage")
   })
 })
 
@@ -261,4 +261,16 @@ describe('buildDisplayNames', () => {
     // Multiple cards named "V" exist; each must carry its subtitle.
     expect(names.get('v-streetkid')).toMatch(/^V — /)
   })
+})
+
+afterEach(()=>vi.restoreAllMocks())
+it('tolerates blocked storage reads and preserves usable bundled decks/settings',()=>{
+  vi.spyOn(Storage.prototype,'getItem').mockImplementation(()=>{throw new Error('Blocked')})
+  expect(listDecks()).toHaveLength(2)
+  expect(getSettings()).toEqual({useOfficialImages:false})
+})
+it('saves a deck whose name is a special object property as an ordinary own key',()=>{
+  const deck={...STARTER_DECK,name:'__proto__'}
+  saveDeck(deck)
+  expect(listDecks().find(d=>d.name==='__proto__')).toEqual(deck)
 })

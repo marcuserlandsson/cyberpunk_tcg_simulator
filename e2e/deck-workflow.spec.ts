@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 
 test('a deck saved while Play is mounted appears immediately in its picker', async ({ page }) => {
   await page.goto('/')

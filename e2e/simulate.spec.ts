@@ -8,7 +8,7 @@
 // kept small, so a real 20-game run comfortably finishes well under this
 // suite's own per-assertion timeout.
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test.describe('Simulate view', () => {
   test('runs a real 20-game random-vs-random sim and shows a win rate', async ({ page }) => {

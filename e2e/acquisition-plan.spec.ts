@@ -1,4 +1,4 @@
-import { test,expect } from '@playwright/test'
+import { test,expect } from './fixtures'
 const starter={demo:true,legends:['goro-takemura-hands-unclean','yorinobu-arasaka-embracing-destruction','saburo-arasaka-stubborn-patriarch']}
 test('plans shared and assembled decks with optional binder copies',async({page})=>{
   await page.addInitScript(({starter})=>localStorage.setItem('ctcg:decks:v1',JSON.stringify({

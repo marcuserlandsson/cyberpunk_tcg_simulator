@@ -1,5 +1,7 @@
 # Cyberpunk TCG app review — 8 September 2026
 
+This document preserves the original assessment. The subsequent fixes, comprehensive-rules audit, and verification are recorded in the [remediation checklist](remediation-checklist.md); consult [current rules decisions](current-rules.md) for the simulator's present behavior and remaining interpretations.
+
 ## Assessment
 
 The app has a useful foundation for learning the game, drafting decks, and recording owned cards. I would address collection safety and simulation fidelity before treating its buy-lists or win rates as dependable acquisition advice.
@@ -195,4 +197,3 @@ A pool-limited sealed builder and best-of-three match tracking would be useful i
 6. Expand player-choice fidelity, deck diagnostics, and multi-deck acquisition planning.
 
 The existing architecture is worth building on. The immediate work is primarily about making its answers trustworthy and aligning its collection model with what you actually want to collect.
-

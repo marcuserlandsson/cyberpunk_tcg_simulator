@@ -8,10 +8,19 @@
   "nodeCount": 713,
   "errataPage": "https://cyberpunktcg.com/errata",
   "errata": [
-    { "card": "Johnny Silverhand: Never Stop Fighting", "change": "Beta Iconic printing cannot be sold; erroneous Sell tag." },
-    { "card": "Kiroshi Optics", "change": "Equip only to a friendly Unit or face-up Legend." },
-    { "card": "Nocturne OP55N1", "change": "Artist credit: Daniel Valaisis." }
+    {
+      "card": "Johnny Silverhand: Never Stop Fighting",
+      "change": "Beta Iconic printing cannot be sold; erroneous Sell tag."
+    },
+    {
+      "card": "Kiroshi Optics",
+      "change": "Equip only to a friendly Unit or face-up Legend."
+    },
+    {
+      "card": "Nocturne OP55N1",
+      "change": "Artist credit: Daniel Valaisis."
+    }
   ],
   "audit": "../rules-audit-2026-09-08.md",
-  "implementationStatus": "corrections-pending"
+  "implementationStatus": "implemented-with-interpretations"
 }

@@ -11,8 +11,8 @@ This is a source/code audit, not a certification that the simulator complies. Ex
 The tables below preserve the **original audit findings**, not current behavior.
 R01–R16 and R18–R20 have corresponding gameplay corrections and regressions;
 see checkpoints 08a–08v in the remediation checklist. R17's finite integer and
-name/subtitle copy rules are corrected. Explicit format and sealed-pool controls
-remain assigned to checklist steps 12 and 17. Official ambiguities C01–C03 remain
+name/subtitle copy rules, explicit formats and sealed-pool controls are corrected
+and verified in checklist steps 12 and 17. Official ambiguities C01–C03 remain
 interpretations; the implementation is not an official certification.
 
 | Findings | Verification families |
@@ -24,7 +24,7 @@ interpretations; the implementation is not an official certification.
 | R06/R13 | Street Cred, signed power and Gig adjustment |
 | R08/R15/R16 | Gear movement, control, errata, terminal ties |
 | R10 | private knowledge, public reveal/search, AI hidden-information invariance |
-| R17 (core) | deck validation, invalid counts and duplicate identities |
+| R17 | deck validation, invalid counts, duplicate identities, sealed pools/formats |
 
 [Current rules decisions](current-rules.md) supersede conflicting historical
 rulings and comments. The remaining product work is tracked separately.

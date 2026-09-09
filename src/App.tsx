@@ -5,7 +5,7 @@ import { DeckBuilderView } from './ui/DeckBuilderView'
 import { SimulateView } from './ui/SimulateView'
 import { CollectionView } from './ui/CollectionView'
 import { loadCardDb } from './engine/cardDb'
-import { getSettings, saveSettings } from './ui/storage'
+import { getSettings, saveSettings, storageHealthMessage } from './ui/storage'
 import { startCollectionSession } from './ui/collectionSession'
 import catalogStatus from '../data/catalog-status.json'
 
@@ -34,6 +34,7 @@ function aiDelayFromUrl(): number | undefined {
 
 export default function App() {
   const [playDeckRequest, setPlayDeckRequest] = useState<{ name: string; id: number } | undefined>()
+  const [storageNotice,setStorageNotice]=useState(storageHealthMessage)
   const [view, setView] = useState<View>('play')
   const [useOfficialImages, setUseOfficialImages] = useState(
     () => getSettings().useOfficialImages
@@ -46,7 +47,7 @@ export default function App() {
   function toggleOfficialImages() {
     const next = !useOfficialImages
     setUseOfficialImages(next)
-    saveSettings({ useOfficialImages: next })
+    try {saveSettings({ useOfficialImages: next })} catch {setStorageNotice("Image preference could not be saved; it remains active in this tab.")}
   }
 
   return (
@@ -76,6 +77,7 @@ export default function App() {
         </label>
       </header>
       <main>
+        {storageNotice && <p role="alert" data-testid="app-storage-notice">{storageNotice}</p>}
         <details className="catalog-status">
           <summary>Card data: {catalogStatus.cardCount} cards · checked {catalogStatus.retrievedAt.slice(0, 10)} · {catalogStatus.pendingCards.length} awaiting implementation</summary>
           <p>Comprehensive rules updated {catalogStatus.rulesUpdatedAt.slice(0, 10)}. Audited gameplay corrections are implemented. Official ambiguities and AI-policy limits still apply; results are practice estimates.</p>

@@ -22,8 +22,9 @@ Card data was transcribed from the official card database (via
 [cyberpunktcg.com/cards](https://cyberpunktcg.com/cards), powered by
 Netdeck.gg) and the two print-and-play demo decks, cross-checked against the
 official Beta gameplay guide. Every non-obvious rules interpretation made
-while building this simulator is recorded, with reasoning, in
-[`docs/rulings.md`](docs/rulings.md).
+during the comprehensive-rules audit is summarized in
+[`docs/current-rules.md`](docs/current-rules.md). The older
+[`docs/rulings.md`](docs/rulings.md) remains historical context.
 
 ## Contents
 
@@ -138,7 +139,7 @@ gained, and the names of any Gear attached to it.
 
 ## Deck building
 
-A legal deck needs:
+A legal **Constructed** deck needs:
 
 - **Exactly 3 Legends**, each with a unique name.
 - **40–50 non-Legend cards** total (the two bundled starter decks are
@@ -186,13 +187,15 @@ way automatically when needed.
 ## Collection tracking
 
 The **Collection** tab tracks which physical cards you own, per *printing* —
-`data/printings.json` currently holds 460 printings of the 151 cards across 13 sets, so
+`data/printings.json` currently holds 460 printings of the 151 cards across 13 sets,
 grouped into 192 reviewed unique illustrations. Exact printing counts are preserved.
 
 - One tile per card showing `owned/target`, plus **✓** when the playset is
   complete and **★** when you own each artwork in any printing. The playset target is
   3, or **1 for a Legend**; art-only promos contribute to collection goals only. Clicking a tile expands
-  per-printing rows with `+`/`−` steppers.
+  per-printing rows with `+`/`−` steppers and direct counts. A compact
+  list includes exact thumbnails and collector-number search. Set/rarity/search
+  filters restrict rows and their scoped physical totals; card goals remain global.
 - **Quick-add** for cracking packs: pick the set you are opening once, then
   type a few letters and press Enter to add 1 — every add lands in that set,
   with single-level undo. Where the set holds more than one printing of the
@@ -206,6 +209,12 @@ grouped into 192 reviewed unique illustrations. Exact printing counts are preser
 In the Deck Builder, each card carries an `owned x/3` badge and the deck gets
 a "missing N cards for this deck" summary with its own buy-list button. That
 is **informational only** — ownership never blocks an add, a save, or a game.
+
+Collection’s purchase planner combines selected decks using maximum requirements for shared cards or summed requirements for assembled decks. Optional reservations keep one owned copy per artwork in the binder. It shows available copies, deck gaps, separate playset gaps and missing-artwork printing alternatives.
+
+Collection sessions stage signed acquisitions/trades with optional date, source and total-cost notes. Drafts survive reload; reviewed changes apply together. Every edit has browser-local before/after history with conflict-aware undo/reapply. Export inventory and history JSON to back up metadata; restore counts through the import preview and history through its separate metadata importer. The inventory file remains the disk source of counts. Bundled demo starter buttons use the checked-in demo quantities, not a Beta/retail box manifest.
+
+Bulk printing counts and replace/merge imports show a count-change preview before applying.
 
 ### Where the collection is stored
 
@@ -234,13 +243,9 @@ safety net, not a second source of truth.
 
 ## Deck versions and practice formats
 
-The builder offers explicit Constructed and Demo formats. Constructed validates 40–50 main-deck cards; Demo relaxes size for practice and is visibly labeled. Each builder save retains an independent version, including notes and a version label. Restore a version into the editor; give it a different name to keep both versions selectable for comparison. Deck text exports retain this metadata. Save and play opens Play with the saved deck selected. New game saves carry rules/engine/card-data provenance; older records require an explicit attempt under current rules.
+The builder offers explicit Constructed, Demo and Sealed formats. Constructed validates 40–50 main-deck cards; Demo relaxes size for practice and is visibly labeled. Each builder save retains an independent version, including notes and a version label. Restore a version into the editor; give it a different name to keep both versions selectable for comparison. Deck text exports retain this metadata. Save and play opens Play with the saved deck selected. New game saves carry rules/engine/card-data provenance; older records require an explicit attempt under current rules.
 
 The diagnostics panel shows cost/type distributions, Sell density and adjustable early-Unit density. Opening six-card samples use the engine’s real seeded deal. The browser can filter by the selected Legends’ combined RAM. Play offers manual practice controlling both sides: the board follows the deciding player, no AI moves automatically, Undo rewinds one decision, and named saved positions serve as repeatable scenarios.
-
-Collection’s purchase planner combines selected decks using maximum requirements for shared cards or summed requirements for assembled decks. Optional reservations keep one owned copy per artwork in the binder. It shows available copies, deck gaps, separate playset gaps and missing-artwork printing alternatives.
-
-Collection sessions stage signed acquisitions/trades with optional date, source and total-cost notes. Drafts survive reload; reviewed changes apply together. Every edit has browser-local before/after history with conflict-aware undo/reapply. Export inventory and history JSON to back up metadata; restore counts through the import preview and history through its separate metadata importer. The inventory file remains the disk source of counts. Bundled demo starter buttons use the checked-in demo quantities, not a Beta/retail box manifest.
 
 Sealed decks use an explicit opened pool (card ID or printing key plus count), require 30+ main cards in up to three colors and exactly three Legends, and ignore RAM/main-deck copy limits. Pool counts remain separate from owned inventory. The manual best-of-three tracker stores deck snapshots, outcomes and notes, with a 50-minute round clock and the official final-turn procedure. Both features follow the [Beta Event Guide](https://cyberpunktcg.com/beta-event-guide); the match tracker records player-entered outcomes rather than enforcing a live game’s tournament clock.
 
@@ -253,8 +258,7 @@ CSV.
 
 Completed runs retain exact decks, seeds, agents, versions and outcomes in browser history. Navigation keeps workers alive. JSON carries complete runs; separate game/card CSV exports include provenance. Matched comparisons run two versions against several opponents with the same seeds, alternating seats and fixed agents. Games played means played, not drawn; conditional win rates are correlation. The 95% [Wilson intervals](https://www.itl.nist.gov/div898/handbook/prc/section2/prc241.htm) describe sampling uncertainty, not AI quality or rules correctness. Reported changes are descriptive, not significance tests.
 
-The same runner is available from the command line, which is how the
-project's own 1,000-game acceptance check is run:
+The same runner is available from the command line; for example, a 1,000-game batch:
 
 ```sh
 npm run sim -- --games 1000 \
@@ -276,6 +280,7 @@ source):
 
 ```sh
 node scripts/fetch-images.mjs
+node scripts/download-printing-images.mjs
 ```
 
 It tolerates any card (or the whole run) failing to fetch — the app is fully
@@ -293,16 +298,15 @@ you want fresher art — the database's image URLs are signed and expire.
 
 ## Where the rules live
 
-- [`docs/rules/`](docs/rules/) — the official Beta gameplay guide, reminder
-  sheet, and the two demo decks' print-and-play PDFs. The gameplay guide is
-  the rules authority for this project; card text overrides it on conflict.
-- [`docs/rulings.md`](docs/rulings.md) — every rules ambiguity, transcription
-  judgment call, and engine-design decision made while building this
-  simulator, numbered and cross-referenced (currently §1–§153). If the
-  simulator does something you didn't expect, this is the first place to
-  check for the reasoning.
+- [Current rules decisions](docs/current-rules.md) — current engine behavior and
+  unresolved official ambiguities. The comprehensive rules and current card
+  text/errata are the authority.
+- [Rules audit](docs/rules-audit-2026-09-08.md) — findings and completed corrections,
+  with the versioned comprehensive-rules snapshot under [docs/rules](docs/rules/).
+- [Historical rulings](docs/rulings.md) — original implementation decisions,
+  superseded where they conflict with the current rules decisions.
 - [`data/transcription-report.md`](data/transcription-report.md) — how the
-  141-card pool was transcribed and independently double-checked against the
+  original 141-card pool was transcribed and independently double-checked against the
   card database and the print-and-play PDFs, including the two verification
   passes' findings.
 - [`data/cards.schema.md`](data/cards.schema.md) — the shape of
@@ -328,12 +332,13 @@ data/
 ├── cards.json           # 151 cards: stats, text, effect definitions and pending status
 ├── printings.json       # 460 physical printings across 13 sets
 │                        # (generated — see data/printings.schema.md)
+├── artworks.json        # reviewed stable identities for 192 illustrations
 ├── decks/                # the two bundled starter decks
 └── images/               # (gitignored) official art, populated by scripts/fetch-images.mjs
-                          # (printing art under images/printings/, from fetch-printings.ts)
+                          # (printing art: scripts/download-printing-images.mjs)
 
 tests/
-├── engine/   # rules-engine unit tests (one Vitest case per normative rule statement)
+├── engine/   # rules-engine boundaries and regression tests
 ├── cards/    # per-card tests, exercising every card's effect through the public engine API
 ├── fuzz/     # seeded random-vs-random invariant sweep (thousands of games; see below)
 ├── ai/       # AI legality/strength/determinism/hidden-info tests
@@ -343,13 +348,12 @@ tests/
 e2e/          # Playwright end-to-end specs, driving a full game in a real browser
 ```
 
-The engine is the single source of truth for legality: `legalActions(state)`
+The engine is the shared implementation of legality: `legalActions(state)`
 enumerates every legal move, the UI's affordances and the AI's decisions both
-derive from that same list, and `applyAction` rejects anything not in it — so
-"a complete game vs the AI is playable with only official-rules-legal moves
-possible" isn't a UI-layer promise, it's structural. The event log emitted by
-every action *is* the game record: undo replays it minus the last human
-action-group, and save/resume serializes it.
+derive from that same list, and `applyAction` rejects anything not in it — the UI and AI therefore follow the same implemented rules. That consistency
+is not proof of official compliance; the audit interpretations still apply.
+Saved game records contain initial deck/config snapshots, version metadata and
+actions. Undo replays the appropriate earlier decision point.
 
 ## Tests
 
@@ -365,11 +369,13 @@ invariants after every single applied action (dice conservation, no negative
 resources, spent cards never act, every `legalActions` result applies
 cleanly, games terminate with a valid reason, winner determination matches
 the rules, and more). Its scale is controlled by the `FUZZ_SEEDS` environment
-variable (default 300, kept small so `npm test` stays fast); it has also been
-run at `FUZZ_SEEDS=2000` (and separately, 500 heuristic-vs-heuristic games
+variable (default 300). Historical hardening before the comprehensive-rules
+audit also ran at `FUZZ_SEEDS=2000` (and separately, 500 heuristic-vs-heuristic games
 with the same invariant battery) with zero failures as part of this
 project's hardening pass:
 
 ```sh
 FUZZ_SEEDS=2000 npx vitest run tests/fuzz --testTimeout=600000
 ```
+
+Browser tests use a dedicated server and reset only the verified `test-results/e2e-collection*` scratch paths for each case. They never use the real collection file or its Git automation. Set `CTCG_E2E_PORT` if the default test port is occupied; set `CTCG_E2E_PREVIEW=1` after building to test production preview. Vitest uses four workers, with explicit longer deadlines for full AI benchmarks.

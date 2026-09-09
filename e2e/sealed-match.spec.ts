@@ -1,4 +1,4 @@
-import { test,expect } from '@playwright/test'
+import { test,expect } from './fixtures'
 const legends=['goro-takemura-hands-unclean','yorinobu-arasaka-embracing-destruction','saburo-arasaka-stubborn-patriarch']
 test('builds within a sealed pool and retains match round-end progress',async({page})=>{
   await page.addInitScript(({legends})=>{

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('converts a starter, restores deck versions, and selects it for Play', async ({ page }) => {
   await page.goto('/')

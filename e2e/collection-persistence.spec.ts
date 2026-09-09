@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 
 test('collection endpoint persists counts and exposes background backup status', async ({ request }) => {
   const before = await request.get('/__collection')

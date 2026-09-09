@@ -247,7 +247,7 @@ describe('heuristic AI: strength vs createRandomAgent', () => {
         `${(decisions / STRENGTH_GAMES).toFixed(0)} decisions/game`
     )
     expect(wins / STRENGTH_GAMES).toBeGreaterThanOrEqual(MIN_WIN_RATE)
-  }, 60_000)
+  }, 120_000)
 })
 
 // ---------------------------------------------------------------------------
@@ -823,8 +823,8 @@ describe('heuristic AI: tuning regressions', () => {
       type: 'choosePlayOrder',
       goFirst: true,
     })
-    // 200 heuristic-vs-heuristic games is ~13s, well past vitest's 5s default.
-  }, 60_000)
+    // A 200-game benchmark needs room for rules-resolution work on a busy host.
+  }, 120_000)
 
   it('the quiescence layer is worth having: quiescence-on beats quiescence-off head to head', () => {
     const { aWins, bWins } = headToHead(

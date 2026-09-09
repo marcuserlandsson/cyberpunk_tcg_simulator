@@ -10,6 +10,7 @@ export default defineConfig({
   plugins: [react(), collectionPlugin()],
   test: {
     environment: 'node',
+    maxWorkers: 4,
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
   },
 } as any)

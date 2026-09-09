@@ -37,7 +37,7 @@ export interface GameRecord {
 }
 
 export function gameProvenance(db: CardDb): NonNullable<GameRecord["provenance"]> { return { engine: ENGINE_VERSION, rules: RULES_VERSION, cards: cardDataFingerprint(db) } }
-export function currentGameRecord(db: CardDb, record: GameRecord): boolean { const expected = gameProvenance(db); return record.provenance?.engine === expected.engine && record.provenance.rules === expected.rules && record.provenance.cards === expected.cards }
+export function currentGameRecord(db: CardDb, record: GameRecord): boolean { const expected = gameProvenance(db); return record?.provenance?.engine === expected.engine && record.provenance.rules === expected.rules && record.provenance.cards === expected.cards }
 
 /**
  * Folds a record back into the state it describes. Throws (via `applyAction`'s

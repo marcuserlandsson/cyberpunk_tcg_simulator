@@ -34,8 +34,10 @@ visible rather than being presented as official resolutions.
 ## Product boundaries
 
 Physical handling, shuffling/cutting etiquette, sleeves and tournament penalties
-are outside the simulator. Explicit formats, sealed pools and match timing are
-tracked in remediation steps 12 and 17. AI policy still chooses among legal
+are outside the simulator. Constructed/Demo/Sealed validation, opened pools and
+a manual best-of-three tracker are implemented. The match clock tracks the event
+procedure independently of a live engine game. AI policy still chooses among legal
 options heuristically; higher simulation counts reduce sampling noise but cannot
 remove policy bias. Existing saved action records may become incompatible after
-rules changes; versioned replay/run handling is tracked in steps 10 and 12.
+rules changes; new records/runs retain version metadata, and older game replays
+require an explicit attempt under current rules.
