@@ -1,8 +1,9 @@
 // The Collection tab shell: loads the printings dataset once, owns the active
-// mode, and mounts the header strip plus the four mode screens. All four stay
-// mounted and are toggled with `hidden` (the same pattern App.tsx uses for the
-// tabs) so filters, a half-typed quick add and the review column survive a
-// switch. The mode is remembered per browser tab in sessionStorage.
+// mode, and mounts the header strip plus the four mode screens. A mode mounts
+// the first time it is opened, then stays mounted (behind `hidden`) for the
+// rest of the session, so its filters, a half-typed quick add and the review
+// column survive switching away and back; a mode that has never been opened
+// renders nothing. The mode is remembered per browser tab in sessionStorage.
 import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import type { CardDb } from '../engine/types'
 import { loadPrintings, printingsByCard, type Printing } from './printings'
