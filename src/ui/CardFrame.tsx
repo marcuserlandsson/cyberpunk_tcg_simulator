@@ -14,6 +14,11 @@ export interface CardFrameProps {
   lag?: boolean
   tempPower?: number
   useOfficialImages: boolean
+  /** Art to show instead of the card's base image when official images are
+   *  on — the Collection tile passes the image of the printing it stands for,
+   *  so a set filter shows that set's art, not whichever printing the base
+   *  art fetch happened to pick. */
+  imageUrl?: string
   /** Keys the face-down back pattern and (later tasks) the ready ring to the
    *  human or the rival. Defaults to 'you' so every existing call site (which
    *  predates this prop) keeps rendering exactly as before. */
@@ -231,6 +236,7 @@ export function CardFrame(props: CardFrameProps): ReactElement {
     lag = false,
     tempPower = 0,
     useOfficialImages,
+    imageUrl: imageOverride,
     owner = 'you',
     onClick,
   } = props
@@ -263,7 +269,7 @@ export function CardFrame(props: CardFrameProps): ReactElement {
   const style: StyleWithVars | undefined = faceDown
     ? undefined
     : { '--card-border-color': ramColorVar(def.color) }
-  const imageUrl = useOfficialImages && !imageFailed ? getOfficialImageUrl(def.id) : undefined
+  const imageUrl = useOfficialImages && !imageFailed ? (imageOverride ?? getOfficialImageUrl(def.id)) : undefined
   const effectivePower = def.power === null ? null : def.power + tempPower
 
   return (

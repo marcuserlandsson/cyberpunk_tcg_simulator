@@ -8,6 +8,7 @@ import { _resetCollectionCacheForTests, getCollection } from '../../src/ui/colle
 import { _resetDraftForTests } from '../../src/ui/sessionDraft'
 import { CollectionBrowse } from '../../src/ui/CollectionBrowse'
 import { biggestSet, collectorNumberKey, compareNumberKeys } from '../../src/ui/collectionSort'
+import { getPrintingImageUrl } from '../../src/ui/images'
 
 const db = loadCardDb()
 const printings = loadPrintings()
@@ -64,6 +65,15 @@ describe('CollectionBrowse', () => {
     const rows = screen.getAllByTestId(/^printing-row-/)
     expect(rows.length).toBe(printings.filter(p => p.cardId === 'industrial-assembly' && p.setCode === 'arasakademodeck').length)
     expect(screen.getByTestId('drawer-filter')).toBeTruthy()
+  })
+  it("tile art is the art of the first matching printing, so a set filter shows that set's printing", async () => {
+    const key = 'arasakademodeck/006'
+    if (getPrintingImageUrl(key) === undefined) return // no bundled images in this environment
+    const user = userEvent.setup()
+    render(<CollectionBrowse db={db} printings={printings} byCard={byCard} known useOfficialImages narrow={false} />)
+    await user.click(screen.getByTestId('set-filter-arasakademodeck'))
+    const img = screen.getAllByTestId('collection-cell').find(el => el.getAttribute('data-card-id') === 'industrial-assembly')!.querySelector('img')!
+    expect(decodeURIComponent(img.getAttribute('src')!)).toContain('arasakademodeck__006')
   })
   it('set filter narrows the grid', async () => {
     const user = userEvent.setup(); mount()
