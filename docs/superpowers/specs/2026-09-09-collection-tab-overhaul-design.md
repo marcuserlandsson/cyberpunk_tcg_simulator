@@ -119,7 +119,7 @@ no longer needs a legend.
   ones QuickAddBar has today.
 - **Count** ("72 cards · 214 printings · 341 owned") reflects the current filters.
   Owned shows "?" when ownership is unavailable.
-- **View toggle:** Grid | List, remembered with the mode.
+- **View toggle:** Grid | List, kept while the tab stays open (not persisted).
 
 ### Grid tiles
 
@@ -139,7 +139,7 @@ cards render at 55% opacity.
 
 The compact list becomes a real table: thumbnail, card (name — subtitle),
 printing (set · collector number, foil/finish tag), rarity, artwork index with
-owned/missing, and a stepper (−, count input, +). Rows are the existing
+owned/missing, and a count input (the −/+ stepper lives in the drawer). Rows are the existing
 `compact-printing` rows re-laid; the `printing-count-<key>` input and its
 behaviour are unchanged. "Show 60 more" stays as a footer button.
 
