@@ -46,6 +46,7 @@ test('recovers a draft acquisition, previews imports, and undoes collection chan
   await page.getByTestId('collection-mode-history').click()
   await page.getByTestId('import-input').fill(JSON.stringify({version:1,counts:{'arasakademodeck/006':1}}))
   await page.getByTestId('import-submit').click()
+  await expect(count).toHaveValue('3')                               // Previewing an import does not write
   await expect(page.getByTestId('import-preview')).toContainText('3 → 1')
   await page.getByTestId('import-apply').click()
   await page.getByTestId('collection-mode-browse').click()

@@ -70,8 +70,7 @@ export function CollectionBrowse({ db, printings, byCard, known, useOfficialImag
                 <span className="tile__ring" aria-hidden="true"><i style={{ width: `${r.target ? Math.min(100, 100 * r.owned / r.target) : 0}%` }} /></span>
                 <span className="tile__own" data-testid={`collection-count-${r.def.id}`}>
                   <span className={`tile__ps${r.target === 0 ? ' tile__ps--only' : known && r.playsetDone ? ' tile__ps--done' : known && r.owned === 0 ? ' tile__ps--zero' : ''}`}>{r.target === 0 ? 'Collection only' : `${known ? r.owned : '?'}/${r.target}`}{known && r.playsetDone && <span title="Playset complete"> ✓</span>}</span>
-                  {' · '}
-                  <span className={`tile__art${known && r.artsDone ? ' tile__art--done' : ''}`}>Art {known ? r.artOwned : '?'}/{r.artTarget}{known && r.artsDone && <span title="All arts owned"> ★</span>}</span>
+                  <span className={`tile__art${known && r.artsDone ? ' tile__art--done' : ''}`}>{' · '}Art {known ? r.artOwned : '?'}/{r.artTarget}{known && r.artsDone && <span title="All arts owned"> ★</span>}</span>
                 </span>
               </div>
             ))}

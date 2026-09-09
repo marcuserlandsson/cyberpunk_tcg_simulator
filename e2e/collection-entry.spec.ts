@@ -24,6 +24,7 @@ test('searches exact printings, edits counts, and previews bulk changes on mobil
   await page.getByTestId('session-paste-add').click()
   await expect(page.getByTestId('session-changes')).toContainText('3 → 5')
   await expect(input).toBeHidden()                                   // Browse is hidden; the count is untouched until Apply
+  await expect(input).toHaveValue('3')                               // Paste has not mutated the count before Apply
   await page.getByTestId('session-apply').click()
   await page.getByTestId('collection-mode-browse').click()
   await expect(page.getByTestId('printing-count-arasakademodeck/006')).toHaveValue('5')

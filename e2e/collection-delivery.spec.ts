@@ -6,6 +6,7 @@ import { test, expect } from './fixtures'
 import { rm } from 'node:fs/promises'
 const SCRATCH = 'test-results/e2e-collection.json'
 test.beforeEach(async () => { await rm(SCRATCH, { force: true }); await rm(SCRATCH.replace(/\.json$/, '.backup.json'), { recursive: true, force: true }) })
+test.afterEach(async () => { await rm(SCRATCH, { force: true }); await rm(SCRATCH.replace(/\.json$/, '.backup.json'), { recursive: true, force: true }) })
 
 test('records a booster box and a demo deck as one undoable acquisition', async ({ page }) => {
   await page.goto('/')
