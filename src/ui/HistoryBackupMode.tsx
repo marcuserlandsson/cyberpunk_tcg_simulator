@@ -37,6 +37,10 @@ export function HistoryBackupMode({ db, printings, known }: { db: CardDb; printi
   const [importError, setImportError] = useState('')
   const [historyText, setHistoryText] = useState('')
   const journal = readCollectionJournal()
+  // `revision` has no reader: it exists only so bumping it after a
+  // history-metadata import (which mutates the journal in place, not the
+  // collection, so useCollection() would not re-render this screen) forces
+  // this component to re-render and pick up the mutated journal.
   void revision
   // An entry is "undone" when a later Undo entry points at it and no later
   // Reapply does. Derived, not stored: the journal format does not change.

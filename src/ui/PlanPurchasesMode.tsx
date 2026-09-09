@@ -1,4 +1,3 @@
-// src/ui/PlanPurchasesMode.tsx
 //
 // Plan purchases: pick the decks you want to own physically, choose whether
 // cards are shared between them or kept in every deck, optionally reserve
