@@ -17,8 +17,8 @@ test('collection cards and expanded printings fit at desktop and phone sizes', a
       expect(overflow).toBe(false)
     }
     await page.getByTestId('expand-animals-wrecker').click()
-    const row = page.locator('.collection-view__printings').first()
+    const row = page.getByTestId('card-drawer')
     expect(await row.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
-    await page.getByTestId('expand-animals-wrecker').click()
+    await page.getByTestId('drawer-close').click()
   }
 })

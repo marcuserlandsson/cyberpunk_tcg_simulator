@@ -5,6 +5,12 @@
 import { test, expect } from './fixtures'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 
+async function applySession(page: import('@playwright/test').Page) {
+  await page.getByTestId('staged-pill').click()
+  await page.getByTestId('session-apply').click()
+  await page.getByTestId('collection-mode-browse').click()
+}
+
 const SCRATCH = 'test-results/e2e-collection.json'
 const SCRATCH_BACKUP = SCRATCH.replace(/\.json$/, '.backup.json')
 // The printing the quick-add below resolves to. Asserting on it from Node is
@@ -34,6 +40,7 @@ test('a quick-added card survives clearing browser storage', async ({ page }) =>
   await page.getByTestId('quick-add-set').selectOption('welcometonightcitybeta')
   await page.getByTestId('quick-add-input').fill('mantis')
   await page.getByTestId('quick-add-input').press('Enter')
+  await applySession(page)
   await expect(page.getByTestId('collection-count-mantis-blades')).toContainText('1/3')
 
   // Wait for the debounced flush to reach disk. Asserted against the
@@ -108,6 +115,7 @@ test('cards entered while saving is broken survive a reload', async ({ page }) =
   await page.getByTestId('quick-add-set').selectOption('welcometonightcitybeta')
   await page.getByTestId('quick-add-input').fill('mantis')
   await page.getByTestId('quick-add-input').press('Enter')
+  await applySession(page)
 
   await expect(page.getByTestId('sync-status')).toContainText('not yet saved', { timeout: 10_000 })
   await expect(page.getByTestId('sync-retry')).toBeVisible()

@@ -10,6 +10,12 @@
 import { test, expect } from './fixtures'
 import { rm } from 'node:fs/promises'
 
+async function applySession(page: import('@playwright/test').Page) {
+  await page.getByTestId('staged-pill').click()
+  await page.getByTestId('session-apply').click()
+  await page.getByTestId('collection-mode-browse').click()
+}
+
 // Now that initCollectionSync (Task 8) is wired in, this test's count reaches
 // the same scratch file (playwright.config.ts's webServer.env) as every other
 // e2e spec's collection state, so a card left on disk by an earlier spec
@@ -36,6 +42,7 @@ test('quick-add persists across reload and shows in the deck builder', async ({ 
 
   await page.getByTestId('quick-add-input').fill('mantis')
   await page.getByTestId('quick-add-input').press('Enter')
+  await applySession(page)
   await expect(page.getByTestId('collection-count-mantis-blades')).toContainText('1/3')
 
   await page.reload()

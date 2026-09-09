@@ -10,5 +10,5 @@ test('newly discovered cards are visible in deck planning and collection', async
   await expect(page.getByTestId('browser-count-detonate')).toContainText('1')
   await page.getByTestId('tab-collection').click()
   await page.getByTestId('expand-detonate').click()
-  await expect(page.locator('.collection-view__printings')).toContainText('031')
+  await expect(page.getByTestId('card-drawer')).toContainText('031')
 })
