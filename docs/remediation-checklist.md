@@ -20,7 +20,7 @@ User request: address the app review and audit the newly published comprehensive
 - [x] 14. Add multi-deck acquisition planning with shared/assembled inventories and optional binder reservations.
 - [x] 15. Add compact collection search, collector numbers, artwork previews, bulk entry, and scoped filters.
 - [x] 16. Add recoverable acquisition/trade sessions, import previews/history, optional date/source/cost, and starter entry.
-- [ ] 17. Add sealed pool validation/building and best-of-three/manual match tracking.
+- [x] 17. Add sealed pool validation/building and best-of-three/manual match tracking.
 - [ ] 18. Stabilize verification timeouts/cleanup, run final regression/build/browser checks, and reconcile documentation.
 
 ## Completion log
@@ -179,3 +179,7 @@ Added multi-word search across names/subtitles/text and printing keys/numbers/se
 ### 16 — acquisition/trade sessions and recoverable history
 
 Every collection edit now records affected before/after counts in independent browser history entries; quota failures retain entries in memory for export. Undo/reapply checks current affected rows and preserves unrelated acquisitions. Signed acquisition/trade sessions retain drafts across reload, capture date/source/total-cost notes, validate underflow, preview and apply atomically. Bundled demo starter contents map to exact printings; they are explicitly not assumed Beta/retail box manifests. Replace/merge imports now preview affected counts and reject stale previews before application. Inventory/history JSON supports separate count and metadata restoration. History and draft persistence is browser-local; inventory continues through the existing disk service. Verified 116 collection/sync/history checks, TypeScript/build and two browser workflows for phone entry, draft reload, metadata, undo/reapply and reviewed imports. The combined browser run exposed shared scratch-state assumptions; this test now initializes its own count, with suite-wide isolation assigned to step 18.
+
+### 17 — sealed pool building and manual match records
+
+Rechecked the official Beta event guide. Sealed decks require 30+ main cards, at most three main-deck colors and exactly three Legends, waive main-deck RAM/copy limits, and validate all used identities against an explicit opened pool. Pool entry accepts card IDs or exact printing keys, filters the browser to opened cards and persists with deck versions/exports. The standard distinct-Legend-name rule remains. Manual match records retain exact decks, notes, game outcomes, a reload-safe 50-minute clock and explicit current/final-turn tracking with the five-minute final-turn clock. Two wins or the round-end most-wins/tie procedure determines match results. Verified 379 passing broad UI/deck/replay checks before fixing a metadata round-trip assertion, 74 passing targeted checks afterward, TypeScript/build and two browser workflows for sealed limits, version restore and match timer/final-turn persistence.

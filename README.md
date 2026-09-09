@@ -242,6 +242,8 @@ Collection’s purchase planner combines selected decks using maximum requiremen
 
 Collection sessions stage signed acquisitions/trades with optional date, source and total-cost notes. Drafts survive reload; reviewed changes apply together. Every edit has browser-local before/after history with conflict-aware undo/reapply. Export inventory and history JSON to back up metadata; restore counts through the import preview and history through its separate metadata importer. The inventory file remains the disk source of counts. Bundled demo starter buttons use the checked-in demo quantities, not a Beta/retail box manifest.
 
+Sealed decks use an explicit opened pool (card ID or printing key plus count), require 30+ main cards in up to three colors and exactly three Legends, and ignore RAM/main-deck copy limits. Pool counts remain separate from owned inventory. The manual best-of-three tracker stores deck snapshots, outcomes and notes, with a 50-minute round clock and the official final-turn procedure. Both features follow the [Beta Event Guide](https://cyberpunktcg.com/beta-event-guide); the match tracker records player-entered outcomes rather than enforcing a live game’s tournament clock.
+
 ## Simulation
 
 The **Simulate** tab picks two decks, runs N AI-vs-AI games in a background

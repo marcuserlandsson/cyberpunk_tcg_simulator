@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { MatchTracker } from './ui/MatchTracker'
 import { PlayView } from './ui/PlayView'
 import { DeckBuilderView } from './ui/DeckBuilderView'
 import { SimulateView } from './ui/SimulateView'
@@ -84,6 +85,7 @@ export default function App() {
         {/* Kept mounted, only hidden: unmounting PlayView would throw away an
             in-progress game every time the player glanced at another tab. */}
         <div hidden={view !== 'play'}>
+          <MatchTracker />
           <PlayView requestedDeck={playDeckRequest} db={db} useOfficialImages={useOfficialImages} aiDelayMs={aiDelayMs} />
         </div>
         {/* Kept mounted, only hidden: matches the Play tab's pattern (Task

@@ -14,6 +14,7 @@
 import { useEffect, useState, type CSSProperties, type ReactElement } from 'react'
 import type { CardDb, CardType } from '../engine/types'
 import { deckFormat, deckSize, validateDeck, type DeckList } from '../engine/deck'
+import { SealedPoolEditor } from './SealedPoolEditor'
 import { exportDeckText, importDeckText } from './storage'
 import { CardFrame, ramColorVar } from './CardFrame'
 
@@ -124,7 +125,7 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
   const usage = ramUsage(db, deck.cards)
   const hasEmptyLegendSlot = deck.legends.some((id) => id === '')
   const sizeMeterPercent = Math.min(100, (size / SIZE_METER_SCALE_MAX) * 100)
-  const bandStartPercent = (MIN_DECK_SIZE / SIZE_METER_SCALE_MAX) * 100
+  const bandStartPercent = ((deckFormat(deck)==='sealed'?30:MIN_DECK_SIZE) / SIZE_METER_SCALE_MAX) * 100
   const bandWidthPercent = ((MAX_DECK_SIZE - MIN_DECK_SIZE) / SIZE_METER_SCALE_MAX) * 100
 
   function setLegend(index: 0 | 1 | 2, id: string): void {
@@ -189,7 +190,8 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
         )}
       </div>
 
-      <label>Format<select data-testid="deck-format" value={deckFormat(deck)} onChange={e => onChangeDeck({ ...deck, format: e.target.value as DeckList['format'], demo: e.target.value === 'demo' })}><option value="constructed">Constructed · 40–50 cards</option><option value="demo">Demo · practice size</option></select></label>
+      <label>Format<select data-testid="deck-format" value={deckFormat(deck)} onChange={e => onChangeDeck({ ...deck, format: e.target.value as DeckList['format'], demo: e.target.value === 'demo' })}><option value="constructed">Constructed · 40–50 cards</option><option value="demo">Demo · practice size</option><option value="sealed">Sealed · 30+ cards from opened pool</option></select></label>
+      {deckFormat(deck)==='sealed' && <SealedPoolEditor db={db} deck={deck} onChange={onChangeDeck} />}
       <label>Version label<input data-testid="deck-version-label" value={deck.versionLabel ?? ''} onChange={e => onChangeDeck({ ...deck, versionLabel: e.target.value })} /></label>
       <label>Deck notes<textarea data-testid="deck-notes" value={deck.notes ?? ''} onChange={e => onChangeDeck({ ...deck, notes: e.target.value })} /></label>
       <div className="deck-panel__legends" data-testid="legend-slots">
@@ -224,7 +226,7 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
         </p>
       )}
 
-      <div className="deck-panel__ram-bars" data-testid="ram-chips">
+      {deckFormat(deck)!=="sealed" && <div className="deck-panel__ram-bars" data-testid="ram-chips">
         {RAM_COLORS.map((color) => {
           const used = usage[color] ?? 0
           const limit = limits[color] ?? 0
@@ -256,7 +258,7 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
             </div>
           )
         })}
-      </div>
+      </div>}
 
       <div className="deck-panel__size-meter-row">
         <div
@@ -271,7 +273,7 @@ export function DeckPanel(props: DeckPanelProps): ReactElement {
           <div className="deck-size-meter__fill" style={{ width: `${sizeMeterPercent}%` }} />
         </div>
         <div className="deck-panel__counter" data-testid="deck-size-counter">
-          Cards: {size}/{deckFormat(deck) === 'demo' ? 'practice' : '40–50'}
+          Cards: {size}/{deckFormat(deck) === 'demo' ? 'practice' : deckFormat(deck) === 'sealed' ? '30+' : '40–50'}
         </div>
       </div>
 

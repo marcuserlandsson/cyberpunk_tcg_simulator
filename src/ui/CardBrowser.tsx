@@ -13,6 +13,8 @@ import { fitsRam } from './deckAnalysis'
 import { playsetTarget } from './collection'
 
 export interface CardBrowserProps {
+  pool?: Record<string,number>
+  ignoreRam?: boolean
   db: CardDb
   useOfficialImages: boolean
   /** Current copy count per non-legend card id, for the count badge. */
@@ -64,6 +66,7 @@ function matchesSearch(def: CardDef, query: string): boolean {
 export function CardBrowser(props: CardBrowserProps): ReactElement {
   const { db, useOfficialImages, counts, legends, owned, onAdd, onRemove, onZoom } = props
 
+  const [poolOnly,setPoolOnly]=useState(true)
   const [legalRamOnly,setLegalRamOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [colors, setColors] = useState<Set<string>>(new Set())
@@ -83,7 +86,8 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
     const min = costMin.trim() === '' ? -Infinity : Number(costMin)
     const max = costMax.trim() === '' ? Infinity : Number(costMax)
     return Object.values(db)
-      .filter(def => !legalRamOnly || fitsRam(db,legends,def))
+      .filter(def => !props.pool || !poolOnly || (props.pool[def.id]??0)>0)
+      .filter(def => props.ignoreRam || !legalRamOnly || fitsRam(db,legends,def))
       .filter((def) => matchesSearch(def, search))
       .filter((def) => colors.size === 0 || colors.has(def.color))
       .filter((def) => types.size === 0 || types.has(def.type))
@@ -91,12 +95,13 @@ export function CardBrowser(props: CardBrowserProps): ReactElement {
       .filter((def) => Number.isFinite(min) === false || def.cost >= min)
       .filter((def) => Number.isFinite(max) === false || def.cost <= max)
       .sort(compareCards)
-  }, [db, search, colors, types, keywords, costMin, costMax, legalRamOnly, legends])
+  }, [db, search, colors, types, keywords, costMin, costMax, legalRamOnly, legends, props.pool, props.ignoreRam, poolOnly])
 
   return (
     <div className="card-browser" data-testid="card-browser">
       <div className="card-browser__filters">
-        <label><input data-testid="filter-legal-ram" type="checkbox" checked={legalRamOnly} onChange={e=>setLegalRamOnly(e.target.checked)} />Fits selected Legends’ RAM</label>
+        <label><input data-testid="filter-legal-ram" disabled={props.ignoreRam} type="checkbox" checked={legalRamOnly} onChange={e=>setLegalRamOnly(e.target.checked)} />Fits selected Legends’ RAM{props.ignoreRam ? " (ignored in sealed)" : ""}</label>
+        {props.pool && <label><input data-testid="filter-pool" type="checkbox" checked={poolOnly} onChange={e=>setPoolOnly(e.target.checked)} />Show only opened pool cards</label>}
         <input
           type="text"
           data-testid="search-input"

@@ -13,7 +13,7 @@
 
 import { useMemo, useState, type ReactElement } from 'react'
 import type { CardDb } from '../engine/types'
-import type { DeckList } from '../engine/deck'
+import { deckFormat, type DeckList } from '../engine/deck'
 import { listDeckVersions, saveDeckVersion } from './deckVersions'
 import { isDeckPickable } from './deckPicker'
 import { DeckDiagnostics } from './DeckDiagnostics'
@@ -154,7 +154,7 @@ export function DeckBuilderView({ db, useOfficialImages, onPlayDeck }: DeckBuild
         <details data-testid="deck-versions"><summary>Saved versions of {deck.name}</summary>{(() => { try { return listDeckVersions(deck.name).map(version => <button key={version.revisionId} onClick={() => setDeck(structuredClone(version))}>{version.versionLabel || 'Untitled version'} · {version.updatedAt} · Restore in editor</button>) } catch { return <p>Version history cannot be read.</p> } })()}</details>
       </div>
       <div className="deck-builder" data-testid="deck-builder">
-        <CardBrowser
+        <CardBrowser pool={deckFormat(deck)==="sealed"?deck.sealedPool:undefined} ignoreRam={deckFormat(deck)==="sealed"}
           db={db}
           useOfficialImages={useOfficialImages}
           counts={deck.cards}

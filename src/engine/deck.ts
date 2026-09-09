@@ -5,14 +5,15 @@ export interface DeckList {
   legends: [string, string, string]
   cards: Record<string, number>
   demo?: boolean
-  format?: 'constructed' | 'demo'
+  format?: 'constructed' | 'demo' | 'sealed'
+  sealedPool?: Record<string, number>
   notes?: string
   revisionId?: string
   versionLabel?: string
   updatedAt?: string
 }
 
-export function deckFormat(deck: DeckList): 'constructed' | 'demo' { return deck.format ?? (deck.demo ? 'demo' : 'constructed') }
+export function deckFormat(deck: DeckList): 'constructed' | 'demo' | 'sealed' { return deck.format ?? (deck.demo ? 'demo' : 'constructed') }
 
 /** CR 7.3.3 groups functional copies by name and subtitle, independent of card number. */
 export function cardIdentity(def: CardDef): string {
@@ -44,6 +45,8 @@ const MAX_COPIES = 3
  */
 export function validateDeck(db: CardDb, deck: DeckList): string[] {
   const errors: string[] = []
+  const sealed = deckFormat(deck) === 'sealed'
+  if (!['constructed','demo','sealed'].includes(deckFormat(deck))) errors.push('Unknown deck format.')
   for (const id of [...deck.legends, ...Object.keys(deck.cards)]) {
     if (db[id]?.implementation === 'pending') errors.push(`Card "${id}" is awaiting simulator implementation; it can be collected and planned but cannot yet be simulated.`)
   }
@@ -104,16 +107,16 @@ export function validateDeck(db: CardDb, deck: DeckList): string[] {
       errors.push(`Card "${id}" is a legend and cannot appear in the main deck's card list.`)
       continue
     }
-    if (count > MAX_COPIES) {
+    if (!sealed && count > MAX_COPIES) {
       errors.push(`Card "${id}" has ${count} copies; the maximum is ${MAX_COPIES}.`)
     }
     const identity = cardIdentity(def)
     const prior = identityCounts.get(identity)
     identityCounts.set(identity, { id, count: (prior?.count ?? 0) + count })
-    if (prior && prior.count + count > MAX_COPIES) {
+    if (!sealed && prior && prior.count + count > MAX_COPIES) {
       errors.push(`Card "${id}" shares its name and subtitle with "${prior.id}"; their combined ${prior.count + count} copies exceed the maximum ${MAX_COPIES}.`)
     }
-    if (def.ram) {
+    if (!sealed && def.ram) {
       const limit = ramLimitByColor[def.ram.color] ?? 0
       if (def.ram.value > limit) {
         errors.push(
@@ -125,14 +128,32 @@ export function validateDeck(db: CardDb, deck: DeckList): string[] {
 
   if (deckFormat(deck) !== 'demo') {
     const size = deckSize(deck)
-    if (size < MIN_DECK_SIZE) {
-      errors.push(`Deck has ${size} non-legend cards; the minimum is ${MIN_DECK_SIZE}.`)
+    const minimum = sealed ? 30 : MIN_DECK_SIZE
+    if (size < minimum) {
+      errors.push(`Deck has ${size} non-legend cards; the minimum is ${minimum}.`)
     }
-    if (size > MAX_DECK_SIZE) {
+    if (!sealed && size > MAX_DECK_SIZE) {
       errors.push(`Deck has ${size} non-legend cards; the maximum is ${MAX_DECK_SIZE}.`)
     }
   }
 
+  if (sealed) {
+    const colors = new Set(Object.entries(deck.cards).filter(([,n])=>n>0).map(([id])=>db[id]?.color).filter(Boolean))
+    if (colors.size > 3) errors.push('Sealed main decks may use at most 3 colors; Legend colors do not count.')
+    if (!deck.sealedPool) errors.push('Add the opened sealed pool before playing this deck.')
+    else {
+      const pool = new Map<string,number>(), used = new Map<string,number>()
+      for (const [id,n] of Object.entries(deck.sealedPool)) {
+        if (!db[id] || !Number.isSafeInteger(n) || n < 0) { errors.push('Invalid sealed pool entry: '+id); continue }
+        const key=cardIdentity(db[id]);pool.set(key,(pool.get(key)??0)+n)
+      }
+      for (const [id,n] of [...Object.entries(deck.cards),...deck.legends.map(id=>[id,1] as [string,number])]) {
+        if (!db[id] || !Number.isSafeInteger(n) || n<1) continue
+        const key=cardIdentity(db[id]);used.set(key,(used.get(key)??0)+n)
+      }
+      for (const [key,n] of used) if(n>(pool.get(key)??0)) errors.push('Sealed deck exceeds opened pool for '+JSON.parse(key).filter(Boolean).join(' — ')+': '+n+' used / '+(pool.get(key)??0)+' opened.')
+    }
+  }
   return errors
 }
 
