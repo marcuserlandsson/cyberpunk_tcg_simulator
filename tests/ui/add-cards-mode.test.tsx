@@ -104,4 +104,13 @@ describe('AddCardsMode', () => {
     mount()
     expect(screen.getByTestId('add-line-input')).toBeTruthy()
   })
+
+  it('the review error and a paste error can both show at once, each under its own test id', () => {
+    stageLine({ key: 'nope/1', delta: 1 })
+    mount()
+    fireEvent.change(screen.getByTestId('session-input'), { target: { value: 'garbage' } })
+    fireEvent.click(screen.getByTestId('session-paste-add'))
+    expect(screen.getByTestId('session-review-error').textContent).toMatch(/unknown printing/)
+    expect(screen.getByTestId('session-error').textContent).toMatch(/Line 1/)
+  })
 })

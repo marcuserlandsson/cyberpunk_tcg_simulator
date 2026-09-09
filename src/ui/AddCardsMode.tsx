@@ -104,7 +104,7 @@ export function AddCardsMode({ db, printings, known }: { db: CardDb; printings: 
         <h3>Review &amp; apply <span className="card__meta">live</span></h3>
         <div className="card__in">
           {!review && <p className="tool-note">Nothing staged yet. Add a product, type card names, or paste lines.</p>}
-          {review?.error && <p className="tool-error" role="alert" data-testid="session-error">{review.error}</p>}
+          {review?.error && <p className="tool-error" role="alert" data-testid="session-review-error">{review.error}</p>}
           {review?.summary && (
             <>
               <p className="tool-figure">{review.summary.copies >= 0 ? '+' : ''}{review.summary.copies} copies · {review.summary.printings} printings · {review.summary.before} → {review.summary.after} owned</p>
