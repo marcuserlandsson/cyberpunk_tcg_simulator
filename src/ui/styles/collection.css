@@ -493,3 +493,29 @@
 .lst .goal__v small { display: inline; margin-left: .4em; }
 .lst button { font-size: 10px; padding: 5px 10px; justify-self: start; }
 @media (max-width: 860px) { .plan__lists { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------------- */
+/* History & backup                                                        */
+/* ---------------------------------------------------------------------- */
+.tl { display: flex; flex-direction: column; width: 100%; }
+.ev { display: grid; grid-template-columns: 96px 1fr auto; gap: 12px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.ev__when { font-family: var(--font-mono); font-size: 11px; color: var(--muted); padding-top: 3px; }
+.ev__what { display: grid; gap: 4px; min-width: 0; }
+.ev__t { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 13px; }
+.ev__d { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.ev__details { display: grid; gap: 8px; margin-top: 6px; }
+.ev--undone .ev__t { text-decoration: line-through; color: var(--muted); }
+.ev__ops { display: flex; gap: 6px; }
+.ev__ops button { font-size: 10px; padding: 5px 10px; }
+.ev__quiet { color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-bright); }
+.kind { font-family: var(--font-display); font-weight: 700; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; padding: 1px 7px; clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%); }
+.kind--acq { background: var(--ram-green); color: #06140b; }
+.kind--trade { background: var(--ram-blue); color: #061019; }
+.kind--grey { background: var(--line-bright); color: var(--text); }
+.kind--undo { background: var(--rival); color: #1a0509; }
+.bk { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+.bk__b { border: 1px solid var(--line); background: var(--panel-2); padding: 12px; display: grid; gap: 8px; align-content: start; }
+.bk__b textarea { width: 100%; min-height: 70px; resize: vertical; }
+.bk__k { font-family: var(--font-display); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+.bk__b .tool-actions button { font-size: 10px; padding: 5px 10px; }
+@media (max-width: 860px) { .bk { grid-template-columns: 1fr; } .ev { grid-template-columns: 1fr; } }

@@ -1,4 +1,3 @@
-import { CollectionSessions } from './CollectionSessions'
 import { PrintingCount } from './PrintingCount'
 import { matchesPrinting } from './collectionEntry'
 import { artworkGroups, ownedArtworkIds } from './artworks'
@@ -28,7 +27,6 @@ import {
   type Collection,
 } from './collection'
 import { AddLine } from './AddLine'
-import { CollectionHeader } from './CollectionHeader'
 import { useCollectionAccess } from './collectionAccess'
 import { ownershipAvailable, useSyncStatus } from './collectionSync'
 
@@ -160,16 +158,10 @@ export function CollectionView({
           {getStorageError()}
         </div>
       )}
-      <CollectionHeader db={db} printings={loadResult.printings} />
       <fieldset disabled={!known} className="collection-editor">
         <AddLine db={db} printings={loadResult.printings} testIdPrefix="quick-add" />
       </fieldset>
 
-      {/* Occasional-use tools, collapsed by default so the grid stays the
-          page: staging a session, pasting bulk counts, planning purchases. */}
-      <div className="tool-rack">
-        <CollectionSessions printings={loadResult.printings} known={known} />
-      </div>
       <div className="collection-view__filters">
         <div className="collection-view__search">
           <input data-testid="collection-search" aria-label="Search cards or printing numbers" value={search} onChange={e=>{setSearch(e.target.value);setRowLimit(60)}} placeholder="Search cards or printing numbers — name, subtitle, collector number, set, artist…" />
