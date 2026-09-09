@@ -29,7 +29,7 @@ import {
   playsetTarget,
   type Collection,
 } from './collection'
-import { QuickAddBar } from './QuickAddBar'
+import { AddLine } from './AddLine'
 import { CollectionHeader } from './CollectionHeader'
 import { useCollectionAccess } from './collectionAccess'
 import { ownershipAvailable, useSyncStatus } from './collectionSync'
@@ -164,7 +164,7 @@ export function CollectionView({
       )}
       <CollectionHeader db={db} printings={loadResult.printings} />
       <fieldset disabled={!known} className="collection-editor">
-        <QuickAddBar db={db} printings={loadResult.printings} />
+        <AddLine db={db} printings={loadResult.printings} testIdPrefix="quick-add" />
       </fieldset>
 
       {/* Occasional-use tools, collapsed by default so the grid stays the

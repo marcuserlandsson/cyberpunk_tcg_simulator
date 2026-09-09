@@ -323,3 +323,24 @@
 .collection-view {
   padding: 0.8em 12px 1.2em;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Add line (shared by Browse quick add and Add cards)                     */
+/* ---------------------------------------------------------------------- */
+.add-line { position: relative; width: 100%; }
+.add-line__bar { display: flex; align-items: stretch; border: 1px solid var(--line-bright); background: var(--panel-2); }
+.add-line__bar input { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; padding: 9px 12px; }
+.add-line__to { display: flex; align-items: center; gap: 8px; padding: 0 10px; border-left: 1px solid var(--line-bright); font-family: var(--font-display); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.add-line__to select { border: 0; background: transparent; padding: 6px 0; max-width: 16em; }
+.add-line__hint { display: flex; align-items: center; padding: 0 12px; border-left: 1px solid var(--line-bright); font-family: var(--font-mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+.add-line__hint kbd { border: 1px solid var(--line-bright); padding: 0 4px; margin: 0 3px; color: var(--text); }
+.add-line__matches { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 2px 0 0; padding: .3em; list-style: none; background: var(--panel-2); border: 1px solid var(--line); max-height: 16em; overflow-y: auto; }
+.add-line__matches li { padding: .2em .3em; font-size: .9em; }
+.add-line__matches li[aria-selected='true'] { background: var(--panel); outline: 1px solid var(--act); }
+.add-line__matches li > button { font: inherit; text-transform: none; letter-spacing: normal; padding: 2px 6px; clip-path: none; box-shadow: none; color: var(--text); }
+.add-line__choices { display: flex; flex-wrap: wrap; align-items: center; gap: .3em; }
+.add-line__choices-label { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.add-line__choices .fchip { font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; padding: 3px 9px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); clip-path: none; box-shadow: none; }
+.add-line__choices .fchip:hover { border-color: var(--you); }
+.add-line__toast { margin-top: .4em; padding: .35em .6em; font-size: .85em; font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--line); }
+@media (max-width: 860px) { .add-line__bar { flex-wrap: wrap; } .add-line__hint { display: none; } .add-line__to { flex: 1 1 100%; border-left: 0; border-top: 1px solid var(--line-bright); } }
