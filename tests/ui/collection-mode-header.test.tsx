@@ -64,6 +64,17 @@ describe('meters', () => {
 })
 
 describe('sync chip', () => {
+  it('puts follow-up actions in a flyout beside the chip, and none when idle', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'unsaved', pendingCount: 2, retrying: true })
+    mount()
+    const flyout = screen.getByTestId('sync-actions')
+    expect(flyout.contains(screen.getByTestId('sync-retry'))).toBe(true)
+    expect(flyout.contains(screen.getByTestId('sync-download'))).toBe(true)
+    cleanup(); vi.restoreAllMocks()
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'idle', pendingCount: 0 })
+    mount()
+    expect(screen.queryByTestId('sync-actions')).toBeNull()
+  })
   it('shows a saved state when idle', () => {
     vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'idle', pendingCount: 0, lastSavedAt: '2026-09-05T00:00:00.000Z' })
     mount()

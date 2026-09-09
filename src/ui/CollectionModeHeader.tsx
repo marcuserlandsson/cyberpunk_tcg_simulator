@@ -49,7 +49,12 @@ export function CollectionModeHeader({ db, printings, mode, onMode }: { db: Card
         ))}
       </div>
       <div className="colhead__status">
-        <span className={`collection-header__sync collection-header__sync--${syncStatus.state} chip chip--sync`} data-testid="sync-status">
+        {/* The chip stays one line; anything that needs a click (retry, download,
+            conflict choice, empty-save confirmation) opens in a flyout anchored
+            under it. Nothing here may change the strip's height — a grid you are
+            clicking +/− in must not move when the save state flips. */}
+        <div className="sync">
+        <span className={`collection-header__sync collection-header__sync--${syncStatus.state} chip chip--sync`} data-testid="sync-status"><span className="sync__text">
           {syncStatus.state === 'loading' && <>Loading collection…</>}
           {syncStatus.state === 'idle' && <>Saved to disk{syncStatus.lastSavedAt !== undefined ? ` · ${new Date(syncStatus.lastSavedAt).toLocaleTimeString()}` : ''}{syncStatus.git === 'failed' && <span className="collection-header__sync-note"> · git backup failed — your data is safe on disk</span>}</>}
           {syncStatus.git === 'pending' && <> · Background backup pending…</>}
@@ -59,7 +64,10 @@ export function CollectionModeHeader({ db, printings, mode, onMode }: { db: Card
           {syncStatus.state === 'error' && <><strong>The collection could not be read from disk.</strong> Nothing has been overwritten, and no totals are shown because this tab does not know what you own.{syncStatus.message !== undefined && <span className="collection-header__sync-note"> · {syncStatus.message}</span>}</>}
           {syncStatus.state === 'conflict' && <>The collection on disk changed while you were editing.{syncStatus.message !== undefined && <span className="collection-header__sync-note"> · {syncStatus.message}</span>}</>}
           {syncStatus.state === 'would-empty' && <>Refused to save: this would empty a collection that still has cards on disk. Nothing is saved until you confirm.</>}
-        </span>
+        </span></span>
+        {(syncStatus.state === 'unsaved' || syncStatus.state === 'error' || syncStatus.state === 'conflict' || syncStatus.state === 'would-empty') && <div className="sync__actions" data-testid="sync-actions">
+        {syncStatus.state === 'would-empty' && <span className="sync__why">This save would empty a collection that still has cards on disk.</span>}
+        {syncStatus.state === 'error' && <span className="sync__why">Nothing has been overwritten.{syncStatus.message !== undefined ? ` ${syncStatus.message}` : ''}</span>}
         {(syncStatus.state === 'unsaved' || syncStatus.state === 'error') && <button type="button" data-testid="sync-retry" onClick={() => void retryCollection()}>Retry now</button>}
         {(syncStatus.state === 'unsaved' || syncStatus.state === 'conflict') && <button type="button" data-testid="sync-download" onClick={() => downloadFile('collection.json', exportCollectionJson(collection))}>Download JSON</button>}
         {syncStatus.state === 'conflict' && (
@@ -71,6 +79,8 @@ export function CollectionModeHeader({ db, printings, mode, onMode }: { db: Card
           </span>
         )}
         {syncStatus.state === 'would-empty' && <button type="button" data-testid="sync-confirm-empty" onClick={() => void confirmEmptySave()}>Yes, save an empty collection</button>}
+        </div>}
+        </div>
         {draft.lines.length > 0 && (
           <button type="button" className={`staged-pill${isDraftStale() ? ' staged-pill--stale' : ''}`} data-testid="staged-pill" title={isDraftStale() ? 'This draft survived a reload and has not been applied' : 'Open the draft session'} onClick={() => onMode('add')}>
             <b>{staged}</b> staged <span className="staged-pill__go">review →</span>

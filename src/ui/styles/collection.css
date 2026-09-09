@@ -98,13 +98,27 @@
 .add-line__choices-label { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
 .add-line__choices .fchip { font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; padding: 3px 9px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); clip-path: none; box-shadow: none; }
 .add-line__choices .fchip:hover { border-color: var(--you); }
-.add-line__toast { margin-top: .4em; padding: .35em .6em; font-size: .85em; font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--line); }
+/* Floats under the bar rather than sitting in flow, so staging a card never
+   shifts the grid beneath it. */
+.add-line__toast { position: absolute; top: calc(100% + 2px); left: 0; z-index: 6; padding: .35em .6em; font-size: .85em; font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 8px 20px rgba(0, 0, 0, .5); }
 @media (max-width: 860px) { .add-line__bar { flex-wrap: wrap; } .add-line__hint { display: none; } .add-line__to { flex: 1 1 100%; border-left: 0; border-top: 1px solid var(--line-bright); } }
 
 /* ---------------------------------------------------------------------- */
 /* Collection header strip: modes · sync · staged pill · meters            */
 /* ---------------------------------------------------------------------- */
-.colhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 10px 12px; margin: 0 -12px 0.8em; border-bottom: 1px solid var(--line); background: var(--panel); }
+/* One fixed-height row: the save state, the pill and the meters may change
+   text but never wrap, and every clickable follow-up opens in a flyout. A
+   strip that grew would shift the grid under the pointer mid-click. */
+.colhead { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 12px 24px; min-height: 56px; padding: 10px 12px; margin: 0 -12px 0.8em; border-bottom: 1px solid var(--line); background: var(--panel); }
+.colhead__status { flex-wrap: nowrap; min-width: 0; }
+.sync { position: relative; min-width: 0; display: flex; }
+.chip--sync { max-width: 30em; min-width: 0; }
+.sync__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync__actions { position: absolute; top: calc(100% + 8px); left: 0; z-index: 25; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; min-width: 22em; max-width: 40em; background: var(--panel); border: 1px solid var(--line-bright); box-shadow: 0 12px 30px rgba(0, 0, 0, .6); font-family: var(--font-mono); font-size: 12px; }
+.sync__why { flex: 1 1 100%; color: var(--muted); }
+.collection-view { position: relative; }
+.collection-view__storage-error { position: absolute; top: 66px; right: 12px; z-index: 25; max-width: 36em; margin: 0; padding: .5em .8em; background: var(--panel); border: 1px solid var(--rival); box-shadow: 0 12px 30px rgba(0, 0, 0, .6); }
+@media (max-width: 860px) { .colhead, .colhead__status { flex-wrap: wrap; } .colhead { min-height: 0; } }
 .colhead__modes { display: inline-flex; border: 1px solid var(--line-bright); }
 .colhead__modes button { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; font-size: 12px; padding: 8px 18px; border: 0; border-right: 1px solid var(--line-bright); background: transparent; color: var(--muted); box-shadow: none; clip-path: none; }
 .colhead__modes button:last-child { border-right: 0; }
