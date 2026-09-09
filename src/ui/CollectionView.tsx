@@ -1,6 +1,5 @@
 import { CollectionSessions } from './CollectionSessions'
 import { PrintingCount } from './PrintingCount'
-import { BulkCollectionEntry } from './BulkCollectionEntry'
 import { matchesPrinting } from './collectionEntry'
 import { AcquisitionPlanner } from './AcquisitionPlanner'
 import { artworkGroups, ownedArtworkIds } from './artworks'
@@ -171,7 +170,6 @@ export function CollectionView({
           page: staging a session, pasting bulk counts, planning purchases. */}
       <div className="tool-rack">
         <CollectionSessions printings={loadResult.printings} known={known} />
-        <BulkCollectionEntry printings={loadResult.printings} known={known} />
         <AcquisitionPlanner db={db} printings={loadResult.printings} counts={collection.counts} known={known} />
       </div>
       <div className="collection-view__filters">

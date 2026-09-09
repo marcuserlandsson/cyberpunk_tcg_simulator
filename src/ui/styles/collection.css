@@ -457,3 +457,23 @@
 .prow__meta b { font-weight: 600; }
 .prow__meta span { font-family: var(--font-mono); font-size: 10px; color: var(--muted); overflow-wrap: anywhere; }
 .prow__key { color: var(--line-bright); }
+
+/* ---------------------------------------------------------------------- */
+/* Mode pages: two-column cards (Add cards, Plan purchases, History)       */
+/* ---------------------------------------------------------------------- */
+.addcards, .plan, .history { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+.card { background: var(--panel); border: 1px solid var(--line); }
+.card > h3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; font-size: 13px; letter-spacing: .1em; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.card__meta { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11px; color: var(--muted); }
+.card__in { padding: 14px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.card__in > .field--wide, .card__in > .tool-table-wrap, .card__in > .tool-panel, .card__in > .change-list, .card__in > .fields { align-self: stretch; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.fields .field input { width: 100%; min-width: 0; }
+.plus { color: var(--ram-green); }
+.minus { color: var(--rival); }
+.session-name { font-family: var(--font-body); font-weight: 600; }
+.session-group td { background: var(--panel-2); }
+.session-bad td { color: var(--rival); }
+.session-x { border: 0; background: transparent; color: var(--muted); font-family: var(--font-mono); padding: 0 6px; box-shadow: none; clip-path: none; }
+.session-x:hover:not(:disabled) { color: var(--rival); background: transparent; }
+@media (max-width: 860px) { .addcards, .plan, .history { grid-template-columns: 1fr; } }
