@@ -7,6 +7,7 @@ import { loadPrintings, printingsByCard } from '../../src/ui/printings'
 import { _resetCollectionCacheForTests, getCollection } from '../../src/ui/collection'
 import { _resetDraftForTests } from '../../src/ui/sessionDraft'
 import { CollectionBrowse } from '../../src/ui/CollectionBrowse'
+import { biggestSet, collectorNumberKey, compareNumberKeys } from '../../src/ui/collectionSort'
 
 const db = loadCardDb()
 const printings = loadPrintings()
@@ -45,6 +46,24 @@ describe('CollectionBrowse', () => {
     const user = userEvent.setup(); mount()
     await user.click(screen.getByTestId('goal-filter-complete'))
     expect(screen.queryAllByTestId('collection-cell')).toHaveLength(0)
+  })
+  it('sorts by collector number of the core set by default, and by name on request', async () => {
+    const user = userEvent.setup(); mount()
+    const core = biggestSet(printings)
+    const first = printings.filter(p => p.setCode === core).sort((a, b) => compareNumberKeys(collectorNumberKey(a.collectorNumber), collectorNumberKey(b.collectorNumber)))[0]
+    expect(screen.getByTestId('collection-sort-number').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getAllByTestId('collection-cell')[0].getAttribute('data-card-id')).toBe(first.cardId)
+    await user.click(screen.getByTestId('collection-sort-name'))
+    const names = screen.getAllByTestId('collection-cell').map(el => db[el.getAttribute('data-card-id')!].name)
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)))
+  })
+  it('with a set filter, the drawer lists only that set\'s printings', async () => {
+    const user = userEvent.setup(); mount()
+    await user.click(screen.getByTestId('set-filter-arasakademodeck'))
+    await user.click(screen.getByTestId('expand-industrial-assembly'))
+    const rows = screen.getAllByTestId(/^printing-row-/)
+    expect(rows.length).toBe(printings.filter(p => p.cardId === 'industrial-assembly' && p.setCode === 'arasakademodeck').length)
+    expect(screen.getByTestId('drawer-filter')).toBeTruthy()
   })
   it('set filter narrows the grid', async () => {
     const user = userEvent.setup(); mount()

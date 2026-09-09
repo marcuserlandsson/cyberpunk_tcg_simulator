@@ -4,6 +4,7 @@ import { readdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildImageIndex, getOfficialImageUrl, buildPrintingImageIndex } from '../../src/ui/images'
+import { loadPrintings } from '../../src/ui/printings'
 
 const IMAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../data/images')
 
@@ -79,6 +80,32 @@ describe('getOfficialImageUrl', () => {
       expect(url).toBeDefined()
       expect(url).toContain(filename)
     }
+  })
+})
+
+describe('getOfficialImageUrl — canonical-printing fallback', () => {
+  // Cards added after the base-art fetch have printing images but no base
+  // file. Like the tests above, discover which branch this environment is in
+  // from the filesystem, then assert that specific outcome.
+  const PRINTINGS_DIR = resolve(IMAGES_DIR, 'printings')
+  function printingFilesFor(cardId: string): string[] {
+    let files: string[]
+    try { files = readdirSync(PRINTINGS_DIR) } catch { return [] }
+    const keys = new Set(loadPrintings().filter(p => p.cardId === cardId).map(p => p.key.replace(/\//g, '__')))
+    return files.filter(f => keys.has(f.replace(/\.(png|jpg|jpeg|webp)$/i, '')))
+  }
+  it('falls back to one of the card\'s printing images when no base image exists', () => {
+    const candidate = loadPrintings().map(p => p.cardId).find(id => realImageFilenameFor(id) === undefined)
+    if (candidate === undefined) return // every card has base art here; nothing to fall back from
+    const files = printingFilesFor(candidate)
+    const url = getOfficialImageUrl(candidate)
+    if (files.length === 0) expect(url).toBeUndefined()
+    else { expect(url).toBeDefined(); expect(files.some(f => decodeURIComponent(url!).includes(f))).toBe(true) } // Vite percent-encodes the β in the filename
+  })
+  it('prefers the base image when both exist', () => {
+    const filename = realImageFilenameFor('mantis-blades')
+    if (filename === undefined) return
+    expect(getOfficialImageUrl('mantis-blades')).toContain(filename)
   })
 })
 

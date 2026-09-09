@@ -3,10 +3,12 @@
 // filter state so the rail, the result count and the grid agree; the drawer
 // replaces the old inline printings expansion so opening a card no longer
 // reflows the grid. Tile footers replace the corner badge and spell out the
-// two goals, so the ✓/★ legend paragraph is gone.
+// two goals, so the ✓/★ legend paragraph is gone. Cards sort by collector
+// number (the binder order) by default, or by name; the drawer lists only the
+// printings the current filters match, with a Show-all toggle.
 import { useMemo, useState, type CSSProperties, type ReactElement } from 'react'
 import type { CardDb, CardDef } from '../engine/types'
-import type { Printing } from './printings'
+import { listSets, type Printing } from './printings'
 import { CardFrame, ramColorVar } from './CardFrame'
 import { AddLine } from './AddLine'
 import { CardDrawer } from './CardDrawer'
@@ -16,6 +18,7 @@ import { matchesPrinting } from './collectionEntry'
 import { artworkGroups, ownedArtworkIds } from './artworks'
 import { getPrintingImageUrl } from './images'
 import { ownedByCard, playsetTarget, useCollection, type Collection } from './collection'
+import { biggestSet, compareCards, comparePrintings, type CollectionSort } from './collectionSort'
 
 interface Rollup { def: CardDef; printings: Printing[]; matching: Printing[]; owned: number; target: number; artOwned: number; artTarget: number; playsetDone: boolean; artsDone: boolean }
 function rollup(def: CardDef, prints: Printing[], collection: Collection, owned: number, matching: Printing[]): Rollup {
@@ -27,6 +30,9 @@ export function CollectionBrowse({ db, printings, byCard, known, useOfficialImag
   const collection = useCollection()
   const [filters, setFilters] = useState<CollectionFilters>(EMPTY_FILTERS)
   const [view, setView] = useState<'grid' | 'list'>('grid')
+  const [sort, setSort] = useState<CollectionSort>('number')
+  const preferredSet = useMemo(() => biggestSet(printings), [printings])
+  const setOrder = useMemo(() => listSets(printings).map(s => s.code), [printings])
   const [expanded, setExpanded] = useState<string | null>(null)
   const [rowLimit, setRowLimit] = useState(60)
   const rarities = useMemo(() => [...new Set(printings.map(p => p.rarity))], [printings])
@@ -40,10 +46,10 @@ export function CollectionBrowse({ db, printings, byCard, known, useOfficialImag
   const rollups = useMemo(() => Object.values(db)
     .filter(def => filters.colors.size === 0 || filters.colors.has(def.color))
     .filter(def => filters.types.size === 0 || filters.types.has(def.type))
-    .map(def => { const prints = byCard.get(def.id) ?? []; return rollup(def, prints, collection, owned[def.id] ?? 0, prints.filter(p => matchesPrinting(def, p, filters.search.replace(/^#\s*/, ''), filters.setCode, filters.rarities))) })
+    .map(def => { const prints = byCard.get(def.id) ?? []; return rollup(def, prints, collection, owned[def.id] ?? 0, prints.filter(p => matchesPrinting(def, p, filters.search.replace(/^#\s*/, ''), filters.setCode, filters.rarities)).sort((a, b) => comparePrintings(a, b, preferredSet, setOrder))) })
     .filter(r => r.matching.length > 0)
     .filter(r => filters.goal === 'missing-playset' ? !r.playsetDone && r.target > 0 : filters.goal === 'missing-arts' ? !r.artsDone : filters.goal === 'complete' ? r.playsetDone && r.artsDone : true)
-    .sort((a, b) => a.def.name.localeCompare(b.def.name)), [db, byCard, collection, owned, filters])
+    .sort((a, b) => compareCards(a, b, sort, filters.setCode, preferredSet)), [db, byCard, collection, owned, filters, sort, preferredSet, setOrder])
 
   const matchingRows = rollups.reduce((n, r) => n + r.matching.length, 0)
   const matchingOwned = rollups.reduce((n, r) => n + r.matching.reduce((a, p) => a + (collection.counts[p.key] ?? 0), 0), 0)
@@ -57,6 +63,7 @@ export function CollectionBrowse({ db, printings, byCard, known, useOfficialImag
           <fieldset disabled={!known} className="collection-editor"><AddLine db={db} printings={printings} testIdPrefix="quick-add" /></fieldset>
           <div className="browse__view">
             <span className="browse__count" data-testid="collection-scope"><b>{rollups.length}</b> cards · <b>{matchingRows}</b> printing rows · <b>{known ? matchingOwned : '?'}</b> physical copies owned</span>
+            <div className="seg browse__sort" role="group" aria-label="Sort"><button type="button" data-testid="collection-sort-number" aria-pressed={sort === 'number'} onClick={() => setSort('number')}>Number</button><button type="button" data-testid="collection-sort-name" aria-pressed={sort === 'name'} onClick={() => setSort('name')}>Name</button></div>
             <div className="seg"><button type="button" aria-pressed={view === 'grid'} onClick={() => setView('grid')}>Grid</button><button type="button" data-testid="collection-compact" aria-pressed={view === 'list'} onClick={() => setView(v => v === 'list' ? 'grid' : 'list')}>List</button></div>
           </div>
         </div>
@@ -96,7 +103,7 @@ export function CollectionBrowse({ db, printings, byCard, known, useOfficialImag
           </div>
         )}
       </div>
-      {open && <CardDrawer def={open.def} printings={open.printings} collection={collection} known={known} onClose={() => setExpanded(null)} />}
+      {open && <CardDrawer def={open.def} printings={open.printings} visible={open.matching} preferredSet={preferredSet} setOrder={setOrder} collection={collection} known={known} onClose={() => setExpanded(null)} />}
     </div>
   )
 }

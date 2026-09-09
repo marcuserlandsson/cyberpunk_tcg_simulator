@@ -8,6 +8,9 @@
 // with no matching files it simply resolves to an empty object, so this
 // module (and anything importing it) loads cleanly today, under both Vite and
 // Vitest (which shares Vite's transform pipeline for `import.meta.glob`).
+import { listSets, loadPrintings, type Printing } from './printings'
+import { biggestSet, comparePrintings } from './collectionSort'
+
 const officialImageModules = import.meta.glob('/data/images/*', {
   eager: true,
   query: '?url',
@@ -33,9 +36,32 @@ export function buildImageIndex(modules: Record<string, string>): Map<string, st
 
 const officialImageIndex = buildImageIndex(officialImageModules)
 
-/** The official art URL for `defId`, or `undefined` if none is bundled. */
+/** The official art URL for `defId`: the bundled base image when there is
+ *  one, otherwise the image of the card's canonical printing (its lowest
+ *  collector number in the biggest set, else its first printing) — cards
+ *  added after the base-art fetch have printing images but no base file.
+ *  `undefined` when neither exists. */
 export function getOfficialImageUrl(defId: string): string | undefined {
-  return officialImageIndex.get(defId)
+  return officialImageIndex.get(defId) ?? canonicalPrintingImage(defId)
+}
+
+let canonicalIndex: Map<string, string> | undefined
+function canonicalPrintingImage(defId: string): string | undefined {
+  if (canonicalIndex === undefined) {
+    canonicalIndex = new Map()
+    try {
+      const prints = loadPrintings()
+      const preferred = biggestSet(prints)
+      const setOrder = listSets(prints).map(s => s.code)
+      const byCard = new Map<string, Printing[]>()
+      for (const p of prints) byCard.set(p.cardId, [...(byCard.get(p.cardId) ?? []), p])
+      for (const [cardId, list] of byCard) {
+        const withImage = list.filter(p => printingImageIndex.has(p.key)).sort((a, b) => comparePrintings(a, b, preferred, setOrder))
+        if (withImage.length > 0) canonicalIndex.set(cardId, printingImageIndex.get(withImage[0].key)!)
+      }
+    } catch { /* an unloadable dataset means no fallback; the Collection tab reports it */ }
+  }
+  return canonicalIndex.get(defId)
 }
 
 const printingImageModules = import.meta.glob('/data/images/printings/*', {
