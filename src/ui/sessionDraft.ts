@@ -11,6 +11,11 @@
 // `useSyncExternalStore`, and a memory fallback when localStorage refuses.
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
+import type { Printing } from './printings'
+import { getCollection, replaceCollection } from './collection'
+import { collectionChanges } from './collectionJournal'
+import { sessionCounts } from './sessionCounts'
+import { parseBulkCounts } from './collectionEntry'
 
 export type SessionKind = 'Acquisition' | 'Trade' | 'Correction'
 export type SessionMode = 'signed' | 'exact'
@@ -131,3 +136,51 @@ export function clearDraft(): void { const d = getDraft(); write({ ...d, lines: 
 export function isDraftStale(): boolean { return getDraft().lines.length > 0 && !touchedThisLoad }
 
 export function _resetDraftForTests(): void { snapshot = undefined; memoryDraft = undefined; storageError = ''; touchedThisLoad = false }
+
+/** Lines → the text grammar the existing parsers read. Group labels are a
+ *  display concern and are not serialized. Line order is irrelevant to both
+ *  parsers (sessionCounts/parseBulkCounts sum per key and reject duplicates by
+ *  key alone), so storage order (newest first) is used as-is. */
+export function draftToText(draft: SessionDraft): string {
+  return draft.lines.map(l => draft.mode === 'signed' ? `${l.key},${(l.delta ?? 0) >= 0 ? '+' : ''}${l.delta ?? 0}` : `${l.key},${l.exact ?? 0}`).join('\n')
+}
+
+/** The counts Apply would write. Delegates the arithmetic and every check
+ *  (unknown key, negative result, duplicate exact row) to the two existing
+ *  parsers so the panel and the paste box can never disagree. */
+export function draftCounts(draft: SessionDraft, printings: Printing[], before: Record<string, number>): Record<string, number> {
+  const text = draftToText(draft)
+  if (draft.mode === 'signed') return sessionCounts(text, printings, before)
+  return { ...before, ...parseBulkCounts(text, printings) }
+}
+
+export interface DraftSummary { copies: number; printings: number; before: number; after: number }
+export function draftSummary(before: Record<string, number>, after: Record<string, number>): DraftSummary {
+  const sum = (c: Record<string, number>) => Object.values(c).reduce((n, v) => n + v, 0)
+  return { copies: sum(after) - sum(before), printings: Object.keys(collectionChanges(before, after)).length, before: sum(before), after: sum(after) }
+}
+
+export interface RarityRow { rarity: string; copies: number }
+/** "What did I pull": positive deltas per rarity. Negative rows (trades out)
+ *  are not pulls and are left out. */
+export function rarityBreakdown(changes: Record<string, { before: number; after: number }>, printings: Printing[]): RarityRow[] {
+  const rarity = new Map(printings.map(p => [p.key, p.rarity]))
+  const totals = new Map<string, number>()
+  for (const [key, c] of Object.entries(changes)) {
+    const gained = c.after - c.before
+    if (gained <= 0) continue
+    const name = rarity.get(key) ?? 'Unknown'
+    totals.set(name, (totals.get(name) ?? 0) + gained)
+  }
+  return [...totals].map(([r, copies]) => ({ rarity: r, copies })).sort((a, b) => b.copies - a.copies || a.rarity.localeCompare(b.rarity))
+}
+
+/** One write, one journal entry, then the draft is emptied. Throws (and
+ *  leaves the draft alone) when the computation refuses. */
+export function applyDraft(printings: Printing[]): void {
+  const draft = getDraft()
+  const before = getCollection().counts
+  const after = draftCounts(draft, printings, before)
+  replaceCollection({ counts: after }, { kind: draft.mode === 'exact' ? 'Bulk counts' : draft.kind, date: draft.date, source: draft.source, cost: draft.cost })
+  clearDraft()
+}
