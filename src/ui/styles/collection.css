@@ -185,7 +185,7 @@
 .listview__name { font-family: var(--font-body); font-weight: 600; }
 .listview__key { color: var(--muted); font-size: 10px; }
 .listview__more { margin: .6em; }
-.tag { font-family: var(--font-display); font-weight: 700; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; padding: 1px 6px; margin-left: 6px; border: 1px solid var(--line-bright); color: var(--muted); }
+.tag { font-family: var(--font-display); font-weight: 700; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; padding: 1px 6px; margin-left: 6px; border: 1px solid var(--line-bright); color: var(--muted); white-space: nowrap; }
 .tag--foil { border-color: var(--act); color: var(--act); }
 .drawer { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 75px); display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--panel); }
 .browse--narrow .drawer { position: static; max-height: none; border-left: 0; border-top: 1px solid var(--line); margin-top: 12px; }
@@ -211,7 +211,7 @@
 .prow img, .prow__img { display: block; width: 34px; height: 48px; object-fit: cover; background: var(--panel-2); border: 1px solid var(--line-bright); }
 .prow__meta { display: grid; gap: 2px; min-width: 0; font-size: 12px; }
 .prow__meta b { font-weight: 600; }
-.prow__meta span { font-family: var(--font-mono); font-size: 10px; color: var(--muted); overflow-wrap: anywhere; }
+.prow__meta > span { font-family: var(--font-mono); font-size: 10px; color: var(--muted); overflow-wrap: anywhere; }
 .prow__key { color: var(--line-bright); }
 
 /* ---------------------------------------------------------------------- */

@@ -84,6 +84,12 @@ describe('sync chip', () => {
     const text = screen.getByTestId('sync-status').textContent ?? ''
     expect(text).toContain('12 changes not yet saved to disk')
     expect(text).not.toMatch(/retrying/i)
+    expect(text).toContain('Refusing to save invalid counts')
+  })
+  it('shows a saving state', () => {
+    vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'saving', pendingCount: 1 })
+    mount()
+    expect(screen.getByTestId('sync-status').textContent).toMatch(/saving/i)
   })
   it('does not say "0 changes" when there is no pending work', () => {
     vi.spyOn(sync, 'useSyncStatus').mockReturnValue({ state: 'unsaved', pendingCount: 0, retrying: false, message: 'Cannot reach the dev server' })
