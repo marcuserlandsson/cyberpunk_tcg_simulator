@@ -6,6 +6,8 @@ import { sessionCounts,starterEntry } from '../../src/ui/sessionCounts'
 import { loadPrintings } from '../../src/ui/printings'
 import arasaka from '../../data/decks/arasaka-embracing-power.json'
 import mercs from '../../data/decks/mercs-the-heist.json'
+import embracingPower from '../../data/decks/embracing-power-starter.json'
+import theHeist from '../../data/decks/the-heist-starter.json'
 import type { DeckList } from '../../src/engine/deck'
 const prints=loadPrintings(),key='arasakademodeck/006',other='welcometonightcityretail/033'
 beforeEach(()=>{localStorage.clear();_resetCollectionCacheForTests()})
@@ -43,11 +45,22 @@ describe('recoverable collection sessions',()=>{
     expect(previewCollectionImport(JSON.stringify({version:1,counts:{[key]:2}}),'replace').after).toEqual({[key]:2})
     expect(getCollection().counts).toEqual({'legacy-key':4})
   })
-  it('maps bundled demo contents to unambiguous printing identities including the three Legends',()=>{
-    for(const [deck,set] of [[arasaka,'arasakademodeck'],[mercs,'mercdemodeck']] as const){
+  it('maps every bundled product to unambiguous printing identities including the three Legends',()=>{
+    for(const [deck,set] of [
+      [arasaka,'arasakademodeck'],[mercs,'mercdemodeck'],
+      [embracingPower,'embracingpowerretailstarterdeck'],[embracingPower,'embracingpowerbetastarterdeck'],
+      [theHeist,'theheistretailstarterdeck'],[theHeist,'theheistbetastarterdeck'],
+    ] as const){
       const text=starterEntry(deck as unknown as DeckList,set,prints),counts=sessionCounts(text,prints,{})
       expect(Object.values(counts).reduce((a,b)=>a+b,0)).toBe(Object.values(deck.cards).reduce((a,b)=>a+b,0)+3)
       expect(Object.keys(counts).every(key=>key.startsWith(set+'/'))).toBe(true)
     }
+  })
+  it('stages a full 43-card starter deck against retail and beta printings independently',()=>{
+    const retail=sessionCounts(starterEntry(embracingPower as unknown as DeckList,'embracingpowerretailstarterdeck',prints),prints,{})
+    const both=sessionCounts(starterEntry(embracingPower as unknown as DeckList,'embracingpowerbetastarterdeck',prints),prints,retail)
+    expect(Object.values(retail).reduce((a,b)=>a+b,0)).toBe(43)
+    expect(Object.values(both).reduce((a,b)=>a+b,0)).toBe(86)
+    expect(Object.keys(both)).toHaveLength(40)
   })
 })

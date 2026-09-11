@@ -38,9 +38,12 @@ function writeJson(key: string, value: unknown): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Bundled starter decks, shipped as static data (`data/decks/*.json`).
- * Read-only: `deleteDeck` refuses to remove one that has no localStorage
- * override (see below).
+ * The bundled decks the app offers as *playable* seats, shipped as static
+ * data. Deliberately a hand-picked list, not everything in `data/decks/`:
+ * that directory also holds the two 43-card retail starter lists, which exist
+ * so the Collection tab can credit a whole opened deck (AddCardsMode's
+ * `PRODUCTS`) and are not registered here. Read-only: `deleteDeck` refuses to
+ * remove one that has no localStorage override (see below).
  */
 const STARTER_DECKS: DeckList[] = [
   arasakaDeck as unknown as DeckList,
