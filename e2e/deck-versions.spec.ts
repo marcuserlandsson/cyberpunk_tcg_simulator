@@ -3,6 +3,10 @@ import { expect, test } from './fixtures'
 test('converts a starter, restores deck versions, and selects it for Play', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('tab-deckBuilder').click()
+  // Name the demo deck rather than loading whatever the picker defaults to:
+  // the bundled list also holds the constructed-legal 43-card starter decks,
+  // and this case is specifically about converting a demo deck.
+  await page.getByTestId('deck-select').selectOption('Arasaka — Embracing Power')
   await page.getByTestId('load-deck-button').click()
   await expect(page.getByTestId('deck-format')).toHaveValue('demo')
   await page.getByTestId('deck-format').selectOption('constructed')

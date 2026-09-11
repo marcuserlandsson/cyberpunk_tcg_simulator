@@ -9,6 +9,8 @@ import { deckMetadataSchema, deckSnapshotSchema } from './deckSchema'
 import { deckFormat, type DeckList } from '../engine/deck'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import mercsDeck from '../../data/decks/mercs-the-heist.json'
+import embracingPowerDeck from '../../data/decks/embracing-power-starter.json'
+import theHeistDeck from '../../data/decks/the-heist-starter.json'
 
 // ---------------------------------------------------------------------------
 // Storage keys & small JSON helpers
@@ -38,14 +40,17 @@ function writeJson(key: string, value: unknown): void {
 // ---------------------------------------------------------------------------
 
 /**
- * The bundled decks the app offers as *playable* seats, shipped as static
- * data. Deliberately a hand-picked list, not everything in `data/decks/`:
- * that directory also holds the two 43-card retail starter lists, which exist
- * so the Collection tab can credit a whole opened deck (AddCardsMode's
- * `PRODUCTS`) and are not registered here. Read-only: `deleteDeck` refuses to
+ * Bundled decks, shipped as static data (`data/decks/*.json`): the two
+ * 43-card retail starter decks, which are constructed-legal and so playable
+ * as-is, and the two 27+3 print-and-play demo decks, which are undersized and
+ * ride the `demo` waiver in `isDeckPickable`. The retail lists are the same
+ * objects AddCardsMode stages as products, so a deck you recorded opening is
+ * the deck you can pick a seat with. Read-only: `deleteDeck` refuses to
  * remove one that has no localStorage override (see below).
  */
 const STARTER_DECKS: DeckList[] = [
+  embracingPowerDeck as unknown as DeckList,
+  theHeistDeck as unknown as DeckList,
   arasakaDeck as unknown as DeckList,
   mercsDeck as unknown as DeckList,
 ]
