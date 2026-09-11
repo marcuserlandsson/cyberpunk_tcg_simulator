@@ -21,13 +21,26 @@ import {
 } from './sessionDraft'
 import arasaka from '../../data/decks/arasaka-embracing-power.json'
 import mercs from '../../data/decks/mercs-the-heist.json'
+import embracingPower from '../../data/decks/embracing-power-starter.json'
+import theHeist from '../../data/decks/the-heist-starter.json'
 
 const KINDS: SessionKind[] = ['Acquisition', 'Trade', 'Correction']
 /** Fixed-content products the repo holds lists for. Boosters are entered
- *  card by card on purpose — their contents vary. */
-const PRODUCTS: { setCode: string; label: string; deck: DeckList }[] = [
-  { setCode: 'arasakademodeck', label: 'Arasaka Demo Deck', deck: arasaka as unknown as DeckList },
-  { setCode: 'mercdemodeck', label: 'Merc Demo Deck', deck: mercs as unknown as DeckList },
+ *  card by card on purpose — their contents vary.
+ *
+ *  A retail starter deck and its beta printing share one card list but are
+ *  separate products: the collection is tracked per printing, so opening one
+ *  of each has to credit two distinct sets of keys. `starterEntry` resolves
+ *  the same list against whichever `setCode` the button carries. */
+const STARTER_NOTE = 'Official 40 + 3 deck list from cyberpunktcg.com — the full contents of one sealed deck.'
+const DEMO_NOTE = 'Bundled demo list (27 + 3), not a retail box manifest — check the quantities against what you received.'
+const PRODUCTS: { setCode: string; label: string; deck: DeckList; note: string }[] = [
+  { setCode: 'embracingpowerretailstarterdeck', label: 'Embracing Power Starter · Retail', deck: embracingPower as unknown as DeckList, note: STARTER_NOTE },
+  { setCode: 'embracingpowerbetastarterdeck', label: 'Embracing Power Starter · Beta', deck: embracingPower as unknown as DeckList, note: STARTER_NOTE },
+  { setCode: 'theheistretailstarterdeck', label: 'The Heist Starter · Retail', deck: theHeist as unknown as DeckList, note: STARTER_NOTE },
+  { setCode: 'theheistbetastarterdeck', label: 'The Heist Starter · Beta', deck: theHeist as unknown as DeckList, note: STARTER_NOTE },
+  { setCode: 'arasakademodeck', label: 'Arasaka Demo Deck', deck: arasaka as unknown as DeckList, note: DEMO_NOTE },
+  { setCode: 'mercdemodeck', label: 'Merc Demo Deck', deck: mercs as unknown as DeckList, note: DEMO_NOTE },
 ]
 
 export function AddCardsMode({ db, printings, known }: { db: CardDb; printings: Printing[]; known: boolean }): ReactElement {
@@ -67,8 +80,8 @@ export function AddCardsMode({ db, printings, known }: { db: CardDb; printings: 
           </div>
           <div className="field field--wide"><span className="field__label">Add a whole product</span>
             <div className="tool-actions">
-              {PRODUCTS.map(pr => { const added = groups.includes(pr.label); return <button type="button" key={pr.setCode} data-testid={`product-${pr.setCode}`} disabled={!known || added || draft.mode === 'exact'} title={draft.mode === 'exact' ? 'Switch to Add / remove copies to add a whole product' : 'Bundled demo list, not a retail box manifest — check the quantities against what you received'} onClick={() => { try { stageLines(parseDraftLines(starterEntry(pr.deck, pr.setCode, printings), 'signed').map(l => ({ ...l, group: pr.label }))); setError('') } catch (e) { setError(String(e)) } }}>{pr.label}{added ? ' ✓ added' : ''}</button> })}
-              <span className="tool-note">Fixed-content products only; boosters are entered card by card below.</span>
+              {PRODUCTS.map(pr => { const added = groups.includes(pr.label); return <button type="button" key={pr.setCode} data-testid={`product-${pr.setCode}`} disabled={!known || added || draft.mode === 'exact'} title={draft.mode === 'exact' ? 'Switch to Add / remove copies to add a whole product' : pr.note} onClick={() => { try { stageLines(parseDraftLines(starterEntry(pr.deck, pr.setCode, printings), 'signed').map(l => ({ ...l, group: pr.label }))); setError('') } catch (e) { setError(String(e)) } }}>{pr.label}{added ? ' ✓ added' : ''}</button> })}
+              <span className="tool-note">Fixed-content products only; boosters are entered card by card below. Retail and beta printings of a starter deck are separate products.</span>
             </div>
           </div>
           <div className="field field--wide"><span className="field__label">Add cards one by one</span>

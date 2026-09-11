@@ -232,7 +232,10 @@ words the transcription preserves in `text`.
 
 ## Deck list format
 
-`data/decks/*.json` files (two starter decks in this task) are:
+`data/decks/*.json` files are (four today: two 27+3 demo decks and two
+43-card retail starter decks; a retail deck and its beta printing share one
+list, resolved against different set codes, so the count of lists is not the
+count of products offered in the Collection tab):
 
 ```jsonc
 {

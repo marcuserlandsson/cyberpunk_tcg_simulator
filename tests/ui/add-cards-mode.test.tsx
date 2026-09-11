@@ -51,6 +51,17 @@ describe('AddCardsMode', () => {
     expect(getDraft().lines).toEqual([])
   })
 
+  it('stages a full starter deck and treats its retail and beta printings as separate products', () => {
+    mount()
+    fireEvent.click(screen.getByTestId('product-embracingpowerretailstarterdeck'))
+    expect((screen.getByTestId('product-embracingpowerretailstarterdeck') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByTestId('product-embracingpowerbetastarterdeck') as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(screen.getByTestId('product-embracingpowerbetastarterdeck'))
+    const lines = getDraft().lines
+    expect(lines.reduce((total, line) => total + (line.delta ?? 0), 0)).toBe(86)
+    expect(new Set(lines.map(line => line.key)).size).toBe(40)
+  })
+
   it('the mode toggle is disabled while lines are staged', () => {
     stageLine({ key: DEMO, delta: 1 })
     mount()

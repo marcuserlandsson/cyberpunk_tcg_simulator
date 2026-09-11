@@ -5691,3 +5691,34 @@ original `.find()` did — credited the wrong printing with nothing on screen
 saying so, which made the buy-list wrong in *both* directions and left in-set
 alt arts unreachable. The undo toast names the collector number for the same
 reason: a mis-attribution has to be visible before Undo means anything.
+
+**The whole-product buttons ship the real 43-card starter decks, not the demo
+lists.** Until now "Add a whole product" offered only `arasakademodeck` (14
+printings) and `mercdemodeck` (15), staged from `data/decks/arasaka-embracing-
+power.json` and `mercs-the-heist.json` — 27 main-deck copies plus 3 legends,
+30 cards. Those are the print-and-play demo decks, and the note above ("the
+Arasaka starter deck, matching our `arasaka-embracing-power.json`") conflates
+them with the retail product: a real Welcome to Night City starter deck is
+**43 cards — 40 main deck + 3 legends**, per the official contents at
+https://cyberpunktcg.com/blog/wnc-starter-decks. Opening a physical deck and
+pressing the demo button left the collection 13 cards short with six wrong
+counts (Embracing Power's demo omits Chrome Fang, Ruthless Lowlife, MaxTac AV,
+Arasaka Emergency Radioport, Shattered Memories and Sandevistan outright).
+`data/decks/embracing-power-starter.json` and `the-heist-starter.json` now
+carry the official quantities; both pass `validateDeck` with zero errors, so
+neither is flagged `demo` and both are constructed-legal at 40 + 3.
+
+**Retail and beta printings of one starter deck are two products, not a
+toggle.** The two lists resolve against four set codes —
+`embracingpowerretailstarterdeck` / `embracingpowerbetastarterdeck` and
+`theheistretailstarterdeck` / `theheistbetastarterdeck`, 20 printings each and
+card-for-card identical. Because the collection is tracked per printing key, a
+player who opened one of each has to credit two disjoint sets of 20 keys;
+a single button with a retail/beta switch would have made the common case
+(owning both) two clicks with a hidden mode change between them, and would
+have had to invent state that `PRODUCTS` does not otherwise carry.
+`starterEntry` already takes the set code as a parameter, so the same deck
+object serves both entries and the quantities cannot drift apart. The six
+buttons stay in the existing `.tool-actions` row; the per-product `note`
+replaces the blanket "not a retail box manifest" tooltip, which is now true of
+the demo decks only.

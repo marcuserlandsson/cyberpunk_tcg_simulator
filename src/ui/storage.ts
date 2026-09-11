@@ -9,6 +9,8 @@ import { deckMetadataSchema, deckSnapshotSchema } from './deckSchema'
 import { deckFormat, type DeckList } from '../engine/deck'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import mercsDeck from '../../data/decks/mercs-the-heist.json'
+import embracingPowerDeck from '../../data/decks/embracing-power-starter.json'
+import theHeistDeck from '../../data/decks/the-heist-starter.json'
 
 // ---------------------------------------------------------------------------
 // Storage keys & small JSON helpers
@@ -38,11 +40,17 @@ function writeJson(key: string, value: unknown): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Bundled starter decks, shipped as static data (`data/decks/*.json`).
- * Read-only: `deleteDeck` refuses to remove one that has no localStorage
- * override (see below).
+ * Bundled decks, shipped as static data (`data/decks/*.json`): the two
+ * 43-card retail starter decks, which are constructed-legal and so playable
+ * as-is, and the two 27+3 print-and-play demo decks, which are undersized and
+ * ride the `demo` waiver in `isDeckPickable`. The retail lists are the same
+ * objects AddCardsMode stages as products, so a deck you recorded opening is
+ * the deck you can pick a seat with. Read-only: `deleteDeck` refuses to
+ * remove one that has no localStorage override (see below).
  */
 const STARTER_DECKS: DeckList[] = [
+  embracingPowerDeck as unknown as DeckList,
+  theHeistDeck as unknown as DeckList,
   arasakaDeck as unknown as DeckList,
   mercsDeck as unknown as DeckList,
 ]

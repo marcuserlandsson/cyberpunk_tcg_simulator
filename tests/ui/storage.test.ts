@@ -30,6 +30,8 @@ beforeEach(() => {
 describe('listDecks', () => {
   it('includes the bundled starter decks even with nothing in localStorage', () => {
     const names = listDecks().map((deck) => deck.name)
+    expect(names).toContain('Embracing Power — Starter Deck')
+    expect(names).toContain('The Heist — Starter Deck')
     expect(names).toContain('Arasaka — Embracing Power')
     expect(names).toContain('Mercs — The Heist')
   })
@@ -266,7 +268,7 @@ describe('buildDisplayNames', () => {
 afterEach(()=>vi.restoreAllMocks())
 it('tolerates blocked storage reads and preserves usable bundled decks/settings',()=>{
   vi.spyOn(Storage.prototype,'getItem').mockImplementation(()=>{throw new Error('Blocked')})
-  expect(listDecks()).toHaveLength(2)
+  expect(listDecks()).toHaveLength(4)
   expect(getSettings()).toEqual({useOfficialImages:false})
 })
 it('saves a deck whose name is a special object property as an ordinary own key',()=>{
