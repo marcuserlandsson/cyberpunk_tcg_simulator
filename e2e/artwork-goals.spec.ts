@@ -1,4 +1,18 @@
 import { test, expect } from './fixtures'
+import { existsSync, readdirSync } from 'node:fs'
+
+// `data/images/` is gitignored on purpose (README §Official card images:
+// "nobody's card art ships with the source", and the app is fully playable
+// with zero images present). So a fresh clone — or a git worktree, which the
+// feature workflow uses — has none of them, `import.meta.glob` in
+// src/ui/images.ts matches nothing, and every printing row renders its
+// `prow__img` placeholder instead of an `<img>`. Asserting on the image
+// unconditionally made that environment fail as a bare "element(s) not
+// found", which reads exactly like a UI regression. Gate the image half of
+// this spec on the art actually being present and say so out loud; the goal
+// arithmetic above it needs no images and always runs.
+const PRINTING_IMAGES = 'data/images/printings'
+const hasBundledArt = existsSync(PRINTING_IMAGES) && readdirSync(PRINTING_IMAGES).length > 0
 
 test('artwork and playset goals advance independently across printings', async ({ page }) => {
   await page.goto('/')
@@ -17,6 +31,11 @@ test('artwork and playset goals advance independently across printings', async (
   await page.getByTestId('collection-mode-browse').click()
   const printing = page.getByTestId('printing-row-edgerunneropens1/004')
   await expect(printing).toContainText('Artwork 1 · owned')
+  if (!hasBundledArt) {
+    test.info().annotations.push({ type: 'skip-reason', description: `no art in ${PRINTING_IMAGES}; run node scripts/download-printing-images.mjs to cover the image path` })
+    await expect(printing.locator('.prow__img')).toBeAttached()
+    return
+  }
   const image = printing.locator('img')
   await expect(image).toBeVisible()
   await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
