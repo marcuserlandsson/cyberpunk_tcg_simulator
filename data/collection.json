@@ -1,7 +1,7 @@
 {
  "version": 1,
- "revision": 112,
- "savedAt": "2026-09-13T10:37:25.172Z",
+ "revision": 113,
+ "savedAt": "2026-09-13T10:40:00.923Z",
  "counts": {
   "embracingpowerbetastarterdeck/β002": 2,
   "embracingpowerbetastarterdeck/β003": 2,
@@ -106,6 +106,7 @@
   "welcometonightcitybeta/β041": 1,
   "welcometonightcitybeta/β006": 10,
   "welcometonightcitybeta/β007": 10,
-  "welcometonightcitybeta/β008": 8
+  "welcometonightcitybeta/β008": 8,
+  "welcometonightcitybeta/β010": 9
  }
 }
