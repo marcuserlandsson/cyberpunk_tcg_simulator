@@ -1,0 +1,208 @@
+[
+  {
+    "type": "choosePlayOrder",
+    "goFirst": true
+  },
+  {
+    "type": "keepHand"
+  },
+  {
+    "type": "mulligan"
+  },
+  {
+    "type": "keepHand"
+  },
+  {
+    "type": "chooseGigDie",
+    "size": 12
+  },
+  {
+    "type": "sellCard",
+    "card": 56
+  },
+  {
+    "type": "playCard",
+    "card": 52,
+    "payment": [
+      56,
+      44
+    ],
+    "targets": []
+  },
+  {
+    "type": "endTurn"
+  },
+  {
+    "type": "chooseGigDie",
+    "size": 4
+  },
+  {
+    "type": "sellCard",
+    "card": 13
+  },
+  {
+    "type": "playCard",
+    "card": 43,
+    "payment": [
+      13
+    ],
+    "targets": [
+      0,
+      0
+    ]
+  },
+  {
+    "type": "playCard",
+    "card": 32,
+    "payment": [
+      1,
+      2,
+      3
+    ],
+    "targets": [
+      52
+    ]
+  },
+  {
+    "type": "endTurn"
+  },
+  {
+    "type": "chooseGigDie",
+    "size": 10
+  },
+  {
+    "type": "playCard",
+    "card": 61,
+    "payment": [
+      56,
+      45,
+      46,
+      44
+    ],
+    "targets": []
+  },
+  {
+    "type": "sellCard",
+    "card": 66
+  },
+  {
+    "type": "callLegend",
+    "payment": [
+      66
+    ]
+  },
+  {
+    "type": "answerIntercept",
+    "answer": 45
+  },
+  {
+    "type": "endTurn"
+  },
+  {
+    "type": "chooseGigDie",
+    "size": 6
+  },
+  {
+    "type": "sellCard",
+    "card": 42
+  },
+  {
+    "type": "playCard",
+    "card": 16,
+    "payment": [
+      13,
+      42,
+      1,
+      2,
+      3
+    ],
+    "targets": [
+      43
+    ]
+  },
+  {
+    "type": "answerIntercept",
+    "answer": 1
+  },
+  {
+    "type": "answerIntercept",
+    "answer": 2
+  },
+  {
+    "type": "answerIntercept",
+    "answer": 0
+  },
+  {
+    "type": "endTurn"
+  },
+  {
+    "type": "chooseGigDie",
+    "size": 8
+  },
+  {
+    "type": "playCard",
+    "card": 53,
+    "payment": [
+      56,
+      66
+    ],
+    "targets": []
+  },
+  {
+    "type": "playCard",
+    "card": 60,
+    "payment": [
+      45,
+      46,
+      44
+    ],
+    "targets": []
+  },
+  {
+    "type": "sellCard",
+    "card": 54
+  },
+  {
+    "type": "callLegend",
+    "payment": [
+      54
+    ]
+  },
+  {
+    "type": "answerIntercept",
+    "answer": 44
+  },
+  {
+    "type": "attack",
+    "attacker": 61,
+    "target": "gigArea"
+  },
+  {
+    "type": "answerIntercept",
+    "answer": 0
+  },
+  {
+    "type": "answerIntercept",
+    "answer": 65
+  },
+  {
+    "type": "react",
+    "reaction": {
+      "type": "block",
+      "blocker": 16
+    }
+  },
+  {
+    "type": "react",
+    "reaction": {
+      "type": "pass"
+    }
+  },
+  {
+    "type": "endTurn"
+  },
+  {
+    "type": "chooseGigDie",
+    "size": 8
+  }
+]

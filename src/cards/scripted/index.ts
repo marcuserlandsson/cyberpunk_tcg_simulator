@@ -53,6 +53,14 @@ export const PRIVATE_INFORMATION_SCRIPTS = new Set([
   'sasha-yakovleva-won-t-let-you-down', 'tetratronic-rippler',
 ])
 
+/** These scripts expose their initial unknown cards publicly before asking a
+ * choice. Their replay prefix is consequently usable by either player. */
+export const PUBLIC_REVEAL_SCRIPTS = new Set([
+  'all-is-lost', 'shattered-memories', 'the-heist', 'fool-on-the-hill',
+  'judy-a-lvarez-braindance-maestro', 'judy-a-lvarez-nothing-to-doubt',
+  'sasha-yakovleva-won-t-let-you-down',
+])
+
 export type ScriptedCard = (db: CardDb, state: GameState, ctx: EffectCtx) => GameState
 
 /** Choices made during a script resolve through the same replay transaction as node targets. */

@@ -1,329 +1,289 @@
+import { spendSearchBudget, type SearchBudget } from './budget'
 import { stillLive } from '../engine/game'
-// The heuristic opponent: a one-ply greedy search over `legalActions`, scored
-// by `evaluate`, with two layers on top of the plain argmax.
-//
-// LAYER 1 — one-ply greedy. For each legal action: `applyAction` on the state
-// (which is pure — it deep-copies internally via `draftState`, so nothing here
-// clones anything itself), score the result from the AI's own perspective, take
-// the max, break ties with the agent's own seeded rng. Because *every* decision
-// the engine asks for arrives as a `legalActions` list — main-phase plays,
-// attacks, react windows, Gig-die steal picks, would-be-defeated/stolen
-// interceptions, forced-attack turns — this one loop answers all of them
-// uniformly. The brief's "special handling" for `chooseGig` (take the most
-// valuable die) and for `react` (simulate each reaction) genuinely falls out of
-// it: a higher-value die is worth more Street Cred to the AI and less to the
-// rival, so it wins the argmax on its own.
-//
-// LAYER 2 — quiescence (`resolveWindows`). A plain one-ply score is blind to
-// exactly the decisions that matter most, because an attack does not *do*
-// anything until a window or two later: right after `attack` the Gig areas are
-// untouched (the defender has yet to react), and right after a defender's
-// `pass` the steal is still a pending `chooseGig` for the attacker. So a
-// candidate whose result sits inside a decision window is played forward with a
-// cheap, information-free default policy — the defender passes, a thief takes
-// its best die, an interception is declined — until the position is quiet.
-// This is what makes the brief's tactical layers real: a Gig-area attack is
-// scored by the dice it actually takes, and a block is scored as "the Gig I
-// keep vs the blocker I spend" rather than as two indistinguishable
-// non-events.
-//
-// LAYER 0 — three pre-state policies, applied BEFORE any simulation, for the
-// decisions whose outcome is rolled by the engine's own rng. Simulating those
-// would let the AI read the die/shuffle it is about to get and pick the branch
-// that happens to roll well — rng exploitation, not skill. So:
-//   * `chooseGigDie` takes the largest die still in the fixer (every die is
-//     rolled in eventually, so ordering only decides how much Street Cred
-//     arrives early; `legalActions` already withholds the d20 until last);
-//   * `chooseGigReroll` rerolls exactly when the die landed below its own
-//     average — a decision that needs the face already showing, not the face
-//     it would land on;
-//   * `mulligan` reads the AI's OWN opening hand (legitimately visible) for
-//     cheap, playable cards, rather than peeking at the hand it would draw.
-// `choosePlayOrder` gets a fixed answer for the same reason: simulating it
-// deals both opening hands.
-//
-// HIDDEN INFORMATION. `evaluate` is the only scoring read of the state and is
-// hidden-info-clean by construction (see its header). This file adds no state
-// reads of its own beyond the public ones the policies above name, and the
-// quiescence policy picks its default actions by *predicate* (`pass`,
-// `answer === -1`, best visible die value), never by list position — so the
-// rival's hand contents cannot steer it even indirectly. `applyAction` itself
-// of course reads hidden state while simulating (a draw's result, a random
-// Legend flip); that is the engine simulating, not the AI peeking, and it
-// cannot influence the choice because `evaluate` scores zone SIZES rather than
-// contents. See docs/rulings.md and the task-10 report for the residual
-// caveats.
-
 import { legalActions } from '../engine/legal'
 import { applyAction } from '../engine/reduce'
 import { PreviewStopped } from '../engine/preview'
 import { actingPlayer, opponentOf } from '../engine/query'
 import { createRng, nextInt, type RngState } from '../engine/rng'
 import { DEFAULT_WEIGHTS, evaluate, type EvalWeights } from './evaluate'
+import { evaluationKnowledge, type EvaluationKnowledge } from './strategy'
 import type { Agent } from './random'
 import type { Action, CardDb, GameState, PlayerId } from '../engine/types'
 
-/**
- * Passing the turn is scored from the resulting position (the rival's start of
- * turn has already run) minus this, so a strictly-improving action is always
- * preferred to ending the turn even when the two positions score the same.
- * Deliberately tiny: the argmax, not this number, is what stops the AI from
- * ending its turn with playable cards in hand.
- */
 export const END_TURN_TEMPO_PENALTY = 5
-
-/**
- * How many default continuations `resolveWindows` will play out. An attack can
- * open a react window, a multi-die steal, and an interception per die; the
- * whole Gig pool is 12 dice, so this is a ceiling on a bounded process rather
- * than a guess — it exists only so a future card that reopens a window cannot
- * spin here forever.
- */
 export const QUIESCENCE_STEP_LIMIT = 32
-
 export interface HeuristicOptions {
-  /** Evaluation weights. Defaults to `evaluate.DEFAULT_WEIGHTS`. */
   weights?: EvalWeights
-  /**
-   * Quiescence depth (LAYER 2). Defaults to `QUIESCENCE_STEP_LIMIT`; **0
-   * disables the layer entirely**, which is only useful for the ablation
-   * regression test that pins how much the layer is worth
-   * (tests/ai/heuristic.test.ts). Not a knob for real play.
-   */
   quiescenceSteps?: number
+  candidateLimit?: number
+  continuationBudget?: number
+  refinedCandidates?: number
+  budget?: SearchBudget
+  /** Extra main actions searched after a candidate. Zero provides an ablation. */
+  searchDepth?: number
+}
+interface Context {
+  db: CardDb
+  perspective: PlayerId
+  weights: EvalWeights
+  knowledge: EvaluationKnowledge
+  windows: number
+  budget?: SearchBudget
+}
+interface Estimate { state: GameState; score: number; stopped: boolean }
+
+function windowPhase(state: GameState): boolean {
+  return ['react', 'chooseGig', 'intercept', 'gigReroll'].includes(state.phase)
+}
+function value(ctx: Context, state: GameState): number {
+  return evaluate(ctx.db, state.pendingIntercept?.view ?? state, ctx.perspective, ctx.weights, ctx.knowledge)
 }
 
-/** Mulligan unless the opening hand holds at least this many cheap cards. */
-const MULLIGAN_MIN_CHEAP_CARDS = 2
-/** "Cheap" = castable off the first couple of €$ the game hands you. */
-const MULLIGAN_CHEAP_COST = 2
-
-/** Current rules/AI mirror sample: first won 114 of 200 seeded games.
- * This is a policy calibration, not a general claim about the TCG matchup. */
-const PREFER_GOING_FIRST = true
-
-/** The phases whose decision is a window inside a larger action. */
-function isWindowPhase(state: GameState): boolean {
-  return (
-    state.phase === 'react' ||
-    state.phase === 'chooseGig' ||
-    state.phase === 'intercept' ||
-    state.phase === 'gigReroll'
-  )
-}
-
-/**
- * The default continuation of an open window: what the AI assumes will happen
- * while it is only *scoring* a candidate, never what it actually plays.
- *
- * Each branch picks by predicate on public information, so nothing hidden can
- * steer it:
- *   * `react` — the defender passes (a block is a candidate in its own right at
- *     the top level, so assuming it away here loses nothing but the
- *     block-after-quick combination);
- *   * `chooseGig` — the thief, whichever side it is, takes the highest top face
- *     on offer (ties to the lowest index, for determinism);
- *   * `intercept` — declined (`-1`), the answer `legal.ts` always offers first;
- *   * `gigReroll` — kept, since the reroll decision has its own policy at the
- *     top level.
- */
-function continuationAction(db: CardDb, state: GameState, actions: Action[]): Action | null {
-  if (state.phase === 'react') {
-    return actions.find((a) => a.type === 'react' && a.reaction.type === 'pass') ?? actions[0]
-  }
-  if (state.phase === 'chooseGig') {
-    const steal = state.pendingSteal
-    if (steal === null) return actions[0]
-    const victim = opponentOf(steal.thief ?? state.activePlayer)
-    const dice = state.players[victim].gigArea
-    let best: Action | null = null
-    let bestValue = -Infinity
-    for (const action of actions) {
-      if (action.type !== 'chooseGig') continue
-      const value = dice[action.dieIndex]?.value ?? -Infinity
-      if (value > bestValue) {
-        bestValue = value
-        best = action
-      }
+/** Expected benefit at an unknown boundary. Never read the actual top card,
+ * future roll, or face-down Legend position. Draw counts are already applied. */
+function unknownBenefit(ctx: Context, error: PreviewStopped): number {
+  const { boundary, state } = error
+  const player = boundary.player ?? (boundary.viewer === 'all' ? state.activePlayer : boundary.viewer)
+  const sign = player === ctx.perspective ? 1 : -1
+  const profile = ctx.knowledge.strategies[player]
+  if (boundary.kind === 'draw') return sign * (boundary.uids?.length ?? 0) * 12
+  if (boundary.kind === 'legend') return sign * (ctx.weights.faceUpLegend + 40)
+  if (boundary.kind !== 'script') return 0
+  if (state.players[player].deck.length === 0) return 0
+  const programRate = profile.programs / Math.max(1, profile.total)
+  switch (boundary.script) {
+    case 'judy-a-lvarez-braindance-maestro': return sign * (Math.round(programRate * (ctx.weights.handCard + 20)) - ctx.weights.deckCard)
+    case 'judy-a-lvarez-nothing-to-doubt': return sign * 100
+    case 'three-mouths-one-desire': return sign * Math.min(3, 1 + state.players[player].gigArea.filter(d => d.value === 1).length) * (ctx.weights.handCard + 16)
+    case 'chrome-reverie':
+    case 'optional-free-call': return sign * (state.players[player].calledLegendThisTurn ? 0 : ctx.weights.faceUpLegend + 40)
+    case 'shattered-memories': {
+      const mine = state.players[player], theirs = state.players[opponentOf(player)]
+      const myDraw = mine.deck.length >= 5 ? 5 : 0, theirDraw = theirs.deck.length >= 5 ? 5 : 0
+      return sign * ((myDraw - mine.hand.length) - (theirDraw - theirs.hand.length)) * ctx.weights.handCard
     }
-    return best ?? actions[0]
+    default: return sign * 35
   }
-  if (state.phase === 'intercept') {
-    return actions.find((a) => a.type === 'answerIntercept' && a.answer === -1) ?? actions[0]
-  }
-  if (state.phase === 'gigReroll') {
-    return (
-      actions.find((a) => a.type === 'chooseGigReroll' && !a.reroll) ?? actions[0]
-    )
-  }
-  return null
 }
 
-/**
- * Plays a candidate's result forward through any open decision window with
- * `continuationAction`, so `evaluate` sees the position an attack (or a block,
- * or an interception) actually reaches rather than the mid-air one it starts.
- * Stops the moment the game is over or the position is quiet.
- */
-function resolveWindows(db: CardDb, state: GameState, stepLimit: number): GameState {
-  let current = state
-  for (let step = 0; step < stepLimit; step++) {
-    if (!stillLive(current) || !isWindowPhase(current)) break
-    const actions = legalActions(db, current)
-    if (actions.length === 0) break
-    const next = continuationAction(db, current, actions)
-    if (next === null) break
-    current = applyAction(db, current, next)
+function applyPreview(ctx: Context, state: GameState, action: Action): Estimate {
+  spendSearchBudget(ctx.budget)
+  try {
+    const next = applyAction(ctx.db, { ...state, simulationPreview: true, previewObserver: ctx.perspective }, action)
+    return { state: next, score: value(ctx, next), stopped: false }
+  } catch (error) {
+    if (!(error instanceof PreviewStopped)) throw error
+    return { state: error.state, score: value(ctx, error.state) + unknownBenefit(ctx, error), stopped: true }
+  }
+}
+
+/** Opponent replies can use public Blockers and abilities, not unseen hand cards.
+ * The real opponent still makes its own full decision when its window arrives. */
+function visibleActions(ctx: Context, state: GameState): Action[] {
+  const actions = legalActions(ctx.db, state)
+  if (actingPlayer(state) === ctx.perspective) return actions
+  return actions.filter(a => {
+    if (a.type === 'react' && a.reaction.type === 'quick') return false
+    if (a.type === 'answerIntercept' && a.answer !== -1 && state.pendingIntercept?.kind === 'steal') return false
+    return true
+  })
+}
+
+function defaultChoice(ctx: Context, state: GameState, actions: Action[]): Action {
+  if (state.phase === 'react') return actions.find(a => a.type === 'react' && a.reaction.type === 'pass') ?? actions[0]
+  if (state.phase === 'gigReroll') return actions.find(a => a.type === 'chooseGigReroll' && !a.reroll) ?? actions[0]
+  if (state.phase === 'chooseGig') {
+    const victim = opponentOf(state.pendingSteal?.thief ?? state.activePlayer)
+    return [...actions].sort((a,b) => (b.type === 'chooseGig' ? state.players[victim].gigArea[b.dieIndex]?.value ?? 0 : 0)
+      - (a.type === 'chooseGig' ? state.players[victim].gigArea[a.dieIndex]?.value ?? 0 : 0))[0]
+  }
+  return actions.find(a => a.type === 'answerIntercept' && a.answer === -1) ?? actions[0]
+}
+
+/** Complete the current effect/attack, optimizing its first decision and using
+ * bounded continuations for later ones. Each real subsequent decision is searched
+ * again. Unlike assuming an unblocked attack, rival public replies minimize our score. */
+function settle(ctx: Context, initial: Estimate, steps: number, optimize = true): Estimate {
+  let current = initial
+  for (let i = 0; i < steps; i++) {
+    if (current.stopped || !stillLive(current.state) || !windowPhase(current.state)) return current
+    const actions = visibleActions(ctx, current.state)
+    if (!actions.length) return current
+    if (optimize && actions.length > 1) {
+      const maximize = actingPlayer(current.state) === ctx.perspective
+      let best: Estimate | undefined
+      for (const action of actions) {
+        const candidate = settle(ctx, applyPreview(ctx, current.state, action), steps - i - 1, false)
+        if (!best || (maximize ? candidate.score > best.score : candidate.score < best.score)) best = candidate
+      }
+      return best!
+    }
+    current = applyPreview(ctx, current.state, defaultChoice(ctx, current.state, actions))
   }
   return current
 }
 
-/**
- * One candidate's score: apply it (one internal `draftState` copy — this
- * function never clones anything itself), quiesce, evaluate.
- */
+function estimate(ctx: Context, state: GameState, action: Action): Estimate {
+  const result = settle(ctx, applyPreview(ctx, state, action), ctx.windows)
+  // A draw/reveal trigger on attack does not make the public attack disappear.
+  if (result.stopped && result.state.phase === 'react' && result.state.pendingAttack && ctx.windows > 0) {
+    const resumed = settle(ctx, { ...result, stopped: false }, ctx.windows, false)
+    result.score = !stillLive(resumed.state) ? resumed.score : result.score + resumed.score - value(ctx, result.state)
+  }
+  if (action.type === 'endTurn') result.score -= END_TURN_TEMPO_PENALTY
+  return result
+}
+
 export function scoreAction(
-  db: CardDb,
-  state: GameState,
-  action: Action,
-  perspective: PlayerId,
-  weights: EvalWeights = DEFAULT_WEIGHTS,
-  quiescenceSteps: number = QUIESCENCE_STEP_LIMIT
+  db: CardDb, state: GameState, action: Action, perspective: PlayerId,
+  weights: EvalWeights = DEFAULT_WEIGHTS, quiescenceSteps: number = QUIESCENCE_STEP_LIMIT,
 ): number {
-  let quiet: GameState
-  try {
-    const applied = applyAction(db, { ...state, simulationPreview: true }, action)
-    quiet = resolveWindows(db, applied, quiescenceSteps)
-  } catch (error) {
-    if (!(error instanceof PreviewStopped)) throw error
-    quiet = error.state
-    // An unknown reveal does not end the rival's attack. Keep the public
-    // continuation (pass/steal) in the estimate without resolving that reveal.
-    // A second information boundary ends the estimate; never replay it twice.
-    if (quiet.phase === 'react' && quiet.pendingAttack !== null && quiescenceSteps > 0) {
-      try {
-        quiet = resolveWindows(db, quiet, quiescenceSteps)
-      } catch (nextError) {
-        if (!(nextError instanceof PreviewStopped)) throw nextError
-        quiet = nextError.state
-      }
-    }
-  }
-  const score = evaluate(db, quiet, perspective, weights)
-  return action.type === 'endTurn' ? score - END_TURN_TEMPO_PENALTY : score
+  const ctx: Context = { db, perspective, weights, knowledge: evaluationKnowledge(db, state, perspective), windows: quiescenceSteps }
+  return estimate(ctx, state, action).score
 }
 
-/**
- * The pre-simulation policies (LAYER 0 in the file header) — the decisions
- * whose result the engine rolls, answered from what is already on the table.
- * Returns null when the decision is one the search should handle.
- */
-function policyAction(
-  db: CardDb,
-  state: GameState,
-  actions: Action[],
-  perspective: PlayerId
-): Action | null {
-  switch (state.phase) {
-    case 'chooseOrder': {
-      const wanted = actions.find(
-        (a) => a.type === 'choosePlayOrder' && a.goFirst === PREFER_GOING_FIRST
-      )
-      return wanted ?? actions[0]
-    }
-
-    case 'mulligan': {
-      const mulliganAction = actions.find((a) => a.type === 'mulligan')
-      if (mulliganAction === undefined) return actions[0]
-      const hand = state.players[perspective].hand
-      const cheap = hand.filter(
-        (uid) => db[state.cards[uid].defId].cost <= MULLIGAN_CHEAP_COST
-      ).length
-      if (cheap >= MULLIGAN_MIN_CHEAP_CARDS) {
-        return actions.find((a) => a.type === 'keepHand') ?? actions[0]
-      }
-      return mulliganAction
-    }
-
-    case 'start': {
-      // The largest die still in the fixer: every die is rolled in eventually,
-      // so the only thing the order decides is how much Street Cred arrives
-      // early. `legalActions` already holds the d20 back until it is the only
-      // one left (guide p4/p12).
-      let best: Action | null = null
-      let bestSize = -Infinity
-      for (const action of actions) {
-        if (action.type !== 'chooseGigDie') continue
-        if (action.size > bestSize) {
-          bestSize = action.size
-          best = action
-        }
-      }
-      return best ?? actions[0]
-    }
-
-    case 'gigReroll': {
-      // Reroll exactly when the face showing is below the die's own average —
-      // decided from the face it HAS, never from the one it would land on.
-      const pending = state.pendingGigRoll
-      const die = pending === null ? undefined : state.players[pending.player].gigArea[pending.dieIndex]
-      const worthRerolling = die !== undefined && die.value * 2 < die.size + 1
-      return (
-        actions.find((a) => a.type === 'chooseGigReroll' && a.reroll === worthRerolling) ??
-        actions[0]
-      )
-    }
-
-    default:
-      return null
+function policyAction(ctx: Context, state: GameState, actions: Action[]): Action | null {
+  const p = state.players[ctx.perspective]
+  const strategy = ctx.knowledge.strategies[ctx.perspective]
+  if (state.phase === 'chooseOrder') return actions.find(a => a.type === 'choosePlayOrder' && a.goFirst) ?? actions[0]
+  if (state.phase === 'mulligan') {
+    const hand = p.hand.map(uid => ctx.db[state.cards[uid].defId])
+    const sellers = hand.filter(c => c.sellTag).length
+    const earlyUnits = hand.filter(c => c.type === 'unit' && c.cost <= 3).length
+    const cheap = hand.filter(c => c.cost <= 2).length
+    const keep = sellers >= 2 && (earlyUnits > 0 || (strategy.units / Math.max(1, strategy.total) < 0.2 && cheap >= 2))
+    return actions.find(a => a.type === (keep ? 'keepHand' : 'mulligan')) ?? actions[0]
   }
+  if (state.phase === 'start') {
+    const dice = actions.filter(a => a.type === 'chooseGigDie')
+    const low = strategy.minD4 || strategy.minGig || strategy.lowCred
+    return dice.sort((a,b) => low ? a.size - b.size : b.size - a.size)[0] ?? actions[0]
+  }
+  if (state.phase === 'gigReroll') {
+    const roll = state.pendingGigRoll
+    const die = roll ? state.players[roll.player].gigArea[roll.dieIndex] : undefined
+    let reroll = die !== undefined && die.value * 2 < die.size + 1
+    if (die && (strategy.minD4 || strategy.minGig || strategy.lowCred)) reroll = die.value > (die.size + 1) / 2
+    if (die && strategy.minGig && die.value === 1) reroll = false
+    if (die && strategy.pairs && p.gigArea.some((d,i) => i !== roll?.dieIndex && d.value === die.value)) reroll = false
+    return actions.find(a => a.type === 'chooseGigReroll' && a.reroll === reroll) ?? actions[0]
+  }
+  return null
 }
 
-/**
- * A heuristic agent: one-ply greedy over `legalActions` scored by `evaluate`,
- * with the layers described in this file's header. `seed` drives only the
- * tie-break among equally-scored actions, on the agent's own mulberry32 stream
- * (never `state.rng`) — so the same seed replayed against the same sequence of
- * questions always answers identically, exactly like `createRandomAgent`.
- *
- * `options` exists so the two tuning decisions behind the defaults stay
- * *measurable* rather than folded away: the weight set and the quiescence
- * depth are both parameters, which is what lets
- * tests/ai/heuristic.test.ts pit the shipped configuration against the
- * alternatives it was chosen over as ordinary regression tests. Real callers
- * pass nothing.
- */
+function actionFamily(action: Action): string {
+  if ('card' in action) return action.type + ':' + action.card
+  if (action.type === 'attack') return action.type + ':' + action.attacker
+  return action.type
+}
+
+function targetPriority(ctx: Context, state: GameState, action: Action): number {
+  if (action.type === 'endTurn') return 1_000_000
+  if (action.type === 'attack' && action.target === 'gigArea') return 10_000
+  const targets = 'targets' in action ? action.targets : action.type === 'attack' && typeof action.target === 'number' ? [action.target] : []
+  let result = 0
+  const view = state.pendingIntercept?.view ?? state
+  for (const uid of targets) {
+    const card = view.cards[uid]
+    if (!card || !view.players.some(p => p.field.includes(uid))) continue
+    const def = ctx.db[card.defId]
+    result += (def.power ?? 0) + (def.keywords.includes('blocker') ? 10 : 0)
+    if (view.players[ctx.perspective].field.includes(uid)) result += card.ready && !card.lag ? 30 : 0
+  }
+  return result
+}
+
+/** Bound target Cartesian products while retaining each distinct card/ability
+ * and several target alternatives. No elapsed-time cutoff: seeded runs remain
+ * deterministic on both fast and slow machines. */
+function candidateActions(ctx: Context, state: GameState, actions: Action[], limit = 48): Action[] {
+  if (actions.length <= Math.min(24, limit) || state.phase !== 'main') return actions
+  const groups = new Map<string, Action[]>()
+  for (const action of actions) {
+    const key = actionFamily(action)
+    const group = groups.get(key) ?? []
+    group.push(action)
+    groups.set(key, group)
+  }
+  const lists = [...groups.values()].map(group => group.sort((a,b) => targetPriority(ctx,state,b) - targetPriority(ctx,state,a)))
+  const result: Action[] = []
+  for (let round = 0; round < 4 && result.length < limit; round++) {
+    for (const list of lists) if (list[round] && result.length < limit) result.push(list[round])
+  }
+  const end = actions.find(a => a.type === 'endTurn')
+  if (limit < 48 && end && !result.includes(end)) result[result.length - 1] = end
+  return result
+}
+
+/** Shared, hidden-information-safe move ordering for the multi-turn planner. */
+export function rankHeuristicActions(db: CardDb, state: GameState, actions: Action[], options: HeuristicOptions = {}): { action: Action; score: number }[] {
+  const perspective = actingPlayer(state)
+  const ctx: Context = { db, perspective, weights: options.weights ?? DEFAULT_WEIGHTS,
+    knowledge: evaluationKnowledge(db, state, perspective), windows: options.quiescenceSteps ?? QUIESCENCE_STEP_LIMIT, budget: options.budget }
+  return candidateActions(ctx, state, actions, options.candidateLimit ?? 48)
+    .map(action => ({ action, score: estimate(ctx, state, action).score }))
+    .sort((a,b) => b.score - a.score)
+}
+
+/** Explore short sequences within the current turn. Every edge is a legal engine
+ * action. Unknown outcomes end a branch; no hypothetical drawn card gets played.
+ * Separate budgets per candidate avoid favoring the first action in enumeration. */
+function continuation(ctx: Context, first: Estimate, depth: number, budget: { left: number }): number {
+  if (depth <= 0 || first.stopped || first.state.phase !== 'main' || first.state.activePlayer !== ctx.perspective || budget.left <= 0) return first.score
+  const actions = candidateActions(ctx, first.state, legalActions(ctx.db, first.state))
+  // Attacks and passing must not disappear when a large target Cartesian product
+  // exhausts the budget. Sampling targets is deterministic and public.
+  const ordered = [...actions.filter(a => a.type === 'attack' || a.type === 'endTurn'), ...actions.filter(a => a.type !== 'attack' && a.type !== 'endTurn')]
+  const candidates: Estimate[] = []
+  const perFamily = new Map<string, number>()
+  const allowance = Math.min(budget.left, depth > 1 ? 10 : budget.left)
+  let used = 0
+  for (const action of ordered) {
+    const family = actionFamily(action), count = perFamily.get(family) ?? 0
+    if (count >= 3) continue
+    perFamily.set(family, count + 1)
+    if (used++ >= allowance || budget.left-- <= 0) break
+    candidates.push(estimate(ctx, first.state, action))
+  }
+  candidates.sort((a,b) => b.score - a.score)
+  let best = first.score
+  for (const candidate of candidates.slice(0, 2)) best = Math.max(best, continuation(ctx, candidate, depth - 1, budget) - 1)
+  return best
+}
+
+/** Bounded tactical search with explicit knowledge and seeded tie-breaking.
+ * Simulations and live play use the same policy; no training or hidden-state RNG
+ * is used to choose moves. Options expose useful strength/speed ablations. */
 export function createHeuristicAgent(seed: number, options: HeuristicOptions = {}): Agent {
-  const weights = options.weights ?? DEFAULT_WEIGHTS
-  const quiescenceSteps = options.quiescenceSteps ?? QUIESCENCE_STEP_LIMIT
   let rng: RngState = createRng(seed)
   return {
-    chooseAction(db: CardDb, state: GameState, actions: Action[]): Action {
-      if (actions.length === 0) {
-        throw new Error('createHeuristicAgent: chooseAction called with an empty actions list')
-      }
+    chooseAction(db, state, actions) {
+      if (!actions.length) throw new Error('createHeuristicAgent: chooseAction called with an empty actions list')
       if (actions.length === 1) return actions[0]
-
-      const perspective: PlayerId = actingPlayer(state)
-      const policy = policyAction(db, state, actions, perspective)
-      if (policy !== null) return policy
-
-      let bestScore = -Infinity
-      let tied: Action[] = []
-      for (const action of actions) {
-        const score = scoreAction(db, state, action, perspective, weights, quiescenceSteps)
-        if (score > bestScore) {
-          bestScore = score
-          tied = [action]
-        } else if (score === bestScore) {
-          tied.push(action)
-        }
+      const perspective = actingPlayer(state)
+      const ctx: Context = { db, perspective, weights: options.weights ?? DEFAULT_WEIGHTS,
+        knowledge: evaluationKnowledge(db, state, perspective), windows: options.quiescenceSteps ?? QUIESCENCE_STEP_LIMIT, budget: options.budget }
+      const policy = policyAction(ctx, state, actions)
+      if (policy) return policy
+      const candidates = candidateActions(ctx, state, actions, options.candidateLimit ?? 48).map(action => ({ action, result: estimate(ctx, state, action) }))
+      candidates.sort((a,b) => b.result.score - a.result.score)
+      const depth = options.searchDepth ?? 2
+      if (depth > 0 && state.phase === 'main') {
+        const families = new Set<string>()
+        const selected = candidates.filter(c => {
+          const key = actionFamily(c.action)
+          if (families.has(key)) return false
+          families.add(key)
+          return true
+        }).slice(0, options.refinedCandidates ?? 3)
+        for (const candidate of selected) candidate.result.score = continuation(ctx, candidate.result, depth, { left: options.continuationBudget ?? 16 })
       }
-
-      if (tied.length === 1) return tied[0]
+      const best = Math.max(...candidates.map(c => c.result.score))
+      const tied = candidates.filter(c => c.result.score === best)
+      if (tied.length === 1) return tied[0].action
       const [index, next] = nextInt(rng, tied.length)
       rng = next
-      return tied[index]
+      return tied[index].action
     },
   }
 }

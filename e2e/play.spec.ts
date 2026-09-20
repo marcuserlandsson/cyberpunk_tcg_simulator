@@ -30,8 +30,8 @@ function playmat(page: Page): Locator {
 }
 
 /** Blocks until the game is waiting on the human (or is over). */
-async function awaitHuman(page: Page): Promise<'human' | 'over'> {
-  await expect(playmat(page)).toHaveAttribute('data-awaiting', /^(human|over)$/)
+async function awaitHuman(page: Page, timeout = 15_000): Promise<'human' | 'over'> {
+  await expect(playmat(page)).toHaveAttribute('data-awaiting', /^(human|over)$/, { timeout })
   const value = await playmat(page).getAttribute('data-awaiting')
   return value === 'over' ? 'over' : 'human'
 }
@@ -270,19 +270,22 @@ test.describe('Play view', () => {
     await expect(page.getByTestId('undo')).toBeDisabled()
   })
 
-  test('saves a game and resumes it from the setup screen', async ({ page }) => {
+  test('saves a Hard game and resumes its difficulty from the setup screen', async ({ page }) => {
     await page.goto('/?aiDelay=0')
     await page.getByTestId('deck-human').selectOption(HUMAN_DECK)
     await page.getByTestId('deck-ai').selectOption(AI_DECK)
     await page.getByTestId('seed-input').fill(SEED)
+    await page.getByTestId('ai-difficulty').selectOption('hard')
+    await page.screenshot({ path: 'test-results/ai-difficulty-play.png', fullPage: true })
     await page.getByTestId('start-game').click()
 
     // A couple of decisions in, so the record is not empty.
     for (let i = 0; i < 6; i++) {
-      if ((await awaitHuman(page)) === 'over') break
+      if ((await awaitHuman(page, 120_000)) === 'over') break
       await takeOneAction(page, false)
     }
-    await awaitHuman(page)
+    await awaitHuman(page, 120_000)
+    await expect(page.getByTestId('game-ai-difficulty')).toHaveText('Hard')
     const logBefore = await logTexts(page)
 
     await page.getByTestId('save-name').fill('e2e-slot')
@@ -297,8 +300,9 @@ test.describe('Play view', () => {
     await resume.click()
 
     await expect(playmat(page)).toBeVisible()
-    await awaitHuman(page)
+    await awaitHuman(page, 120_000)
     // The replayed game is the same game: the same log, line for line.
     expect(await logTexts(page)).toEqual(logBefore)
+    await expect(page.getByTestId('game-ai-difficulty')).toHaveText('Hard')
   })
 })

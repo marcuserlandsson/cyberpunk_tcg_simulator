@@ -30,6 +30,9 @@ import type { Action, CardDb, GameState, PlayerId } from './types'
  * `Action` variant holds only primitives and arrays of primitives.
  */
 export interface GameRecord {
+  /** Opponent configuration; replay itself only applies the recorded actions. */
+  aiDifficulty?: 'easy' | 'medium' | 'hard'
+  aiVersion?: string
   practiceMode?: boolean
   provenance?: { engine: string; rules: string; cards: string }
   config: NewGameConfig

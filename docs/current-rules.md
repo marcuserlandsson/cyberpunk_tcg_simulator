@@ -37,7 +37,9 @@ Physical handling, shuffling/cutting etiquette, sleeves and tournament penalties
 are outside the simulator. Constructed/Demo/Sealed validation, opened pools and
 a manual best-of-three tracker are implemented. The match clock tracks the event
 procedure independently of a live engine game. AI policy still chooses among legal
-options heuristically; higher simulation counts reduce sampling noise but cannot
+options with bounded sequence search, public opponent replies, deck-aware resource
+evaluation, and viewer-scoped replay knowledge. Unknown outcomes use estimates;
+higher simulation counts reduce sampling noise but cannot
 remove policy bias. Existing saved action records may become incompatible after
 rules changes; new records/runs retain version metadata, and older game replays
 require an explicit attempt under current rules.

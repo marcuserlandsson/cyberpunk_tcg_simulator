@@ -10,6 +10,21 @@
 
 import { expect, test } from './fixtures'
 
+test('runs the strategic AI through the real simulation worker', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/')
+  await page.getByTestId('tab-simulate').click()
+  await page.getByTestId('sim-agent-a').selectOption('medium')
+  await page.getByTestId('sim-agent-b').selectOption('medium')
+  await page.getByTestId('sim-games').fill('4')
+  await page.getByTestId('sim-run').click()
+  await expect(page.getByTestId('sim-results')).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByTestId('sim-winrate-a')).toContainText('%')
+  await expect(page.getByTestId('sim-progress')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
 test.describe('Simulate view', () => {
   test('runs a real 20-game random-vs-random sim and shows a win rate', async ({ page }) => {
     const pageErrors: string[] = []
@@ -72,4 +87,22 @@ test('compares two versions against two opponents and retains the matched result
   await page.getByTestId('sim-benchmark').locator('summary').click()
   await expect(page.getByTestId('benchmark-result')).toHaveCount(2)
   await expect(page.getByTestId('sim-history').locator('summary')).toContainText('(4)')
+})
+
+
+test('runs Hard versus Easy and retains difficulty in simulation history', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('tab-simulate').click()
+  await page.getByTestId('sim-deck-a').selectOption('Arasaka \u2014 Embracing Power')
+  await page.getByTestId('sim-deck-b').selectOption('Mercs \u2014 The Heist')
+  await page.getByTestId('sim-agent-a').selectOption('hard')
+  await page.getByTestId('sim-agent-b').selectOption('easy')
+  await page.getByTestId('sim-games').fill('1')
+  await page.screenshot({ path: 'test-results/ai-difficulty-simulate.png', fullPage: true })
+  await page.getByTestId('sim-run').click()
+  await expect(page.getByTestId('sim-results')).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByTestId('sim-provenance')).toContainText('hard vs easy')
+  await page.reload()
+  await page.getByTestId('tab-simulate').click()
+  await expect(page.getByTestId('sim-provenance')).toContainText('hard vs easy')
 })

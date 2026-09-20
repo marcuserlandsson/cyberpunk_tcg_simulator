@@ -1,7 +1,7 @@
 import type { CardDb } from './types'
 
 /** Bump when engine behavior or the AI policy changes. */
-export const ENGINE_VERSION = 'comprehensive-2026-09-08-v1'
+export const ENGINE_VERSION = 'planning-ai-2026-09-16-v4'
 export const RULES_VERSION = '2026-09-01T19:28:10.028Z'
 
 /** Reproducibility fingerprint, not a security checksum. */

@@ -34,12 +34,12 @@ import { newGame } from '../engine/game'
 import { legalActions } from '../engine/legal'
 import { applyAction } from '../engine/reduce'
 import { actingPlayer } from '../engine/query'
-import { createRandomAgent, type Agent } from '../ai/random'
-import { createHeuristicAgent } from '../ai/heuristic'
+import type { Agent } from '../ai/random'
+import { createAgent, type AgentKind } from '../ai/agents'
 import type { DeckList } from '../engine/deck'
 import type { CardDb, GameState, PlayerId } from '../engine/types'
 
-export type AgentKind = 'heuristic' | 'random'
+export type { AgentKind } from '../ai/agents'
 
 export interface SimOptions {
   benchmark?: { id: string; opponent: number; role: 'baseline' | 'candidate' }
@@ -99,10 +99,6 @@ export function gameSeedFor(seed: number, gameIndex: number): number {
  */
 export function agentSeedsFor(gameSeed: number): [number, number] {
   return [gameSeed * 2 + 1, gameSeed * 2 + 2]
-}
-
-function createAgent(kind: AgentKind, seed: number): Agent {
-  return kind === 'random' ? createRandomAgent(seed) : createHeuristicAgent(seed)
 }
 
 // A real ceiling, not a guess: the heuristic test suite's own full-game loop

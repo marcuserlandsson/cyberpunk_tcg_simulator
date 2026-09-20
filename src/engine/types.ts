@@ -867,6 +867,8 @@ export interface PendingSteal {
  * the rng lives in the state that is being replayed.
  */
 export interface PendingIntercept {
+  /** Information boundaries already crossed by this action, with their entitled viewers. */
+  revealedInformation?: InformationBoundary[]
   /** Immutable board at this choice; never used as the replay base. */
   view?: GameState
   /** Which mutation is being intercepted. */
@@ -898,6 +900,9 @@ export interface GameState {
 
   /** AI-only scratch state: stop lookahead at a future hidden-information read. */
   simulationPreview?: boolean
+  previewObserver?: PlayerId
+  previewRevealed?: InformationBoundary[]
+  informationTrace?: InformationBoundary[]
   /** Transient resolution work, scoped to a single deterministic action replay. */
   effectQueue?: import('./resolution').PendingEffect[]
   resolvingEffects?: boolean
@@ -949,6 +954,16 @@ export interface GameState {
   winner: PlayerId | null
   rng: RngState
   events: GameEvent[]
+}
+
+/** Replay knowledge, not a permission to inspect the next unknown outcome. */
+export interface InformationBoundary {
+  viewer: PlayerId | 'all'
+  player?: PlayerId
+  kind?: 'script' | 'draw' | 'legend' | 'discard' | 'reveal' | 'peek'
+  sourceUid?: number
+  script?: string
+  uids?: number[]
 }
 
 // ---------------------------------------------------------------------------

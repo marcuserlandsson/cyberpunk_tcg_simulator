@@ -1,3 +1,4 @@
+import { AI_DIFFICULTIES, AI_LABELS, type AiDifficulty } from '../ai/agents'
 import { actionPayment, withPayment } from './payments'
 import { paymentLabel, readyPaymentUids } from '../engine/economy'
 // The playmat.
@@ -172,7 +173,8 @@ export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> 
 
 export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: PlayViewProps): ReactElement {
   const [manual,setManual] = useState(false)
-  const game = useGame(db, { aiDelayMs, manual })
+  const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>('medium')
+  const game = useGame(db, { aiDelayMs, manual, aiDifficulty })
   const HUMAN = game.record?.practiceMode && game.state ? actingPlayer(game.state) : DEFAULT_HUMAN
   const AI = opponentOf(HUMAN)
   const { record, legal } = game
@@ -507,6 +509,14 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
           </select>
         </label>
         <label className="play-setup__field">
+          AI difficulty
+          <select data-testid="ai-difficulty" value={aiDifficulty} disabled={manual}
+            onChange={event => setAiDifficulty(event.target.value as AiDifficulty)}>
+            {AI_DIFFICULTIES.map(kind => <option key={kind} value={kind}>{AI_LABELS[kind]}</option>)}
+          </select>
+          {aiDifficulty === 'hard' && !manual && <small>Plans ahead for up to 10 seconds per decision.</small>}
+        </label>
+        <label className="play-setup__field">
           Seed (optional)
           <input
             data-testid="seed-input"
@@ -638,6 +648,10 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
               <span className="chip" data-testid="active-indicator">
                 {yourTurn ? 'Your turn' : "Rival's turn"}
               </span>
+              {!game.record?.practiceMode && <span className="chip" data-testid="game-ai-difficulty">
+                {AI_LABELS[game.record?.aiDifficulty ?? 'medium']}
+              </span>}
+              {game.aiError && <span role="alert">{game.aiError} <button onClick={game.retryAI}>Retry AI</button></span>}
               {game.aiThinking && (
                 <span className="chip chip--thinking" data-testid="ai-thinking">
                   Rival is thinking…

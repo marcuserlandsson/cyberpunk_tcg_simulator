@@ -156,6 +156,21 @@ export function deleteDeck(name: string): void {
 // (multiple "V"s, "Goro Takemura"s, etc.) — export disambiguates those with
 // "Name — Subtitle" (an em dash); import accepts both the plain name (when
 // unambiguous) and the "Name — Subtitle" form.
+//
+// Import also accepts the official cyberpunktcg.com deck builder export:
+//   # <deck name>
+//
+//   // Legends (3)
+//   1 <Name: Subtitle>
+//   ...
+//
+//   // Units (17)        <- any other "// Section (N)" header is a card section
+//   3 <Name or "Name: Subtitle">
+//   ...
+//   // Gears (14) / // Programs (9) ...
+//
+// i.e. "//" section headers, "N Name" count lines without an "x", and a
+// colon between name and subtitle.
 // ---------------------------------------------------------------------------
 
 function buildNameIndex(db: CardDb): Map<string, string[]> {
@@ -211,9 +226,11 @@ export function exportDeckText(db: CardDb, deck: DeckList): string {
 
 type Resolved = { id: string } | { error: string }
 
-/** Resolves one exported name (plain, or "Name — Subtitle") back to a card id. */
+/** Resolves one exported name (plain, "Name — Subtitle", or the official
+ *  builder's "Name: Subtitle") back to a card id. No card name or subtitle
+ *  contains a colon, so ": " is a safe separator. */
 function resolveCardName(db: CardDb, nameIndex: Map<string, string[]>, raw: string): Resolved {
-  const dashMatch = raw.match(/^(.+?)\s+—\s+(.+)$/)
+  const dashMatch = raw.match(/^(.+?)\s+—\s+(.+)$/) ?? raw.match(/^(.+?):\s+(.+)$/)
   if (dashMatch) {
     const [, name, subtitle] = dashMatch
     const candidates = nameIndex.get(name) ?? []
@@ -259,18 +276,25 @@ export function importDeckText(db: CardDb, text: string): DeckList {
       section = null
       continue
     }
-    if (line === '## Legends') {
-      section = 'legends'
-      continue
-    }
-    if (line === '## Cards') {
-      section = 'cards'
+    // Section headers: our own "## Legends" / "## Cards", or the official
+    // builder's "// Legends (3)", "// Units (17)", "// Gears (14)", ... where
+    // every non-legend section holds main-deck cards.
+    const sectionMatch = line.match(/^(?:##|\/\/)\s*(.+?)\s*(?:\(\d+\))?$/)
+    if (sectionMatch) {
+      section = sectionMatch[1].toLowerCase() === 'legends' ? 'legends' : 'cards'
       continue
     }
     if (section === 'legends') {
-      legendLines.push(line)
+      // The official builder prefixes legends with a count ("1 River Ward: ...").
+      const match = line.match(/^(\d+)(?:\s*x)?\s+(.+)$/i)
+      if (match) {
+        for (let i = 0; i < Number(match[1]); i++) legendLines.push(match[2])
+      } else {
+        legendLines.push(line)
+      }
     } else if (section === 'cards') {
-      const match = line.match(/^(\d+)\s*x\s+(.+)$/i)
+      // "3x Mantis Blades" (our export) or "3 Mantis Blades" (official builder).
+      const match = line.match(/^(\d+)(?:\s*x)?\s+(.+)$/i)
       if (!match) throw new Error(`Could not import deck: malformed card line "${line}".`)
       cardLines.push({ count: Number(match[1]), name: match[2] })
     }

@@ -41,7 +41,7 @@ export function discardChosenCards(db: CardDb, state: GameState, player: PlayerI
   for (let i = 0; i < count && p.hand.length > 0; i++) {
     // The discarded identity (and any following cost comparison) is not known
     // to another player's lookahead before this choice has been made.
-    stopAtHiddenInformation(state)
+    stopAtHiddenInformation(state, { viewer: player, kind: 'discard', sourceUid })
     const chosen = chooseEffectOption(state, player, sourceUid, 'Choose a card to discard', [...p.hand],
       Object.fromEntries(p.hand.map(uid => [uid, db[state.cards[uid].defId].name])), true)
     if (chosen === null) break

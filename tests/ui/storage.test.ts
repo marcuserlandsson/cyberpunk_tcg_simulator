@@ -185,6 +185,100 @@ describe('exportDeckText / importDeckText', () => {
     ].join('\n')
     expect(() => importDeckText(db, text)).toThrowError(/ambiguous/i)
   })
+
+  it('imports the official cyberpunktcg.com deck builder export format', () => {
+    // Verbatim shape of an export from the official deck builder: "// Section (N)"
+    // headers, "N Name" count lines without an "x", and "Name: Subtitle".
+    const text = [
+      '# YYR Adam Smasher',
+      '',
+      '// Legends (3)',
+      '1 River Ward: Detective on the Hunt',
+      '1 Rogue Amendiares: Preem Solo',
+      '1 Adam Smasher: Ender of Legends',
+      '',
+      '// Units (17)',
+      '3 Augmented Negotiators',
+      '3 Swordwise Huscle',
+      '2 Hanako Arasaka: In a Gilded Cage',
+      '3 Meredith Stout: Stone Cold Corpo',
+      "1 Rockn' Rockerboy",
+      '3 Jackie Welles: Ride or Die Choom',
+      '2 Johnny Silverhand: Never Stop Fighting',
+      '',
+      '// Gears (14)',
+      '3 Mantis Blades',
+      '3 Adrenaline Converter',
+      '3 Satori: Sword of Saburo',
+      '3 Zetatech Faceplate',
+      '2 Gorilla Arms',
+      '',
+      '// Programs (9)',
+      '3 Detonate',
+      '3 Live with the Aftermath',
+      '3 Bootleg Black Sapphire Show',
+    ].join('\n')
+
+    expect(importDeckText(db, text)).toEqual({
+      name: 'YYR Adam Smasher',
+      legends: [
+        'river-ward-detective-on-the-hunt',
+        'rogue-amendiares-preem-solo',
+        'adam-smasher-ender-of-legends',
+      ],
+      cards: {
+        'augmented-negotiators': 3,
+        'swordwise-huscle': 3,
+        'hanako-arasaka-in-a-gilded-cage': 2,
+        'meredith-stout-stone-cold-corpo': 3,
+        'rockn-rockerboy': 1,
+        'jackie-welles-ride-or-die-choom': 3,
+        'johnny-silverhand-never-stop-fighting': 2,
+        'mantis-blades': 3,
+        'adrenaline-converter': 3,
+        'satori-sword-of-saburo': 3,
+        'zetatech-faceplate': 3,
+        'gorilla-arms': 2,
+        detonate: 3,
+        'live-with-the-aftermath': 3,
+        'bootleg-black-sapphire-show': 3,
+      },
+    })
+  })
+
+  it('accepts official-format lines with Windows line endings', () => {
+    const text = [
+      '# CRLF Deck',
+      '// Legends (3)',
+      '1 River Ward: Detective on the Hunt',
+      '1 Rogue Amendiares: Preem Solo',
+      '1 Adam Smasher: Ender of Legends',
+      '// Gears (3)',
+      '3 Mantis Blades',
+    ].join('\r\n')
+    expect(importDeckText(db, text)).toEqual({
+      name: 'CRLF Deck',
+      legends: [
+        'river-ward-detective-on-the-hunt',
+        'rogue-amendiares-preem-solo',
+        'adam-smasher-ender-of-legends',
+      ],
+      cards: { 'mantis-blades': 3 },
+    })
+  })
+
+  it('rejects an unknown subtitle in the "Name: Subtitle" form', () => {
+    const text = [
+      '# Bad Subtitle',
+      '// Legends (3)',
+      '1 River Ward: Not His Subtitle',
+      '1 Rogue Amendiares: Preem Solo',
+      '1 Adam Smasher: Ender of Legends',
+      '// Gears (3)',
+      '3 Mantis Blades',
+    ].join('\n')
+    expect(() => importDeckText(db, text)).toThrowError(/River Ward: Not His Subtitle/)
+  })
 })
 
 describe('settings', () => {

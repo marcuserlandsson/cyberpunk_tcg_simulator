@@ -299,7 +299,7 @@ export function drawCards(draft: GameState, player: PlayerId, count: number): bo
     draft.events.push({ type: 'cardDrawn', player, uid })
   }
   // The number drawn is knowable; their identities must not affect lookahead.
-  if (count > 0) stopAtHiddenInformation(draft)
+  if (count > 0) stopAtHiddenInformation(draft, { viewer: player, kind: 'draw', uids: p.hand.slice(-count) })
   return true
 }
 

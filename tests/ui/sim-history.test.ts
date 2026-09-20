@@ -10,6 +10,12 @@ function run() { const [deckA,deckB] = listDecks(); return createSimRun(db, { de
 beforeEach(() => localStorage.clear())
 afterEach(() => vi.restoreAllMocks())
 describe('complete simulation history', () => {
+  it.each(['easy', 'medium', 'hard', 'heuristic', 'random'] as const)('round-trips the %s difficulty', kind => {
+    const saved = run()
+    saved.options.agentA = kind
+    saved.options.agentB = kind
+    expect(parseSimRun(JSON.stringify(saved))).toEqual(saved)
+  })
   it('stores independent runs and immutable deck/settings/result snapshots', () => {
     const [deckA,deckB] = structuredClone(listDecks())
     const opts = { deckA,deckB,games: 1,seed: 42,agentA: 'random' as const,agentB: 'random' as const }

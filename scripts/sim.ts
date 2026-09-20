@@ -4,9 +4,9 @@
 //
 //   npm run sim -- --games 1000 --deckA data/decks/arasaka-embracing-power.json \
 //                   --deckB data/decks/mercs-the-heist.json --seed 42 \
-//                   [--agentA heuristic|random] [--agentB heuristic|random]
+//                   [--agentA easy|medium|hard|random] [--agentB easy|medium|hard|random]
 //
-// `agentA`/`agentB` both default to `heuristic`. This is the acceptance path
+// `agentA`/`agentB` both default to `medium`. This is the acceptance path
 // for the task brief: a 1000-game run at this seed must complete without
 // throwing.
 
@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { loadCardDb } from '../src/engine/cardDb'
 import { runGames } from '../src/sim/runner'
+import { AGENT_KINDS } from '../src/ai/agents'
 import type { AgentKind, CardStat, SimOptions } from '../src/sim/runner'
 import type { DeckList } from '../src/engine/deck'
 
@@ -32,9 +33,9 @@ function flag(argv: string[], name: string): string | undefined {
 }
 
 function parseAgentKind(raw: string | undefined): AgentKind {
-  if (raw === 'random') return 'random'
-  if (raw === undefined || raw === 'heuristic') return 'heuristic'
-  throw new Error(`--agentA/--agentB must be "heuristic" or "random", got "${raw}"`)
+  if (raw === undefined) return 'medium'
+  if (AGENT_KINDS.includes(raw as AgentKind)) return raw as AgentKind
+  throw new Error(`--agentA/--agentB must be ${AGENT_KINDS.join(', ')}, got "${raw}"`)
 }
 
 function parseArgs(argv: string[]): Cli {
@@ -43,7 +44,7 @@ function parseArgs(argv: string[]): Cli {
   if (deckAPath === undefined || deckBPath === undefined) {
     throw new Error(
       'Usage: npm run sim -- --deckA <path> --deckB <path> [--games N] [--seed N] ' +
-        '[--agentA heuristic|random] [--agentB heuristic|random]'
+        '[--agentA easy|medium|hard|random] [--agentB easy|medium|hard|random]'
     )
   }
   const gamesRaw = flag(argv, 'games')

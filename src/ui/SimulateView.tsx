@@ -1,3 +1,4 @@
+import { AI_LABELS } from '../ai/agents'
 // Task 15: the Simulate view. Runs many AI-vs-AI games through the Task 11
 // runner (`src/sim/runner.ts`), off the main thread via the Task 11 worker
 // (`src/sim/worker.ts`), and renders the aggregate `SimResult`: win rates,
@@ -201,8 +202,8 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
   const [deckBName, setDeckBName] = useState(
     () => pickableDecks[1]?.name ?? pickableDecks[0]?.name ?? decks[0]?.name ?? ''
   )
-  const [agentA, setAgentA] = useState<AgentKind>('heuristic')
-  const [agentB, setAgentB] = useState<AgentKind>('heuristic')
+  const [agentA, setAgentA] = useState<AgentKind>('medium')
+  const [agentB, setAgentB] = useState<AgentKind>('medium')
   const [gamesText, setGamesText] = useState(String(DEFAULT_GAMES))
   const [seedText, setSeedText] = useState(String(DEFAULT_SEED))
 
@@ -407,8 +408,7 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
             value={agentA}
             onChange={(event) => setAgentA(event.target.value as AgentKind)}
           >
-            <option value="heuristic">Heuristic</option>
-            <option value="random">Random</option>
+            {(['easy', 'medium', 'hard', 'random'] as const).map(kind => <option key={kind} value={kind}>{AI_LABELS[kind]}</option>)}
           </select>
         </label>
 
@@ -434,13 +434,13 @@ export function SimulateView({ db, createWorker }: SimulateViewProps): ReactElem
             value={agentB}
             onChange={(event) => setAgentB(event.target.value as AgentKind)}
           >
-            <option value="heuristic">Heuristic</option>
-            <option value="random">Random</option>
+            {(['easy', 'medium', 'hard', 'random'] as const).map(kind => <option key={kind} value={kind}>{AI_LABELS[kind]}</option>)}
           </select>
         </label>
 
         <label className="sim-setup__field">
           <span className="sim-setup__field-label">Games</span>
+          {(agentA === 'hard' || agentB === 'hard') && <small>Hard plans ahead; batches take longer.</small>}
           <input
             data-testid="sim-games"
             type="number"

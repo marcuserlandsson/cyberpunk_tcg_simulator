@@ -1,0 +1,3702 @@
+{
+  "date": "2026-09-16",
+  "aiVersion": "planning-2026-09-16-v4",
+  "engineVersion": "planning-ai-2026-09-16-v4",
+  "cardData": "738abcde",
+  "validation": {
+    "unitCases": 1691,
+    "unitFiles": 89,
+    "fullRunPassed": 1688,
+    "timingFailuresPassedInIsolatedRerun": 3,
+    "browserCasesPassed": 27,
+    "productionBuild": "passed",
+    "assertionsOrTimeoutsWeakened": false
+  },
+  "profile": {
+    "candidates": 6,
+    "samples": 6,
+    "rolloutActions": 120,
+    "turns": 2,
+    "rolloutDepth": 2,
+    "rolloutWindows": 8,
+    "transitions": 12000,
+    "strategicCandidates": true,
+    "saleCandidates": 2,
+    "searchOpening": false,
+    "opponentModel": "80% compatible reference list / 20% catalog; catalog when no reference fits"
+  },
+  "protocol": {
+    "pairedSeats": true,
+    "agentSeed": "gameSeed + seat * 5000",
+    "gameActionCap": 1500,
+    "strengthSeeds": "66000-66029, two seats per seed, 20 games per deck",
+    "ladderSeeds": "65000-65029, two seats per seed, 20 games per deck",
+    "judySeeds": "52000-52011, two seats per seed; both-Hard subset 52000-52005",
+    "timing": "Observed with concurrent benchmarks/tests; not isolated latency or a hardware guarantee",
+    "promotion": "Batches labelled setup under v3 used exactly the configuration promoted to the v4 default; subsequent current batches use v4 directly",
+    "interpretation": "AI-policy outcomes, not human competitive matchup estimates or evidence of expert strength"
+  },
+  "decks": [
+    {
+      "name": "Embracing Power — Starter Deck",
+      "legends": [
+        "goro-takemura-hands-unclean",
+        "yorinobu-arasaka-embracing-destruction",
+        "saburo-arasaka-stubborn-patriarch"
+      ],
+      "cards": {
+        "chrome-fang": 2,
+        "minotaur": 2,
+        "ruthless-lowlife": 3,
+        "swordwise-huscle": 2,
+        "emergency-atlus": 2,
+        "field-operator": 2,
+        "goro-takemura-losing-his-way": 2,
+        "maxtac-av": 2,
+        "arasaka-emergency-radioport": 2,
+        "mantis-blades": 3,
+        "satori-sword-of-saburo": 3,
+        "industrial-assembly": 2,
+        "over-the-edge": 2,
+        "shattered-memories": 2,
+        "corpo-security": 3,
+        "sandevistan": 3,
+        "corporate-surveillance": 3
+      }
+    },
+    {
+      "name": "The Heist — Starter Deck",
+      "legends": [
+        "v-corporate-exile",
+        "viktor-vektor-sit-down-and-relax",
+        "jackie-welles-pour-one-out-for-me"
+      ],
+      "cards": {
+        "dexter-deshawn-one-last-chance": 2,
+        "heywood-ripperdoc": 2,
+        "offduty-malfini": 2,
+        "secondhand-bombus": 2,
+        "t-bug-amateur-philosopher": 2,
+        "kiroshi-optics": 3,
+        "mandibular-upgrade": 3,
+        "zetatech-faceplate": 3,
+        "afterparty-at-lizzie-s": 2,
+        "delamain-cab": 3,
+        "evelyn-parker-scheming-siren": 3,
+        "mt0d12-flathead": 2,
+        "psycho-squad": 2,
+        "dying-night-v-s-pistol": 2,
+        "tetratronic-rippler": 2,
+        "floor-it": 3,
+        "reboot-optics": 2
+      }
+    },
+    {
+      "name": "BBG Judy",
+      "legends": [
+        "hanako-arasaka-daughter-of-the-emperor",
+        "jackie-welles-pour-one-out-for-me",
+        "judy-a-lvarez-braindance-maestro"
+      ],
+      "cards": {
+        "peace-offering": 3,
+        "memory-relapse": 2,
+        "floor-it": 3,
+        "jacked-in-voodoo-boy": 3,
+        "trust-no-one": 3,
+        "three-mouths-one-desire": 3,
+        "delamain-rideshare-ai": 3,
+        "les-e-le-mens": 3,
+        "lizzy-wizzy-delicate-weapon": 3,
+        "maman-brigitte-spirit-of-death": 3,
+        "placide-voodoo-sentinel": 2,
+        "towerfall": 3,
+        "nocturne-op55-n1": 3,
+        "pyramid-song": 3
+      },
+      "format": "constructed",
+      "revisionId": "7d4ac89d-d1c0-4d0a-8241-9d8bc6f93f48",
+      "updatedAt": "2026-09-15T07:19:37.016Z"
+    }
+  ],
+  "hardVsMedium": {
+    "games": 60,
+    "wins": 43,
+    "losses": 17,
+    "draws": 0,
+    "byDeck": {
+      "Embracing Power — Starter Deck": {
+        "games": 20,
+        "wins": 15
+      },
+      "The Heist — Starter Deck": {
+        "games": 20,
+        "wins": 14
+      },
+      "BBG Judy": {
+        "games": 20,
+        "wins": 14
+      }
+    },
+    "batches": [
+      {
+        "aiVersion": "planning-2026-09-15-v3",
+        "engineVersion": "planning-ai-2026-09-15-v3",
+        "model": "setup",
+        "baseSeed": 66000,
+        "offset": 0,
+        "requested": 12,
+        "completed": 12
+      },
+      {
+        "aiVersion": "planning-2026-09-15-v3",
+        "engineVersion": "planning-ai-2026-09-15-v3",
+        "model": "setup",
+        "baseSeed": 66000,
+        "offset": 12,
+        "requested": 12,
+        "completed": 12
+      },
+      {
+        "aiVersion": "planning-2026-09-16-v4",
+        "engineVersion": "planning-ai-2026-09-16-v4",
+        "model": "current",
+        "baseSeed": 66000,
+        "offset": 24,
+        "requested": 12,
+        "completed": 12
+      },
+      {
+        "aiVersion": "planning-2026-09-16-v4",
+        "engineVersion": "planning-ai-2026-09-16-v4",
+        "model": "current",
+        "baseSeed": 66000,
+        "offset": 36,
+        "requested": 12,
+        "completed": 12
+      },
+      {
+        "aiVersion": "planning-2026-09-16-v4",
+        "engineVersion": "planning-ai-2026-09-16-v4",
+        "model": "current",
+        "baseSeed": 66000,
+        "offset": 48,
+        "requested": 12,
+        "completed": 12
+      }
+    ],
+    "records": [
+      {
+        "seed": 66000,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 108,
+        "ms": 37316.2176
+      },
+      {
+        "seed": 66000,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 89,
+        "ms": 17678.793599999997
+      },
+      {
+        "seed": 66001,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 157,
+        "ms": 62403.4699
+      },
+      {
+        "seed": 66001,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 171,
+        "ms": 95116.49250000001
+      },
+      {
+        "seed": 66002,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 5,
+        "actions": 98,
+        "ms": 36785.203299999994
+      },
+      {
+        "seed": 66002,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 98,
+        "ms": 33811.037899999996
+      },
+      {
+        "seed": 66003,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 6,
+        "actions": 100,
+        "ms": 29088.95259999996
+      },
+      {
+        "seed": 66003,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 96,
+        "ms": 23787.505900000047
+      },
+      {
+        "seed": 66004,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 170,
+        "ms": 83027.71500000003
+      },
+      {
+        "seed": 66004,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 103,
+        "ms": 50270.59450000001
+      },
+      {
+        "seed": 66005,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 116,
+        "ms": 76891.77309999993
+      },
+      {
+        "seed": 66005,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 80,
+        "ms": 41751.12690000003
+      },
+      {
+        "seed": 66006,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 78,
+        "ms": 14136.7508
+      },
+      {
+        "seed": 66006,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 71,
+        "ms": 8551.8241
+      },
+      {
+        "seed": 66007,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 105,
+        "ms": 40246.835900000005
+      },
+      {
+        "seed": 66007,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 123,
+        "ms": 52077.0546
+      },
+      {
+        "seed": 66008,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 95,
+        "ms": 44410.4556
+      },
+      {
+        "seed": 66008,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 177,
+        "ms": 101679.35489999998
+      },
+      {
+        "seed": 66009,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 104,
+        "ms": 31201.32329999999
+      },
+      {
+        "seed": 66009,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 154,
+        "ms": 60170.561800000025
+      },
+      {
+        "seed": 66010,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 101,
+        "ms": 47341.94469999999
+      },
+      {
+        "seed": 66010,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 173,
+        "ms": 125374.66589999996
+      },
+      {
+        "seed": 66011,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 107,
+        "ms": 70166.33640000003
+      },
+      {
+        "seed": 66011,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 11,
+        "actions": 240,
+        "ms": 179274.50179999997
+      },
+      {
+        "seed": 66012,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 5,
+        "actions": 73,
+        "ms": 41179.3493
+      },
+      {
+        "seed": 66012,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 128,
+        "ms": 65222.471600000004
+      },
+      {
+        "seed": 66013,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 146,
+        "ms": 81293.9961
+      },
+      {
+        "seed": 66013,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 151,
+        "ms": 72397.7464
+      },
+      {
+        "seed": 66014,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 137,
+        "ms": 62538.654099999985
+      },
+      {
+        "seed": 66014,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 96,
+        "ms": 40898.619200000016
+      },
+      {
+        "seed": 66015,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 154,
+        "ms": 64186.10280000005
+      },
+      {
+        "seed": 66015,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 92,
+        "ms": 32376.90750000003
+      },
+      {
+        "seed": 66016,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 8,
+        "actions": 211,
+        "ms": 99898.24050000007
+      },
+      {
+        "seed": 66016,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 148,
+        "ms": 68040.57909999997
+      },
+      {
+        "seed": 66017,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 100,
+        "ms": 23489.104199999943
+      },
+      {
+        "seed": 66017,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 146,
+        "ms": 55358.54600000009
+      },
+      {
+        "seed": 66018,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 6,
+        "actions": 84,
+        "ms": 24601.115400000002
+      },
+      {
+        "seed": 66018,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 88,
+        "ms": 27281.8533
+      },
+      {
+        "seed": 66019,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 6,
+        "actions": 161,
+        "ms": 77405.44320000001
+      },
+      {
+        "seed": 66019,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 159,
+        "ms": 85969.13760000002
+      },
+      {
+        "seed": 66020,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 125,
+        "ms": 36825.33660000001
+      },
+      {
+        "seed": 66020,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 101,
+        "ms": 31839.627799999987
+      },
+      {
+        "seed": 66021,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 102,
+        "ms": 30391.271799999988
+      },
+      {
+        "seed": 66021,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 118,
+        "ms": 20615.032000000007
+      },
+      {
+        "seed": 66022,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 128,
+        "ms": 57414.57380000001
+      },
+      {
+        "seed": 66022,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 8,
+        "actions": 204,
+        "ms": 109217.78589999996
+      },
+      {
+        "seed": 66023,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 124,
+        "ms": 44265.3763
+      },
+      {
+        "seed": 66023,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 108,
+        "ms": 34275.448399999994
+      },
+      {
+        "seed": 66024,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 109,
+        "ms": 52633.4752
+      },
+      {
+        "seed": 66024,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 86,
+        "ms": 31121.237799999995
+      },
+      {
+        "seed": 66025,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 179,
+        "ms": 111802.5143
+      },
+      {
+        "seed": 66025,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 139,
+        "ms": 64302.78080000001
+      },
+      {
+        "seed": 66026,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 116,
+        "ms": 46597.361799999984
+      },
+      {
+        "seed": 66026,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 107,
+        "ms": 36516.2905
+      },
+      {
+        "seed": 66027,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 106,
+        "ms": 32109.0196
+      },
+      {
+        "seed": 66027,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 139,
+        "ms": 47723.855700000015
+      },
+      {
+        "seed": 66028,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 125,
+        "ms": 42036.66950000002
+      },
+      {
+        "seed": 66028,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 73,
+        "ms": 36123.20999999996
+      },
+      {
+        "seed": 66029,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 116,
+        "ms": 51656.99920000008
+      },
+      {
+        "seed": 66029,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 119,
+        "ms": 49776.72840000002
+      }
+    ],
+    "decisionMs": {
+      "count": 3683,
+      "mean": 873.3481793374966,
+      "p50": 2.352800000051502,
+      "p95": 3790.240300000005,
+      "p99": 4712.651899999939,
+      "max": 5976.242599999998
+    }
+  },
+  "mediumVsEasy": {
+    "games": 60,
+    "wins": 51,
+    "losses": 9,
+    "draws": 0,
+    "byDeck": {
+      "Embracing Power — Starter Deck": {
+        "games": 20,
+        "wins": 17
+      },
+      "The Heist — Starter Deck": {
+        "games": 20,
+        "wins": 18
+      },
+      "BBG Judy": {
+        "games": 20,
+        "wins": 16
+      }
+    },
+    "batches": [
+      {
+        "aiVersion": "planning-2026-09-15-v3",
+        "engineVersion": "planning-ai-2026-09-15-v3",
+        "model": "current",
+        "baseSeed": 65000,
+        "offset": 0,
+        "requested": 60,
+        "completed": 60
+      }
+    ],
+    "records": [
+      {
+        "seed": 65000,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 94,
+        "ms": 823.3624000000001
+      },
+      {
+        "seed": 65000,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 90,
+        "ms": 323.6159
+      },
+      {
+        "seed": 65001,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 112,
+        "ms": 901.7316999999998
+      },
+      {
+        "seed": 65001,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 167,
+        "ms": 2420.1221
+      },
+      {
+        "seed": 65002,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 5,
+        "actions": 83,
+        "ms": 571.6841999999997
+      },
+      {
+        "seed": 65002,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 118,
+        "ms": 1326.2749000000003
+      },
+      {
+        "seed": 65003,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 118,
+        "ms": 621.2840000000006
+      },
+      {
+        "seed": 65003,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 74,
+        "ms": 255.47510000000057
+      },
+      {
+        "seed": 65004,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 116,
+        "ms": 1023.8295999999991
+      },
+      {
+        "seed": 65004,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 102,
+        "ms": 876.7613999999994
+      },
+      {
+        "seed": 65005,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 93,
+        "ms": 568.6674999999996
+      },
+      {
+        "seed": 65005,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 85,
+        "ms": 448.6129999999994
+      },
+      {
+        "seed": 65006,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 88,
+        "ms": 446.77250000000095
+      },
+      {
+        "seed": 65006,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 86,
+        "ms": 462.23239999999896
+      },
+      {
+        "seed": 65007,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 153,
+        "ms": 796.0950999999986
+      },
+      {
+        "seed": 65007,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 82,
+        "ms": 280.2042000000001
+      },
+      {
+        "seed": 65008,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 85,
+        "ms": 544.7237000000005
+      },
+      {
+        "seed": 65008,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 97,
+        "ms": 560.1162999999997
+      },
+      {
+        "seed": 65009,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 88,
+        "ms": 374.7042000000001
+      },
+      {
+        "seed": 65009,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 105,
+        "ms": 636.6715000000004
+      },
+      {
+        "seed": 65010,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 5,
+        "actions": 90,
+        "ms": 707.3083000000006
+      },
+      {
+        "seed": 65010,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 140,
+        "ms": 1548.9291999999987
+      },
+      {
+        "seed": 65011,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 87,
+        "ms": 741.1905999999981
+      },
+      {
+        "seed": 65011,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 93,
+        "ms": 696.0841
+      },
+      {
+        "seed": 65012,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 86,
+        "ms": 351.4205000000002
+      },
+      {
+        "seed": 65012,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 101,
+        "ms": 501.022399999998
+      },
+      {
+        "seed": 65013,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 152,
+        "ms": 1048.7471000000005
+      },
+      {
+        "seed": 65013,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 67,
+        "ms": 197.80010000000038
+      },
+      {
+        "seed": 65014,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 5,
+        "actions": 81,
+        "ms": 256.1725000000006
+      },
+      {
+        "seed": 65014,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 91,
+        "ms": 511.957699999999
+      },
+      {
+        "seed": 65015,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 117,
+        "ms": 372.9337000000014
+      },
+      {
+        "seed": 65015,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 87,
+        "ms": 232.44610000000102
+      },
+      {
+        "seed": 65016,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 5,
+        "actions": 98,
+        "ms": 1104.7302000000018
+      },
+      {
+        "seed": 65016,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 116,
+        "ms": 651.5659999999989
+      },
+      {
+        "seed": 65017,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 113,
+        "ms": 591.5089999999982
+      },
+      {
+        "seed": 65017,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 147,
+        "ms": 808.0803999999989
+      },
+      {
+        "seed": 65018,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 100,
+        "ms": 250.09110000000146
+      },
+      {
+        "seed": 65018,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 112,
+        "ms": 290.7517999999982
+      },
+      {
+        "seed": 65019,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 5,
+        "actions": 95,
+        "ms": 884.8718000000008
+      },
+      {
+        "seed": 65019,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 77,
+        "ms": 524.2287999999971
+      },
+      {
+        "seed": 65020,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 166,
+        "ms": 1595.128499999999
+      },
+      {
+        "seed": 65020,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 170,
+        "ms": 1008.3166000000019
+      },
+      {
+        "seed": 65021,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 98,
+        "ms": 221.10250000000087
+      },
+      {
+        "seed": 65021,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 101,
+        "ms": 313.0044999999991
+      },
+      {
+        "seed": 65022,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 113,
+        "ms": 389.59760000000097
+      },
+      {
+        "seed": 65022,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 71,
+        "ms": 347.53029999999853
+      },
+      {
+        "seed": 65023,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 162,
+        "ms": 1224.902299999998
+      },
+      {
+        "seed": 65023,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 81,
+        "ms": 406.5194000000047
+      },
+      {
+        "seed": 65024,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 122,
+        "ms": 563.9791000000041
+      },
+      {
+        "seed": 65024,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 82,
+        "ms": 434.46370000000024
+      },
+      {
+        "seed": 65025,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 102,
+        "ms": 709.140800000001
+      },
+      {
+        "seed": 65025,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 86,
+        "ms": 399.10319999999774
+      },
+      {
+        "seed": 65026,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 87,
+        "ms": 458.491200000004
+      },
+      {
+        "seed": 65026,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 107,
+        "ms": 815.6995999999999
+      },
+      {
+        "seed": 65027,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 6,
+        "actions": 80,
+        "ms": 236.12000000000262
+      },
+      {
+        "seed": 65027,
+        "deck": "Embracing Power — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 81,
+        "ms": 386.73420000000624
+      },
+      {
+        "seed": 65028,
+        "deck": "The Heist — Starter Deck",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 5,
+        "actions": 83,
+        "ms": 408.54699999999866
+      },
+      {
+        "seed": 65028,
+        "deck": "The Heist — Starter Deck",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 5,
+        "actions": 80,
+        "ms": 542.9306999999972
+      },
+      {
+        "seed": 65029,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 114,
+        "ms": 961.9206999999951
+      },
+      {
+        "seed": 65029,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 147,
+        "ms": 865.3456000000006
+      }
+    ],
+    "decisionMs": {
+      "count": 3103,
+      "mean": 9.413805510796035,
+      "p50": 1.5658000000003085,
+      "p95": 43.576600000000326,
+      "p99": 109.93440000000192,
+      "max": 447.6756999999998
+    }
+  },
+  "judyMediumVsStarterMedium": {
+    "games": 24,
+    "wins": 4,
+    "losses": 20,
+    "draws": 0,
+    "byDeck": {
+      "BBG Judy": {
+        "games": 24,
+        "wins": 4
+      }
+    },
+    "batches": [
+      {
+        "aiVersion": "planning-2026-09-15-v3",
+        "engineVersion": "planning-ai-2026-09-15-v3",
+        "model": "current",
+        "baseSeed": 52000,
+        "offset": 0,
+        "requested": 24,
+        "completed": 24
+      }
+    ],
+    "records": [
+      {
+        "seed": 52000,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 106,
+        "ms": 1022.3358
+      },
+      {
+        "seed": 52000,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 108,
+        "ms": 742.2826
+      },
+      {
+        "seed": 52001,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 5,
+        "actions": 65,
+        "ms": 317.96079999999984
+      },
+      {
+        "seed": 52001,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 112,
+        "ms": 1058.3835999999997
+      },
+      {
+        "seed": 52002,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 130,
+        "ms": 1446.3722000000002
+      },
+      {
+        "seed": 52002,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 83,
+        "ms": 550.1411000000007
+      },
+      {
+        "seed": 52003,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 110,
+        "ms": 940.9593000000004
+      },
+      {
+        "seed": 52003,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 89,
+        "ms": 732.0003999999999
+      },
+      {
+        "seed": 52004,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 5,
+        "actions": 59,
+        "ms": 262.7327000000005
+      },
+      {
+        "seed": 52004,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 110,
+        "ms": 980.5782000000008
+      },
+      {
+        "seed": 52005,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 131,
+        "ms": 1089.4482000000007
+      },
+      {
+        "seed": 52005,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 129,
+        "ms": 944.2635000000009
+      },
+      {
+        "seed": 52006,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 109,
+        "ms": 564.1095000000005
+      },
+      {
+        "seed": 52006,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 5,
+        "actions": 80,
+        "ms": 414.8168000000005
+      },
+      {
+        "seed": 52007,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 6,
+        "actions": 116,
+        "ms": 1035.2602000000006
+      },
+      {
+        "seed": 52007,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 101,
+        "ms": 640.1858000000011
+      },
+      {
+        "seed": 52008,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 98,
+        "ms": 730.9236999999994
+      },
+      {
+        "seed": 52008,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 112,
+        "ms": 773.8071999999993
+      },
+      {
+        "seed": 52009,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 95,
+        "ms": 627.387200000001
+      },
+      {
+        "seed": 52009,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 104,
+        "ms": 876.9602000000014
+      },
+      {
+        "seed": 52010,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 94,
+        "ms": 592.6703999999991
+      },
+      {
+        "seed": 52010,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 92,
+        "ms": 532.9343000000008
+      },
+      {
+        "seed": 52011,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 103,
+        "ms": 636.7740000000013
+      },
+      {
+        "seed": 52011,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 110,
+        "ms": 861.0532999999996
+      }
+    ],
+    "decisionMs": {
+      "count": 1387,
+      "mean": 8.372178586878135,
+      "p50": 1.9355000000000473,
+      "p95": 38.25240000000031,
+      "p99": 78.84749999999985,
+      "max": 181.85580000000027
+    }
+  },
+  "judyHardVsStarterMedium": {
+    "games": 24,
+    "wins": 6,
+    "losses": 18,
+    "draws": 0,
+    "byDeck": {
+      "BBG Judy": {
+        "games": 24,
+        "wins": 6
+      }
+    },
+    "batches": [
+      {
+        "aiVersion": "planning-2026-09-15-v3",
+        "engineVersion": "planning-ai-2026-09-15-v3",
+        "model": "setup",
+        "baseSeed": 52000,
+        "offset": 0,
+        "requested": 24,
+        "completed": 24
+      }
+    ],
+    "records": [
+      {
+        "seed": 52000,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 102,
+        "ms": 27658.7444
+      },
+      {
+        "seed": 52000,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 119,
+        "ms": 36859.004
+      },
+      {
+        "seed": 52001,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 99,
+        "ms": 15983.918799999992
+      },
+      {
+        "seed": 52001,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 5,
+        "actions": 75,
+        "ms": 13621.092799999999
+      },
+      {
+        "seed": 52002,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 126,
+        "ms": 47613.71950000001
+      },
+      {
+        "seed": 52002,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 87,
+        "ms": 20490.787899999996
+      },
+      {
+        "seed": 52003,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 114,
+        "ms": 28048.953899999993
+      },
+      {
+        "seed": 52003,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 86,
+        "ms": 18594.750300000014
+      },
+      {
+        "seed": 52004,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 102,
+        "ms": 27336.84910000002
+      },
+      {
+        "seed": 52004,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 106,
+        "ms": 27690.357299999974
+      },
+      {
+        "seed": 52005,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 108,
+        "ms": 29030.248499999987
+      },
+      {
+        "seed": 52005,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 124,
+        "ms": 39588.73569999996
+      },
+      {
+        "seed": 52006,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 6,
+        "actions": 83,
+        "ms": 21427.66690000001
+      },
+      {
+        "seed": 52006,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 92,
+        "ms": 29599.141000000003
+      },
+      {
+        "seed": 52007,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 6,
+        "actions": 90,
+        "ms": 24081.01900000003
+      },
+      {
+        "seed": 52007,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 5,
+        "actions": 81,
+        "ms": 18656.856099999975
+      },
+      {
+        "seed": 52008,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 98,
+        "ms": 23865.72529999999
+      },
+      {
+        "seed": 52008,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 97,
+        "ms": 35166.23979999998
+      },
+      {
+        "seed": 52009,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 103,
+        "ms": 29940.781100000022
+      },
+      {
+        "seed": 52009,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 6,
+        "actions": 80,
+        "ms": 25785.357099999965
+      },
+      {
+        "seed": 52010,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 119,
+        "ms": 43364.91319999995
+      },
+      {
+        "seed": 52010,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 112,
+        "ms": 44542.45869999996
+      },
+      {
+        "seed": 52011,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 103,
+        "ms": 36714.68920000002
+      },
+      {
+        "seed": 52011,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 93,
+        "ms": 39282.71769999992
+      }
+    ],
+    "decisionMs": {
+      "count": 1368,
+      "mean": 512.5643959795337,
+      "p50": 2.8306999999913387,
+      "p95": 2632.5993000000017,
+      "p99": 3478.2517000000225,
+      "max": 4535.554700000095
+    }
+  },
+  "judyHardVsStarterHard": {
+    "games": 12,
+    "wins": 3,
+    "losses": 9,
+    "draws": 0,
+    "byDeck": {
+      "BBG Judy": {
+        "games": 12,
+        "wins": 3
+      }
+    },
+    "batches": [
+      {
+        "aiVersion": "planning-2026-09-15-v3",
+        "engineVersion": "planning-ai-2026-09-15-v3",
+        "model": "setup",
+        "baseSeed": 52000,
+        "offset": 0,
+        "requested": 12,
+        "completed": 12
+      }
+    ],
+    "records": [
+      {
+        "seed": 52000,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 8,
+        "actions": 133,
+        "ms": 102836.25720000001
+      },
+      {
+        "seed": 52000,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 144,
+        "ms": 121943.7051
+      },
+      {
+        "seed": 52001,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 105,
+        "ms": 51287.32210000002
+      },
+      {
+        "seed": 52001,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 104,
+        "ms": 70424.34600000002
+      },
+      {
+        "seed": 52002,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": true,
+        "winner": 0,
+        "turns": 7,
+        "actions": 104,
+        "ms": 78614.13500000001
+      },
+      {
+        "seed": 52002,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 77,
+        "ms": 60221.59379999997
+      },
+      {
+        "seed": 52003,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 7,
+        "actions": 101,
+        "ms": 89010.14559999999
+      },
+      {
+        "seed": 52003,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 6,
+        "actions": 86,
+        "ms": 59882.79850000003
+      },
+      {
+        "seed": 52004,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 5,
+        "actions": 59,
+        "ms": 28480.95239999995
+      },
+      {
+        "seed": 52004,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": true,
+        "winner": 1,
+        "turns": 7,
+        "actions": 103,
+        "ms": 71937.30529999989
+      },
+      {
+        "seed": 52005,
+        "deck": "BBG Judy",
+        "seat": 0,
+        "won": false,
+        "winner": 1,
+        "turns": 6,
+        "actions": 86,
+        "ms": 42818.62360000005
+      },
+      {
+        "seed": 52005,
+        "deck": "BBG Judy",
+        "seat": 1,
+        "won": false,
+        "winner": 0,
+        "turns": 7,
+        "actions": 135,
+        "ms": 97000.49899999995
+      }
+    ],
+    "decisionMs": {
+      "count": 717,
+      "mean": 563.3750930265,
+      "p50": 3.0563000000547618,
+      "p95": 2989.1958000000013,
+      "p99": 3840.142900000006,
+      "max": 5197.091999999946
+    }
+  },
+  "developmentComparisons": {
+    "catalogPlannerJudy": {
+      "games": 24,
+      "wins": 2,
+      "losses": 22,
+      "draws": 0,
+      "byDeck": {
+        "BBG Judy": {
+          "games": 24,
+          "wins": 2
+        }
+      },
+      "batches": [
+        {
+          "aiVersion": "planning-2026-09-15-v3",
+          "engineVersion": "planning-ai-2026-09-15-v3",
+          "model": "current",
+          "baseSeed": 52000,
+          "offset": 0,
+          "requested": 24,
+          "completed": 4
+        },
+        {
+          "aiVersion": "planning-2026-09-15-v3",
+          "engineVersion": "planning-ai-2026-09-15-v3",
+          "model": "current",
+          "baseSeed": 52000,
+          "offset": 4,
+          "requested": 20,
+          "completed": 20
+        }
+      ],
+      "records": [
+        {
+          "seed": 52000,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 9,
+          "actions": 139,
+          "ms": 53261.655
+        },
+        {
+          "seed": 52000,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 8,
+          "actions": 136,
+          "ms": 63951.761099999996
+        },
+        {
+          "seed": 52001,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 5,
+          "actions": 65,
+          "ms": 11416.142699999997
+        },
+        {
+          "seed": 52001,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 152,
+          "ms": 50516.831000000006
+        },
+        {
+          "seed": 52002,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 134,
+          "ms": 49583.7726
+        },
+        {
+          "seed": 52002,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 94,
+          "ms": 15921.297400000003
+        },
+        {
+          "seed": 52003,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 127,
+          "ms": 28265.744600000005
+        },
+        {
+          "seed": 52003,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 86,
+          "ms": 13715.1449
+        },
+        {
+          "seed": 52004,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 157,
+          "ms": 46545.0782
+        },
+        {
+          "seed": 52004,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 78,
+          "ms": 11871.977899999998
+        },
+        {
+          "seed": 52005,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 108,
+          "ms": 18889.181499999977
+        },
+        {
+          "seed": 52005,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 5,
+          "actions": 61,
+          "ms": 5804.603000000003
+        },
+        {
+          "seed": 52006,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 109,
+          "ms": 14085.859399999987
+        },
+        {
+          "seed": 52006,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 92,
+          "ms": 22309.30620000002
+        },
+        {
+          "seed": 52007,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 6,
+          "actions": 116,
+          "ms": 32459.530600000027
+        },
+        {
+          "seed": 52007,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 79,
+          "ms": 11884.013999999996
+        },
+        {
+          "seed": 52008,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 98,
+          "ms": 14590.457999999984
+        },
+        {
+          "seed": 52008,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 76,
+          "ms": 10285.271799999988
+        },
+        {
+          "seed": 52009,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 105,
+          "ms": 19105.22590000002
+        },
+        {
+          "seed": 52009,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 9,
+          "actions": 179,
+          "ms": 43528.984800000035
+        },
+        {
+          "seed": 52010,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 105,
+          "ms": 17453.399199999985
+        },
+        {
+          "seed": 52010,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 119,
+          "ms": 23155.795600000012
+        },
+        {
+          "seed": 52011,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 82,
+          "ms": 12217.466000000015
+        },
+        {
+          "seed": 52011,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 92,
+          "ms": 20016.828700000013
+        }
+      ],
+      "decisionMs": {
+        "count": 1465,
+        "mean": 414.13207310580185,
+        "p50": 3.870600000023842,
+        "p95": 1932.1268000000127,
+        "p99": 3526.888399999996,
+        "max": 5564.183199999998
+      }
+    },
+    "referencePlannerJudy": {
+      "games": 24,
+      "wins": 2,
+      "losses": 22,
+      "draws": 0,
+      "byDeck": {
+        "BBG Judy": {
+          "games": 24,
+          "wins": 2
+        }
+      },
+      "batches": [
+        {
+          "aiVersion": "planning-2026-09-15-v3",
+          "engineVersion": "planning-ai-2026-09-15-v3",
+          "model": "reference",
+          "baseSeed": 52000,
+          "offset": 0,
+          "requested": 24,
+          "completed": 4
+        },
+        {
+          "aiVersion": "planning-2026-09-15-v3",
+          "engineVersion": "planning-ai-2026-09-15-v3",
+          "model": "reference",
+          "baseSeed": 52000,
+          "offset": 4,
+          "requested": 20,
+          "completed": 20
+        }
+      ],
+      "records": [
+        {
+          "seed": 52000,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 102,
+          "ms": 42677.4735
+        },
+        {
+          "seed": 52000,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 8,
+          "actions": 136,
+          "ms": 58202.6853
+        },
+        {
+          "seed": 52001,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 84,
+          "ms": 16368.762499999997
+        },
+        {
+          "seed": 52001,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 152,
+          "ms": 56756.535099999994
+        },
+        {
+          "seed": 52002,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 6,
+          "actions": 83,
+          "ms": 10973.3454
+        },
+        {
+          "seed": 52002,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 94,
+          "ms": 13789.3558
+        },
+        {
+          "seed": 52003,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 127,
+          "ms": 25710.034600000003
+        },
+        {
+          "seed": 52003,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 86,
+          "ms": 12859.619300000006
+        },
+        {
+          "seed": 52004,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 102,
+          "ms": 19727.984500000006
+        },
+        {
+          "seed": 52004,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 80,
+          "ms": 15757.024300000005
+        },
+        {
+          "seed": 52005,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 108,
+          "ms": 20049.71149999999
+        },
+        {
+          "seed": 52005,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 5,
+          "actions": 61,
+          "ms": 6271.0383
+        },
+        {
+          "seed": 52006,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 6,
+          "actions": 83,
+          "ms": 15862.578399999999
+        },
+        {
+          "seed": 52006,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 91,
+          "ms": 18954.997900000017
+        },
+        {
+          "seed": 52007,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 6,
+          "actions": 106,
+          "ms": 18015.6281
+        },
+        {
+          "seed": 52007,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 83,
+          "ms": 19391.530300000013
+        },
+        {
+          "seed": 52008,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 98,
+          "ms": 14716.372600000002
+        },
+        {
+          "seed": 52008,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 76,
+          "ms": 10399.41929999998
+        },
+        {
+          "seed": 52009,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 6,
+          "actions": 68,
+          "ms": 10423.757099999988
+        },
+        {
+          "seed": 52009,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 9,
+          "actions": 179,
+          "ms": 49800.53690000001
+        },
+        {
+          "seed": 52010,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 105,
+          "ms": 17907.0257
+        },
+        {
+          "seed": 52010,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 119,
+          "ms": 23695.391999999993
+        },
+        {
+          "seed": 52011,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 82,
+          "ms": 11459.4767
+        },
+        {
+          "seed": 52011,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 92,
+          "ms": 20432.020699999994
+        }
+      ],
+      "decisionMs": {
+        "count": 1340,
+        "mean": 393.03463328358214,
+        "p50": 3.5077999999630265,
+        "p95": 1777.0487999999896,
+        "p99": 3052.8396000000066,
+        "max": 5085.238800000003
+      }
+    },
+    "oneSaleAndOpeningJudy": {
+      "games": 12,
+      "wins": 1,
+      "losses": 11,
+      "draws": 0,
+      "byDeck": {
+        "BBG Judy": {
+          "games": 12,
+          "wins": 1
+        }
+      },
+      "batches": [
+        {
+          "aiVersion": "planning-2026-09-15-v3",
+          "engineVersion": "planning-ai-2026-09-15-v3",
+          "model": "strategic",
+          "baseSeed": 52000,
+          "offset": 0,
+          "requested": 12,
+          "completed": 12
+        }
+      ],
+      "records": [
+        {
+          "seed": 52000,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 102,
+          "ms": 26698.6735
+        },
+        {
+          "seed": 52000,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 132,
+          "ms": 41844.077099999995
+        },
+        {
+          "seed": 52001,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 84,
+          "ms": 13157.070900000006
+        },
+        {
+          "seed": 52001,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 152,
+          "ms": 45348.82609999999
+        },
+        {
+          "seed": 52002,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 91,
+          "ms": 19808.093200000003
+        },
+        {
+          "seed": 52002,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 87,
+          "ms": 20897.481500000024
+        },
+        {
+          "seed": 52003,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 127,
+          "ms": 35678.3609
+        },
+        {
+          "seed": 52003,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 86,
+          "ms": 17075.373500000016
+        },
+        {
+          "seed": 52004,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 102,
+          "ms": 24496.456200000015
+        },
+        {
+          "seed": 52004,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 77,
+          "ms": 19775.05879999997
+        },
+        {
+          "seed": 52005,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 108,
+          "ms": 25077.267300000007
+        },
+        {
+          "seed": 52005,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 5,
+          "actions": 61,
+          "ms": 8221.824000000022
+        }
+      ],
+      "decisionMs": {
+        "count": 685,
+        "mean": 433.0615220437957,
+        "p50": 3.320300000021234,
+        "p95": 2114.690899999987,
+        "p99": 2768.5877999999975,
+        "max": 3027.0274999999965
+      }
+    },
+    "oneSaleWithoutOpeningJudy": {
+      "games": 24,
+      "wins": 7,
+      "losses": 17,
+      "draws": 0,
+      "byDeck": {
+        "BBG Judy": {
+          "games": 24,
+          "wins": 7
+        }
+      },
+      "batches": [
+        {
+          "aiVersion": "planning-2026-09-15-v3",
+          "engineVersion": "planning-ai-2026-09-15-v3",
+          "model": "tactical",
+          "baseSeed": 52000,
+          "offset": 0,
+          "requested": 24,
+          "completed": 24
+        }
+      ],
+      "records": [
+        {
+          "seed": 52000,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 102,
+          "ms": 26755.6678
+        },
+        {
+          "seed": 52000,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 119,
+          "ms": 36798.95389999999
+        },
+        {
+          "seed": 52001,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 5,
+          "actions": 65,
+          "ms": 9118.239999999998
+        },
+        {
+          "seed": 52001,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 5,
+          "actions": 75,
+          "ms": 13687.232099999994
+        },
+        {
+          "seed": 52002,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 126,
+          "ms": 46327.91709999999
+        },
+        {
+          "seed": 52002,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 87,
+          "ms": 17816.837300000014
+        },
+        {
+          "seed": 52003,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 112,
+          "ms": 24548.36049999998
+        },
+        {
+          "seed": 52003,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 86,
+          "ms": 17559.9124
+        },
+        {
+          "seed": 52004,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 102,
+          "ms": 23082.004000000015
+        },
+        {
+          "seed": 52004,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 106,
+          "ms": 21627.79700000002
+        },
+        {
+          "seed": 52005,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 108,
+          "ms": 24576.8223
+        },
+        {
+          "seed": 52005,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 124,
+          "ms": 32458.748699999996
+        },
+        {
+          "seed": 52006,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 6,
+          "actions": 83,
+          "ms": 18612.141799999983
+        },
+        {
+          "seed": 52006,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 91,
+          "ms": 25159.94160000002
+        },
+        {
+          "seed": 52007,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 6,
+          "actions": 90,
+          "ms": 21403.71139999997
+        },
+        {
+          "seed": 52007,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 5,
+          "actions": 81,
+          "ms": 15670.852599999984
+        },
+        {
+          "seed": 52008,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 98,
+          "ms": 24818.5
+        },
+        {
+          "seed": 52008,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 104,
+          "ms": 30272.6238
+        },
+        {
+          "seed": 52009,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 103,
+          "ms": 27506.569499999983
+        },
+        {
+          "seed": 52009,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 6,
+          "actions": 80,
+          "ms": 24601.942099999986
+        },
+        {
+          "seed": 52010,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 6,
+          "actions": 74,
+          "ms": 19236.044700000028
+        },
+        {
+          "seed": 52010,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 112,
+          "ms": 33200.42869999999
+        },
+        {
+          "seed": 52011,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 103,
+          "ms": 20600.458400000003
+        },
+        {
+          "seed": 52011,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 75,
+          "ms": 24699.49040000001
+        }
+      ],
+      "decisionMs": {
+        "count": 1315,
+        "mean": 438.7204819771861,
+        "p50": 2.6195000000298023,
+        "p95": 2320.296699999948,
+        "p99": 2943.797499999986,
+        "max": 3964.0719999999856
+      }
+    },
+    "catalogMirrors": {
+      "games": 24,
+      "wins": 14,
+      "losses": 10,
+      "draws": 0,
+      "byDeck": {
+        "Embracing Power — Starter Deck": {
+          "games": 8,
+          "wins": 5
+        },
+        "The Heist — Starter Deck": {
+          "games": 8,
+          "wins": 5
+        },
+        "BBG Judy": {
+          "games": 8,
+          "wins": 4
+        }
+      },
+      "batches": [
+        {
+          "aiVersion": "planning-2026-09-15-v3",
+          "engineVersion": "planning-ai-2026-09-15-v3",
+          "model": null,
+          "baseSeed": 65000,
+          "offset": 0,
+          "requested": 12,
+          "completed": 12
+        },
+        {
+          "aiVersion": "planning-2026-09-15-v3",
+          "engineVersion": "planning-ai-2026-09-15-v3",
+          "model": null,
+          "baseSeed": 65000,
+          "offset": 12,
+          "requested": 12,
+          "completed": 12
+        }
+      ],
+      "records": [
+        {
+          "seed": 65000,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 114,
+          "ms": 42716.6095
+        },
+        {
+          "seed": 65000,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 112,
+          "ms": 32934.745299999995
+        },
+        {
+          "seed": 65001,
+          "deck": "The Heist — Starter Deck",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 214,
+          "ms": 154562.1925
+        },
+        {
+          "seed": 65001,
+          "deck": "The Heist — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 186,
+          "ms": 109774.9713
+        },
+        {
+          "seed": 65002,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 5,
+          "actions": 83,
+          "ms": 20589.680400000012
+        },
+        {
+          "seed": 65002,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 6,
+          "actions": 120,
+          "ms": 43889.625899999985
+        },
+        {
+          "seed": 65003,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 113,
+          "ms": 21948.17790000001
+        },
+        {
+          "seed": 65003,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 136,
+          "ms": 50812.7904
+        },
+        {
+          "seed": 65004,
+          "deck": "The Heist — Starter Deck",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 214,
+          "ms": 95583.02149999997
+        },
+        {
+          "seed": 65004,
+          "deck": "The Heist — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 6,
+          "actions": 125,
+          "ms": 48945.87640000007
+        },
+        {
+          "seed": 65005,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 5,
+          "actions": 88,
+          "ms": 34658.28229999996
+        },
+        {
+          "seed": 65005,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 81,
+          "ms": 37872.049699999974
+        },
+        {
+          "seed": 65006,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 5,
+          "actions": 75,
+          "ms": 16363.496000000001
+        },
+        {
+          "seed": 65006,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 96,
+          "ms": 34361.158299999996
+        },
+        {
+          "seed": 65007,
+          "deck": "The Heist — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 153,
+          "ms": 78597.74970000001
+        },
+        {
+          "seed": 65007,
+          "deck": "The Heist — Starter Deck",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 8,
+          "actions": 162,
+          "ms": 65533.707299999995
+        },
+        {
+          "seed": 65008,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 6,
+          "actions": 105,
+          "ms": 43304.42630000002
+        },
+        {
+          "seed": 65008,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 79,
+          "ms": 17155.7782
+        },
+        {
+          "seed": 65009,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 124,
+          "ms": 35086.97779999999
+        },
+        {
+          "seed": 65009,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 116,
+          "ms": 48104.866699999955
+        },
+        {
+          "seed": 65010,
+          "deck": "The Heist — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 150,
+          "ms": 57406.95860000001
+        },
+        {
+          "seed": 65010,
+          "deck": "The Heist — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 6,
+          "actions": 140,
+          "ms": 46128.11599999998
+        },
+        {
+          "seed": 65011,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 6,
+          "actions": 91,
+          "ms": 27290.7831
+        },
+        {
+          "seed": 65011,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 117,
+          "ms": 30427.038900000043
+        }
+      ],
+      "decisionMs": {
+        "count": 1458,
+        "mean": 806.3889608367626,
+        "p50": 3.0887000000220723,
+        "p95": 3759.1097999999765,
+        "p99": 5220.146000000008,
+        "max": 6244.45120000001
+      }
+    },
+    "referenceMirrors": {
+      "games": 24,
+      "wins": 16,
+      "losses": 8,
+      "draws": 0,
+      "byDeck": {
+        "Embracing Power — Starter Deck": {
+          "games": 8,
+          "wins": 4
+        },
+        "The Heist — Starter Deck": {
+          "games": 8,
+          "wins": 7
+        },
+        "BBG Judy": {
+          "games": 8,
+          "wins": 5
+        }
+      },
+      "batches": [
+        {
+          "aiVersion": "planning-2026-09-15-v3",
+          "engineVersion": "planning-ai-2026-09-15-v3",
+          "model": "reference",
+          "baseSeed": 65000,
+          "offset": 0,
+          "requested": 24,
+          "completed": 24
+        }
+      ],
+      "records": [
+        {
+          "seed": 65000,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 118,
+          "ms": 39966.1924
+        },
+        {
+          "seed": 65000,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 112,
+          "ms": 28111.862800000003
+        },
+        {
+          "seed": 65001,
+          "deck": "The Heist — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 181,
+          "ms": 99555.4587
+        },
+        {
+          "seed": 65001,
+          "deck": "The Heist — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 186,
+          "ms": 83201.45549999998
+        },
+        {
+          "seed": 65002,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 5,
+          "actions": 81,
+          "ms": 27758.52390000003
+        },
+        {
+          "seed": 65002,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 6,
+          "actions": 114,
+          "ms": 46906.30410000001
+        },
+        {
+          "seed": 65003,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 113,
+          "ms": 19362.045799999963
+        },
+        {
+          "seed": 65003,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 126,
+          "ms": 41419.22690000001
+        },
+        {
+          "seed": 65004,
+          "deck": "The Heist — Starter Deck",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 182,
+          "ms": 82141.16859999998
+        },
+        {
+          "seed": 65004,
+          "deck": "The Heist — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 6,
+          "actions": 128,
+          "ms": 45159.38500000001
+        },
+        {
+          "seed": 65005,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 5,
+          "actions": 88,
+          "ms": 18903.21000000002
+        },
+        {
+          "seed": 65005,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 81,
+          "ms": 25031.26980000001
+        },
+        {
+          "seed": 65006,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 6,
+          "actions": 96,
+          "ms": 21667.032999999938
+        },
+        {
+          "seed": 65006,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 96,
+          "ms": 22779.850199999986
+        },
+        {
+          "seed": 65007,
+          "deck": "The Heist — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 7,
+          "actions": 150,
+          "ms": 68960.58400000003
+        },
+        {
+          "seed": 65007,
+          "deck": "The Heist — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 165,
+          "ms": 59911.620200000005
+        },
+        {
+          "seed": 65008,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 6,
+          "actions": 105,
+          "ms": 44176.938199999975
+        },
+        {
+          "seed": 65008,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 6,
+          "actions": 79,
+          "ms": 19162.231600000057
+        },
+        {
+          "seed": 65009,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 6,
+          "actions": 94,
+          "ms": 23133.318100000033
+        },
+        {
+          "seed": 65009,
+          "deck": "Embracing Power — Starter Deck",
+          "seat": 1,
+          "won": false,
+          "winner": 0,
+          "turns": 7,
+          "actions": 116,
+          "ms": 40073.7916
+        },
+        {
+          "seed": 65010,
+          "deck": "The Heist — Starter Deck",
+          "seat": 0,
+          "won": true,
+          "winner": 0,
+          "turns": 5,
+          "actions": 101,
+          "ms": 52280.548300000024
+        },
+        {
+          "seed": 65010,
+          "deck": "The Heist — Starter Deck",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 7,
+          "actions": 208,
+          "ms": 116601.96860000002
+        },
+        {
+          "seed": 65011,
+          "deck": "BBG Judy",
+          "seat": 0,
+          "won": false,
+          "winner": 1,
+          "turns": 7,
+          "actions": 112,
+          "ms": 49665.273400000064
+        },
+        {
+          "seed": 65011,
+          "deck": "BBG Judy",
+          "seat": 1,
+          "won": true,
+          "winner": 1,
+          "turns": 6,
+          "actions": 107,
+          "ms": 57924.426800000016
+        }
+      ],
+      "decisionMs": {
+        "count": 1454,
+        "mean": 771.1663980055033,
+        "p50": 3.5235000000102445,
+        "p95": 3323.4920000000275,
+        "p99": 4376.052700000117,
+        "max": 5673.906799999997
+      }
+    }
+  }
+}

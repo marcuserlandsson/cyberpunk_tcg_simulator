@@ -1,113 +1,28 @@
-import { stillLive } from '../engine/game'
-// The heuristic AI's static evaluation function: how good is this position for
-// one player, in a single number?
-//
-// HIDDEN-INFORMATION DISCIPLINE (the hard constraint on this file). Every
-// feature below is derived only from facts a human sitting at the table can
-// see:
-//
-//   * both Gig areas — dice on the table, sizes and top faces alike;
-//   * both fields — Units are played face-up, so their `effectivePower` (Gear,
-//     buffs and active statics included) is public;
-//   * face-up Legends — public by definition;
-//   * ZONE SIZES: hand, deck, eddies, and the ready/spent split within the
-//     eddies and legends zones. A face-down €$ is worth exactly 1 €$ whichever
-//     card it is (economy.ts), so its count is all that matters and its
-//     identity is never read;
-//   * the terminal `winner`.
-//
-// What is deliberately NOT read anywhere in this file: the rival's hand
-// *contents*, either player's deck *contents or order*, any face-down Legend's
-// `defId`, and — the one that is easy to miss — either player's TRASH, in
-// contents or in size. `effectivePower` is safe on both sides because
-// `query.inPlay` only lets a Legend contribute statics once it is face-up, so
-// no face-down identity can leak into a power number. The AI's own hand is
-// legitimately visible to it, but this function ignores its contents too, and
-// scores only its size.
-//
-// Those last two omissions are what make the whole thing hold under
-// simulation, and they are pinned rather than asserted. A candidate action the
-// AI is only *scoring* can move hidden cards around for real — a
-// `discardRandomRival` picks an index into the rival's shuffled hand
-// (`effects.ts`), a draw pulls off a shuffled deck — so two clones that differ
-// only in hidden information genuinely produce DIFFERENT positions after the
-// same candidate. They must still produce the same *number*, and they do,
-// because hand/deck are scored by size and the trash is not scored at all.
-// tests/ai/heuristic.test.ts asserts exactly that, in two ways: a targeted
-// `augmented-negotiators` fixture where blocking discards a provably different
-// rival card in each clone, and a harvest over synthetic decks built to
-// contain `discardRandomRival` cards, which requires that at least one
-// candidate's outcome materially diverged and that no such divergence changed
-// a score or the chosen action. See docs/rulings.md §150.
-//
-// Sign convention: positive is good for `perspective`. Every term is an
-// integer, so two equal positions score exactly equal and the caller's
-// tie-break is a real tie-break rather than float noise.
-
-import { GIGS_TO_WIN, isOvertime } from '../engine/game'
+import { GIGS_TO_WIN, isOvertime, stillLive } from '../engine/game'
 import { readyPaymentUids } from '../engine/economy'
-import { effectiveKeywords, effectivePower, opponentOf, streetCred } from '../engine/query'
+import { attackActions, stealCount } from '../engine/combat'
+import { cantAttack, cantAttackGigArea, effectiveKeywords, effectivePower, opponentOf, signedPower, streetCred, valuePairCount } from '../engine/query'
 import type { CardDb, GameState, PlayerId } from '../engine/types'
+import { evaluationKnowledge, retainedCardValue, type EvaluationKnowledge } from './strategy'
 
 export interface EvalWeights {
-  /** A Gig die is the win condition; nothing else comes close. */
   gig: number
-  /**
-   * Holding 7+ Gigs wins outright at the start of your next turn
-   * (`game.beginTurn`), so it is a win in all but name — worth far more than
-   * the 7th die's own `gig` term, but still short of `terminal` because the
-   * rival gets one whole turn to steal one back.
-   */
   sevenGigs: number
-  /** Overtime is sudden death on Gig COUNT, so a lead there is nearly terminal. */
   overtimeMajority: number
-  /** Sum of Gig top faces (guide p12) — gates a lot of printed conditions. */
   streetCred: number
   friendlyPower: number
   rivalPower: number
   handCard: number
-  /**
-   * An €$ card in the eddies zone is a permanent income source (it readies
-   * every turn), so owning one is worth appreciably more than a card in hand;
-   * `readyPayer` prices only the *readiness* that a play spends, which is why
-   * spending €$ on a decent body is a clear gain rather than a wash.
-   */
   eddie: number
   readyPayer: number
   faceUpLegend: number
-  /**
-   * A READY friendly Unit with the Blocker keyword (printed or Gear-granted)
-   * denies roughly one rival steal per turn — a blocked direct attack steals
-   * nothing. Without this term a 0-power blocker looks like pure cost and the
-   * AI never deploys it, which the 2026-08-25 balance investigation measured
-   * as the entire Arasaka-vs-Mercs 91% artifact (the decks' genuine gap is
-   * ~53%): secondhand-bombus/mandibular-upgrade were played at 1–3% of their
-   * playable decision points while the 2-power corpo-security was played 4×
-   * as often. Keyword reads are hidden-info-safe: field Units are face-up.
-   */
   readyBlocker: number
   deckCard: number
-  /** Extra penalty per card below `DECKOUT_THRESHOLD` — running out is a loss. */
   deckoutAversion: number
-  /** A won/lost game. */
   terminal: number
 }
 
-/** Below this many cards left, deckout stops being theoretical. */
 export const DECKOUT_THRESHOLD = 5
-
-/**
- * The tuned weights (see .superpowers/sdd/.../task-10-report.md for the
- * measured tuning rounds). The brief's starting set, with three changes the
- * measurements forced:
- *   * `friendlyPower` up and the €$ cost of a play split into `eddie` (kept)
- *     vs `readyPayer` (spent), because at the brief's numbers a 2-cost 3-power
- *     Unit scored NEGATIVE and the AI simply never played anything;
- *   * `sevenGigs`, which the brief's set had no term for at all, so a steal to
- *     7 looked exactly as good as any other steal;
- *   * `rivalPower` slightly below `friendlyPower`, so trading bodies evenly is
- *     mildly good for the side that keeps initiative.
- */
 export const DEFAULT_WEIGHTS: EvalWeights = {
   gig: 1000,
   sevenGigs: 300_000,
@@ -115,99 +30,97 @@ export const DEFAULT_WEIGHTS: EvalWeights = {
   streetCred: 10,
   friendlyPower: 25,
   rivalPower: 20,
-  handCard: 12,
-  eddie: 14,
+  handCard: 24,
+  eddie: 32,
   readyPayer: 6,
-  faceUpLegend: 25,
-  readyBlocker: 400,
+  faceUpLegend: 45,
+  readyBlocker: 300,
   deckCard: 1,
   deckoutAversion: 50,
   terminal: 1_000_000_000,
 }
 
-/** Total `effectivePower` of everything `player` has on the field. */
-function fieldPower(db: CardDb, state: GameState, player: PlayerId): number {
-  let total = 0
-  for (const uid of state.players[player].field) total += effectivePower(db, state, uid)
-  return total
-}
-
-/**
- * How many €$ `player` could pay right now: every ready card in the eddies and
- * legends zones (economy.ts prices each at 1 €$). Counts only readiness, never
- * which card it is.
- */
-function readyPayers(db: CardDb, state: GameState, player: PlayerId): number {
-  return readyPaymentUids(db, state, player).length
-}
-
-function faceUpLegends(state: GameState, player: PlayerId): number {
-  return state.players[player].legends.filter((uid) => state.cards[uid].faceUp).length
-}
-
-/**
- * READY field Units with the Blocker keyword, printed or granted (Gear moves
- * with its host, so `effectiveKeywords` is the truth `legal.ts` blocks from).
- * Field Units are face-up, so this reads no hidden information.
- */
-function readyBlockers(db: CardDb, state: GameState, player: PlayerId): number {
-  let count = 0
-  for (const uid of state.players[player].field) {
-    if (state.cards[uid].ready && effectiveKeywords(db, state, uid).includes('blocker')) count += 1
-  }
-  return count
-}
-
-/**
- * Position value for `perspective`, in "score units" (a Gig die is 1000 of
- * them). Pure: never mutates `state`, never reads hidden information — see the
- * file header.
- */
+/** Evaluate public board facts and the observer's already-known hand. Lookahead
+ * supplies knowledge captured BEFORE the candidate, so a random draw cannot
+ * leak its identity through hand quality or newly discovered deck strategy. */
 export function evaluate(
-  db: CardDb,
-  state: GameState,
-  perspective: PlayerId,
-  weights: EvalWeights = DEFAULT_WEIGHTS
+  db: CardDb, state: GameState, perspective: PlayerId,
+  weights: EvalWeights = DEFAULT_WEIGHTS,
+  knowledge: EvaluationKnowledge = evaluationKnowledge(db, state, perspective),
 ): number {
-  if (!stillLive(state)) {
-    return state.winner === null ? 0 : state.winner === perspective ? weights.terminal : -weights.terminal
-  }
-
+  if (!stillLive(state)) return state.winner === null ? 0 : state.winner === perspective ? weights.terminal : -weights.terminal
   const rival = opponentOf(perspective)
-  const mine = state.players[perspective]
-  const theirs = state.players[rival]
-
-  const myGigs = mine.gigArea.length
-  const theirGigs = theirs.gigArea.length
-
+  const mine = state.players[perspective], theirs = state.players[rival]
+  const myGigs = mine.gigArea.length, theirGigs = theirs.gigArea.length
   let score = (myGigs - theirGigs) * weights.gig
-
-  // Win proximity: 7 Gigs held at a turn start is an outright win, so reaching
-  // 7 dominates every board consideration below.
   if (myGigs >= GIGS_TO_WIN) score += weights.sevenGigs
   if (theirGigs >= GIGS_TO_WIN) score -= weights.sevenGigs
-
-  // CR 1.11: overtime requires seven Gigs, even if six would be a majority.
   if (isOvertime(state)) score += ((myGigs >= GIGS_TO_WIN ? 1 : 0) - (theirGigs >= GIGS_TO_WIN ? 1 : 0)) * weights.overtimeMajority
 
-  score += ((streetCred(state, perspective) ?? 0) - (streetCred(state, rival) ?? 0)) * weights.streetCred
+  for (const player of [perspective, rival]) {
+    const sign = player === perspective ? 1 : -1
+    const p = state.players[player]
+    const strategy = knowledge.strategies[player]
+    const cred = streetCred(state, player) ?? 0
+    // Low-Cred decks care about dice for victory, but lower faces unlock effects.
+    score += sign * cred * (strategy.lowCred ? 0 : weights.streetCred)
+    if (strategy.lowCred && cred < (streetCred(state, opponentOf(player)) ?? 0)) score += sign * 90
+    if (strategy.minD4 && p.gigArea.some(d => d.size === 4 && d.value === 1)) score += sign * 180
+    else if (strategy.minGig && p.gigArea.some(d => d.value === 1)) score += sign * 65
+    const faceUp = p.legends.filter(uid => state.cards[uid].faceUp)
+    if (strategy.pairs) score += sign * valuePairCount(state, player) * (faceUp.length ? 70 : 25)
 
-  score += fieldPower(db, state, perspective) * weights.friendlyPower
-  score -= fieldPower(db, state, rival) * weights.rivalPower
-
-  score += (mine.hand.length - theirs.hand.length) * weights.handCard
-
-  score += mine.eddies.length * weights.eddie
-  score += readyPayers(db, state, perspective) * weights.readyPayer
-  score += faceUpLegends(state, perspective) * weights.faceUpLegend
-
-  score += readyBlockers(db, state, perspective) * weights.readyBlocker
-  score -= readyBlockers(db, state, rival) * weights.readyBlocker
-
-  score += mine.deck.length * weights.deckCard
-  if (mine.deck.length < DECKOUT_THRESHOLD) {
-    score -= (DECKOUT_THRESHOLD - mine.deck.length) * weights.deckoutAversion
+    const currentAttacks = new Set(attackActions(db, { ...state, activePlayer: player })
+      .filter(a => a.type === 'attack').map(a => a.type === 'attack' ? a.attacker : -1))
+    for (const uid of p.field) {
+      const card = state.cards[uid], def = db[card.defId]
+      const power = effectivePower(db, state, uid)
+      // A temporary debuff without a follow-up is not lasting removal.
+      const lastingPower = Math.max(0, signedPower(db, state, uid) - card.tempPower)
+      score += sign * lastingPower * (player === perspective ? weights.friendlyPower : weights.rivalPower)
+      const blocker = effectiveKeywords(db, state, uid).includes('blocker')
+      if (blocker) {
+        // A rival blocker spent on our turn readies before its next turn. Its
+        // temporary absence matters only if we can exploit it with attackers.
+        const facingAttackers = state.players[opponentOf(player)].field.some(other => effectivePower(db, state, other) > 0 && !cantAttack(db, state, other))
+        score += sign * Math.round(weights.readyBlocker * 0.5)
+        if (card.ready) score += sign * Math.round(weights.readyBlocker * (facingAttackers ? 0.5 : 0.1))
+      }
+      const locked = state.floatingEffects.some(e => e.unitUid === uid &&
+        (e.kind === 'unitCantAttack' || (e.kind === 'unitCantReady' && !card.ready)) &&
+        (e.expiry === 'ownerNextTurnStart' || player === state.activePlayer)) || (card.skipNextReady && !card.ready)
+      // A spent/Lag body is still a future attacker. Persistent denial removes
+      // that threat for a turn; being spent alone does not.
+      if (!locked && !cantAttackGigArea(db, state, uid) && !cantAttack(db, state, uid)) {
+        score += sign * stealCount(lastingPower) * 100
+      }
+      if (player === knowledge.turnPlayer && player === state.activePlayer && currentAttacks.has(uid)) {
+        score += sign * (stealCount(power) * 100 + (def.effects.some(e => e.trigger === 'onAttack') ? 20 : 0))
+        if (card.tempPower > 0) score += sign * Math.min(card.tempPower, 5) * 6
+      }
+    }
+    for (const uid of faceUp) {
+      const def = db[state.cards[uid].defId]
+      score += sign * weights.faceUpLegend
+      if (def.effects.some(e => e.trigger === 'onStartTurn' || e.trigger === 'onFriendlyCardPlayed')) score += sign * 65
+    }
   }
 
+  score += (mine.hand.length - theirs.hand.length) * weights.handCard
+  const copies = new Map<string, number>()
+  // Only the observer's identities are known, even when scoring a rival reply.
+  const observer = knowledge.observer
+  const handSign = observer === perspective ? 1 : -1
+  for (const uid of state.players[observer].hand) {
+    const defId = knowledge.hand.get(uid)
+    if (!defId) continue
+    const count = copies.get(defId) ?? 0
+    copies.set(defId, count + 1)
+    score += handSign * Math.round(retainedCardValue(db, state, observer, defId) / (count + 1))
+  }
+  score += mine.eddies.length * weights.eddie
+  score += readyPaymentUids(db, state, perspective).length * weights.readyPayer
+  score += mine.deck.length * weights.deckCard
+  if (mine.deck.length < DECKOUT_THRESHOLD) score -= (DECKOUT_THRESHOLD - mine.deck.length) * weights.deckoutAversion
   return score
 }

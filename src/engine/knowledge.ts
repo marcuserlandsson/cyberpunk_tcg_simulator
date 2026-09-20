@@ -18,7 +18,7 @@ export function chooseFaceDownLegend(state: GameState, player: PlayerId, sourceU
 /** Show the identity only during this permitted peek. The board retains a public marker. */
 export function peekLegends(db: CardDb, state: GameState, player: PlayerId, uids: number[], sourceUid: number): void {
   if (!uids.length) return
-  stopAtHiddenInformation(state)
+  stopAtHiddenInformation(state, { viewer: player, kind: 'peek', sourceUid, uids })
   const legends = state.players[player].legends
   for (const uid of uids) state.cards[uid].knownTo = [...new Set([...(state.cards[uid].knownTo ?? []), player])]
   if (state.effectQueue === undefined && state.interceptAnswers.length === 0) return
@@ -37,7 +37,7 @@ export function callChosenLegend(db: CardDb, state: GameState, player: PlayerId,
   if (p.calledLegendThisTurn) return
   const uid = chosen ?? chooseFaceDownLegend(state, player, sourceUid, optional)
   if (uid === null || !p.legends.includes(uid) || state.cards[uid].faceUp) return
-  stopAtHiddenInformation(state)
+  stopAtHiddenInformation(state, { viewer: 'all', player, kind: 'legend', sourceUid, uids: [uid] })
   state.cards[uid].faceUp = true
   p.calledLegendThisTurn = true
   state.events.push({ type: 'legendCalled', player, uid })
@@ -47,7 +47,7 @@ export function callChosenLegend(db: CardDb, state: GameState, player: PlayerId,
 /** Public reveal lasts through an explicit acknowledgement, with a permanent log entry. */
 export function revealCards(db: CardDb, state: GameState, player: PlayerId, uids: number[], sourceUid: number, acknowledge = true): void {
   if (!uids.length) return
-  stopAtHiddenInformation(state)
+  stopAtHiddenInformation(state, { viewer: 'all', kind: 'reveal', sourceUid, uids })
   for (const uid of uids) state.events.push({ type: 'cardRevealed', player, uid })
   if (!acknowledge || (state.effectQueue === undefined && state.interceptAnswers.length === 0)) return
   askIntercept(state, { kind: 'effectChoice', player, protector: sourceUid, subject: sourceUid,

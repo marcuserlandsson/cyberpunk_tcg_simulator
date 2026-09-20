@@ -4,7 +4,7 @@ An unofficial, fan-made playtesting simulator for **WeirdCo's Official
 Cyberpunk Trading Card Game** (Cyberpunk 2077 license), built against the
 public card pool ahead of the game's retail launch. The game runs
 in your browser: build a deck from the 151-card catalog, then play a
-complete game against a heuristic AI opponent, or batch-simulate thousands of
+complete game against an Easy, Medium or Hard AI opponent, or batch-simulate
 AI-vs-AI games to see how decks and cards perform. All 151 catalog cards
 currently have gameplay implementations.
 The gameplay corrections from the comprehensive rules audit are implemented.
@@ -89,7 +89,8 @@ locally).
 **Starting a game:** on the Play tab, pick a deck for yourself and one for
 the AI (the two bundled starter decks — Arasaka's "Embracing Power" and the
 Mercs' "The Heist" — are always available, plus anything you've saved in the
-Deck Builder), optionally set a seed for a reproducible shuffle, and click
+Deck Builder), choose Easy, Medium or Hard, optionally set a seed for a
+reproducible shuffle, and click
 **Start Game**. You'll get one optional full mulligan on your opening hand.
 
 **Playing your turn:** the playmat is laid out like the physical table. The
@@ -268,7 +269,14 @@ npm run sim -- --games 1000 \
 ```
 
 Flags: `--games` (default 100), `--seed` (default 1), and `--agentA`/
-`--agentB` (`heuristic` (default) or `random`).
+`--agentB` (`easy`, `medium` (default), `hard`, or `random`). The legacy
+`heuristic` name remains an alias for Medium.
+
+Both Play and Simulate offer difficulty selection. Hard compares sampled future
+turns and possible opponent replies; live decisions have a ten-second deadline.
+Simulations use the same planner with a deterministic work budget, so Hard batches
+take longer. Saved games retain their difficulty. See [AI planning and measured
+strength](docs/ai-difficulty.md) for the search limits and benchmark results.
 
 ## Official card images
 
@@ -321,7 +329,7 @@ src/
 │             # seeded RNG, deck validation, event log — no UI, no card-specific logic
 ├── cards/    # effect primitives (the vocabulary cards are built from) +
 │             # scripted/ escape-hatch implementations for cards that need one
-├── ai/       # the heuristic opponent (src/ai/heuristic.ts) and a random-legal-mover
+├── ai/       # shared difficulty profiles, tactical evaluator, planner and live worker
 │             # baseline (src/ai/random.ts) used by tests and by the AI-strength benchmark
 ├── sim/      # batch AI-vs-AI runner (src/sim/runner.ts), driven directly by the
 │             # CLI (scripts/sim.ts) and, in the browser, from a Web Worker (src/sim/worker.ts)

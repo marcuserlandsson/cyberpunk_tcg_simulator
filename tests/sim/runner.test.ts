@@ -93,12 +93,13 @@ describe('runGames: determinism', () => {
   })
 
   it('is deterministic for heuristic agents too (small game count)', () => {
+    // Six complete searched games verify reproducibility; AI latency has its own test.
     const opts = baseOpts({ games: 3, seed: 7, agentA: 'heuristic', agentB: 'heuristic' })
     const first = runGames(db, opts)
     const second = runGames(db, opts)
     expect(second).toEqual(first)
     expect(first.games).toHaveLength(3)
-  })
+  }, 30_000)
 
   it('per-game seeds are derived from opts.seed + gameIndex and match GameResult.seed', () => {
     const opts = baseOpts({ games: 5, seed: 100 })

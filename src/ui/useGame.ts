@@ -26,7 +26,8 @@
 // needed.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createHeuristicAgent } from '../ai/heuristic'
+import { createAgent, AI_VERSION, type AiDifficulty } from '../ai/agents'
+import type { AiWorker, AiResponse } from '../ai/workerProtocol'
 import { legalActions } from '../engine/legal'
 import { actingPlayer } from '../engine/query'
 import { applyAction } from '../engine/reduce'
@@ -44,11 +45,12 @@ import type { Action, CardDb, GameEvent, GameState, PlayerId } from '../engine/t
 
 /** The seat the person clicking always occupies. */
 export const HUMAN: PlayerId = 0
-/** The seat the heuristic agent always occupies. */
+/** The seat the AI opponent always occupies. */
 export const AI: PlayerId = 1
 
 /** How long the AI "thinks" between its own consecutive actions, by default. */
 export const DEFAULT_AI_DELAY_MS = 300
+export const HARD_THINKING_LIMIT_MS = 10_000
 
 export interface LogLine {
   text: string
@@ -59,6 +61,8 @@ export interface UseGameOptions {
   /** Pacing delay between AI actions, in ms. 0 in tests and in E2E runs. */
   manual?: boolean
   aiDelayMs?: number
+  aiDifficulty?: AiDifficulty
+  createAiWorker?: () => AiWorker
 }
 
 export interface UseGameApi {
@@ -70,6 +74,8 @@ export interface UseGameApi {
   aiThinking: boolean
   /** True when there is a human action `undo` would strip. */
   canUndo: boolean
+  aiError: string | null
+  retryAI: () => void
   /**
    * Set when `start` or (far more commonly) `load` was handed a config/record
    * the engine can no longer replay — typically a save written before a rules
@@ -137,6 +143,9 @@ function randomSeed(): number {
 export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   const aiDelayMs = options.aiDelayMs ?? DEFAULT_AI_DELAY_MS
   const [game, setGame] = useState<Game | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  const retryAI = useCallback(() => { setAiError(null); setRetry(value => value + 1) }, [])
   const [loadError, setLoadError] = useState<string | null>(null)
   // `act` must not go stale between renders, so the reducer reads `db` through
   // a ref rather than closing over it.
@@ -147,21 +156,25 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
     try {
       const next = gameFromRecord(dbRef.current, {
         practiceMode: options.manual ?? false,
+        aiDifficulty: options.aiDifficulty ?? 'medium',
+        aiVersion: AI_VERSION,
         provenance: gameProvenance(dbRef.current),
         config: { decks: structuredClone([humanDeck, aiDeck]), seed: seed ?? randomSeed() },
         actions: [],
       })
       setGame(next)
+      setAiError(null)
       setLoadError(null)
     } catch (error) {
       setLoadError(describeLoadFailure(error))
     }
-  }, [options.manual])
+  }, [options.manual, options.aiDifficulty])
 
   const load = useCallback((record: GameRecord) => {
     try {
       const next = gameFromRecord(dbRef.current, record)
       setGame(next)
+      setAiError(null)
       setLoadError(null)
     } catch (error) {
       setLoadError(describeLoadFailure(error))
@@ -175,6 +188,7 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   }, [])
 
   const undo = useCallback(() => {
+    setAiError(null)
     setGame((current) => {
       if (current === null) return current
       const rewound = current.record.practiceMode ? { ...current.record, actions: current.record.actions.slice(0,-1) } : undoToLastDecisionOf(dbRef.current, current.record, HUMAN)
@@ -197,34 +211,59 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
 
   const acting = game === null ? null : actingPlayer(game.state)
   const over = game === null || game.state.phase === 'gameOver'
-  const aiThinking = game !== null && !game.record.practiceMode && !over && acting === AI
+  const aiThinking = !aiError && game !== null && !game.record.practiceMode && !over && acting === AI
 
   // --- the AI loop -------------------------------------------------------
   useEffect(() => {
     if (game === null || game.record.practiceMode || game.state.phase === 'gameOver') return
     if (actingPlayer(game.state) !== AI) return
 
+    setAiError(null)
+    let active = true
+    let worker: AiWorker | undefined
+    let deadline: ReturnType<typeof setTimeout> | undefined
+    let bestCompleted: Action | undefined
+    const fail = (message: string) => {
+      if (active) { active = false; clearTimeout(deadline); setAiError(message); worker?.terminate() }
+    }
+    const accept = (action: Action) => {
+      if (!active) return
+      try {
+        const next = applyOne(dbRef.current, game, action)
+        active = false
+        clearTimeout(deadline)
+        worker?.terminate()
+        setGame(current => current === game ? next : current)
+      } catch (error) { fail(error instanceof Error ? error.message : String(error)) }
+    }
     const timer = setTimeout(() => {
-      setGame((current) => {
-        // A stale timer (a re-render, or React's development double-mount)
-        // must never get a second action in: the identity check makes the
-        // update a no-op unless it is still the very state this effect saw.
-        if (current !== game) return current
-        const actions = legalActions(dbRef.current, current.state)
-        if (actions.length === 0) return current
-        const agent = createHeuristicAgent(
-          agentSeedFor(current.record.config.seed, current.record.actions.length)
-        )
-        return applyOne(
-          dbRef.current,
-          current,
-          agent.chooseAction(dbRef.current, current.state, actions)
-        )
-      })
+      try {
+        const difficulty = game.record.aiDifficulty ?? 'medium'
+        const seed = agentSeedFor(game.record.config.seed, game.record.actions.length)
+        worker = options.createAiWorker?.() ?? (typeof Worker === 'undefined' ? undefined :
+          new Worker(new URL('../ai/worker.ts', import.meta.url), { type: 'module' }))
+        if (worker) {
+          worker.onmessage = (event: MessageEvent<AiResponse>) => {
+            if (!active) return
+            if (event.data.type === 'action') accept(event.data.action)
+            else if (event.data.type === 'progress') bestCompleted = event.data.action
+            else fail(event.data.message)
+          }
+          worker.onerror = () => fail('The rival could not finish its decision. Try again.')
+          worker.postMessage({ db: dbRef.current, state: game.state, seed, difficulty })
+          if (difficulty === 'hard') deadline = setTimeout(() => {
+            if (bestCompleted) accept(bestCompleted)
+            else fail('The rival did not respond in time. Try again.')
+          }, HARD_THINKING_LIMIT_MS)
+        } else {
+          const actions = legalActions(dbRef.current, game.state)
+          accept(createAgent(difficulty, seed).chooseAction(dbRef.current, game.state, actions))
+        }
+      } catch (error) { fail(error instanceof Error ? error.message : String(error)) }
     }, aiDelayMs)
 
-    return () => clearTimeout(timer)
-  }, [game, aiDelayMs])
+    return () => { active = false; clearTimeout(timer); clearTimeout(deadline); worker?.terminate() }
+  }, [game, aiDelayMs, options.createAiWorker, retry])
 
   const legal = useMemo(() => {
     if (game === null || over || (!game.record.practiceMode && acting !== HUMAN)) return []
@@ -244,6 +283,8 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
     legal,
     aiThinking,
     canUndo,
+    aiError,
+    retryAI,
     loadError,
     clearLoadError,
     start,

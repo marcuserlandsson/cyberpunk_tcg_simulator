@@ -470,6 +470,7 @@ export function applyAction(db: CardDb, state: GameState, action: Action): GameS
     resumed.phase = pending.resumePhase
     resumed.pendingIntercept = null
     resumed.interceptAnswers = []
+    if (state.simulationPreview) resumed.previewRevealed = pending.revealedInformation ?? state.previewRevealed
     return runAction(db, resumed, pending.action, [...pending.answers, action.answer], pending.knownCards)
   }
 
@@ -495,6 +496,7 @@ function runAction(
   knownCards: NonNullable<GameState['pendingIntercept']>['knownCards'] = [],
 ): GameState {
   const draft = draftState(state)
+  draft.informationTrace = []
   draft.interceptAnswers = [...answers]
   draft.pendingIntercept = null
 
@@ -516,7 +518,14 @@ function runAction(
       paused.pendingIntercept = {
         ...error.ask,
         ...(!state.simulationPreview ? { view: draft } : {}),
-        knownCards: [...knownCards, ...(error.ask.knownCards ?? [])],
+        knownCards: [...knownCards, ...(error.ask.knownCards ?? []),
+          ...draft.players.flatMap((player, seat) => [
+            ...player.hand.map(uid => ({ uid, viewer: seat as PlayerId })),
+            ...[...player.trash, ...player.field, ...player.legends.filter(uid => draft.cards[uid].faceUp)]
+              .map(uid => ({ uid, viewer: 'all' as const })),
+          ]),
+        ],
+        revealedInformation: draft.informationTrace,
         action,
         answers: [...answers],
         resumePhase: state.phase,
@@ -532,6 +541,8 @@ function runAction(
   delete draft.effectQueue
   delete draft.resolvingEffects
   delete draft.lastKnownCards
+  delete draft.informationTrace
+  delete draft.previewRevealed
   checkOvertimeWin(draft)
   return draft
 }

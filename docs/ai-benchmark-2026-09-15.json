@@ -1,0 +1,207 @@
+{
+  "engineVersion": "strategic-ai-2026-09-15-v2",
+  "baselineCommit": "6f33927",
+  "bbGDeck": {
+    "name": "BBG Draw and Wipe (WillGlitch, 2026-09-11)",
+    "notes": "Public comparison list; not confirmed as the user's list. Source: https://choom.gg/guides/bbg-draw-and-wipe-f4d128",
+    "legends": [
+      "jackie-welles-pour-one-out-for-me",
+      "hanako-arasaka-daughter-of-the-emperor",
+      "judy-a-lvarez-braindance-maestro"
+    ],
+    "cards": {
+      "lizzy-wizzy-delicate-weapon": 3,
+      "maman-brigitte-spirit-of-death": 3,
+      "jacked-in-voodoo-boy": 3,
+      "delamain-rideshare-ai": 3,
+      "peace-offering": 3,
+      "memory-relapse": 2,
+      "placide-voodoo-sentinel": 2,
+      "les-e-le-mens": 3,
+      "towerfall": 2,
+      "trust-no-one": 3,
+      "three-mouths-one-desire": 3,
+      "pyramid-song": 3,
+      "nocturne-op55-n1": 3,
+      "chrome-reverie": 3,
+      "maxtac-av": 1
+    }
+  },
+  "matchupSettings": {
+    "gamesPerMatchup": 200,
+    "seed": 7,
+    "alternatingSeats": true,
+    "bothAgents": "heuristic"
+  },
+  "baseline": [
+    {
+      "opponent": "Embracing Power — Starter Deck",
+      "winRate": 0.085,
+      "avgTurns": 6.335,
+      "reasons": {
+        "sevenGigs": 180,
+        "overtimeSevenGigs": 20
+      }
+    },
+    {
+      "opponent": "The Heist — Starter Deck",
+      "winRate": 0.165,
+      "avgTurns": 6.27,
+      "reasons": {
+        "sevenGigs": 173,
+        "overtimeSevenGigs": 27
+      }
+    }
+  ],
+  "revised": [
+    {
+      "opponent": "embracing-power-starter",
+      "wins": 49,
+      "games": 200,
+      "winRate": 0.245,
+      "avgTurns": 6.38,
+      "reasons": {
+        "sevenGigs": 170,
+        "overtimeSevenGigs": 30
+      },
+      "ms": 91020
+    },
+    {
+      "opponent": "the-heist-starter",
+      "wins": 48,
+      "games": 200,
+      "winRate": 0.24,
+      "avgTurns": 6.33,
+      "reasons": {
+        "sevenGigs": 156,
+        "overtimeSevenGigs": 44
+      },
+      "ms": 203756
+    }
+  ],
+  "identicalDeckSettings": {
+    "gamesPerDeck": 100,
+    "seed": 12000,
+    "alternatingSeats": true
+  },
+  "identicalDeckResults": [
+    {
+      "deck": "bbg",
+      "wins": 65,
+      "losses": 35,
+      "draws": 0,
+      "games": 100,
+      "judyTakes": 80,
+      "judyLeaves": 0,
+      "decisions": 11188,
+      "ms": 55249
+    },
+    {
+      "deck": "embracing-power-starter",
+      "wins": 75,
+      "losses": 25,
+      "draws": 0,
+      "games": 100,
+      "judyTakes": 0,
+      "judyLeaves": 0,
+      "decisions": 10242,
+      "ms": 30452
+    },
+    {
+      "deck": "the-heist-starter",
+      "wins": 71,
+      "losses": 29,
+      "draws": 0,
+      "games": 100,
+      "judyTakes": 0,
+      "judyLeaves": 0,
+      "decisions": 15306,
+      "ms": 169366
+    }
+  ],
+  "userDeckFollowup": {
+    "deck": {
+      "name": "BBG Judy",
+      "legends": [
+        "hanako-arasaka-daughter-of-the-emperor",
+        "jackie-welles-pour-one-out-for-me",
+        "judy-a-lvarez-braindance-maestro"
+      ],
+      "cards": {
+        "peace-offering": 3,
+        "memory-relapse": 2,
+        "floor-it": 3,
+        "jacked-in-voodoo-boy": 3,
+        "trust-no-one": 3,
+        "three-mouths-one-desire": 3,
+        "delamain-rideshare-ai": 3,
+        "les-e-le-mens": 3,
+        "lizzy-wizzy-delicate-weapon": 3,
+        "maman-brigitte-spirit-of-death": 3,
+        "placide-voodoo-sentinel": 2,
+        "towerfall": 3,
+        "nocturne-op55-n1": 3,
+        "pyramid-song": 3
+      },
+      "format": "constructed",
+      "revisionId": "7d4ac89d-d1c0-4d0a-8241-9d8bc6f93f48",
+      "updatedAt": "2026-09-15T07:19:37.016Z"
+    },
+    "opponent": "Embracing Power — Starter Deck",
+    "seed": 7,
+    "alternatingSeats": true,
+    "differencesFromPublicReference": [
+      {
+        "id": "floor-it",
+        "user": 3,
+        "reference": 0
+      },
+      {
+        "id": "towerfall",
+        "user": 3,
+        "reference": 2
+      },
+      {
+        "id": "chrome-reverie",
+        "user": 0,
+        "reference": 3
+      },
+      {
+        "id": "maxtac-av",
+        "user": 0,
+        "reference": 1
+      }
+    ],
+    "results": [
+      {
+        "policy": "previous",
+        "wins": 14,
+        "losses": 186,
+        "games": 200,
+        "avgTurns": 6.305,
+        "reasons": {
+          "sevenGigs": 184,
+          "overtimeSevenGigs": 16
+        },
+        "judyTaken": 101,
+        "judyLeft": 90,
+        "ms": 80183
+      },
+      {
+        "policy": "improved",
+        "wins": 42,
+        "losses": 158,
+        "games": 200,
+        "avgTurns": 6.275,
+        "reasons": {
+          "sevenGigs": 169,
+          "overtimeSevenGigs": 31
+        },
+        "judyTaken": 185,
+        "judyLeft": 0,
+        "ms": 172873
+      }
+    ],
+    "productionRunnerCrossCheckGames": 4
+  }
+}

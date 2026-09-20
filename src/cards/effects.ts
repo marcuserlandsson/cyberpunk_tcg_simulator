@@ -49,7 +49,7 @@ import {
 } from '../engine/query'
 import { nextInt, rollDie } from '../engine/rng'
 import { stopAtHiddenInformation } from '../engine/preview'
-import { PRIVATE_INFORMATION_SCRIPTS } from './scripted/index'
+import { PRIVATE_INFORMATION_SCRIPTS, PUBLIC_REVEAL_SCRIPTS } from './scripted/index'
 import { chooseEffectOption, discardChosenCards } from '../engine/choices'
 import { chooseAndStealGigs } from '../engine/stealing'
 import { scriptedCards } from './scripted/index'
@@ -996,7 +996,10 @@ function applyNode(
     }
 
     case 'scripted': {
-      if (PRIVATE_INFORMATION_SCRIPTS.has(node.name)) stopAtHiddenInformation(draft)
+      if (PRIVATE_INFORMATION_SCRIPTS.has(node.name)) stopAtHiddenInformation(draft, {
+        viewer: PUBLIC_REVEAL_SCRIPTS.has(node.name) ? 'all' : ctx.player,
+        player: ctx.player, kind: 'script', sourceUid: ctx.sourceUid, script: node.name,
+      })
       const script = scriptedCards[node.name]
       if (!script) {
         throw new Error(`Unknown scripted card effect "${node.name}" (src/cards/scripted).`)
