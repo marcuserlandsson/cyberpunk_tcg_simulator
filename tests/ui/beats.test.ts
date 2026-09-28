@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildBeats, BEAT_MS } from '../../src/ui/presentation/beats'
+import { beatAnimations } from '../../src/ui/presentation/beatAnimations'
 import type { Frame } from '../../src/engine/timeline'
 import type { GameEvent, GameState } from '../../src/engine/types'
 import { startedGame } from '../engine/gameHelpers'
@@ -114,5 +115,22 @@ describe('buildBeats', () => {
 
   it('returns nothing for no frames', () => {
     expect(buildBeats([], 'ai')).toEqual([])
+  })
+})
+
+describe('beatAnimations', () => {
+  const [attack, roll, steal, over] = buildBeats(frames(
+    { type: 'attackDeclared', attacker: 900, target: 'gigArea' },
+    { type: 'dieRolled', player: 1, size: 8, value: 5 },
+    { type: 'gigStolen', from: 0, die: { size: 6, value: 3 } },
+    { type: 'gameEnded', winner: 1, reason: 'sevenGigs' },
+  ), 'ai')
+
+  it('maps beats onto the existing animation flags', () => {
+    expect(beatAnimations(null)).toEqual({ lungeUid: null, tumble: null, steal: null, glitch: false })
+    expect(beatAnimations(attack).lungeUid).toBe(900)
+    expect(beatAnimations(roll).tumble).toEqual({ player: 1, size: 8 })
+    expect(beatAnimations(steal).steal).toEqual({ from: 0, size: 6, value: 3 })
+    expect(beatAnimations(over).glitch).toBe(true)
   })
 })

@@ -22,7 +22,7 @@ import { paymentLabel, readyPaymentUids } from '../engine/economy'
 // indistinguishable. Nothing is chosen for the player except things that are
 // not decisions.
 
-import { useEffect, useMemo, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react'
 import { Field } from './Field'
 import { HandStrip } from './HandStrip'
 import { LogPanel } from './LogPanel'
@@ -30,8 +30,11 @@ import { ReactionBar } from './ReactionBar'
 import { StreetStrip } from './StreetStrip'
 import { ZonePanels } from './ZonePanels'
 import { ZoomPanel } from './ZoomPanel'
-import { HUMAN as DEFAULT_HUMAN, useGame } from './useGame'
-import { useAnimations } from './useAnimations'
+import { HUMAN as DEFAULT_HUMAN, buildLog, useGame } from './useGame'
+import { beatAnimations } from './presentation/beatAnimations'
+import { PacingControls } from './presentation/PacingControls'
+import { usePresentation } from './presentation/usePresentation'
+import { loadSpeed, saveSpeed, type Speed } from './presentation/speed'
 import { deleteGameRecord, useDecks, listGameRecords } from './storage'
 import { deckPickerLabel, isDeckPickable } from './deckPicker'
 import {
@@ -171,26 +174,42 @@ export function endReasonLabel(event: Extract<GameEvent, { type: 'gameEnded' }> 
   }
 }
 
+/** `data-awaiting`: whose input the game waits on, or `presenting` while beats play. */
+export function awaitingAttribute(input: { presenting: boolean; legalCount: number; over: boolean }): string {
+  if (input.presenting) return 'presenting'
+  if (input.legalCount > 0) return 'human'
+  return input.over ? 'over' : 'ai'
+}
+
 export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: PlayViewProps): ReactElement {
   const [manual,setManual] = useState(false)
   const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>('medium')
-  const game = useGame(db, { aiDelayMs, manual, aiDifficulty })
+  // Reduced motion and `?aiDelay=0` (every E2E run) force Instant, which is
+  // exactly the pre-pacing behaviour. `matchMedia` is guarded because jsdom
+  // lacks it.
+  const reducesMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
+  const speedForced = aiDelayMs === 0 || reducesMotion
+  const [chosenSpeed, setChosenSpeed] = useState<Speed>(loadSpeed)
+  const speed: Speed = speedForced ? 'instant' : chosenSpeed
+  const changeSpeed = (next: Speed) => { setChosenSpeed(next); saveSpeed(next) }
+  const game = useGame(db, { aiDelayMs, manual, aiDifficulty, pacing: speed !== 'instant' })
+  const presentation = usePresentation({
+    beats: game.beats,
+    ackBeat: game.ackBeat,
+    clearBeats: game.clearBeats,
+    awaitingHuman: game.legal.length > 0 || game.state?.phase === 'gameOver',
+    speed,
+  })
+  const beat = presentation.beat
   const HUMAN = game.record?.practiceMode && game.state ? actingPlayer(game.state) : DEFAULT_HUMAN
   const AI = opponentOf(HUMAN)
   const { record, legal } = game
-  const state = game.state?.pendingIntercept?.view
-    ? { ...game.state.pendingIntercept.view, phase: game.state.phase, pendingIntercept: game.state.pendingIntercept }
-    : game.state
-
-  // Showpiece motion (Task 8) is off under `prefers-reduced-motion: reduce`
-  // and whenever `aiDelayMs === 0` — the latter is how the E2E suite always
-  // runs (`?aiDelay=0`), so those specs never race a mid-flight animation.
-  // `matchMedia` is guarded because jsdom (every vitest UI test) does not
-  // implement it.
-  const reducesMotion =
-    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
-  const animationsEnabled = aiDelayMs !== 0 && !reducesMotion
-  const anim = useAnimations(state?.events ?? [], animationsEnabled)
+  const base = beat?.board ?? game.state
+  const state = base?.pendingIntercept?.view
+    ? { ...base.pendingIntercept.view, phase: base.phase, pendingIntercept: base.pendingIntercept }
+    : base
+  const anim = beatAnimations(beat)
+  const logLines = useMemo(() => (beat === null ? game.eventsForLog : buildLog(db, beat.board)), [beat, db, game.eventsForLog])
 
   const [pending, setPending] = useState<Pending | null>(null)
   // The uid the board/hand is currently hovering (or focused on, for
@@ -622,18 +641,27 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
     // waiting for" — the single fact any automated driver (the E2E suite, and
     // Task 15's) needs in order to never race the AI's own timer.
     <BoardPerspective.Provider value={HUMAN}><section
-      className={`playmat${promptOpen ? ' playmat--prompting' : ''}${anim.glitch ? ' is-glitching' : ''}`}
+      className={`playmat${promptOpen ? ' playmat--prompting' : ''}${anim.glitch ? ' is-glitching' : ''}${beat !== null ? ' is-presenting' : ''}`}
       aria-label="Playmat"
       data-testid="playmat"
-      data-awaiting={legal.length > 0 ? 'human' : state.phase === 'gameOver' ? 'over' : 'ai'}
+      data-awaiting={awaitingAttribute({ presenting: game.presenting, legalCount: legal.length, over: state.phase === 'gameOver' })}
       data-turn={state.turnNumber}
       data-phase={state.phase}
+      style={beat !== null ? ({ '--beat-ms': `${presentation.durationMs}ms` } as CSSProperties) : undefined}
     >
       {/* Floats over the top of the board (absolute, prompts.css-style) so
           the four-row board grid keeps its rows. */}
       {record?.practiceMode && <p className="chip practice-seat" data-testid="practice-seat">Manual practice · controlling player {HUMAN + 1} · log labels remain relative to player 1</p>}
       <div className="playmat__body">
-        <div className="playmat__board">
+        <div
+          className="playmat__board"
+          onClickCapture={(event) => {
+            if (presentation.beat === null) return
+            event.stopPropagation()
+            event.preventDefault()
+            presentation.skipBeat()
+          }}
+        >
           <div className="rival-strip" data-testid="rival-side">
             {/* Turn/phase/whose-turn already read prominently off `StreetStrip`'s
                 vs-block below; these stay tiny and muted so nothing is said
@@ -757,12 +785,22 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
             useOfficialImages={useOfficialImages}
           />
           <LogPanel
-            lines={game.eventsForLog}
+            lines={logLines}
+            highlight={beat === null ? null : { from: beat.firstIndex, to: beat.lastIndex }}
             headerExtra={
               <span className="chip chip--seed" data-testid="seed-chip">
                 seed {record?.config.seed}
               </span>
             }
+          />
+          <PacingControls
+            speed={speed}
+            onSpeed={changeSpeed}
+            paused={presentation.paused}
+            onPause={presentation.togglePause}
+            onSkipTurn={presentation.skipTurn}
+            beat={beat}
+            disabled={speedForced}
           />
           <div className="action-rail">
             <button

@@ -1317,3 +1317,20 @@
 .log-line--sys .log-panel__text {
   color: var(--act);
 }
+
+/* Beat playback controls (PacingControls.tsx), in the rail under the feed. */
+.pacing-controls {
+  display: grid;
+  gap: 4px;
+}
+.pacing-controls__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+/* The log line(s) of the beat being shown right now. */
+.log-panel__line--current {
+  background: var(--panel-2);
+  box-shadow: inset 2px 0 0 var(--act);
+}

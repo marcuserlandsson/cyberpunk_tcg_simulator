@@ -9,7 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { PlayView, endReasonLabel, lastGameEnded } from '../../src/ui/PlayView'
+import { PlayView, awaitingAttribute, endReasonLabel, lastGameEnded } from '../../src/ui/PlayView'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { newGame } from '../../src/engine/game'
 import { legalActions } from '../../src/engine/legal'
@@ -408,4 +408,27 @@ it('requires an explicit current-rules attempt for a legacy replay and preserves
   fireEvent.click(screen.getByTestId('replay-current-rules'))
   expect(screen.queryByTestId('play-setup')).toBeNull()
   expect(listGameRecords()[0].record).toEqual(GOOD_RECORD)
+})
+
+describe('PlayView pacing wiring', () => {
+  it('shows the pacing controls in the rail', () => {
+    saveGameRecord('pacing-slot', GOOD_RECORD)
+    render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
+    fireEvent.click(screen.getByTestId('resume-game'))
+
+    // `toBeInTheDocument`/`toBeChecked` need @testing-library/jest-dom, which
+    // this project does not depend on (see tests/ui/cardframe.test.tsx) — use
+    // built-in Vitest matchers instead.
+    expect(screen.getByTestId('pacing-controls')).toBeTruthy()
+    expect((screen.getByTestId('pacing-speed-instant') as HTMLInputElement).checked).toBe(true) // aiDelayMs=0 forces Instant
+  })
+
+  it('data-awaiting reports presenting while beats are queued', () => {
+    // A unit test at the hook level already pins the gating (Task 5). Here we
+    // only pin the attribute mapping, via the pure helper.
+    expect(awaitingAttribute({ presenting: true, legalCount: 3, over: false })).toBe('presenting')
+    expect(awaitingAttribute({ presenting: false, legalCount: 3, over: false })).toBe('human')
+    expect(awaitingAttribute({ presenting: false, legalCount: 0, over: true })).toBe('over')
+    expect(awaitingAttribute({ presenting: false, legalCount: 0, over: false })).toBe('ai')
+  })
 })

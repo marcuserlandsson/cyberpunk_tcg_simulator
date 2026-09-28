@@ -6,6 +6,9 @@ export interface LogPanelProps {
   /** Rendered beside the "Feed" title — the seed chip lives here now (moved
    *  out of the old control bar per the playmat restyle). */
   headerExtra?: ReactNode
+  /** Event-index range of the beat being shown; those lines get
+   *  `log-panel__line--current`. */
+  highlight?: { from: number; to: number } | null
 }
 
 /**
@@ -35,7 +38,7 @@ function actorClass(text: string): string | null {
  * engine's own history, with no separate narration to drift out of sync (and
  * undo removes lines simply because the events are gone).
  */
-export function LogPanel({ lines, headerExtra }: LogPanelProps): ReactElement {
+export function LogPanel({ lines, headerExtra, highlight }: LogPanelProps): ReactElement {
   const scroller = useRef<HTMLOListElement>(null)
   const wasAtBottom = useRef(true)
 
@@ -65,9 +68,10 @@ export function LogPanel({ lines, headerExtra }: LogPanelProps): ReactElement {
       >
         {lines.map((line, index) => {
           const actor = actorClass(line.text)
+          const current = highlight != null && index >= highlight.from && index <= highlight.to && 'log-panel__line--current'
           return (
             <li
-              className={['log-panel__line', actor].filter(Boolean).join(' ')}
+              className={['log-panel__line', actor, current].filter(Boolean).join(' ')}
               key={index}
               data-testid="log-line"
               data-turn={line.turn}

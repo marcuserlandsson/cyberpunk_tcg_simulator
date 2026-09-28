@@ -20,7 +20,8 @@ describe('human payment selection', () => {
     const action = legalActions(db, state).find(a => a.type === 'playCard' && a.card === program)!
     const pending = applyAction(db, state, action)
     mock.api = { state: pending, record: { actions: [action], config: { seed: 1 } }, legal: legalActions(db, pending),
-      aiThinking: false, canUndo: false, loadError: null, eventsForLog: [], act: mock.act }
+      aiThinking: false, canUndo: false, loadError: null, eventsForLog: [], act: mock.act,
+      beats: [], ackBeat: vi.fn(), clearBeats: vi.fn(), presenting: false }
     render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
     fireEvent.click(screen.getByTestId('cancel-setup'))
     expect(screen.getByTestId('resolving-programs').textContent).toContain(db['all-is-lost'].name)
@@ -33,7 +34,8 @@ describe('human payment selection', () => {
     const legend = state.players[0].legends[0]
     state.cards[legend].ready = true
     mock.api = { state, record: { actions: [], config: { seed: 1 } }, legal: legalActions(db, state),
-      aiThinking: false, canUndo: false, loadError: null, eventsForLog: [], act: mock.act }
+      aiThinking: false, canUndo: false, loadError: null, eventsForLog: [], act: mock.act,
+      beats: [], ackBeat: vi.fn(), clearBeats: vi.fn(), presenting: false }
     render(<PlayView db={db} useOfficialImages={false} aiDelayMs={0} />)
     fireEvent.click(screen.getByTestId('cancel-setup'))
     fireEvent.click(screen.getByTestId('call-legend'))
