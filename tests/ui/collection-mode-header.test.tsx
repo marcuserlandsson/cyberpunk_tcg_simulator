@@ -7,13 +7,14 @@ import { _resetCollectionCacheForTests, setCount } from '../../src/ui/collection
 import { DRAFT_KEY, _resetDraftForTests, emptyDraft, stageLine } from '../../src/ui/sessionDraft'
 import { CollectionModeHeader } from '../../src/ui/CollectionModeHeader'
 import * as sync from '../../src/ui/collectionSync'
+import { _resetSellListForTests, addToSellList } from '../../src/ui/sellDraft'
 
 const db = loadCardDb()
 const printings = loadPrintings()
-beforeEach(() => { localStorage.clear(); _resetCollectionCacheForTests(); _resetDraftForTests() })
+beforeEach(() => { localStorage.clear(); _resetCollectionCacheForTests(); _resetDraftForTests(); _resetSellListForTests() })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
-function mount(mode: 'browse' | 'add' | 'plan' | 'history' = 'browse', onMode = vi.fn()) {
+function mount(mode: 'browse' | 'add' | 'plan' | 'sell' | 'history' = 'browse', onMode = vi.fn()) {
   render(<CollectionModeHeader db={db} printings={printings} mode={mode} onMode={onMode} />)
   return onMode
 }
@@ -24,6 +25,17 @@ describe('mode control', () => {
     expect(screen.getByTestId('collection-mode-browse').getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(screen.getByTestId('collection-mode-plan'))
     expect(onMode).toHaveBeenCalledWith('plan')
+  })
+
+  it('offers a Sell mode after Plan purchases with a badge for listed printings', () => {
+    addToSellList([{ key: 'arasakademodeck/006', count: 2 }, { key: 'welcometonightcityretail/033', count: 1 }])
+    const onMode = vi.fn()
+    mount('browse', onMode)
+    const labels = screen.getAllByRole('button').map(b => b.getAttribute('data-testid')).filter(id => id?.startsWith('collection-mode-'))
+    expect(labels).toEqual(['collection-mode-browse', 'collection-mode-add', 'collection-mode-plan', 'collection-mode-sell', 'collection-mode-history'])
+    expect(screen.getByTestId('collection-mode-sell').textContent).toBe('Sell2')
+    fireEvent.click(screen.getByTestId('collection-mode-sell'))
+    expect(onMode).toHaveBeenCalledWith('sell')
   })
 })
 

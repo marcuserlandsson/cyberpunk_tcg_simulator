@@ -6,13 +6,14 @@ import { loadPrintings, printingsByCard } from '../../src/ui/printings'
 import { _resetCollectionCacheForTests, getCollection, setCount } from '../../src/ui/collection'
 import { CardDrawer } from '../../src/ui/CardDrawer'
 import { artworkGroups } from '../../src/ui/artworks'
+import { _resetSellListForTests, getSellList } from '../../src/ui/sellDraft'
 
 const db = loadCardDb()
 const printings = loadPrintings()
 const byCard = printingsByCard(printings)
 const cardId = 'industrial-assembly'
 const prints = byCard.get(cardId)!
-beforeEach(() => { localStorage.clear(); _resetCollectionCacheForTests() })
+beforeEach(() => { localStorage.clear(); _resetCollectionCacheForTests(); _resetSellListForTests() })
 afterEach(cleanup)
 
 function mount(onClose = vi.fn()) {
@@ -62,5 +63,13 @@ describe('CardDrawer', () => {
     const onClose = mount()
     fireEvent.click(screen.getByTestId('drawer-close'))
     expect(onClose).toHaveBeenCalledOnce()
+  })
+  it('adds one copy of a printing to the sell list, only when one is owned', () => {
+    setCount('arasakademodeck/006', 2)
+    mount()
+    expect((screen.getByTestId('printing-sell-welcometonightcityretail/033') as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByTestId('printing-sell-arasakademodeck/006'))
+    fireEvent.click(screen.getByTestId('printing-sell-arasakademodeck/006'))
+    expect(getSellList().lines).toEqual([{ key: 'arasakademodeck/006', count: 2 }])
   })
 })

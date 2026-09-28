@@ -1,5 +1,5 @@
 // The Collection tab shell: loads the printings dataset once, owns the active
-// mode, and mounts the header strip plus the four mode screens. A mode mounts
+// mode, and mounts the header strip plus the five mode screens. A mode mounts
 // the first time it is opened, then stays mounted (behind `hidden`) for the
 // rest of the session, so its filters, a half-typed quick add and the review
 // column survive switching away and back; a mode that has never been opened
@@ -14,10 +14,11 @@ import { CollectionModeHeader, type CollectionMode } from './CollectionModeHeade
 import { CollectionBrowse } from './CollectionBrowse'
 import { AddCardsMode } from './AddCardsMode'
 import { PlanPurchasesMode } from './PlanPurchasesMode'
+import { SellMode } from './SellMode'
 import { HistoryBackupMode } from './HistoryBackupMode'
 
 const MODE_KEY = 'ctcg:collectionMode:v1'
-const MODES: CollectionMode[] = ['browse', 'add', 'plan', 'history']
+const MODES: CollectionMode[] = ['browse', 'add', 'plan', 'sell', 'history']
 const NARROW = 860
 
 function readMode(): CollectionMode {
@@ -61,6 +62,7 @@ export function CollectionView({ db, useOfficialImages }: { db: CardDb; useOffic
         <div hidden={mode !== 'browse'}>{visited.has('browse') && <CollectionBrowse db={db} printings={loadResult.printings} byCard={loadResult.byCard} known={known} useOfficialImages={useOfficialImages} narrow={narrow} />}</div>
         <div hidden={mode !== 'add'}>{visited.has('add') && <AddCardsMode db={db} printings={loadResult.printings} known={known} />}</div>
         <div hidden={mode !== 'plan'}>{visited.has('plan') && <PlanPurchasesMode db={db} printings={loadResult.printings} known={known} />}</div>
+        <div hidden={mode !== 'sell'}>{visited.has('sell') && <SellMode db={db} printings={loadResult.printings} known={known} />}</div>
         <div hidden={mode !== 'history'}>{visited.has('history') && <HistoryBackupMode db={db} printings={loadResult.printings} known={known} />}</div>
       </fieldset>
     </div>

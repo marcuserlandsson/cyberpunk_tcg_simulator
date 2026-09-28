@@ -19,6 +19,7 @@ import { getPrintingImageUrl } from './images'
 import { ramColorVar } from './CardFrame'
 import { PrintingCount } from './PrintingCount'
 import { comparePrintings } from './collectionSort'
+import { addToSellList } from './sellDraft'
 
 export function CardDrawer({ def, printings, visible, preferredSet = '', setOrder = [], collection, known, onClose }: {
   def: CardDef; printings: Printing[]; visible?: Printing[]; preferredSet?: string; setOrder?: readonly string[]
@@ -70,10 +71,13 @@ export function CardDrawer({ def, printings, visible, preferredSet = '', setOrde
                     <span>{p.collectorNumber} · {p.rarity} · {artIndex > 0 ? `Artwork ${artIndex}${known ? (ownedArts.has(p.artworkId!) ? ' · owned' : ' · missing') : ''}` : 'artwork unreviewed'}</span>
                     <span className="prow__key">{p.key}</span>
                   </span>
-                  <span className="collection-view__stepper">
-                    <button type="button" data-testid={`printing-dec-${p.key}`} disabled={!known || count === 0} onClick={() => adjustCount(p.key, -1)}>−</button>
-                    <PrintingCount printingKey={p.key} count={count} known={known} />
-                    <button type="button" data-testid={`printing-inc-${p.key}`} disabled={!known} onClick={() => adjustCount(p.key, 1)}>+</button>
+                  <span className="prow__act">
+                    <span className="collection-view__stepper">
+                      <button type="button" data-testid={`printing-dec-${p.key}`} disabled={!known || count === 0} onClick={() => adjustCount(p.key, -1)}>−</button>
+                      <PrintingCount printingKey={p.key} count={count} known={known} />
+                      <button type="button" data-testid={`printing-inc-${p.key}`} disabled={!known} onClick={() => adjustCount(p.key, 1)}>+</button>
+                    </span>
+                    <button type="button" className="btn--ghost" data-testid={`printing-sell-${p.key}`} disabled={!known || count === 0} title="Add one copy to the sell list" onClick={() => addToSellList([{ key: p.key, count: 1 }])}>Sell +1</button>
                   </span>
                 </div>
               )

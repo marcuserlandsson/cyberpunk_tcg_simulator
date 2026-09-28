@@ -1,5 +1,5 @@
 //
-// The strip under the app nav on the Collection tab: which of the four modes
+// The strip under the app nav on the Collection tab: which of the five modes
 // is open, whether the file is saved, whether a session draft is waiting, and
 // how far the two goals have got. The sync-status block is moved here from
 // CollectionHeader verbatim — its states, wording and CSS classes are pinned
@@ -11,10 +11,11 @@ import { completionStats, exportCollectionJson, useCollection } from './collecti
 import { useSyncStatus, retryCollection, resolveConflict, confirmEmptySave, ownershipAvailable } from './collectionSync'
 import { readCollectionJournal } from './collectionJournal'
 import { isDraftStale, useDraft } from './sessionDraft'
+import { useSellList } from './sellDraft'
 
-export type CollectionMode = 'browse' | 'add' | 'plan' | 'history'
+export type CollectionMode = 'browse' | 'add' | 'plan' | 'sell' | 'history'
 const MODES: { id: CollectionMode; label: string }[] = [
-  { id: 'browse', label: 'Browse' }, { id: 'add', label: 'Add cards' }, { id: 'plan', label: 'Plan purchases' }, { id: 'history', label: 'History & backup' },
+  { id: 'browse', label: 'Browse' }, { id: 'add', label: 'Add cards' }, { id: 'plan', label: 'Plan purchases' }, { id: 'sell', label: 'Sell' }, { id: 'history', label: 'History & backup' },
 ]
 
 function totalCount(counts: Record<string, number>): number { return Object.values(counts).reduce((sum, n) => sum + n, 0) }
@@ -34,6 +35,7 @@ export function CollectionModeHeader({ db, printings, mode, onMode }: { db: Card
   const collection = useCollection()
   const syncStatus = useSyncStatus()
   const draft = useDraft()
+  const sellLines = useSellList().lines.length
   const stats = useMemo(() => completionStats(db, printings, collection), [db, printings, collection])
   const historyCount = readCollectionJournal().entries.length
   const staged = draft.lines.reduce((n, l) => n + Math.abs(l.delta ?? (l.exact !== undefined ? 1 : 0)), 0)
@@ -44,7 +46,7 @@ export function CollectionModeHeader({ db, printings, mode, onMode }: { db: Card
       <div className="colhead__modes" role="group" aria-label="Collection modes">
         {MODES.map(m => (
           <button type="button" key={m.id} data-testid={`collection-mode-${m.id}`} aria-pressed={mode === m.id} onClick={() => onMode(m.id)}>
-            {m.label}{m.id === 'history' && historyCount > 0 && <span className="colhead__count">{historyCount}</span>}
+            {m.label}{m.id === 'history' && historyCount > 0 && <span className="colhead__count">{historyCount}</span>}{m.id === 'sell' && sellLines > 0 && <span className="colhead__count">{sellLines}</span>}
           </button>
         ))}
       </div>

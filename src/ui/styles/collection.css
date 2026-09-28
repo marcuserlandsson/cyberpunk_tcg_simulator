@@ -239,6 +239,7 @@
 .prow__meta b { font-weight: 600; }
 .prow__meta > span { font-family: var(--font-mono); font-size: 10px; color: var(--muted); overflow-wrap: anywhere; }
 .prow__key { color: var(--line-bright); }
+.prow__act { display: flex; align-items: center; gap: 6px; }
 
 /* ---------------------------------------------------------------------- */
 /* Mode pages: two-column cards (Add cards, Plan purchases, History)       */
