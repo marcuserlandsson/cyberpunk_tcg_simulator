@@ -1,7 +1,20 @@
 {
   "version": 1,
-  "subtitle": "when-shared",
+  "subtitle": "always",
   "separator": " - ",
-  "expansions": {},
+  "expansions": {
+    "welcometonightcitybeta": { "expansion": "Welcome to Night City - Beta" },
+    "theheistbetastarterdeck": { "expansion": "The Heist - Beta Starter Deck" },
+    "embracingpowerbetastarterdeck": { "expansion": "Embracing Power - Beta Starter Deck" },
+    "boxtoppersbeta": { "expansion": "Box Toppers - Beta" },
+    "prereleasebeta": { "expansion": "Pre-Release Beta" },
+    "PRM01": { "expansion": "Set 1 Promos" },
+    "mercdemodeck": { "expansion": "The Heist - Demo Deck" },
+    "arasakademodeck": { "expansion": "Embracing Power - Demo Deck" },
+    "welcometonightcityretail": { "expansion": "Welcome to Night City - Retail" },
+    "theheistretailstarterdeck": { "expansion": "The Heist - Retail Starter Deck" },
+    "embracingpowerretailstarterdeck": { "expansion": "Embracing Power - Retail Starter Deck" },
+    "boxtoppersretail": { "expansion": "Box Toppers - Retail" }
+  },
   "names": {}
 }

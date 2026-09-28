@@ -25,16 +25,24 @@ You can change any line on the sell list.
 
 ## Exporting
 
-- **Copy for bulk listing**: text grouped by Cardmarket expansion, in
-  collector-number order, to follow on each expansion's bulk listing page.
+- **Copy for bulk listing**: text grouped by Cardmarket expansion, rows
+  alphabetically with collector numbers, to follow on each expansion's bulk
+  listing page.
 - **CSV · <expansion>**: one file per expansion for the
   [Cardmarket Bulk Import](https://github.com/PedroPerpetua/cardmarket-bulk-import/)
   extension (columns `name,quantity,condition,language`). Open that
   expansion's bulk listing page, import the file, check the rows, set prices.
+- **`(V.n)` suffixes**: when one Cardmarket expansion carries several
+  printings of the same card, Cardmarket names them `Name (V.1)`, `(V.2)`,
+  `(V.3)` in collector-number order. This is automatic — added from the full
+  printings dataset, not just what is being sold — so `names` in the
+  expansion map below is only for the exceptions that don't follow this
+  pattern.
 
 Nothing changes in the collection until you tick the sold lines and confirm
 **Mark sold**, which removes those copies in one save and records a *Sale*
-in History (undo it there if needed).
+in History. Undoing a Sale in History restores the copies, but not the
+sell-list lines — re-add them from the surplus table if needed.
 
 ## The expansion map
 
@@ -43,11 +51,12 @@ names:
 
 - `expansions`: `setCode → { expansion, variant? }`. A set without an entry
   exports under its own name with a "⚠ check expansion" marker, and its CSV
-  filename contains `CHECK`.
+  filename contains `CHECK`. Edgerunner Open isn't on Cardmarket, so it has
+  no entry.
 - `subtitle` (`always` | `when-shared`) and `separator` control how names are
   written.
-- `names`: `printingKey → exact Cardmarket name` for the exceptions, such as
-  Cardmarket's own version suffixes.
+- `names`: `printingKey → exact Cardmarket name`, only for the exceptions the
+  automatic `(V.n)` rule above gets wrong.
 
 After Cardmarket adds a set, add its entry and run
 `npx vitest run tests/ui/cardmarket-export.test.ts`.
