@@ -18,40 +18,49 @@ test('rival actions play as beats before the human is prompted', async ({ page }
 
   // The pregame reveal (order roll, both hands' draws, the rival's own
   // mulligan) plays as one continuous presenting sequence before the human
-  // is asked anything at all. Drain it before touching the human's own
-  // mulligan prompt, which — like every human-chosen action — resolves
-  // instantly rather than queuing beats.
-  for (let i = 0; i < 60; i++) {
-    const awaiting = await playmat.getAttribute('data-awaiting')
-    if (awaiting === 'human') break
-    await page.waitForTimeout(100)
-  }
-  const keepHand = page.getByTestId('keep-hand')
-  if (await keepHand.isVisible().catch(() => false)) await keepHand.click()
+  // is asked anything at all. Wait for it to drain before touching the
+  // human's own mulligan prompt.
+  await expect.poll(() => playmat.getAttribute('data-awaiting'), { timeout: 30_000 }).toBe('human')
 
-  // Rival goes first with this seed, so the human's next prompts (if any)
-  // are answered with the same safe defaults play.spec.ts's takeOneAction
-  // uses, until the rival's own turn starts playing as beats.
-  for (let i = 0; i < 60; i++) {
-    const awaiting = await playmat.getAttribute('data-awaiting')
-    if (awaiting === 'presenting') break
-    if (awaiting === 'human') {
+  // Rival goes first with this seed, so the human's prompts are answered with
+  // the same safe defaults play.spec.ts's takeOneAction uses, until the
+  // rival's own turn starts playing as beats.
+  await expect(async () => {
+    if ((await playmat.getAttribute('data-awaiting')) === 'human') {
       const orderFirst = page.getByTestId('choose-order-first')
-      const stillKeepHand = page.getByTestId('keep-hand')
+      const keepHand = page.getByTestId('keep-hand')
       const endTurn = page.getByTestId('end-turn')
-      if (await orderFirst.isVisible().catch(() => false)) await orderFirst.click()
-      else if (await stillKeepHand.isVisible().catch(() => false)) await stillKeepHand.click()
-      else if (await endTurn.isEnabled().catch(() => false)) await endTurn.click()
+      if (await orderFirst.isVisible()) await orderFirst.click()
+      else if (await keepHand.isVisible()) await keepHand.click()
+      else if (await endTurn.isEnabled()) await endTurn.click()
     }
-    await page.waitForTimeout(100)
-  }
-  await expect(playmat).toHaveAttribute('data-awaiting', 'presenting', { timeout: 15_000 })
+    expect(await playmat.getAttribute('data-awaiting')).toBe('presenting')
+  }).toPass({ timeout: 15_000, intervals: [100] })
+
+  // Pause at once, so the presenting window cannot close under the checks.
+  await page.keyboard.press('p')
+  await expect(page.getByTestId('pacing-pause')).toHaveAttribute('aria-pressed', 'true')
+  await expect(playmat).toHaveAttribute('data-awaiting', 'presenting')
   await expect(page.getByTestId('beat-layer')).toBeVisible()
   await page.screenshot({ path: 'test-results/pacing-beat.png' })
 
-  // Playback blocks the prompt; skipping the turn gets back to the human.
+  // Playback blocks the prompt.
   await expect(page.getByTestId('end-turn')).toBeDisabled()
-  await page.getByTestId('pacing-skip-turn').click()
+
+  // Space skips a beat even while paused: the step indicator or the beat
+  // itself changes.
+  // Read straight from the DOM: a locator would wait for a missing element.
+  const signature = () => page.evaluate(() => {
+    const step = document.querySelector('[data-testid="pacing-step"]')
+    const layer = document.querySelector('[data-testid="beat-layer"]')
+    return [step?.textContent, layer?.className, layer?.textContent].join('|')
+  })
+  const before = await signature()
+  await page.keyboard.press('Space')
+  await expect.poll(signature).not.toBe(before)
+
+  // Skipping the turn gets back to the human.
+  if ((await playmat.getAttribute('data-awaiting')) === 'presenting') await page.getByTestId('pacing-skip-turn').click()
   await expect(playmat).toHaveAttribute('data-awaiting', /^(human|over)$/, { timeout: 30_000 })
   await expect(page.getByTestId('beat-layer')).toHaveCount(0)
 })
