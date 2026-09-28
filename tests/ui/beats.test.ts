@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildBeats, BEAT_MS } from '../../src/ui/presentation/beats'
 import { beatAnimations } from '../../src/ui/presentation/beatAnimations'
 import type { Frame } from '../../src/engine/timeline'
-import type { GameEvent, GameState } from '../../src/engine/types'
+import type { Action, GameEvent, GameState } from '../../src/engine/types'
 import { startedGame } from '../engine/gameHelpers'
 
 const base: GameState = startedGame()
@@ -120,15 +120,66 @@ describe('buildBeats', () => {
       { type: 'cardPlayed', player: 0, uid: 800 },
       { type: 'effectResolved', sourceUid: 800, description: 'defeat 900', targets: [900] },
       { type: 'unitDefeated', uid: 900 },
-    ), 'human')
+    ), 'human', { type: 'playCard', card: 800, payment: [], targets: [900] })
     expect(beats.map((b) => b.baseMs)).toEqual([0, 0, BEAT_MS.effect, BEAT_MS.defeat])
+  })
+
+  // Final review I5: only the beat the chosen action itself produces is
+  // instant, keyed on the action type.
+  it.each<[string, Action, GameEvent[], number[]]>([
+    ['callLegend zeroes its spotlight', { type: 'callLegend', payment: [] },
+      [{ type: 'legendCalled', player: 0, uid: 800 }, { type: 'effectResolved', sourceUid: 800, description: 'draw 1' }],
+      [0, BEAT_MS.effect]],
+    ['attack zeroes the attack', { type: 'attack', attacker: 800, target: 'gigArea' },
+      [{ type: 'attackDeclared', attacker: 800, target: 'gigArea' }, { type: 'effectResolved', sourceUid: 800, description: 'draw 1' }],
+      [0, BEAT_MS.effect]],
+    ['a block zeroes the block', { type: 'react', reaction: { type: 'block', blocker: 800 } },
+      [{ type: 'attackBlocked', blocker: 800 }, { type: 'unitDefeated', uid: 900 }],
+      [0, BEAT_MS.defeat]],
+    ['activateAbility zeroes its effect', { type: 'activateAbility', card: 800, abilityIndex: 0, targets: [] },
+      [{ type: 'abilityActivated', player: 0, uid: 800, abilityIndex: 0 }, { type: 'effectResolved', sourceUid: 800, description: 'draw 1' },
+        { type: 'effectResolved', sourceUid: 900, description: 'draw 1' }],
+      [0, BEAT_MS.effect]],
+    ['a quick play zeroes its spotlight', { type: 'react', reaction: { type: 'quick', card: 800, payment: [], targets: [] } },
+      [{ type: 'cardPlayed', player: 0, uid: 800 }], [0]],
+    ['a quick ability zeroes its effect', { type: 'react', reaction: { type: 'quickAbility', card: 800, abilityIndex: 0, targets: [] } },
+      [{ type: 'effectResolved', sourceUid: 800, description: 'draw 1' }], [0]],
+    ['chooseGig zeroes the steal', { type: 'chooseGig', dieIndex: 0 },
+      [{ type: 'gigStolen', from: 1, die: { size: 6, value: 3 } }, { type: 'effectResolved', sourceUid: 800, description: 'draw 1' }],
+      [0, BEAT_MS.effect]],
+    ['chooseGigDie zeroes the roll', { type: 'chooseGigDie', size: 6 },
+      [{ type: 'dieRolled', player: 0, size: 6, value: 3 }], [0]],
+    ['a reroll zeroes the roll', { type: 'chooseGigReroll', reroll: true },
+      [{ type: 'dieRolled', player: 0, size: 6, value: 5 }], [0]],
+    ["endTurn keeps the human's own end-of-turn trigger paced", { type: 'endTurn' },
+      [{ type: 'effectResolved', sourceUid: 800, description: 'draw 1' }, { type: 'turnEnded', player: 0 }],
+      [BEAT_MS.effect, 0]],
+    ["a react pass keeps the rival's first effect paced", { type: 'react', reaction: { type: 'pass' } },
+      [{ type: 'effectResolved', sourceUid: 900, description: 'draw 1' }],
+      [BEAT_MS.effect]],
+    ["answerIntercept keeps the rival's steal paced", { type: 'answerIntercept', answer: -1 },
+      [{ type: 'gigStolen', from: 0, die: { size: 6, value: 3 } }],
+      [BEAT_MS.steal]],
+    ['keepHand zeroes only the leading minor beats', { type: 'keepHand' },
+      [{ type: 'handKept', player: 0 }, { type: 'dieRolled', player: 1, size: 6, value: 3 }],
+      [0, BEAT_MS.dieRoll]],
+    ['playCard does not zero a later-kind primary beat', { type: 'playCard', card: 800, payment: [], targets: [] },
+      [{ type: 'effectResolved', sourceUid: 900, description: 'draw 1' }, { type: 'cardPlayed', player: 0, uid: 800 }],
+      [BEAT_MS.effect, BEAT_MS.spotlight]],
+  ])('%s', (_name, action, events, expected) => {
+    expect(buildBeats(frames(...events), 'human', action).map((b) => b.baseMs)).toEqual(expected)
+  })
+
+  it("never zeroes the rival's own action", () => {
+    const beats = buildBeats(frames({ type: 'cardPlayed', player: 1, uid: 900 }), 'ai', { type: 'playCard', card: 900, payment: [], targets: [] })
+    expect(beats[0].baseMs).toBe(BEAT_MS.spotlight)
   })
 
   it("still shows the rival's turn banner after the human ends their turn", () => {
     const beats = buildBeats(frames(
       { type: 'turnEnded', player: 0 },
       { type: 'turnStarted', player: 1, turn: 4 },
-    ), 'human')
+    ), 'human', { type: 'endTurn' })
     expect(beats.map((b) => [b.kind, b.baseMs])).toEqual([['silent', 0], ['turnBanner', BEAT_MS.turnBanner]])
   })
 

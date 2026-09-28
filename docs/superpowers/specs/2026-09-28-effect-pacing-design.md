@@ -129,7 +129,7 @@ card objects). Frames are UI-only and discarded once presented.
 
 ## 2. Beat model
 
-`buildBeats(frames: Frame[], actor: 'human' | 'ai'): Beat[]` is a pure
+`buildBeats(frames: Frame[], actor: 'human' | 'ai', action?: Action): Beat[]` is a pure
 function in `src/ui/presentation/beats.ts`. Captions are not stored on the
 beat. `BeatLayer` renders them at display time with `describeEvent`, which
 keeps `beats.ts` free of a dependency on `useGame.ts`. Effect callouts and the
@@ -176,14 +176,24 @@ interface Beat {
 
 ### Human actions
 
-When `actor === 'human'`, walk the beats in order:
+`buildBeats` takes the action that produced the frames as a third argument
+(`buildBeats(frames, actor, action?)`; `useGame`'s `advance` passes it). When
+`actor === 'human'`, walk the beats in order:
 
 - `minor` and `silent` beats get `baseMs = 0`.
-- The first *primary* beat (`spotlight`, `effect`, `attack`, `block`,
-  `steal`, `dieRoll`) also gets `baseMs = 0`, and the walk stops. That beat is
-  the action the player just chose.
-- Any other kind (`turnBanner`, `defeat`, `gameOver`) stops the walk without
-  being zeroed. Ending your turn therefore still shows the rival's turn banner.
+- The first other beat stops the walk. It gets `baseMs = 0` only when it is
+  the beat the chosen action itself produces, keyed on the action type:
+  - `playCard`, `callLegend`, a `react` legend call or quick play: the
+    `spotlight`
+  - `attack`: the `attack`
+  - a `react` block: the `block`
+  - `activateAbility`, a `react` quick ability: the `effect`
+  - `chooseGig`, `chooseGigDie`, `chooseGigReroll`: the `dieRoll` or `steal`
+- Every other action (`endTurn`, a `react` pass, `keepHand`, `mulligan`,
+  `choosePlayOrder`, `answerIntercept`, `sellCard`) zeroes only the leading
+  minor and silent beats. The human's own end-of-turn trigger, a rival effect
+  after a pass, and a rival steal after an intercept answer are therefore
+  paced, and ending your turn still shows the rival's turn banner.
 
 Every later beat is paced normally. Beats with `baseMs = 0` are acknowledged
 immediately. Their frame is still committed, so cards glide to their new

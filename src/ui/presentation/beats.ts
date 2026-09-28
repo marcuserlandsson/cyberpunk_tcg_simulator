@@ -5,7 +5,7 @@
 
 import { opponentOf } from '../../engine/query'
 import type { Frame } from '../../engine/timeline'
-import type { GameEvent, GameState, PlayerId } from '../../engine/types'
+import type { Action, GameEvent, GameState, PlayerId } from '../../engine/types'
 
 export type BeatKind = 'turnBanner' | 'spotlight' | 'effect' | 'attack' | 'block'
   | 'defeat' | 'steal' | 'dieRoll' | 'minor' | 'silent' | 'gameOver'
@@ -40,8 +40,29 @@ const KIND: Record<GameEvent['type'], BeatKind> = {
   gameEnded: 'gameOver',
 }
 
-/** A beat that resolves the human's own chosen action. */
-const PRIMARY = new Set<BeatKind>(['spotlight', 'effect', 'attack', 'block', 'steal', 'dieRoll'])
+/**
+ * The beat kinds a human action produces itself, keyed on the action type
+ * (final review I5). An action that is not listed (endTurn, a react pass,
+ * keepHand, mulligan, choosePlayOrder, answerIntercept, sellCard, ...)
+ * produces no primary beat: whatever primary beat follows it is a
+ * consequence, and is paced.
+ */
+function chosenKinds(action: Action | undefined): ReadonlySet<BeatKind> {
+  switch (action?.type) {
+    case 'playCard': case 'callLegend': return new Set(['spotlight'])
+    case 'attack': return new Set(['attack'])
+    case 'activateAbility': return new Set(['effect'])
+    case 'chooseGig': case 'chooseGigDie': case 'chooseGigReroll': return new Set(['dieRoll', 'steal'])
+    case 'react':
+      switch (action.reaction.type) {
+        case 'block': return new Set(['block'])
+        case 'callLegend': case 'quick': return new Set(['spotlight'])
+        case 'quickAbility': return new Set(['effect'])
+        default: return new Set()
+      }
+    default: return new Set()
+  }
+}
 const EXITS = new Set<GameEvent['type']>(['cardTrashed', 'cardBottomDecked', 'cardRemoved'])
 
 function uidOf(event: GameEvent): number | null {
@@ -93,7 +114,12 @@ function absorbs(beat: Beat, event: GameEvent, player: PlayerId | null): boolean
   return false
 }
 
-export function buildBeats(frames: Frame[], actor: 'human' | 'ai'): Beat[] {
+/**
+ * `action` is the action that produced these frames. For a human action, the
+ * leading minor/silent beats and the one beat the action itself produces
+ * (`chosenKinds`) are instant; everything after is paced.
+ */
+export function buildBeats(frames: Frame[], actor: 'human' | 'ai', action?: Action): Beat[] {
   const beats: Beat[] = []
   for (const frame of frames) {
     const { event, board, eventIndex } = frame
@@ -114,9 +140,10 @@ export function buildBeats(frames: Frame[], actor: 'human' | 'ai'): Beat[] {
     })
   }
   if (actor === 'human') {
+    const chosen = chosenKinds(action)
     for (const beat of beats) {
       if (beat.kind === 'minor' || beat.kind === 'silent') { beat.baseMs = 0; continue }
-      if (PRIMARY.has(beat.kind)) beat.baseMs = 0
+      if (chosen.has(beat.kind)) beat.baseMs = 0
       break
     }
   }

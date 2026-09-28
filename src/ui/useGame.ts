@@ -189,7 +189,7 @@ function advance(db: CardDb, session: Session, action: Action, pacing: boolean):
   const next = withAction(game, action, state)
   return {
     game: next,
-    beats: [...session.beats, ...buildBeats(fresh, actor)],
+    beats: [...session.beats, ...buildBeats(fresh, actor, action)],
     seen: Math.max(session.seen, lastEventIndex(state), ...fresh.map((frame) => frame.eventIndex)),
   }
 }
