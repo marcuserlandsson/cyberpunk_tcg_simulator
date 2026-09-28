@@ -516,8 +516,10 @@ function slotDemand(
   ).length
 }
 
-function note(draft: GameState, sourceUid: number, description: string): void {
-  emit(draft, { type: 'effectResolved', sourceUid, description })
+function note(draft: GameState, sourceUid: number, description: string, targets: number[] = []): void {
+  emit(draft, targets.length > 0
+    ? { type: 'effectResolved', sourceUid, description, targets }
+    : { type: 'effectResolved', sourceUid, description })
 }
 
 /** The next bound slot value, or null when it could not be filled. */
@@ -609,7 +611,7 @@ function applyNode(
       if (node.duration === 'turn') draft.cards[target].tempPower += amount
       else draft.cards[target].permPower += amount
       const sign = amount >= 0 ? '+' : ''
-      note(draft, ctx.sourceUid, `${sign}${amount} power (${node.duration}) on ${target}`)
+      note(draft, ctx.sourceUid, `${sign}${amount} power (${node.duration}) on ${target}`, [target])
       return
     }
 
@@ -619,7 +621,7 @@ function applyNode(
       if (!draft.cards[target].tempKeywords.includes(node.keyword)) {
         draft.cards[target].tempKeywords.push(node.keyword)
       }
-      note(draft, ctx.sourceUid, `grant {${node.keyword}} to ${target} this turn`)
+      note(draft, ctx.sourceUid, `grant {${node.keyword}} to ${target} this turn`, [target])
       return
     }
 
@@ -700,7 +702,7 @@ function applyNode(
       if (target === null || !draft.cards[target]) return
       const amount = resolvePowerAmount(draft, node.amount, target, ctx.player)
       draft.cards[target].fightPowerBonusThisTurn = (draft.cards[target].fightPowerBonusThisTurn ?? 0) + amount
-      note(draft, ctx.sourceUid, `+${amount} fight power (this turn) on ${target}`)
+      note(draft, ctx.sourceUid, `+${amount} fight power (this turn) on ${target}`, [target])
       return
     }
 
@@ -708,7 +710,7 @@ function applyNode(
       const target = takeTarget(node, ctx, slots)
       if (target === null || !draft.cards[target]) return
       draft.cards[target].skipNextReady = true
-      note(draft, ctx.sourceUid, `${target} skips its next ready step`)
+      note(draft, ctx.sourceUid, `${target} skips its next ready step`, [target])
       return
     }
 
@@ -811,7 +813,7 @@ function applyNode(
         return
       }
       if (!draft.players[controllerOf(draft, target)].field.includes(target)) return
-      note(draft, ctx.sourceUid, `defeat ${target}`)
+      note(draft, ctx.sourceUid, `defeat ${target}`, [target])
       defeatUnit(draft, db, target)
       return
     }
@@ -820,8 +822,8 @@ function applyNode(
       const target = takeTarget(node, ctx, slots)
       if (target === null) return
       if (!draft.players[controllerOf(draft, target)].field.includes(target)) return
-      note(draft, ctx.sourceUid, `bounce ${target}`)
       leaveField(draft, db, target, 'hand')
+      note(draft, ctx.sourceUid, `bounce ${target}`, [target])
       return
     }
 
@@ -829,7 +831,7 @@ function applyNode(
       const target = takeTarget(node, ctx, slots)
       if (target === null) return
       if (!draft.players[controllerOf(draft, target)].field.includes(target)) return
-      note(draft, ctx.sourceUid, `bottom-deck ${target}`)
+      note(draft, ctx.sourceUid, `bottom-deck ${target}`, [target])
       leaveField(draft, db, target, 'deckBottom')
       return
     }
@@ -841,7 +843,7 @@ function applyNode(
       if (!p.trash.includes(target)) return
       p.trash = p.trash.filter((uid) => uid !== target)
       p.hand.push(target)
-      note(draft, ctx.sourceUid, `retrieve ${target} from the trash`)
+      note(draft, ctx.sourceUid, `retrieve ${target} from the trash`, [target])
       return
     }
 
@@ -853,7 +855,7 @@ function applyNode(
       p.hand = p.hand.filter((uid) => uid !== target)
       p.trash.push(target)
       emit(draft, { type: 'cardTrashed', uid: target })
-      note(draft, ctx.sourceUid, `discard ${target}`)
+      note(draft, ctx.sourceUid, `discard ${target}`, [target])
       return
     }
 
@@ -861,16 +863,16 @@ function applyNode(
       const target = takeTarget(node, ctx, slots)
       if (target === null || !draft.cards[target]) return
       readyCardOnDraft(draft, target)
-      note(draft, ctx.sourceUid, `ready ${target}`)
+      note(draft, ctx.sourceUid, `ready ${target}`, [target])
       return
     }
 
     case 'spendCard': {
       const target = takeTarget(node, ctx, slots)
       if (target === null || !draft.cards[target]) return
-      note(draft, ctx.sourceUid, `spend ${target}`)
       // Being spent by an effect is still being spent (docs/rulings.md §47).
       spendOnDraft(db, draft, [target])
+      note(draft, ctx.sourceUid, `spend ${target}`, [target])
       return
     }
 

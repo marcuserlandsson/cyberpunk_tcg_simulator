@@ -1030,7 +1030,7 @@ export type GameEvent =
   | { type: 'attackBlocked'; blocker: number }
   | { type: 'unitDefeated'; uid: number }
   | { type: 'gigStolen'; from: PlayerId; die: GigDie }
-  | { type: 'effectResolved'; sourceUid: number; description: string }
+  | { type: 'effectResolved'; sourceUid: number; description: string; targets?: number[] }
   | { type: 'cardTrashed'; uid: number }
   | { type: 'cardBottomDecked'; uid: number }
   | { type: 'cardRemoved'; uid: number }

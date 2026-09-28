@@ -24,6 +24,7 @@ import {
   streetCred,
 } from '../../src/engine/query'
 import { applyAction } from '../../src/engine/reduce'
+import { recordFrames } from '../../src/engine/timeline'
 import type {
   Action,
   CardDb,
@@ -3967,5 +3968,69 @@ describe('interception: stealInterceptByDiscard (alt-cunningham, §144)', () => 
     const prevented = applyAction(withWatcher, asked, { type: 'answerIntercept', answer: match })
     expect(prevented.players[0].gigArea).toEqual([]) // nothing stolen
     expect(prevented.players[0].hand).toEqual([]) // and so nothing drawn
+  })
+})
+
+describe('presentation frames (effect pacing)', () => {
+  const effectFrame = (frames: ReturnType<typeof recordFrames>['frames']) =>
+    frames.find((f) => f.event.type === 'effectResolved')!
+
+  it('buffPower notes its target after the power change', () => {
+    const db = makeDb([
+      def('pump', 'program', { effects: [onPlay({ kind: 'buffPower', amount: 2, target: 'friendlyUnit', duration: 'turn' })] }),
+      def('grunt', 'unit', { power: 1 }),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'pump')
+    const unit = mint(s, 0, 'field', 'grunt')
+    const { frames } = recordFrames(() => fire(db, s, src, [unit]))
+    const frame = effectFrame(frames)
+    expect(frame.event).toMatchObject({ targets: [unit] })
+    expect(effectivePower(db, frame.board, unit)).toBe(3)
+  })
+
+  it('defeat notes while the target is on the field, and the trash frame follows', () => {
+    const db = makeDb([
+      def('hit', 'program', { effects: [onPlay({ kind: 'defeat', target: 'rivalUnit' })] }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'hit')
+    const victim = mint(s, 1, 'field', 'grunt')
+    const { frames } = recordFrames(() => fire(db, s, src, [victim]))
+    const noted = effectFrame(frames)
+    expect(noted.event).toMatchObject({ targets: [victim] })
+    expect(noted.board.players[1].field).toContain(victim)
+    const trashed = frames.find((f) => f.event.type === 'cardTrashed' && f.event.uid === victim)!
+    expect(trashed.eventIndex).toBeGreaterThan(noted.eventIndex)
+    expect(trashed.board.players[1].trash).toContain(victim)
+  })
+
+  it('bounce notes after the card is back in hand', () => {
+    const db = makeDb([
+      def('shoo', 'program', { effects: [onPlay({ kind: 'bounce', target: 'rivalUnit' })] }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'shoo')
+    const victim = mint(s, 1, 'field', 'grunt')
+    const { frames } = recordFrames(() => fire(db, s, src, [victim]))
+    const frame = effectFrame(frames)
+    expect(frame.event).toMatchObject({ targets: [victim] })
+    expect(frame.board.players[1].hand).toContain(victim)
+  })
+
+  it('spendCard notes after the card is spent', () => {
+    const db = makeDb([
+      def('tap', 'program', { effects: [onPlay({ kind: 'spendCard', target: 'rivalUnit' })] }),
+      def('grunt', 'unit'),
+    ])
+    const s = scenario()
+    const src = mint(s, 0, 'trash', 'tap')
+    const victim = mint(s, 1, 'field', 'grunt', { ready: true })
+    const { frames } = recordFrames(() => fire(db, s, src, [victim]))
+    const frame = effectFrame(frames)
+    expect(frame.event).toMatchObject({ targets: [victim] })
+    expect(frame.board.cards[victim].ready).toBe(false)
   })
 })

@@ -99,10 +99,11 @@ function GigPool(props: GigPoolProps): ReactElement {
             return (
               <button
                 type="button"
-                key={index}
+                key={die.id ?? `i${index}`}
                 className={`die-slot${stealable ? ' is-stealable' : ''}${tumblingHere ? ' is-tumbling' : ''}`}
                 data-testid="gig-die"
                 data-index={index}
+                data-die-id={die.id}
                 data-size={die.size}
                 data-stealable={stealable ? 'true' : undefined}
                 disabled={!stealable}
@@ -120,9 +121,10 @@ function GigPool(props: GigPoolProps): ReactElement {
             return (
               <button
                 type="button"
-                key={`${die.size}-${index}`}
+                key={die.id ?? `${die.size}-${index}`}
                 className={`die-slot${choosable ? ' is-choosable' : ''}`}
                 data-testid="fixer-die"
+                data-die-id={die.id}
                 data-size={die.size}
                 data-choosable={choosable ? 'true' : undefined}
                 disabled={!choosable}
