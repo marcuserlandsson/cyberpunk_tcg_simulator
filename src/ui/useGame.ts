@@ -256,7 +256,6 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
 
   const undo = useCallback(() => {
     setAiError(null)
-    setAiChoice(null)
     setSession((current) => {
       const currentGame = current.game
       if (currentGame === null) return current
@@ -347,7 +346,12 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
     setAiChoice(null)
     if (aiChoice.game !== session.game) return
     try {
-      setSession(advance(dbRef.current, session, aiChoice.action, pacing))
+      const next = advance(dbRef.current, session, aiChoice.action, pacing)
+      // The identity check is re-applied inside the updater so the guard and
+      // the write land as one atomic step against whatever session is
+      // actually current when this update is processed, not just the one
+      // captured in this closure.
+      setSession((current) => (current.game === aiChoice.game ? next : current))
     } catch (error) {
       setAiError(error instanceof Error ? error.message : String(error))
     }

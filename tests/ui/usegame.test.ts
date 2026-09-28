@@ -18,11 +18,11 @@ import { newGame } from '../../src/engine/game'
 import { actingPlayer } from '../../src/engine/query'
 import { legalActions } from '../../src/engine/legal'
 import { applyAction } from '../../src/engine/reduce'
-import { gameProvenance, replay } from '../../src/engine/replay'
+import { gameProvenance, replay, type GameRecord } from '../../src/engine/replay'
 import { AI_VERSION } from '../../src/ai/agents'
 import { describeEvent, useGame } from '../../src/ui/useGame'
 import type { DeckList } from '../../src/engine/deck'
-import type { CardDb } from '../../src/engine/types'
+import type { Action, CardDb } from '../../src/engine/types'
 import arasakaDeck from '../../data/decks/arasaka-embracing-power.json'
 import mercsDeck from '../../data/decks/mercs-the-heist.json'
 
@@ -445,6 +445,10 @@ describe('useGame pacing', () => {
     expect(hook.result.current.presenting).toBe(true)
     expect(hook.result.current.legal).toEqual([])
     expect(hook.result.current.aiThinking).toBe(false)
+    // It is still the AI's decision after the beat it just queued: the 20ms
+    // wait below proves an AI move is genuinely held, not just that nothing
+    // happens because it is the human's turn.
+    expect(actingPlayer(hook.result.current.state!)).toBe(1)
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(hook.result.current.record!.actions.length).toBe(applied)
     await drain(hook)
@@ -487,17 +491,22 @@ describe('useGame pacing', () => {
   })
 
   it('does not replay presented beats after an intercept answer', async () => {
-    // Find a record whose next human action pauses for a human intercept.
-    let found: { seed: number; prefix: import('../../src/engine/types').Action[]; action: import('../../src/engine/types').Action } | null = null
+    // Find a record whose next human action pauses for a human intercept —
+    // and only after the pause itself has already emitted at least one event,
+    // so the pre-pause beats this test guards against re-showing actually
+    // exist. (A pause with nothing emitted yet, like the very first
+    // `callLegend` of a game, would make the assertions below vacuously true.)
+    let found: { seed: number; prefix: Action[]; action: Action } | null = null
     for (let seed = 1; seed <= 150 && found === null; seed++) {
       let state = newGame(db, { decks: [arasaka, mercs], seed })
-      const prefix: import('../../src/engine/types').Action[] = []
+      const prefix: Action[] = []
       for (let i = 0; i < 250 && state.phase !== 'gameOver' && found === null; i++) {
         const actions = legalActions(db, state)
         if (actions.length === 0) break
         const action = actions[(seed * 7 + i) % actions.length]
         const next = applyAction(db, state, action)
-        if (next.phase === 'intercept' && next.pendingIntercept?.player === 0 && actingPlayer(state) === 0) {
+        const pausedAfterEvents = (next.pendingIntercept?.view ?? next).events.length - 1 > state.events.length - 1
+        if (next.phase === 'intercept' && next.pendingIntercept?.player === 0 && actingPlayer(state) === 0 && pausedAfterEvents) {
           found = { seed, prefix: [...prefix], action }
         }
         prefix.push(action)
@@ -506,21 +515,27 @@ describe('useGame pacing', () => {
     }
     expect(found).not.toBeNull()
     const hook = mountPaced()
-    const record = {
+    const record: GameRecord = {
       practiceMode: true,
-      aiDifficulty: 'medium' as const,
+      aiDifficulty: 'medium',
       aiVersion: AI_VERSION,
       provenance: gameProvenance(db),
-      config: { decks: [arasaka, mercs] as [typeof arasaka, typeof mercs], seed: found!.seed },
+      config: { decks: [arasaka, mercs], seed: found!.seed },
       actions: found!.prefix,
     }
-    await act(async () => hook.result.current.load(record as never))
+    await act(async () => hook.result.current.load(record))
     await act(async () => hook.result.current.act(found!.action))
     const shown = new Set<number>()
     for (const beat of hook.result.current.beats) for (let i = beat.firstIndex; i <= beat.lastIndex; i++) shown.add(i)
+    // The pause itself must have produced beats, or the loop below that checks
+    // nothing was re-shown would pass trivially.
+    expect(shown.size).toBeGreaterThan(0)
     await drain(hook)
     expect(hook.result.current.state!.phase).toBe('intercept')
     await act(async () => hook.result.current.act(hook.result.current.legal[0]))
+    // The intercept answer's own beats must be real, or the "none were shown
+    // before" check below would also pass trivially.
+    expect(hook.result.current.beats.length).toBeGreaterThan(0)
     for (const beat of hook.result.current.beats) expect(shown.has(beat.firstIndex)).toBe(false)
   })
 })
