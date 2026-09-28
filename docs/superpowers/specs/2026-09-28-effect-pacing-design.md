@@ -105,11 +105,18 @@ A frame must show what its beat is about:
 
 - **In-place effects** (buff, grant keyword, ready, spend, change gig, draw)
   must emit *after* the mutation, so the frame shows the result.
-- **Removal effects** (`defeat`, `bounce`, `bottomDeck`) already emit their
-  `effectResolved` note *before* the card leaves the field. That is the
-  desired order, because the target is still on the board to draw the target
-  line to. The removal event that follows (`unitDefeated`, `cardTrashed`,
-  ...) must emit after the card has moved, so its frame shows the card gone.
+- **Removal effects** (`defeat`, `bottomDeck`) emit their `effectResolved`
+  note *before* the card leaves the field. That is the desired order, because
+  the target is still on the board to draw the target line to.
+  `unitDefeated` is also pushed before `leaveField`, but `leaveField` then
+  emits `cardTrashed` / `cardBottomDecked` / `cardRemoved` *after* the move.
+  `buildBeats` therefore lets a `defeat` or `effect` beat absorb an
+  immediately following exit event for the same uid. The beat's board is then
+  the post-move frame, and `BeatLayer` flies an exit ghost from the card's
+  previous position to its pile.
+- `bounce` has no exit event, because a return to hand emits nothing. Its
+  note moves to *after* `leaveField`, so the effect frame shows the card in
+  hand. `spendCard` notes before spending, and moves after it.
 
 Audit `note()` and each `events.push` site against these two rules and move
 the emits that break them. Regression tests cover representative primitives
