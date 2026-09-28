@@ -7,19 +7,20 @@
 // acquisitionPlan.ts and buildBuyList, unchanged.
 import { useMemo, useState, type ReactElement } from 'react'
 import type { CardDb } from '../engine/types'
-import { deckSize, validateDeck } from '../engine/deck'
+import { validateDeck } from '../engine/deck'
 import type { Printing } from './printings'
-import { acquisitionPlan } from './acquisitionPlan'
+import { acquisitionPlan, type DeckMode } from './acquisitionPlan'
 import { buildBuyList, playsetGaps, useCollection } from './collection'
 import { missingArtworks } from './artworks'
 import { buildDisplayNames, useDecks } from './storage'
+import { DeckChips, DeckModeSeg } from './DeckChoice'
 
 export function PlanPurchasesMode({ db, printings, known }: { db: CardDb; printings: Printing[]; known: boolean }): ReactElement {
   const decks = useDecks()
   const collection = useCollection()
   const names = useMemo(() => buildDisplayNames(db), [db])
   const [selected, setSelected] = useState<string[]>([])
-  const [mode, setMode] = useState<'shared' | 'assembled'>('shared')
+  const [mode, setMode] = useState<DeckMode>('shared')
   const [reserve, setReserve] = useState(false)
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const chosen = decks.filter(d => selected.includes(d.name))
@@ -36,19 +37,9 @@ export function PlanPurchasesMode({ db, printings, known }: { db: CardDb; printi
       <section className="card">
         <h3>Decks to build <span className="card__meta">pick the decks you want to own physically</span></h3>
         <div className="card__in">
+          <DeckChips db={db} decks={decks} selected={selected} onSelected={setSelected} idPrefix="acquisition" />
           <div className="tool-actions">
-            {decks.length === 0 && <span className="tool-note">No saved decks yet.</span>}
-            {decks.map(d => { const errors = validateDeck(db, d).length; return (
-              <label key={d.name} className={`check-chip deckchip${selected.includes(d.name) ? ' deckchip--on' : ''}`}>
-                <input type="checkbox" aria-label={d.name} data-testid={`acquisition-deck-${d.name}`} checked={selected.includes(d.name)} onChange={e => setSelected(old => e.target.checked ? [...old, d.name] : old.filter(n => n !== d.name))} />
-                {d.name}<span className={`deckchip__st${errors ? ' deckchip__st--bad' : ''}`}>{errors ? `${errors} error${errors === 1 ? '' : 's'}` : `${deckSize(d)} cards`}</span>
-              </label>) })}
-          </div>
-          <div className="tool-actions">
-            <div className="field"><span className="field__label">Cards are</span><div className="seg">
-              <button type="button" data-testid="acquisition-mode-shared" aria-pressed={mode === 'shared'} onClick={() => setMode('shared')}>Shared between decks</button>
-              <button type="button" data-testid="acquisition-mode-assembled" aria-pressed={mode === 'assembled'} onClick={() => setMode('assembled')}>Kept in every deck</button>
-            </div></div>
+            <DeckModeSeg mode={mode} onMode={setMode} idPrefix="acquisition" />
             <label className="check-chip"><input type="checkbox" data-testid="reserve-artwork" checked={reserve} onChange={e => setReserve(e.target.checked)} />Keep one of each artwork in the binder</label>
           </div>
           <p className="tool-note">Shared: buy the maximum any one deck needs. Kept: add every deck's requirement. Binder copies are taken out of what decks can use{reserve ? '; a newly bought missing artwork kept in the binder needs an extra playable copy to fill a deck gap' : ''}. Playset progress still counts all owned copies.</p>
