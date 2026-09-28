@@ -112,6 +112,7 @@ Panel chrome for the config row (deck/agent pickers, games, seed, Run as primary
 - **Offline-safe:** fonts via `@fontsource` npm packages; no runtime requests to external hosts. New dependencies limited to `@fontsource/*`.
 - **Rival information hygiene unchanged:** the UI must not render hidden info (rival hand contents, deck order, face-down legend identities) — card backs only.
 - **Reduced motion:** every animation gated behind `prefers-reduced-motion: no-preference`; showpieces also disabled at `?aiDelay=0`.
+- Superseded for paced beats by `2026-09-28-effect-pacing-design.md`: rival actions and the consequences of human actions play as timed beats (skippable, pausable, with an Instant speed). The human's own chosen action still resolves instantly.
 
 ## Success criteria
 
