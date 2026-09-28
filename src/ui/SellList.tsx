@@ -81,10 +81,12 @@ export function SellList({ db, printings, known, surplusByIdentity }: { db: Card
         </div>
         {confirm && (
           <div className="tool-panel" data-testid="sell-confirm">
-            <table className="data-table"><tbody>{selected.map(l => { const after = saleCounts([l.key], confirm)[l.key]; return <tr key={l.key}><td className="session-name">{byKey.get(l.key) ? names.get(byKey.get(l.key)!.cardId) : l.key}</td><td className="tool-note">{byKey.get(l.key)?.setName} {byKey.get(l.key)?.collectorNumber}</td><td className="num">{confirm[l.key] ?? 0} → {after}</td></tr> })}</tbody></table>
-            <div className="tool-actions">
-              <button type="button" className="btn--danger" data-testid="sell-confirm-ok" onClick={sell}>Remove {selectedCopies} {selectedCopies === 1 ? 'copy' : 'copies'} from the collection</button>
-              <button type="button" className="btn--ghost" data-testid="sell-confirm-cancel" onClick={() => setConfirm(null)}>Cancel</button>
+            <div className="tool-panel__body">
+              <table className="data-table"><tbody>{selected.map(l => { const after = saleCounts([l.key], confirm)[l.key]; return <tr key={l.key}><td className="session-name">{byKey.get(l.key) ? names.get(byKey.get(l.key)!.cardId) : l.key}</td><td className="tool-note">{byKey.get(l.key)?.setName} {byKey.get(l.key)?.collectorNumber}</td><td className="num">{confirm[l.key] ?? 0} → {after}</td></tr> })}</tbody></table>
+              <div className="tool-actions">
+                <button type="button" className="btn--danger" data-testid="sell-confirm-ok" onClick={sell}>Remove {selectedCopies} {selectedCopies === 1 ? 'copy' : 'copies'} from the collection</button>
+                <button type="button" className="btn--ghost" data-testid="sell-confirm-cancel" onClick={() => setConfirm(null)}>Cancel</button>
+              </div>
             </div>
           </div>
         )}
