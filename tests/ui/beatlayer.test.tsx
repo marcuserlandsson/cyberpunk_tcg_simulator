@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, renderHook, screen, cleanup } from '@testing-library/react'
 import { createRef, useLayoutEffect, useRef } from 'react'
 import type { RefObject } from 'react'
-import { BeatLayer, effectCaption } from '../../src/ui/presentation/BeatLayer'
+import { BeatLayer } from '../../src/ui/presentation/BeatLayer'
 import { buildBeats } from '../../src/ui/presentation/beats'
 import { useFlip } from '../../src/ui/presentation/useFlip'
 import { HandStrip } from '../../src/ui/HandStrip'
@@ -68,6 +68,11 @@ describe('BeatLayer', () => {
     expect(callout.textContent).toContain(`defeat ${humanName}`)
   })
 
+  it('keeps amounts intact while naming the target slot (final review I1)', () => {
+    layer({ type: 'effectResolved', sourceUid: rivalCard, description: `+${humanCard} power (turn) on ${humanCard}`, targets: [humanCard] })
+    expect(screen.getByTestId('beat-callout').textContent).toContain(`+${humanCard} power (turn) on ${humanName}`)
+  })
+
   it('announces whose turn starts', () => {
     layer({ type: 'turnStarted', player: 1, turn: 3 })
     expect(screen.getByTestId('beat-banner').textContent).toContain("RIVAL'S TURN")
@@ -81,7 +86,7 @@ describe('BeatLayer', () => {
 
   it('never names a face-down card in the effect callout (source or target)', () => {
     const legend = board.players[1].legends[0] // face-down by default
-    layer({ type: 'effectResolved', sourceUid: legend, description: `boost ${legend}`, targets: [legend] })
+    layer({ type: 'effectResolved', sourceUid: legend, description: `defeat ${legend}`, targets: [legend] })
     const callout = screen.getByTestId('beat-callout')
     expect(callout.textContent).not.toContain(db[board.cards[legend].defId].name)
     expect(callout.textContent).toContain('a face-down card')
@@ -181,12 +186,6 @@ describe('spotlitUid also hides a called Legend while its spotlight plays', () =
     const legendCard = getByTestId('legends').querySelector('[data-testid="board-card"]')
     expect(legendCard).not.toBeNull()
     expect(legendCard!.className).toContain('is-spotlit')
-  })
-})
-
-describe('effectCaption', () => {
-  it('leaves untargeted descriptions alone', () => {
-    expect(effectCaption(db, board, { type: 'effectResolved', sourceUid: rivalCard, description: 'draw 2' })).toBe('draw 2')
   })
 })
 

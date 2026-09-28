@@ -56,3 +56,14 @@ describe('CR 10.28–10.29: replacement ordering and chains', () => {
     expect(next.players[1].field).toEqual(expect.arrayContaining([victim, jackie]))
   })
 })
+
+describe('intercepted defeat note', () => {
+  it('carries the protected unit as its target (presentation payload only)', () => {
+    const { state, attacker, victim, jackie } = board()
+    let next = applyAction(db, state, { type: 'attack', attacker, target: victim })
+    next = applyAction(db, next, { type: 'react', reaction: { type: 'pass' } })
+    next = resolveEffectChoices(db, applyAction(db, next, { type: 'answerIntercept', answer: jackie }))
+    const note = next.events.find(e => e.type === 'effectResolved' && e.description.startsWith('intercepts the defeat of'))
+    expect(note).toEqual({ type: 'effectResolved', sourceUid: jackie, description: `intercepts the defeat of ${victim}`, targets: [victim] })
+  })
+})

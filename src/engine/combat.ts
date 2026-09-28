@@ -569,7 +569,7 @@ export function defeatUnit(
       const payment = choosePayment(db, draft, player, intercept.eddies, intercept.protector)
       if (payment !== null) {
         spendOnDraft(db, draft, payment)
-        emit(draft, { type: 'effectResolved', sourceUid: intercept.protector, description: `intercepts the defeat of ${uid}` })
+        emit(draft, { type: 'effectResolved', sourceUid: intercept.protector, description: `intercepts the defeat of ${uid}`, targets: [uid] })
         defeatUnit(draft, db, intercept.protector, { usedReplacements: [...used, intercept.protector] })
         return
       }

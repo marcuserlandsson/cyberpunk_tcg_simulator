@@ -42,6 +42,7 @@ import {
 import { saveGameRecord } from './storage'
 import { applyActionTimeline } from '../engine/timeline'
 import { buildBeats, type Beat } from './presentation/beats'
+import { describeEffect } from './presentation/describeEffect'
 import type { DeckList } from '../engine/deck'
 import type { Action, CardDb, GameEvent, GameState, PlayerId } from '../engine/types'
 
@@ -509,8 +510,11 @@ export function describeEvent(db: CardDb, state: GameState, event: GameEvent): s
       return event.from === HUMAN
         ? `Rival stole your ${dieText(event.die.size, event.die.value)}.`
         : `You stole Rival's ${dieText(event.die.size, event.die.value)}.`
-    case 'effectResolved':
-      return `${nameOf(db, state, event.sourceUid)}: ${event.description}.`
+    case 'effectResolved': {
+      const source = state.cards[event.sourceUid]?.faceUp === false ? 'A face-down card' : nameOf(db, state, event.sourceUid)
+      const text = describeEffect(db, state, event)
+      return `${source}: ${text}${/[.!?…]$/.test(text) ? '' : '.'}`
+    }
     case 'cardRevealed':
       return `${who(event.player)} revealed ${nameOf(db, state, event.uid)}.`
     case 'cardTrashed':

@@ -39,6 +39,33 @@ describe('buildBeats', () => {
     expect(beats[0]).toMatchObject({ kind: 'effect', sourceUid: 900, targets: [800], firstIndex: 100, lastIndex: 101, player: 1 })
   })
 
+  it('merges a mode note into the effect it chose (same source)', () => {
+    const beats = buildBeats(frames(
+      { type: 'abilityActivated', player: 1, uid: 900, abilityIndex: 0 },
+      { type: 'effectResolved', sourceUid: 900, description: 'mode 1' },
+      { type: 'effectResolved', sourceUid: 900, description: 'defeat 800', targets: [800] },
+    ), 'ai')
+    expect(beats).toHaveLength(1)
+    expect(beats[0]).toMatchObject({ kind: 'effect', firstIndex: 100, lastIndex: 102, targets: [800] })
+    expect(beats[0].events.at(-1)).toMatchObject({ description: 'defeat 800' })
+  })
+
+  it("keeps a mode note apart from a different source's effect", () => {
+    const beats = buildBeats(frames(
+      { type: 'effectResolved', sourceUid: 900, description: 'mode 0' },
+      { type: 'effectResolved', sourceUid: 800, description: 'draw 1' },
+    ), 'ai')
+    expect(beats).toHaveLength(2)
+  })
+
+  it('never merges two ordinary effects of the same source', () => {
+    const beats = buildBeats(frames(
+      { type: 'effectResolved', sourceUid: 900, description: 'draw 1' },
+      { type: 'effectResolved', sourceUid: 900, description: 'draw 1' },
+    ), 'ai')
+    expect(beats).toHaveLength(2)
+  })
+
   it('lets a defeat absorb the exit event of the same card', () => {
     const beats = buildBeats(frames(
       { type: 'unitDefeated', uid: 800 },

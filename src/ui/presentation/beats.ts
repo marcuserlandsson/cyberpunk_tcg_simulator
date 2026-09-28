@@ -72,11 +72,18 @@ function targetsOf(event: GameEvent): (number | 'gigArea')[] {
   return []
 }
 
+function isModeNote(event: Extract<GameEvent, { type: 'effectResolved' }>): boolean {
+  return /^mode \d+$/.test(event.description)
+}
+
 function absorbs(beat: Beat, event: GameEvent, player: PlayerId | null): boolean {
   const last = beat.events[beat.events.length - 1]
   const kind = KIND[event.type]
   if (beat.kind === 'effect' && last.type === 'abilityActivated' && event.type === 'effectResolved')
     return event.sourceUid === last.uid
+  // A modal choice's `mode N` note is folded into the effect it chose.
+  if (beat.kind === 'effect' && last.type === 'effectResolved' && isModeNote(last) && event.type === 'effectResolved')
+    return event.sourceUid === last.sourceUid
   if (EXITS.has(event.type) && (beat.kind === 'defeat' || beat.kind === 'effect')) {
     const uid = uidOf(event)
     return beat.kind === 'defeat' ? uid === beat.sourceUid : uid !== null && beat.targets.includes(uid)

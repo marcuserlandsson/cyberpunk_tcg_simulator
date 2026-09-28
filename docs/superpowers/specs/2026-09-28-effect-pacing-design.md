@@ -132,7 +132,14 @@ card objects). Frames are UI-only and discarded once presented.
 `buildBeats(frames: Frame[], actor: 'human' | 'ai'): Beat[]` is a pure
 function in `src/ui/presentation/beats.ts`. Captions are not stored on the
 beat. `BeatLayer` renders them at display time with `describeEvent`, which
-keeps `beats.ts` free of a dependency on `useGame.ts`.
+keeps `beats.ts` free of a dependency on `useGame.ts`. Effect callouts and the
+log's effect lines both use `describeEffect`
+(`src/ui/presentation/describeEffect.ts`), which turns the engine's terse notes
+into readable text: a `scripted:*` note shows the source card's printed text
+(trimmed to about 140 characters), `mode N` reads "chooses an effect", Gig
+notes read "sets a Gig from a to b" / "matches a Gig: a → b" / "swaps two
+Gigs", and card uids are named only in their own slot (never by a global
+replace), with hidden cards reading "a face-down card".
 
 ```ts
 type BeatKind = 'turnBanner' | 'spotlight' | 'effect' | 'attack' | 'block'
@@ -157,7 +164,7 @@ interface Beat {
 |---|---|---|---|
 | turnBanner | `turnStarted`, plus the ready and draw events that follow it | "RIVAL'S TURN" / "YOUR TURN" sweep | 900ms |
 | spotlight | `cardPlayed`, `legendCalled` | Board veil, the card goes center stage with a caption, then flies to its slot | 1400ms |
-| effect | `effectResolved`; absorbs an immediately preceding `abilityActivated` | Source pulses, callout with the description, line to each target | 1100ms |
+| effect | `effectResolved`; absorbs an immediately preceding `abilityActivated`, and a `mode N` note absorbs the next `effectResolved` of the same source | Source pulses, callout with the readable description (`describeEffect`), line to each target | 1100ms |
 | attack | `attackDeclared` | Attacker lunges, line to the target unit or Gig area | 900ms |
 | block | `attackBlocked` | Blocker highlighted, attack line re-points to it | 700ms |
 | defeat | `unitDefeated` | Glitch, then the card flies to trash | 700ms |

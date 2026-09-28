@@ -18,31 +18,11 @@ import { useLayoutEffect, useState, type CSSProperties, type ReactElement, type 
 import { CardFrame } from '../CardFrame'
 import { FACE_DOWN_DEF } from '../ZonePanels'
 import { describeEvent } from '../useGame'
-import type { CardDb, GameEvent, GameState, PlayerId } from '../../engine/types'
+import type { CardDb, PlayerId } from '../../engine/types'
 import type { Beat } from './beats'
+import { describeEffect } from './describeEffect'
 
 type Box = { x: number; y: number; w: number; h: number }
-
-/** A card whose identity the human isn't entitled to know yet — a face-down
- *  Legend, most commonly — reads as "a face-down card" rather than by name,
- *  everywhere a beat would otherwise name it (docs/rulings.md's "a face-down
- *  card's identity is never material" hygiene, extended from the board's own
- *  rendering to the presentation text describing it). */
-function visibleCardName(db: CardDb, board: GameState, uid: number): string | undefined {
-  const instance = board.cards[uid]
-  if (instance === undefined) return undefined
-  if (instance.faceUp === false) return 'a face-down card'
-  return db[instance.defId]?.name
-}
-
-export function effectCaption(db: CardDb, board: GameState, event: Extract<GameEvent, { type: 'effectResolved' }>): string {
-  let text = event.description
-  for (const uid of event.targets ?? []) {
-    const name = visibleCardName(db, board, uid)
-    if (name !== undefined) text = text.replace(new RegExp(`\\b${uid}\\b`, 'g'), name)
-  }
-  return text
-}
 
 function boxOf(root: HTMLElement, rect: DOMRect): Box {
   const origin = root.getBoundingClientRect()
@@ -143,7 +123,7 @@ export function BeatLayer({ db, beat, human, root, previousRects, useOfficialIma
               ? 'A face-down card'
               : db[beat.board.cards[event.sourceUid]?.defId ?? '']?.name ?? 'Effect'
           }</strong>
-          <span>{effectCaption(db, beat.board, event)}</span>
+          <span>{describeEffect(db, beat.board, event)}</span>
         </div>
       )}
 
