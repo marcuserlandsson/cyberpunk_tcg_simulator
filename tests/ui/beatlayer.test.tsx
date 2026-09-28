@@ -234,7 +234,7 @@ describe('useFlip', () => {
       const previousRects = useFlip(root, frameKey, 1000, true)
       return (
         <div ref={root}>
-          <div data-uid="1" />
+          <div className="board-card" data-uid="1" />
           <Child previousRects={previousRects} />
         </div>
       )
@@ -253,5 +253,75 @@ describe('useFlip', () => {
     expect(seenByChild[1]).toBe(0)
 
     rectSpy.mockRestore()
+  })
+
+  // Final review I2: a frame that commits while the previous glide is still
+  // running must measure the card's true slot, not its in-flight position.
+  it('starts the next glide from the true previous slot when a frame commits mid-animation', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<div class="board-card" data-uid="1"></div>'
+    document.body.appendChild(root)
+    const el = root.firstElementChild as HTMLElement
+    let layoutLeft = 0
+    // The live animation's current offset: getBoundingClientRect includes it,
+    // as a browser's does for an in-flight `translate`.
+    let running: { offset: number; playState: string } | null = null
+    const calls: Keyframe[][] = []
+    ;(el as unknown as { animate: unknown }).animate = (keyframes: Keyframe[]) => {
+      calls.push(keyframes)
+      const dx = Number(String(keyframes[0].translate).split('px')[0])
+      const animation = { offset: dx / 2, playState: 'running', cancel() { animation.playState = 'idle'; if (running === animation) running = null } }
+      running = animation
+      return animation
+    }
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const left = this === el ? layoutLeft + (running?.offset ?? 0) : 0
+      return { left, top: 0, right: left, bottom: 0, width: 10, height: 10, x: left, y: 0, toJSON: () => ({}) } as DOMRect
+    })
+
+    const hook = renderHook(({ key }) => useFlip({ current: root }, key, 1000, true), { initialProps: { key: 0 as unknown } })
+    layoutLeft = 100
+    hook.rerender({ key: 1 }) // glide 0 -> 100 starts, and is still running...
+    layoutLeft = 200
+    hook.rerender({ key: 2 }) // ...when the next frame commits
+
+    expect(calls).toHaveLength(2)
+    expect(calls[0][0].translate).toBe('-100px 0px')
+    // From the true slot at 100, not from wherever the first glide had got to.
+    expect(calls[1][0].translate).toBe('-100px 0px')
+    expect(hook.result.current.current.get('1')?.left).toBe(200)
+
+    rectSpy.mockRestore()
+    root.remove()
+  })
+
+  // Final review I3: nested [data-uid] elements (buttons inside a card) must
+  // never overwrite the card root's rect.
+  it('measures card roots only, ignoring nested [data-uid] elements', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<div class="board-card" data-uid="1"><button data-uid="1"></button></div>'
+    document.body.appendChild(root)
+    const card = root.firstElementChild as HTMLElement
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const left = this === card ? 10 : 500
+      return { left, top: 0, right: left, bottom: 0, width: 10, height: 10, x: left, y: 0, toJSON: () => ({}) } as DOMRect
+    })
+    const hook = renderHook(() => useFlip({ current: root }, 0, 1000, true))
+    expect(hook.result.current.current.get('1')?.left).toBe(10)
+    rectSpy.mockRestore()
+    root.remove()
+  })
+})
+
+describe('card action buttons (final review I3)', () => {
+  it('carry no data-uid of their own', () => {
+    const uid = board.players[0].hand[0]
+    const affordances = { ...NO_AFFORDANCES, sellable: new Set([uid]), abilities: new Set([uid]) }
+    const { container } = render(
+      <HandStrip db={db} state={board} player={0} hidden={false} affordances={affordances} handlers={noopHandlers} useOfficialImages={false} />
+    )
+    const buttons = container.querySelectorAll('[data-testid="sell-button"], [data-testid="ability-button"]')
+    expect(buttons.length).toBe(2)
+    buttons.forEach((button) => expect(button.hasAttribute('data-uid')).toBe(false))
   })
 })

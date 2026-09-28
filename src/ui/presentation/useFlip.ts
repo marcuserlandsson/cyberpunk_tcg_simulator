@@ -1,5 +1,5 @@
-// FLIP card movement between presentation frames: remember where every
-// [data-uid] element was, and when the frame changes, animate each moved
+// FLIP card movement between presentation frames: remember where every card
+// root (FLIP_SELECTOR) was, and when the frame changes, animate each moved
 // element from its old spot to its new one. The CSS `translate` property is
 // used, not `transform`, so hand-fan rotations and spent-card rotations
 // compose instead of being overwritten mid-flight.
@@ -27,9 +27,16 @@
 
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 
+/**
+ * The elements FLIP moves and measures: card roots only. A nested element
+ * that happened to carry `data-uid` (a button inside a card, say) would
+ * otherwise overwrite its card's rect (final review I3).
+ */
+export const FLIP_SELECTOR = '.board-card[data-uid], .eddie-card[data-uid]'
+
 function measure(root: HTMLElement): Map<string, DOMRect> {
   const rects = new Map<string, DOMRect>()
-  root.querySelectorAll<HTMLElement>('[data-uid]').forEach((el) => rects.set(el.dataset.uid!, el.getBoundingClientRect()))
+  root.querySelectorAll<HTMLElement>(FLIP_SELECTOR).forEach((el) => rects.set(el.dataset.uid!, el.getBoundingClientRect()))
   return rects
 }
 
@@ -53,23 +60,30 @@ export function useFlip(
   const current = useRef(new Map<string, DOMRect>())
   const previous = useRef(new Map<string, DOMRect>())
   const lastKeys = useRef(new Map<string, string>())
+  const glides = useRef<Animation[]>([])
 
   useLayoutEffect(() => {
     const element = root.current
     if (element === null) return
+    // A glide still in flight would be included in getBoundingClientRect, so
+    // the new frame would measure (and later start from) a mid-air position
+    // and overshoot. Settle every glide this hook started before measuring
+    // (final review I2).
+    glides.current.forEach((animation) => animation.cancel())
+    glides.current = []
     const next = measure(element)
     previous.current = current.current
     current.current = next
     if (!enabled) { lastKeys.current = pulseKeys(element); return }
     const ms = Math.min(450, Math.max(180, durationMs * 0.4))
-    element.querySelectorAll<HTMLElement>('[data-uid]').forEach((el) => {
+    element.querySelectorAll<HTMLElement>(FLIP_SELECTOR).forEach((el) => {
       const before = previous.current.get(el.dataset.uid!)
       const after = next.get(el.dataset.uid!)
       if (before === undefined || after === undefined || typeof el.animate !== 'function') return
       const dx = before.left - after.left
       const dy = before.top - after.top
       if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return
-      el.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: ms, easing: 'cubic-bezier(.2,.7,.2,1)' })
+      glides.current.push(el.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: ms, easing: 'cubic-bezier(.2,.7,.2,1)' }))
     })
 
     const keys = pulseKeys(element)

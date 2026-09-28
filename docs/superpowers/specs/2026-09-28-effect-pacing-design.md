@@ -267,9 +267,12 @@ behavior it covered to the new tests.
 - Card components get `data-uid`. `BeatLayer` finds source and target
   elements with `querySelector('[data-uid="…"]')` and measures them with
   `getBoundingClientRect`.
-- **`useFlip`**: before a displayed-frame change, record the rects of
-  `[data-uid]` elements. After commit, animate each moved card from its old
-  rect to its new one with `element.animate`. This covers draws, field
+- **`useFlip`**: before a displayed-frame change, record the rects of card
+  roots (`.board-card[data-uid]`, `.eddie-card[data-uid]`; nested elements
+  never carry `data-uid`). After commit, animate each moved card from its old
+  rect to its new one with `element.animate`. Glides still running when the
+  next frame commits are cancelled before measuring, so a card never starts
+  from a mid-air position. This covers draws, field
   entries, trash and bottom-deck. Cards that appear with no previous rect
   animate in from their zone's pile element.
 - **Diff cues:**

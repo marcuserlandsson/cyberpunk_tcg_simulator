@@ -21,6 +21,7 @@ import { describeEvent } from '../useGame'
 import type { CardDb, PlayerId } from '../../engine/types'
 import type { Beat } from './beats'
 import { describeEffect } from './describeEffect'
+import { FLIP_SELECTOR } from './useFlip'
 
 type Box = { x: number; y: number; w: number; h: number }
 
@@ -29,11 +30,16 @@ function boxOf(root: HTMLElement, rect: DOMRect): Box {
   return { x: rect.left - origin.left + root.scrollLeft, y: rect.top - origin.top + root.scrollTop, w: rect.width, h: rect.height }
 }
 
+/** A card root (never a nested element that also carries the uid). */
+function cardSelector(uid: number): string {
+  return FLIP_SELECTOR.split(', ').map((root) => root.replace('[data-uid]', `[data-uid="${uid}"]`)).join(', ')
+}
+
 function locate(root: HTMLElement | null, previous: Map<string, DOMRect>, target: number | 'gigArea', owner: PlayerId | null): Box | null {
   if (root === null) return null
   const selector = target === 'gigArea'
     ? `[data-testid="gig-area"][data-player="${owner === null ? 0 : 1 - owner}"]`
-    : `[data-uid="${target}"]`
+    : cardSelector(target)
   const el = root.querySelector(selector)
   if (el !== null) return boxOf(root, el.getBoundingClientRect())
   const old = target === 'gigArea' ? undefined : previous.get(String(target))

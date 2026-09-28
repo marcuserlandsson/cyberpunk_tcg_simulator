@@ -193,7 +193,6 @@ export function BoardCard(props: {
             type="button"
             className="board-card__action"
             data-testid="sell-button"
-            data-uid={uid}
             onClick={() => handlers.onSell(uid)}
           >
             Sell
@@ -204,7 +203,6 @@ export function BoardCard(props: {
             type="button"
             className="board-card__action"
             data-testid="ability-button"
-            data-uid={uid}
             onClick={() => handlers.onAbility(uid)}
           >
             Ability
