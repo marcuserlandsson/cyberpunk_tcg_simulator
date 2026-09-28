@@ -59,7 +59,7 @@ call sites with it:
 ### `applyActionTimeline`
 
 ```ts
-export interface Frame { eventIndex: number; board: GameState }
+export interface Frame { eventIndex: number; event: GameEvent; board: GameState }
 export interface Timeline { state: GameState; frames: Frame[] }
 export function applyActionTimeline(db: CardDb, state: GameState, action: Action): Timeline
 ```
@@ -67,7 +67,7 @@ export function applyActionTimeline(db: CardDb, state: GameState, action: Action
 - It sets a module-scoped recorder, calls `applyAction`, clears the recorder
   in `finally`, and returns the frames it collected.
 - While the recorder is set, `emit` pushes the event and then records
-  `{ eventIndex: draft.events.length - 1, board: draftState(draft) }`.
+  `{ eventIndex: draft.events.length - 1, event, board: draftState(draft) }`.
 - The recorder is never stored on `GameState`. It stays out of saves,
   `draftState` copies, the game record and AI search.
 - `board` is a full `GameState`, so existing components render a frame
@@ -79,9 +79,16 @@ export function applyActionTimeline(db: CardDb, state: GameState, action: Action
   (section 3).
 - Re-entrancy: the engine never calls `applyAction` from inside resolution.
   The only other caller is `replay.ts`, which loads saves outside any
-  timeline. So `applyActionTimeline` throws if a recorder is already set, and
-  the planning audit confirms that no `emit` fires on a scratch draft other
-  than the action's own during resolution.
+  timeline. So `applyActionTimeline` throws if a recorder is already set.
+- **Scratch drafts:** resolution sometimes works on copies of the draft
+  (`resolveEffect`, and scripts that return a fresh state). A copy that is
+  thrown away could emit events that never reach the result. After the call,
+  frames are therefore filtered against the result's events. The result is
+  `pendingIntercept.view` when an intercept paused the action, otherwise the
+  returned state. A frame is kept only when
+  `result.events[frame.eventIndex] === frame.event` (event objects are
+  shared by reference across `draftState` copies). When several frames share
+  an index, the last one is kept.
 
 ### Data additions
 
@@ -94,10 +101,19 @@ export function applyActionTimeline(db: CardDb, state: GameState, action: Action
 
 ### Risk: emit ordering
 
-For each effect primitive, the event must be emitted *after* the board
-mutation, so that the frame shows the result. Audit `note()` and each
-`events.push` site, and move emits that currently fire before their mutation.
-Regression tests cover representative primitives (section 5).
+A frame must show what its beat is about:
+
+- **In-place effects** (buff, grant keyword, ready, spend, change gig, draw)
+  must emit *after* the mutation, so the frame shows the result.
+- **Removal effects** (`defeat`, `bounce`, `bottomDeck`) already emit their
+  `effectResolved` note *before* the card leaves the field. That is the
+  desired order, because the target is still on the board to draw the target
+  line to. The removal event that follows (`unitDefeated`, `cardTrashed`,
+  ...) must emit after the card has moved, so its frame shows the card gone.
+
+Audit `note()` and each `events.push` site against these two rules and move
+the emits that break them. Regression tests cover representative primitives
+(section 5).
 
 ### Cost
 
@@ -106,23 +122,27 @@ card objects). Frames are UI-only and discarded once presented.
 
 ## 2. Beat model
 
-`buildBeats(frames: Frame[], events: GameEvent[], actor: 'human' | 'ai'): Beat[]`
-is a pure function in `src/ui/presentation/beats.ts`.
+`buildBeats(frames: Frame[], actor: 'human' | 'ai'): Beat[]` is a pure
+function in `src/ui/presentation/beats.ts`. Captions are not stored on the
+beat. `BeatLayer` renders them at display time with `describeEvent`, which
+keeps `beats.ts` free of a dependency on `useGame.ts`.
 
 ```ts
 type BeatKind = 'turnBanner' | 'spotlight' | 'effect' | 'attack' | 'block'
   | 'defeat' | 'steal' | 'dieRoll' | 'minor' | 'silent' | 'gameOver'
 interface Beat {
+  id: number               // = lastIndex; unique within a game
   kind: BeatKind
   events: GameEvent[]      // one or more consecutive events
   firstIndex: number       // event index range covered
   lastIndex: number
-  board: GameState         // the frame after lastIndex
+  board: GameState         // the frame at lastIndex
   baseMs: number           // duration before the speed multiplier; 0 = instant
-  player?: PlayerId
-  sourceUid?: number
-  targets?: (number | 'gigArea')[]
-  caption?: string         // from describeEvent
+  player: PlayerId | null
+  sourceUid: number | null
+  targets: (number | 'gigArea')[]
+  step: number             // 1-based position within this action's beats
+  of: number               // number of beats this action produced
 }
 ```
 
@@ -138,13 +158,24 @@ interface Beat {
 | dieRoll | `dieRolled` | Existing tumble | 700ms |
 | minor | `cardDrawn`, `cardSold`, `cardTrashed`, `cardBottomDecked`, `cardRemoved`, `cardRevealed`, `mulliganTaken`, `handKept` | Card moves between zones, no caption. Consecutive same-kind events by the same player merge into one beat | 350ms |
 | silent | `turnEnded`, `gameStarted`, `playOrderChosen` | Frame applies instantly | 0 |
-| gameOver | `gameEnded` | Existing overlay | 0 (overlay takes over) |
+| gameOver | `gameEnded` | Existing glitch, then the overlay | 600ms |
 
 ### Human actions
 
-When `actor === 'human'`, every beat up to and including the first non-minor
-beat gets `baseMs = 0`. That beat still plays a short in-place flash, with no
-spotlight. Every later beat is paced normally.
+When `actor === 'human'`, walk the beats in order:
+
+- `minor` and `silent` beats get `baseMs = 0`.
+- The first *primary* beat (`spotlight`, `effect`, `attack`, `block`,
+  `steal`, `dieRoll`) also gets `baseMs = 0`, and the walk stops. That beat is
+  the action the player just chose.
+- Any other kind (`turnBanner`, `defeat`, `gameOver`) stops the walk without
+  being zeroed. Ending your turn therefore still shows the rival's turn banner.
+
+Every later beat is paced normally. Beats with `baseMs = 0` are acknowledged
+immediately. Their frame is still committed, so cards glide to their new
+positions over a short fixed movement (section 4).
+
+In manual practice mode, every action counts as the human's.
 
 ### Hidden information
 
@@ -250,8 +281,11 @@ behavior it covered to the new tests.
   - An action that hits an intercept returns frames up to the pause point.
   - A nested `applyActionTimeline` throws.
   - The recorder is cleared after a thrown `IllegalActionError`.
-  - Representative primitives (draw, defeat, buff, ready/spend, trash, steal)
-    produce a frame that shows the result.
+  - Representative primitives follow the ordering rules above. A buff frame
+    shows the new power. A defeat effect's frame still has the target on the
+    field, and the following `unitDefeated` frame has it in the trash.
+  - An event emitted on a scratch draft that is thrown away produces no
+    frame.
 - **Beats** (`tests/ui/beats.test.ts`): table-driven tests for grouping,
   minor-beat merging, absorbing `abilityActivated`, human first-beat instant,
   and a hidden rival draw caption.
