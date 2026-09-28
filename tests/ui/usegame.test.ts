@@ -14,9 +14,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { loadCardDb } from '../../src/engine/cardDb'
+import { newGame } from '../../src/engine/game'
 import { actingPlayer } from '../../src/engine/query'
 import { legalActions } from '../../src/engine/legal'
-import { replay } from '../../src/engine/replay'
+import { applyAction } from '../../src/engine/reduce'
+import { gameProvenance, replay } from '../../src/engine/replay'
+import { AI_VERSION } from '../../src/ai/agents'
 import { describeEvent, useGame } from '../../src/ui/useGame'
 import type { DeckList } from '../../src/engine/deck'
 import type { CardDb } from '../../src/engine/types'
@@ -417,4 +420,107 @@ it('manual practice controls both seats, never schedules AI, and saves/undoes a 
     act(()=>vi.advanceTimersByTime(1000))
     expect(hook.result.current.record).toEqual(before)
   } finally { hook.unmount();vi.useRealTimers() }
+})
+
+describe('useGame pacing', () => {
+  let aiFirstSeed = 1
+  while (actingPlayer(newGame(db, { decks: [arasaka, mercs], seed: aiFirstSeed })) !== 1) aiFirstSeed++
+
+  function mountPaced() {
+    return renderHook(() => useGame(db, { aiDelayMs: 0, pacing: true }))
+  }
+
+  /** Acknowledges every queued beat, one render at a time. */
+  async function drain(hook: ReturnType<typeof mountPaced>): Promise<void> {
+    for (let i = 0; i < 500 && hook.result.current.beats.length > 0; i++) {
+      await act(async () => hook.result.current.ackBeat(hook.result.current.beats[0].id))
+    }
+  }
+
+  it('queues beats for an AI action and holds the next AI action until they drain', async () => {
+    const hook = mountPaced()
+    await act(async () => hook.result.current.start(arasaka, mercs, aiFirstSeed))
+    await waitFor(() => expect(hook.result.current.beats.length).toBeGreaterThan(0))
+    const applied = hook.result.current.record!.actions.length
+    expect(hook.result.current.presenting).toBe(true)
+    expect(hook.result.current.legal).toEqual([])
+    expect(hook.result.current.aiThinking).toBe(false)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(hook.result.current.record!.actions.length).toBe(applied)
+    await drain(hook)
+    await waitFor(() => expect(
+      hook.result.current.record!.actions.length > applied || hook.result.current.legal.length > 0,
+    ).toBe(true))
+  })
+
+  it('only offers the human legal actions once the queue is empty', async () => {
+    const hook = mountPaced()
+    await act(async () => hook.result.current.start(arasaka, mercs, aiFirstSeed))
+    for (let i = 0; i < 50 && hook.result.current.legal.length === 0; i++) {
+      await drain(hook)
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+    }
+    expect(hook.result.current.legal.length).toBeGreaterThan(0)
+    expect(hook.result.current.beats).toEqual([])
+  })
+
+  it('does not queue anything when pacing is off', async () => {
+    const hook = renderHook(() => useGame(db, { aiDelayMs: 0 }))
+    await act(async () => hook.result.current.start(arasaka, mercs, aiFirstSeed))
+    await waitFor(() => expect(hook.result.current.legal.length).toBeGreaterThan(0))
+    expect(hook.result.current.beats).toEqual([])
+  })
+
+  it('undo clears the queue', async () => {
+    const hook = mountPaced()
+    await act(async () => hook.result.current.start(arasaka, mercs, SEED))
+    for (let i = 0; i < 50 && hook.result.current.legal.length === 0; i++) {
+      await drain(hook)
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+    }
+    const endTurn = hook.result.current.legal.find((a) => a.type === 'endTurn') ?? hook.result.current.legal[0]
+    await act(async () => hook.result.current.act(endTurn))
+    expect(hook.result.current.beats.length).toBeGreaterThan(0)
+    await act(async () => hook.result.current.undo())
+    expect(hook.result.current.beats).toEqual([])
+    expect(hook.result.current.legal.length).toBeGreaterThan(0)
+  })
+
+  it('does not replay presented beats after an intercept answer', async () => {
+    // Find a record whose next human action pauses for a human intercept.
+    let found: { seed: number; prefix: import('../../src/engine/types').Action[]; action: import('../../src/engine/types').Action } | null = null
+    for (let seed = 1; seed <= 150 && found === null; seed++) {
+      let state = newGame(db, { decks: [arasaka, mercs], seed })
+      const prefix: import('../../src/engine/types').Action[] = []
+      for (let i = 0; i < 250 && state.phase !== 'gameOver' && found === null; i++) {
+        const actions = legalActions(db, state)
+        if (actions.length === 0) break
+        const action = actions[(seed * 7 + i) % actions.length]
+        const next = applyAction(db, state, action)
+        if (next.phase === 'intercept' && next.pendingIntercept?.player === 0 && actingPlayer(state) === 0) {
+          found = { seed, prefix: [...prefix], action }
+        }
+        prefix.push(action)
+        state = next
+      }
+    }
+    expect(found).not.toBeNull()
+    const hook = mountPaced()
+    const record = {
+      practiceMode: true,
+      aiDifficulty: 'medium' as const,
+      aiVersion: AI_VERSION,
+      provenance: gameProvenance(db),
+      config: { decks: [arasaka, mercs] as [typeof arasaka, typeof mercs], seed: found!.seed },
+      actions: found!.prefix,
+    }
+    await act(async () => hook.result.current.load(record as never))
+    await act(async () => hook.result.current.act(found!.action))
+    const shown = new Set<number>()
+    for (const beat of hook.result.current.beats) for (let i = beat.firstIndex; i <= beat.lastIndex; i++) shown.add(i)
+    await drain(hook)
+    expect(hook.result.current.state!.phase).toBe('intercept')
+    await act(async () => hook.result.current.act(hook.result.current.legal[0]))
+    for (const beat of hook.result.current.beats) expect(shown.has(beat.firstIndex)).toBe(false)
+  })
 })

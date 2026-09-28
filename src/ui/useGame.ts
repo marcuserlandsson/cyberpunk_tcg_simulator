@@ -40,6 +40,8 @@ import {
   gameProvenance,
 } from '../engine/replay'
 import { saveGameRecord } from './storage'
+import { applyActionTimeline } from '../engine/timeline'
+import { buildBeats, type Beat } from './presentation/beats'
 import type { DeckList } from '../engine/deck'
 import type { Action, CardDb, GameEvent, GameState, PlayerId } from '../engine/types'
 
@@ -63,6 +65,11 @@ export interface UseGameOptions {
   aiDelayMs?: number
   aiDifficulty?: AiDifficulty
   createAiWorker?: () => AiWorker
+  /**
+   * Queue presentation beats per action (PlayView turns this off for Instant
+   * speed, `?aiDelay=0` and reduced motion).
+   */
+  pacing?: boolean
 }
 
 export interface UseGameApi {
@@ -93,6 +100,14 @@ export interface UseGameApi {
   save: (name: string) => void
   load: (record: GameRecord) => void
   eventsForLog: LogLine[]
+  /** Presentation beats queued for display, oldest first. */
+  beats: Beat[]
+  /** Acknowledges the beat at the front of the queue, if `id` still matches it. */
+  ackBeat: (id: number) => void
+  /** Drops every queued beat immediately (used by undo and speed changes). */
+  clearBeats: () => void
+  /** True while there are beats still waiting to be shown. */
+  presenting: boolean
 }
 
 /**
@@ -123,11 +138,58 @@ interface Game {
   owners: PlayerId[]
 }
 
-function applyOne(db: CardDb, game: Game, action: Action): Game {
+/** The live game plus the beats still waiting to be shown. */
+interface Session {
+  game: Game | null
+  beats: Beat[]
+  /** Highest event index already queued or shown; replays below it are skipped. */
+  seen: number
+}
+
+const NO_SESSION: Session = { game: null, beats: [], seen: -1 }
+
+/** The last event index a state has shown, counting a paused intercept's view. */
+function lastEventIndex(state: GameState): number {
+  return (state.pendingIntercept?.view ?? state).events.length - 1
+}
+
+function settled(game: Game): Session {
+  return { game, beats: [], seen: lastEventIndex(game.state) }
+}
+
+function withAction(game: Game, action: Action, state: GameState): Game {
   return {
     record: { ...game.record, actions: [...game.record.actions, action] },
-    state: applyAction(db, game.state, action),
+    state,
     owners: [...game.owners, actingPlayer(game.state)],
+  }
+}
+
+function applyOne(db: CardDb, game: Game, action: Action): Game {
+  return withAction(game, action, applyAction(db, game.state, action))
+}
+
+/**
+ * Applies one action to the session. With pacing on, the action's frames
+ * become queued beats. Frames at or below `seen` are dropped: an intercept
+ * answer replays its action from the start, and the part before the pause
+ * was already shown.
+ */
+function advance(db: CardDb, session: Session, action: Action, pacing: boolean): Session {
+  const game = session.game
+  if (game === null) return session
+  if (!pacing) {
+    const next = applyOne(db, game, action)
+    return { game: next, beats: [], seen: Math.max(session.seen, lastEventIndex(next.state)) }
+  }
+  const { state, frames } = applyActionTimeline(db, game.state, action)
+  const actor = game.record.practiceMode || actingPlayer(game.state) === HUMAN ? 'human' : 'ai'
+  const fresh = frames.filter((frame) => frame.eventIndex > session.seen)
+  const next = withAction(game, action, state)
+  return {
+    game: next,
+    beats: [...session.beats, ...buildBeats(fresh, actor)],
+    seen: Math.max(session.seen, lastEventIndex(state), ...fresh.map((frame) => frame.eventIndex)),
   }
 }
 
@@ -142,7 +204,10 @@ function randomSeed(): number {
 
 export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   const aiDelayMs = options.aiDelayMs ?? DEFAULT_AI_DELAY_MS
-  const [game, setGame] = useState<Game | null>(null)
+  const [session, setSession] = useState<Session>(NO_SESSION)
+  const game = session.game
+  const pacing = options.pacing ?? false
+  const [aiChoice, setAiChoice] = useState<{ game: Game; action: Action } | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
   const retryAI = useCallback(() => { setAiError(null); setRetry(value => value + 1) }, [])
@@ -162,7 +227,8 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
         config: { decks: structuredClone([humanDeck, aiDeck]), seed: seed ?? randomSeed() },
         actions: [],
       })
-      setGame(next)
+      setSession(settled(next))
+      setAiChoice(null)
       setAiError(null)
       setLoadError(null)
     } catch (error) {
@@ -173,7 +239,8 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   const load = useCallback((record: GameRecord) => {
     try {
       const next = gameFromRecord(dbRef.current, record)
-      setGame(next)
+      setSession(settled(next))
+      setAiChoice(null)
       setAiError(null)
       setLoadError(null)
     } catch (error) {
@@ -184,22 +251,32 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   const clearLoadError = useCallback(() => setLoadError(null), [])
 
   const act = useCallback((action: Action) => {
-    setGame((current) => (current === null ? current : applyOne(dbRef.current, current, action)))
-  }, [])
+    setSession((current) => advance(dbRef.current, current, action, pacing))
+  }, [pacing])
 
   const undo = useCallback(() => {
     setAiError(null)
-    setGame((current) => {
-      if (current === null) return current
-      const rewound = current.record.practiceMode ? { ...current.record, actions: current.record.actions.slice(0,-1) } : undoToLastDecisionOf(dbRef.current, current.record, HUMAN)
-      if (rewound.actions.length === current.record.actions.length) return current
-      return {
+    setAiChoice(null)
+    setSession((current) => {
+      const currentGame = current.game
+      if (currentGame === null) return current
+      const rewound = currentGame.record.practiceMode ? { ...currentGame.record, actions: currentGame.record.actions.slice(0,-1) } : undoToLastDecisionOf(dbRef.current, currentGame.record, HUMAN)
+      if (rewound.actions.length === currentGame.record.actions.length) return current
+      return settled({
         record: rewound,
         state: replay(dbRef.current, rewound),
-        owners: current.owners.slice(0, rewound.actions.length),
-      }
+        owners: currentGame.owners.slice(0, rewound.actions.length),
+      })
     })
   }, [])
+
+  const ackBeat = useCallback((id: number) => {
+    setSession((current) => current.beats[0]?.id === id ? { ...current, beats: current.beats.slice(1) } : current)
+  }, [])
+  const clearBeats = useCallback(() => {
+    setSession((current) => current.beats.length === 0 ? current : { ...current, beats: [] })
+  }, [])
+  const presenting = session.beats.length > 0
 
   const save = useCallback(
     (name: string) => {
@@ -212,6 +289,7 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
   const acting = game === null ? null : actingPlayer(game.state)
   const over = game === null || game.state.phase === 'gameOver'
   const aiThinking = !aiError && game !== null && !game.record.practiceMode && !over && acting === AI
+    && !presenting && aiChoice === null
 
   // --- the AI loop -------------------------------------------------------
   useEffect(() => {
@@ -228,13 +306,10 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
     }
     const accept = (action: Action) => {
       if (!active) return
-      try {
-        const next = applyOne(dbRef.current, game, action)
-        active = false
-        clearTimeout(deadline)
-        worker?.terminate()
-        setGame(current => current === game ? next : current)
-      } catch (error) { fail(error instanceof Error ? error.message : String(error)) }
+      active = false
+      clearTimeout(deadline)
+      worker?.terminate()
+      setAiChoice({ game, action })
     }
     const timer = setTimeout(() => {
       try {
@@ -265,10 +340,23 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
     return () => { active = false; clearTimeout(timer); clearTimeout(deadline); worker?.terminate() }
   }, [game, aiDelayMs, options.createAiWorker, retry])
 
+  // The AI may finish thinking while beats play; its move is applied only
+  // once the player has seen everything before it.
+  useEffect(() => {
+    if (aiChoice === null || session.beats.length > 0) return
+    setAiChoice(null)
+    if (aiChoice.game !== session.game) return
+    try {
+      setSession(advance(dbRef.current, session, aiChoice.action, pacing))
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : String(error))
+    }
+  }, [aiChoice, session, pacing])
+
   const legal = useMemo(() => {
-    if (game === null || over || (!game.record.practiceMode && acting !== HUMAN)) return []
+    if (game === null || over || presenting || (!game.record.practiceMode && acting !== HUMAN)) return []
     return legalActions(db, game.state)
-  }, [db, game, over, acting])
+  }, [db, game, over, acting, presenting])
 
   const eventsForLog = useMemo(() => {
     if (game === null) return []
@@ -293,6 +381,10 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
     save,
     load,
     eventsForLog,
+    beats: session.beats,
+    ackBeat,
+    clearBeats,
+    presenting,
   }
 }
 
