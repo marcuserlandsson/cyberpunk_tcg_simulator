@@ -73,6 +73,17 @@ describe('usePresentation', () => {
     expect(h.result.current.api.beat?.id).toBe(2)
   })
 
+  it('does not reuse a stale beat\'s remaining time for an unrelated beat with the same id', () => {
+    const h = harness([beat(5)])
+    act(() => { vi.advanceTimersByTime(400) })
+    act(() => h.result.current.setBeats([]))
+    act(() => h.result.current.setBeats([beat(5)]))
+    act(() => { vi.advanceTimersByTime(999) })
+    expect(h.result.current.api.beat?.id).toBe(5)
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(h.result.current.beats).toEqual([])
+  })
+
   it('skipTurn drains the queue and keeps draining new beats until the human is up', () => {
     const h = harness([beat(1), beat(2)])
     act(() => h.result.current.api.skipTurn())

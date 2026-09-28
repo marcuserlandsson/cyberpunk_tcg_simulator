@@ -38,7 +38,7 @@ export function usePresentation({ beats, ackBeat, clearBeats, awaitingHuman, spe
   const [paused, setPaused] = useState(false)
   const [hidden, setHidden] = useState(() => typeof document !== 'undefined' && document.visibilityState === 'hidden')
   const [fastForward, setFastForward] = useState(false)
-  const remaining = useRef<{ id: number; ms: number } | null>(null)
+  const remaining = useRef<{ beat: Beat; ms: number } | null>(null)
 
   useEffect(() => {
     const onVisibility = () => setHidden(document.visibilityState === 'hidden')
@@ -56,16 +56,17 @@ export function usePresentation({ beats, ackBeat, clearBeats, awaitingHuman, spe
   }, [fastForward, awaitingHuman, beats.length])
 
   useEffect(() => {
-    if (beat === null || speed === 'instant' || fastForward) return
+    if (beat === null) { remaining.current = null; return }
+    if (speed === 'instant' || fastForward) return
     if (durationMs === 0) { ackBeat(beat.id); return }
-    if (remaining.current?.id !== beat.id) remaining.current = { id: beat.id, ms: durationMs }
+    if (remaining.current?.beat !== beat) remaining.current = { beat, ms: durationMs }
     if (paused || hidden) return
     const startedAt = Date.now()
     const timer = setTimeout(() => { remaining.current = null; ackBeat(beat.id) }, remaining.current.ms)
     return () => {
       clearTimeout(timer)
-      if (remaining.current?.id === beat.id)
-        remaining.current = { id: beat.id, ms: Math.max(0, remaining.current.ms - (Date.now() - startedAt)) }
+      if (remaining.current?.beat === beat)
+        remaining.current = { beat, ms: Math.max(0, remaining.current.ms - (Date.now() - startedAt)) }
     }
   }, [beat, durationMs, paused, hidden, speed, fastForward, ackBeat])
 
