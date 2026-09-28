@@ -8,7 +8,11 @@ export interface AcquisitionNeed {
   identity: string; id: string; required: number; owned: number; reserved: number; available: number; missing: number
   playsetMissing: number; missingArts: { id: string; choices: string[] }[]
 }
-export function acquisitionPlan(db: CardDb, decks: DeckList[], printings: Printing[], counts: Record<string,number>, mode: 'shared' | 'assembled', reserveArtwork: boolean): AcquisitionNeed[] {
+export type DeckMode = 'shared' | 'assembled'
+
+/** Per card identity: the copies the chosen decks need — the max any one deck
+ *  needs when cards are shared, the sum when every deck is kept assembled. */
+export function deckRequirements(db: CardDb, decks: DeckList[], mode: DeckMode): Map<string, { id: string; count: number }> {
   const required = new Map<string,{id:string; count:number}>()
   const identity = (id:string) => db[id] ? cardIdentity(db[id]) : id
   for (const deck of decks) {
@@ -19,6 +23,12 @@ export function acquisitionPlan(db: CardDb, decks: DeckList[], printings: Printi
     }
     for (const [key,value] of own) required.set(key,{id:value.id,count:mode==='shared' ? Math.max(required.get(key)?.count ?? 0,value.count) : (required.get(key)?.count ?? 0)+value.count})
   }
+  return required
+}
+
+export function acquisitionPlan(db: CardDb, decks: DeckList[], printings: Printing[], counts: Record<string,number>, mode: DeckMode, reserveArtwork: boolean): AcquisitionNeed[] {
+  const required = deckRequirements(db, decks, mode)
+  const identity = (id:string) => db[id] ? cardIdentity(db[id]) : id
   const owned = new Map<string,number>(), reserved = new Map<string,number>()
   for (const p of printings) if(p.playable!==false) owned.set(identity(p.cardId),(owned.get(identity(p.cardId))??0)+(counts[p.key]??0))
   if(reserveArtwork) for(const art of artworkGroups(printings)) {
