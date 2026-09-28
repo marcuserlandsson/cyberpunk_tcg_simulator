@@ -22,7 +22,7 @@ import { paymentLabel, readyPaymentUids } from '../engine/economy'
 // indistinguishable. Nothing is chosen for the player except things that are
 // not decisions.
 
-import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
 import { Field } from './Field'
 import { HandStrip } from './HandStrip'
 import { LogPanel } from './LogPanel'
@@ -32,8 +32,10 @@ import { ZonePanels } from './ZonePanels'
 import { ZoomPanel } from './ZoomPanel'
 import { HUMAN as DEFAULT_HUMAN, buildLog, useGame } from './useGame'
 import { beatAnimations } from './presentation/beatAnimations'
+import { BeatLayer } from './presentation/BeatLayer'
 import { PacingControls } from './presentation/PacingControls'
 import { usePresentation } from './presentation/usePresentation'
+import { useFlip } from './presentation/useFlip'
 import { loadSpeed, saveSpeed, type Speed } from './presentation/speed'
 import { deleteGameRecord, useDecks, listGameRecords } from './storage'
 import { deckPickerLabel, isDeckPickable } from './deckPicker'
@@ -210,6 +212,8 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
     : base
   const anim = beatAnimations(beat)
   const logLines = useMemo(() => (beat === null ? game.eventsForLog : buildLog(db, beat.board)), [beat, db, game.eventsForLog])
+  const boardRef = useRef<HTMLDivElement | null>(null)
+  const previousRects = useFlip(boardRef, state, presentation.durationMs, speed !== 'instant')
 
   const [pending, setPending] = useState<Pending | null>(null)
   // The uid the board/hand is currently hovering (or focused on, for
@@ -641,7 +645,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
     // waiting for" — the single fact any automated driver (the E2E suite, and
     // Task 15's) needs in order to never race the AI's own timer.
     <BoardPerspective.Provider value={HUMAN}><section
-      className={`playmat${promptOpen ? ' playmat--prompting' : ''}${anim.glitch ? ' is-glitching' : ''}${beat !== null ? ' is-presenting' : ''}`}
+      className={`playmat${promptOpen ? ' playmat--prompting' : ''}${anim.glitch ? ' is-glitching' : ''}${beat !== null ? ' is-presenting' : ''}${presentation.paused ? ' is-paused' : ''}`}
       aria-label="Playmat"
       data-testid="playmat"
       data-awaiting={awaitingAttribute({ presenting: game.presenting, legalCount: legal.length, over: state.phase === 'gameOver' })}
@@ -655,6 +659,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
       <div className="playmat__body">
         <div
           className="playmat__board"
+          ref={boardRef}
           onClickCapture={(event) => {
             if (presentation.beat === null) return
             event.stopPropagation()
@@ -702,6 +707,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
               handlers={handlers}
               useOfficialImages={useOfficialImages}
               lungeUid={anim.lungeUid}
+              spotlitUid={beat?.kind === 'spotlight' ? beat.sourceUid : null}
             />
             <HandStrip
               db={db}
@@ -735,6 +741,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
               handlers={handlers}
               useOfficialImages={useOfficialImages}
               lungeUid={anim.lungeUid}
+              spotlitUid={beat?.kind === 'spotlight' ? beat.sourceUid : null}
             />
             <ZonePanels
               db={db}
@@ -775,6 +782,15 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
               </button>
             </div>
           )}
+
+          <BeatLayer
+            db={db}
+            beat={beat}
+            human={HUMAN}
+            root={boardRef}
+            previousRects={previousRects}
+            useOfficialImages={useOfficialImages}
+          />
         </div>
 
         <div className="playmat__rail" data-testid="control-bar">

@@ -1334,3 +1334,37 @@
   background: var(--panel-2);
   box-shadow: inset 2px 0 0 var(--act);
 }
+
+/* BeatLayer (presentation/BeatLayer.tsx): inside .playmat__board, over the
+   board rows. `.playmat__board` is already `position: relative` above (its
+   own overflow/grid rule), so this layer only needs its own stacking. */
+.beat-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.beat-layer--you { --beat-color: var(--you); }
+.beat-layer--rival { --beat-color: var(--rival); }
+.beat-layer__veil { position: absolute; inset: 0; background: rgba(7, 7, 13, 0.72); }
+.beat-layer__spotlight {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%;
+  filter: drop-shadow(0 0 22px var(--beat-color));
+}
+.beat-layer__caption {
+  position: absolute; left: 50%; top: 10px; translate: -50% 0; margin: 0;
+  padding: 3px 12px; background: var(--panel); border: 1px solid var(--beat-color);
+  color: var(--beat-color); font-family: var(--font-display); letter-spacing: 0.08em;
+  text-transform: uppercase; white-space: nowrap;
+}
+.beat-layer__caption--small { font-family: var(--font-body); text-transform: none; letter-spacing: 0; font-size: 13px; }
+.beat-layer__callout {
+  position: absolute; display: grid; gap: 2px; max-width: 220px; padding: 5px 8px;
+  background: var(--panel); border: 1px solid var(--beat-color); font-size: 12px;
+}
+.beat-layer__callout strong { color: var(--beat-color); font-family: var(--font-display); text-transform: uppercase; }
+.beat-layer__lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.beat-layer__line { stroke: var(--beat-color); stroke-width: 2; stroke-dasharray: 6 5; }
+.beat-layer__target { position: absolute; box-shadow: 0 0 0 2px var(--act), 0 0 16px var(--act); border-radius: 4px; }
+.beat-layer__banner {
+  position: absolute; left: 0; right: 0; top: 50%; translate: 0 -50%; padding: 10px 0;
+  text-align: center; background: linear-gradient(90deg, transparent, var(--panel) 20%, var(--panel) 80%, transparent);
+  color: var(--beat-color); font-family: var(--font-display); font-size: 28px; letter-spacing: 0.2em;
+}
+.beat-layer__ghost { position: absolute; border: 1px solid var(--beat-color); background: var(--panel-2); border-radius: 4px; opacity: 0; }
+.board-card.is-spotlit { visibility: hidden; }

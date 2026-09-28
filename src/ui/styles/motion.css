@@ -26,9 +26,9 @@
     }
   }
 
-  /* Task 8 — showpiece motion (src/ui/useAnimations.ts drives all four of
-     these via short-lived classes; every one reverts on its own within
-     ~600ms so no animation here can block input longer than that). */
+  /* Task 8 — showpiece motion (src/ui/presentation/beatAnimations.ts drives
+     all four of these via short-lived classes; every one reverts on its own
+     within ~600ms so no animation here can block input longer than that). */
 
   /* Attack lunge (Field.tsx `.is-lunging`, on the attacker's own
      `.board-card`). `--lunge-dir` is set inline per attacker: the human's own
@@ -102,4 +102,36 @@
   .is-glitching {
     animation: glitch 350ms steps(4) 1;
   }
+
+  /* Effect pacing (presentation/BeatLayer.tsx). `--beat-ms` is set per beat
+     on the playmat by PlayView from the beat's base time and the speed. */
+  @keyframes beat-spotlight {
+    0% { opacity: 0; scale: 0.35; }
+    18%, 78% { opacity: 1; scale: 1; }
+    100% { opacity: 0; scale: 0.35; }
+  }
+  .beat-layer__spotlight { animation: beat-spotlight var(--beat-ms, 1400ms) ease-in-out forwards; }
+  @keyframes beat-fade {
+    0% { opacity: 0; }
+    15%, 85% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .beat-layer__veil,
+  .beat-layer__caption,
+  .beat-layer__callout,
+  .beat-layer__target { animation: beat-fade var(--beat-ms, 1000ms) ease-in-out forwards; }
+  @keyframes beat-line { from { stroke-dashoffset: 60; } to { stroke-dashoffset: 0; } }
+  .beat-layer__line { animation: beat-line calc(var(--beat-ms, 900ms) * 0.5) linear infinite; }
+  @keyframes beat-banner {
+    0% { opacity: 0; translate: -40% -50%; }
+    20%, 80% { opacity: 1; translate: 0 -50%; }
+    100% { opacity: 0; translate: 40% -50%; }
+  }
+  .beat-layer__banner { animation: beat-banner var(--beat-ms, 900ms) ease-in-out forwards; }
+  @keyframes beat-ghost {
+    0% { opacity: 1; translate: 0 0; }
+    100% { opacity: 0.2; translate: var(--ghost-x) var(--ghost-y); scale: 0.6; }
+  }
+  .beat-layer__ghost { animation: beat-ghost var(--beat-ms, 700ms) ease-in forwards; }
+  .playmat.is-presenting.is-paused .beat-layer * { animation-play-state: paused; }
 }

@@ -14,6 +14,10 @@ export interface FieldProps {
   useOfficialImages: boolean
   /** The attacker whose lunge (Task 8) is currently playing, if any. */
   lungeUid?: number | null
+  /** The card whose spotlight (Task 8) is currently playing, if any — its real
+   *  board rendition hides (`is-spotlit`) while the overlay shows it at zoom
+   *  size. */
+  spotlitUid?: number | null
 }
 
 // React's CSSProperties doesn't model custom properties; this is the usual
@@ -51,6 +55,8 @@ export function BoardCard(props: {
   /** Task 8's lunge: set only by `Field`'s field-zone cards (hand/legend cards
    *  never attack, so they never pass this). */
   lungeUid?: number | null
+  /** Task 8's spotlight: set only by `Field`'s field-zone cards, same as `lungeUid`. */
+  spotlitUid?: number | null
 }): ReactElement | null {
   const { AI } = useBoardPerspective()
   const { db, state, uid, zone, affordances, handlers, useOfficialImages, style } = props
@@ -78,6 +84,7 @@ export function BoardCard(props: {
     selected && 'is-selected',
     clickable && 'is-clickable',
     lunging && 'is-lunging',
+    props.spotlitUid === uid && 'is-spotlit',
   ]
     .filter(Boolean)
     .join(' ')
@@ -110,6 +117,8 @@ export function BoardCard(props: {
       data-playable={playable ? 'true' : undefined}
       data-attacker={attacker ? 'true' : undefined}
       data-target={target ? 'true' : undefined}
+      data-pulse-id={`power-${uid}`}
+      data-pulse-key={power ?? ''}
     >
       {faceDown && instance.knownTo?.length ? (
         <span className="chip" data-testid="known-legend-marker">Previously seen by {instance.knownTo.map(player => player === AI ? 'rival' : 'you').join(' and ')}</span>
@@ -200,7 +209,7 @@ export function BoardCard(props: {
 
 /** A player's field: the Units in play, left to right in engine order. */
 export function Field(props: FieldProps): ReactElement {
-  const { db, state, player, affordances, handlers, useOfficialImages, lungeUid } = props
+  const { db, state, player, affordances, handlers, useOfficialImages, lungeUid, spotlitUid } = props
   const field = state.players[player].field
 
   return (
@@ -219,6 +228,7 @@ export function Field(props: FieldProps): ReactElement {
             handlers={handlers}
             useOfficialImages={useOfficialImages}
             lungeUid={lungeUid}
+            spotlitUid={spotlitUid}
           />
         ))}
       </div>

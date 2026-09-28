@@ -14,8 +14,12 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  /* transform: 250ms (up from 160ms) so a ready/spend tap rotation
+     (`.card-frame--spent`'s `rotate(90deg)`, set/cleared as `BoardCard` reads
+     `instance.ready`) reads as a deliberate turn rather than a snap — the same
+     declaration a hover scale/lunge transform rides on, per Task 8's brief. */
   .card-frame {
-    transition: transform 160ms ease, box-shadow 160ms ease;
+    transition: transform 250ms ease, box-shadow 160ms ease;
   }
 }
 

@@ -74,6 +74,7 @@ export function HandStrip(props: HandStripProps): ReactElement {
                 className="board-card board-card--hand-back"
                 key={uid}
                 data-testid="hand-back"
+                data-uid={uid}
                 style={fanStyle(index, hand.length)}
               >
                 {/* Red-keyed to the rival (`card-frame--rival`, matching every

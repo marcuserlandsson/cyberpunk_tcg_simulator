@@ -25,7 +25,7 @@ export interface ZonePanelsProps {
  * whichever card it is; its identity is never material), that hygiene
  * matters more than which specific def happens to be in a pile.
  */
-const FACE_DOWN_DEF: CardDef = {
+export const FACE_DOWN_DEF: CardDef = {
   id: 'face-down',
   name: '',
   color: '',
@@ -86,7 +86,13 @@ function CardZones(props: ZonePanelsProps): ReactElement {
         </div>
       </div>
 
-      <div className={eddiesClasses} data-testid="eddies" data-player={player}>
+      <div
+        className={eddiesClasses}
+        data-testid="eddies"
+        data-player={player}
+        data-pulse-id={`eddies-${player}`}
+        data-pulse-key={`${p.eddies.length}:${p.eddies.filter((uid) => state.cards[uid].ready).length}`}
+      >
         <span className="zone__label">Eddies</span>
         <div className="zone__cards">
           {p.eddies.map((uid) => {
@@ -96,6 +102,7 @@ function CardZones(props: ZonePanelsProps): ReactElement {
                 key={uid}
                 className="eddie-card"
                 data-testid="eddie-card"
+                data-uid={uid}
                 data-ready={ready ? 'true' : 'false'}
               >
                 <CardFrame
@@ -116,7 +123,7 @@ function CardZones(props: ZonePanelsProps): ReactElement {
       </div>
 
       <div className="zone zone--counts" data-testid="counts" data-player={player}>
-        <div className="pile">
+        <div className="pile" data-pile="deck">
           <CardFrame
             def={FACE_DOWN_DEF}
             size="small"
@@ -128,7 +135,7 @@ function CardZones(props: ZonePanelsProps): ReactElement {
             Deck {p.deck.length}
           </span>
         </div>
-        <div className="pile">
+        <div className="pile" data-pile="trash">
           <CardFrame
             def={FACE_DOWN_DEF}
             size="small"
