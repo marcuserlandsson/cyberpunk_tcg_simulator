@@ -1,5 +1,6 @@
 import { stillLive } from './game'
 import { callChosenLegend } from './knowledge'
+import { emit } from './emit'
 // The reducer: `applyAction(db, state, action) -> newState`.
 //
 // Contract:
@@ -163,7 +164,7 @@ function choosePlayOrder(draft: GameState, goFirst: boolean): void {
   const rollWinner = draft.activePlayer
   const first: PlayerId = goFirst ? rollWinner : opponentOf(rollWinner)
   draft.firstPlayer = first
-  draft.events.push({ type: 'playOrderChosen', first })
+  emit(draft, { type: 'playOrderChosen', first })
 
   for (const uid of draft.players[first].legends.slice(0, 2)) {
     draft.cards[uid].ready = false
@@ -190,7 +191,7 @@ function mulligan(draft: GameState): void {
   p.deck = shuffled
   draft.rng = rng
   p.mulliganDone = true
-  draft.events.push({ type: 'mulliganTaken', player })
+  emit(draft, { type: 'mulliganTaken', player })
   if (!drawCards(draft, player, OPENING_HAND_SIZE)) {
     endGame(draft, opponentOf(player), 'deckout')
   }
@@ -202,7 +203,7 @@ function mulligan(draft: GameState): void {
  */
 function keepHand(draft: GameState, db: CardDb): void {
   const player = draft.activePlayer
-  draft.events.push({ type: 'handKept', player })
+  emit(draft, { type: 'handKept', player })
   if (player === draft.firstPlayer) {
     draft.activePlayer = opponentOf(player)
     return
@@ -246,7 +247,7 @@ function chooseGigDie(draft: GameState, db: CardDb, size: number): void {
   draft.rng = rng
   p.gigArea.push({ ...die, value })
   const dieIndex = p.gigArea.length - 1
-  draft.events.push({ type: 'dieRolled', player, size: die.size, value })
+  emit(draft, { type: 'dieRolled', player, size: die.size, value })
 
   fireGigRollTrigger(db, draft, player, die.size, value)
   // A roll trigger can end the game (a forced draw off an empty deck).
@@ -293,7 +294,7 @@ function chooseGigReroll(draft: GameState, db: CardDb, reroll: boolean): void {
       const [value, rng] = rollDie(draft.rng, die.size)
       draft.rng = rng
       die.value = value
-      draft.events.push({ type: 'dieRolled', player: pending.player, size: die.size, value })
+      emit(draft, { type: 'dieRolled', player: pending.player, size: die.size, value })
       fireGigRollTrigger(db, draft, pending.player, die.size, value)
     }
   }
@@ -336,7 +337,7 @@ function sellCard(draft: GameState, cardUid: number): void {
   card.faceUp = false
   card.ready = true
   p.soldThisTurn = true
-  draft.events.push({ type: 'cardSold', player, uid: cardUid })
+  emit(draft, { type: 'cardSold', player, uid: cardUid })
 }
 
 /**
@@ -423,7 +424,7 @@ function react(draft: GameState, db: CardDb, reaction: Reaction): void {
  */
 function endTurn(draft: GameState, db: CardDb): void {
   const player = draft.activePlayer
-  draft.events.push({ type: 'turnEnded', player })
+  emit(draft, { type: 'turnEnded', player })
   // [trigger seam] "At the end of your turn, ..." — broadcast to every
   // in-play card of the player whose turn is ending, before the turn buffs
   // wipe (docs/rulings.md §55 ff.).

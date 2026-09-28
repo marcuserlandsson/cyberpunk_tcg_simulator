@@ -1,3 +1,4 @@
+import { emit } from './emit'
 import { stopAtHiddenInformation } from './preview'
 import type { CardDb, GameState, PlayerId } from './types'
 import { askIntercept } from './intercept'
@@ -47,7 +48,7 @@ export function discardChosenCards(db: CardDb, state: GameState, player: PlayerI
     if (chosen === null) break
     p.hand = p.hand.filter(uid => uid !== chosen)
     p.trash.push(chosen)
-    state.events.push({ type: 'cardTrashed', uid: chosen })
+    emit(state, { type: 'cardTrashed', uid: chosen })
     discarded.push(chosen)
   }
   return discarded

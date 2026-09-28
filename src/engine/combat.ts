@@ -1,5 +1,6 @@
 import { stillLive } from './game'
 import { chooseEffectOption } from './choices'
+import { emit } from './emit'
 // Combat: declaring an attack, the react window, blocks, fights and Gig
 // stealing. The rules authority is the gameplay guide's ATTACK (p10) and
 // ATTACKING (p10-11) sections plus the glossary entries SPEND/READY, LAG,
@@ -393,7 +394,7 @@ export function declareAttack(
   spendOnDraft(db, draft, [attacker])
   // An on-spend effect can end the game; never open a window over `gameOver`.
   if (!stillLive(draft)) return
-  draft.events.push({ type: 'attackDeclared', attacker, target })
+  emit(draft, { type: 'attackDeclared', attacker, target })
 
   // [trigger seam] on-attack effects on the attacking Unit (and its Gear)
   // resolve here — after it is spent (guide step 01) and before the rival
@@ -475,22 +476,22 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
   card.playedThisTurn = false
 
   if (db[card.defId].type === 'legend') {
-    if (exit === 'trash') draft.events.push({ type: 'cardTrashed', uid })
-    if (exit === 'deckBottom') draft.events.push({ type: 'cardBottomDecked', uid })
+    if (exit === 'trash') emit(draft, { type: 'cardTrashed', uid })
+    if (exit === 'deckBottom') emit(draft, { type: 'cardBottomDecked', uid })
     owner.removed.push(uid)
-    draft.events.push({ type: 'cardRemoved', uid })
+    emit(draft, { type: 'cardRemoved', uid })
   } else {
     switch (exit) {
       case 'trash':
         owner.trash.push(uid)
-        draft.events.push({ type: 'cardTrashed', uid })
+        emit(draft, { type: 'cardTrashed', uid })
         break
       case 'hand':
         owner.hand.push(uid)
         break
       case 'deckBottom':
         owner.deck.push(uid)
-        draft.events.push({ type: 'cardBottomDecked', uid })
+        emit(draft, { type: 'cardBottomDecked', uid })
         break
     }
   }
@@ -504,8 +505,8 @@ export function leaveField(draft: GameState, db: CardDb, uid: number, exit: Fiel
     draft.cards[gearUid].tempPower = 0
     draft.cards[gearUid].permPower = 0
     draft.cards[gearUid].tempKeywords = []
-    if (exit === 'trash') draft.events.push({ type: 'cardTrashed', uid: gearUid })
-    if (exit === 'deckBottom') draft.events.push({ type: 'cardBottomDecked', uid: gearUid })
+    if (exit === 'trash') emit(draft, { type: 'cardTrashed', uid: gearUid })
+    if (exit === 'deckBottom') emit(draft, { type: 'cardBottomDecked', uid: gearUid })
   }
   if (exit === 'deckBottom' && randomize) {
     for (const player of [0, 1] as const) {
@@ -568,7 +569,7 @@ export function defeatUnit(
       const payment = choosePayment(db, draft, player, intercept.eddies, intercept.protector)
       if (payment !== null) {
         spendOnDraft(db, draft, payment)
-        draft.events.push({ type: 'effectResolved', sourceUid: intercept.protector, description: `intercepts the defeat of ${uid}` })
+        emit(draft, { type: 'effectResolved', sourceUid: intercept.protector, description: `intercepts the defeat of ${uid}` })
         defeatUnit(draft, db, intercept.protector, { usedReplacements: [...used, intercept.protector] })
         return
       }
@@ -587,7 +588,7 @@ export function defeatUnit(
   // §81 ff.) — captured the same way, before `leaveField` clears it.
   const defeatedWasEquipped = gear.length > 0
 
-  draft.events.push({ type: 'unitDefeated', uid })
+  emit(draft, { type: 'unitDefeated', uid })
   leaveField(draft, db, uid, 'trash')
 
   // [trigger seam] "The first time an ARASAKA Unit is defeated each turn,
@@ -648,7 +649,7 @@ export function defeatGear(draft: GameState, db: CardDb, gearUid: number): void 
   draft.cards[host].attachedGear = draft.cards[host].attachedGear.filter((uid) => uid !== gearUid)
   const owner = draft.cards[gearUid].owner
   draft.players[owner].trash.push(gearUid)
-  draft.events.push({ type: 'cardTrashed', uid: gearUid })
+  emit(draft, { type: 'cardTrashed', uid: gearUid })
   // The host inherits bottom-box Defeated text; defeating the Gear itself does not fire it.
 }
 
@@ -809,7 +810,7 @@ export function blockAttack(draft: GameState, db: CardDb, blocker: number): void
   // fight) must not still run.
   if (!stillLive(draft)) return
   attack.redirectedTo = blocker
-  draft.events.push({ type: 'attackBlocked', blocker })
+  emit(draft, { type: 'attackBlocked', blocker })
   // [trigger seam] "When this Unit uses {Blocker}, ..." — before the fight, so
   // a buff or a Gig gain it grants is live for that fight (docs/rulings.md §41).
   fireTriggerOnDraft(db, draft, 'onBlock', blocker, [])

@@ -1,4 +1,5 @@
 import { revealCards, callChosenLegend, chooseFaceDownLegend, peekLegends } from '../../engine/knowledge'
+import { emit } from '../../engine/emit'
 // Escape hatch for the handful of cards whose text no reasonable data
 // vocabulary will ever express (multi-step searches, "choose one" modes,
 // look-at-a-face-down-Legend, and so on). A card reaches it via the
@@ -102,7 +103,7 @@ function trashFromTop(state: GameState, player: PlayerId, count: number): number
     const uid = p.deck.shift()
     if (uid === undefined) break
     p.trash.push(uid)
-    state.events.push({ type: 'cardTrashed', uid })
+    emit(state, { type: 'cardTrashed', uid })
     moved.push(uid)
   }
   return moved
@@ -126,7 +127,7 @@ function mistyReveal(cardType: 'unit' | 'gear' | 'program'): ScriptedCard {
       readyFriendlyEddies(state, ctx.player, 1)
     } else {
       p.trash.push(uid)
-      state.events.push({ type: 'cardTrashed', uid })
+      emit(state, { type: 'cardTrashed', uid })
     }
     return state
   }
@@ -288,7 +289,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
       totalDiscarded += p.hand.length
       for (const uid of p.hand) {
         p.trash.push(uid)
-        state.events.push({ type: 'cardTrashed', uid })
+        emit(state, { type: 'cardTrashed', uid })
       }
       p.hand = []
       const draw = chooseEffectOption(state, player, ctx.sourceUid, 'Draw exactly 5 cards?', [1, -1], { 1: 'Draw 5', [-1]: 'Decline' })
@@ -579,7 +580,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (p.trash.includes(hostUid)) {
       p.trash = p.trash.filter((uid) => uid !== hostUid)
       p.deck.push(hostUid)
-      state.events.push({ type: 'cardBottomDecked', uid: hostUid })
+      emit(state, { type: 'cardBottomDecked', uid: hostUid })
     }
     return state
   },
@@ -646,7 +647,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (chosen === undefined) return state
     p.deck = p.deck.filter(uid => uid !== chosen)
     p.trash.push(chosen)
-    state.events.push({ type: 'cardTrashed', uid: chosen })
+    emit(state, { type: 'cardTrashed', uid: chosen })
     return state
   },
 
@@ -711,7 +712,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (!p.hand.includes(discarded)) return state
     p.hand = p.hand.filter((uid) => uid !== discarded)
     p.trash.push(discarded)
-    state.events.push({ type: 'cardTrashed', uid: discarded })
+    emit(state, { type: 'cardTrashed', uid: discarded })
     const cost = db[state.cards[discarded].defId].cost
     const rival = opponentOf(ctx.player)
     const candidates = state.players[rival].field.filter(
@@ -752,7 +753,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     } else {
       for (const uid of revealed) {
         p.trash.push(uid)
-        state.events.push({ type: 'cardTrashed', uid })
+        emit(state, { type: 'cardTrashed', uid })
       }
       if (!drawCards(state, ctx.player, 2)) {
         endGame(state, opponentOf(ctx.player), 'deckout')
@@ -778,7 +779,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (discarded === undefined) return state
     p.hand = p.hand.filter((uid) => uid !== discarded)
     p.trash.push(discarded)
-    state.events.push({ type: 'cardTrashed', uid: discarded })
+    emit(state, { type: 'cardTrashed', uid: discarded })
     if (!drawCards(state, ctx.player, 1)) {
       endGame(state, opponentOf(ctx.player), 'deckout')
     }
@@ -860,7 +861,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (!p.hand.includes(discarded)) return state
     p.hand = p.hand.filter((uid) => uid !== discarded)
     p.trash.push(discarded)
-    state.events.push({ type: 'cardTrashed', uid: discarded })
+    emit(state, { type: 'cardTrashed', uid: discarded })
     const count = p.legends.filter((uid) => state.cards[uid].faceUp).length
     if (count > 0 && !drawCards(state, ctx.player, count)) {
       endGame(state, opponentOf(ctx.player), 'deckout')
@@ -1077,7 +1078,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     const uid = p.deck.shift()
     if (uid === undefined) return state
     p.trash.push(uid)
-    state.events.push({ type: 'cardTrashed', uid })
+    emit(state, { type: 'cardTrashed', uid })
     if (db[state.cards[uid].defId]?.type === 'program' && chooseEffectOption(state, ctx.player, ctx.sourceUid,
       'Add the trashed Program to your hand?', [1, -1], { 1: 'Add to hand', [-1]: 'Leave in trash' }) === 1) {
       p.trash = p.trash.filter((u) => u !== uid)
@@ -1168,7 +1169,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     for (const uid of [progA, progB]) {
       p.hand = p.hand.filter((u) => u !== uid)
       p.trash.push(uid)
-      state.events.push({ type: 'cardTrashed', uid })
+      emit(state, { type: 'cardTrashed', uid })
     }
     const rival = opponentOf(ctx.player)
     const candidates = state.players[rival].field.filter(
@@ -1215,7 +1216,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (!p.hand.includes(program)) return state
     p.hand = p.hand.filter((uid) => uid !== program)
     p.trash.push(program)
-    state.events.push({ type: 'cardTrashed', uid: program })
+    emit(state, { type: 'cardTrashed', uid: program })
     const rival = opponentOf(ctx.player)
     const target = pick(db, state, ctx, state.players[rival].field)
     if (target !== undefined) {
@@ -1274,7 +1275,7 @@ export const scriptedCards: Record<string, ScriptedCard> = {
     if (roll === 0) {
       p.deck.shift()
       p.trash.push(uid)
-      state.events.push({ type: 'cardTrashed', uid })
+      emit(state, { type: 'cardTrashed', uid })
     }
     return state
   },

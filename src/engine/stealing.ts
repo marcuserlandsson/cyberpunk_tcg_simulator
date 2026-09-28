@@ -1,5 +1,6 @@
 import { stillLive } from './game'
 import { fireWatcherTrigger } from '../cards/effects'
+import { emit } from './emit'
 import { chooseEffectOption } from './choices'
 import { checkOvertimeWin } from './game'
 import { askIntercept, DECLINE } from './intercept'
@@ -27,8 +28,8 @@ export function transferStolenGigs(db: CardDb, draft: GameState, sourceUid: numb
         const p = draft.players[victim]
         p.hand = p.hand.filter(uid => uid !== answer)
         p.trash.push(answer)
-        draft.events.push({ type: 'cardTrashed', uid: answer })
-        draft.events.push({ type: 'effectResolved', sourceUid: intercept.protector,
+        emit(draft, { type: 'cardTrashed', uid: answer })
+        emit(draft, { type: 'effectResolved', sourceUid: intercept.protector,
           description: `prevents the steal of d${die.size}:${die.value}` })
         continue
       }
@@ -39,7 +40,7 @@ export function transferStolenGigs(db: CardDb, draft: GameState, sourceUid: numb
   const indexes = new Set(accepted)
   draft.players[victim].gigArea = area.filter((_die, index) => !indexes.has(index))
   draft.players[thief].gigArea.push(...stolen)
-  for (const die of stolen) draft.events.push({ type: 'gigStolen', from: victim, die: { ...die } })
+  for (const die of stolen) emit(draft, { type: 'gigStolen', from: victim, die: { ...die } })
   if (stolen.length === 0) return 0
   if (draft.cards[sourceUid]) draft.cards[sourceUid].stoleGigThisTurn = true
   for (const effect of draft.floatingEffects) {

@@ -1,4 +1,5 @@
 import { stillLive } from '../engine/game'
+import { emit } from '../engine/emit'
 // The effect interpreter: the data-driven half of the rules engine.
 //
 // A card's behaviour is a list of `EffectDef`s (types.ts), each a trigger + an
@@ -516,7 +517,7 @@ function slotDemand(
 }
 
 function note(draft: GameState, sourceUid: number, description: string): void {
-  draft.events.push({ type: 'effectResolved', sourceUid, description })
+  emit(draft, { type: 'effectResolved', sourceUid, description })
 }
 
 /** The next bound slot value, or null when it could not be filled. */
@@ -592,7 +593,7 @@ function applyNode(
         if (p.hand.length === 0) break
         const [uid] = p.hand.splice(randomIndex(draft, p.hand.length), 1)
         p.trash.push(uid)
-        draft.events.push({ type: 'cardTrashed', uid })
+        emit(draft, { type: 'cardTrashed', uid })
       }
       note(draft, ctx.sourceUid, `rival discards ${node.count}`)
       return
@@ -851,7 +852,7 @@ function applyNode(
       if (!p.hand.includes(target)) return
       p.hand = p.hand.filter((uid) => uid !== target)
       p.trash.push(target)
-      draft.events.push({ type: 'cardTrashed', uid: target })
+      emit(draft, { type: 'cardTrashed', uid: target })
       note(draft, ctx.sourceUid, `discard ${target}`)
       return
     }
@@ -908,7 +909,7 @@ function applyNode(
       const [value, rng] = rollDie(draft.rng, die.size)
       draft.rng = rng
       die.value = value
-      draft.events.push({ type: 'dieRolled', player, size: die.size, value })
+      emit(draft, { type: 'dieRolled', player, size: die.size, value })
       note(draft, ctx.sourceUid, `reroll a ${node.whose} gig`)
       // [trigger seam] "When you roll a min or max value on a Gig, ..." — the
       // ROLLER is this effect's controller, whichever player's die was
@@ -925,7 +926,7 @@ function applyNode(
         const uid = p.deck.shift()
         if (uid === undefined) break
         p.trash.push(uid)
-        draft.events.push({ type: 'cardTrashed', uid })
+        emit(draft, { type: 'cardTrashed', uid })
       }
       note(draft, ctx.sourceUid, `trash ${node.count} from the ${node.whose} deck`)
       return
@@ -1800,7 +1801,7 @@ export function playCardOnDraft(
   // below (the `cardPlayed` event, the once-per-turn discount marking,
   // `onPlay`, `onFriendlyCardPlayed`) may still run (docs/rulings.md §147).
   if (!stillLive(draft)) return
-  draft.events.push({ type: 'cardPlayed', player, uid: cardUid })
+  emit(draft, { type: 'cardPlayed', player, uid: cardUid })
 
   // "Play your first CYBERWARE Gear each turn for -3 €$, to a minimum of
   // 1 €$" (viktor-vektor-drop-your-illusions, docs/rulings.md §81 ff.) — mark
@@ -1826,11 +1827,11 @@ export function playCardOnDraft(
     if (!draft.resolvingPrograms?.length) delete draft.resolvingPrograms
     p.trash.push(cardUid)
     if (stillLive(draft)) {
-      draft.events.push({ type: 'cardTrashed', uid: cardUid })
+      emit(draft, { type: 'cardTrashed', uid: cardUid })
       if (programDestination === 'deckBottom') {
         p.trash = p.trash.filter(uid => uid !== cardUid)
         p.deck.push(cardUid)
-        draft.events.push({ type: 'cardBottomDecked', uid: cardUid })
+        emit(draft, { type: 'cardBottomDecked', uid: cardUid })
       }
     }
   }
@@ -1868,7 +1869,7 @@ export function activateAbilityOnDraft(
     ? choosePayment(db, draft, player, eddies, cardUid, effect.cost?.selfSpend ? host : undefined)
     : []
 
-  draft.events.push({ type: 'abilityActivated', player, uid: cardUid, abilityIndex })
+  emit(draft, { type: 'abilityActivated', player, uid: cardUid, abilityIndex })
   if (effect.oncePerTurn === true) markOncePerTurn(draft, cardUid, abilityIndex)
   // The self-spend and the €$ are one cost: pay them both before anything
   // resolves, so an `onSpend` trigger cannot see a half-paid cost.

@@ -18,6 +18,7 @@
 
 import { createRng, rollDie, shuffle, type RngState } from './rng'
 import type { DeckList } from './deck'
+import { emit } from './emit'
 import { opponentOf } from './query'
 import { stopAtHiddenInformation } from './preview'
 import type {
@@ -283,7 +284,7 @@ export function endGame(
   if (!stillLive(draft)) return
   draft.winner = winner
   draft.phase = 'gameOver'
-  draft.events.push({ type: 'gameEnded', winner, reason })
+  emit(draft, { type: 'gameEnded', winner, reason })
 }
 
 /**
@@ -296,7 +297,7 @@ export function drawCards(draft: GameState, player: PlayerId, count: number): bo
     const uid = p.deck.shift()
     if (uid === undefined) return false
     p.hand.push(uid)
-    draft.events.push({ type: 'cardDrawn', player, uid })
+    emit(draft, { type: 'cardDrawn', player, uid })
   }
   // The number drawn is knowable; their identities must not affect lookahead.
   if (count > 0) stopAtHiddenInformation(draft, { viewer: player, kind: 'draw', uids: p.hand.slice(-count) })
@@ -422,7 +423,7 @@ export function beginTurn(draft: GameState, player: PlayerId, turnNumber: number
   draft.activePlayer = player
   draft.turnNumber = turnNumber
   draft.phase = 'start'
-  draft.events.push({ type: 'turnStarted', player, turn: turnNumber })
+  emit(draft, { type: 'turnStarted', player, turn: turnNumber })
   draft.emptyFixerStarts = draft.players[player].fixer.length === 0 ? (draft.emptyFixerStarts ?? 0) + 1 : 0
 
   if (draft.players[player].gigArea.length >= GIGS_TO_WIN) {

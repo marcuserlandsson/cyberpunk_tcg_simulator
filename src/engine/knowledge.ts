@@ -1,5 +1,6 @@
 import { fireTriggerOnDraft } from '../cards/effects'
 import { chooseEffectOption } from './choices'
+import { emit } from './emit'
 import { askIntercept } from './intercept'
 import { stopAtHiddenInformation } from './preview'
 import type { CardDb, GameState, PlayerId } from './types'
@@ -40,7 +41,7 @@ export function callChosenLegend(db: CardDb, state: GameState, player: PlayerId,
   stopAtHiddenInformation(state, { viewer: 'all', player, kind: 'legend', sourceUid, uids: [uid] })
   state.cards[uid].faceUp = true
   p.calledLegendThisTurn = true
-  state.events.push({ type: 'legendCalled', player, uid })
+  emit(state, { type: 'legendCalled', player, uid })
   fireTriggerOnDraft(db, state, 'onCall', uid, [])
 }
 
@@ -48,7 +49,7 @@ export function callChosenLegend(db: CardDb, state: GameState, player: PlayerId,
 export function revealCards(db: CardDb, state: GameState, player: PlayerId, uids: number[], sourceUid: number, acknowledge = true): void {
   if (!uids.length) return
   stopAtHiddenInformation(state, { viewer: 'all', kind: 'reveal', sourceUid, uids })
-  for (const uid of uids) state.events.push({ type: 'cardRevealed', player, uid })
+  for (const uid of uids) emit(state, { type: 'cardRevealed', player, uid })
   if (!acknowledge || (state.effectQueue === undefined && state.interceptAnswers.length === 0)) return
   askIntercept(state, { kind: 'effectChoice', player, protector: sourceUid, subject: sourceUid,
     options: [0], optionLabels: { 0: 'Continue' },
