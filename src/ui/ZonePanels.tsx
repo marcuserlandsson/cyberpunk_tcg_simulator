@@ -12,6 +12,10 @@ export interface ZonePanelsProps {
   affordances: BoardAffordances
   handlers: BoardHandlers
   useOfficialImages: boolean
+  /** The Legend whose spotlight (Task 8) is currently playing, if any — see
+   *  Field.tsx's own `spotlitUid`, threaded here so a called Legend's real
+   *  card hides the same way a played field card's does. */
+  spotlitUid?: number | null
 }
 
 /**
@@ -53,8 +57,8 @@ const EDDIES_DENSE_THRESHOLD = 6
  * chip beside the row as the at-a-glance summary.
  */
 function CardZones(props: ZonePanelsProps): ReactElement {
-  const { AI } = useBoardPerspective()
-  const { db, state, player, affordances, handlers, useOfficialImages } = props
+  const { HUMAN, AI } = useBoardPerspective()
+  const { db, state, player, affordances, handlers, useOfficialImages, spotlitUid } = props
   const p = state.players[player]
   const readyEddies = p.eddies.filter((uid) => state.cards[uid].ready).length
   const owner: CardFrameOwner = player === AI ? 'rival' : 'you'
@@ -81,6 +85,7 @@ function CardZones(props: ZonePanelsProps): ReactElement {
               affordances={affordances}
               handlers={handlers}
               useOfficialImages={useOfficialImages}
+              spotlitUid={spotlitUid}
             />
           ))}
         </div>
@@ -102,7 +107,15 @@ function CardZones(props: ZonePanelsProps): ReactElement {
                 key={uid}
                 className="eddie-card"
                 data-testid="eddie-card"
-                data-uid={uid}
+                // Face-down, always — an eddie's own identity is never
+                // material even to its owner (docs/rulings.md). But the uid
+                // itself IS identifying (uids are assigned in decklist
+                // order), so it's only safe on the DOM for the human's own
+                // eddies, which the human already knows the contents of
+                // (they chose to sell it). The rival's eddie uids stay off
+                // the DOM so nothing here leaks which specific card the
+                // rival sold.
+                data-uid={player === HUMAN ? uid : undefined}
                 data-ready={ready ? 'true' : 'false'}
               >
                 <CardFrame

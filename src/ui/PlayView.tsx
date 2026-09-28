@@ -207,9 +207,18 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
   const AI = opponentOf(HUMAN)
   const { record, legal } = game
   const base = beat?.board ?? game.state
-  const state = base?.pendingIntercept?.view
-    ? { ...base.pendingIntercept.view, phase: base.phase, pendingIntercept: base.pendingIntercept }
-    : base
+  // Memoized on `[base]` (fix round 1): the pendingIntercept branch below
+  // builds a fresh object every time it runs, and without this `state` was a
+  // *new* object identity on every render even when `base` hadn't changed —
+  // which fed useFlip's `frameKey` a value that churned every render, not
+  // just every frame, defeating its "once per frame" contract.
+  const state = useMemo(
+    () =>
+      base?.pendingIntercept?.view
+        ? { ...base.pendingIntercept.view, phase: base.phase, pendingIntercept: base.pendingIntercept }
+        : base,
+    [base]
+  )
   const anim = beatAnimations(beat)
   const logLines = useMemo(() => (beat === null ? game.eventsForLog : buildLog(db, beat.board)), [beat, db, game.eventsForLog])
   const boardRef = useRef<HTMLDivElement | null>(null)
@@ -698,6 +707,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
               affordances={affordances}
               handlers={handlers}
               useOfficialImages={useOfficialImages}
+              spotlitUid={beat?.kind === 'spotlight' ? beat.sourceUid : null}
             />
             <Field
               db={db}
@@ -750,6 +760,7 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
               affordances={affordances}
               handlers={handlers}
               useOfficialImages={useOfficialImages}
+              spotlitUid={beat?.kind === 'spotlight' ? beat.sourceUid : null}
             />
           </div>
 

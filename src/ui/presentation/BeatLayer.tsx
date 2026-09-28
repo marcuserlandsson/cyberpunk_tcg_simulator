@@ -5,9 +5,14 @@
 //   effect     - a callout next to the source, plus target lines
 //   attack     - a line from the attacker to its target
 //   turnBanner - a sweep naming whose turn it is
-//   defeat and exit-absorbing effects - a ghost flying to the trash or deck pile
+//   defeat and exit-absorbing effects - a ghost flying to the trash or deck
+//     pile (a card that leaves the game via 'cardRemoved' gets no ghost: it
+//     never lands in either pile)
 // Positions come from the rendered board ([data-uid] and [data-pile]
 // elements), falling back to the pre-frame rects for cards that just left.
+// A hidden card (face-down, not the human's own) never carries [data-uid] —
+// `locate` then falls back to its pre-frame rect, or degrades to a null box
+// if it never had one either.
 
 import { useLayoutEffect, useState, type CSSProperties, type ReactElement, type RefObject } from 'react'
 import { CardFrame } from '../CardFrame'
@@ -18,11 +23,23 @@ import type { Beat } from './beats'
 
 type Box = { x: number; y: number; w: number; h: number }
 
+/** A card whose identity the human isn't entitled to know yet — a face-down
+ *  Legend, most commonly — reads as "a face-down card" rather than by name,
+ *  everywhere a beat would otherwise name it (docs/rulings.md's "a face-down
+ *  card's identity is never material" hygiene, extended from the board's own
+ *  rendering to the presentation text describing it). */
+function visibleCardName(db: CardDb, board: GameState, uid: number): string | undefined {
+  const instance = board.cards[uid]
+  if (instance === undefined) return undefined
+  if (instance.faceUp === false) return 'a face-down card'
+  return db[instance.defId]?.name
+}
+
 export function effectCaption(db: CardDb, board: GameState, event: Extract<GameEvent, { type: 'effectResolved' }>): string {
   let text = event.description
   for (const uid of event.targets ?? []) {
-    const def = db[board.cards[uid]?.defId ?? '']
-    if (def) text = text.replace(new RegExp(`\\b${uid}\\b`, 'g'), def.name)
+    const name = visibleCardName(db, board, uid)
+    if (name !== undefined) text = text.replace(new RegExp(`\\b${uid}\\b`, 'g'), name)
   }
   return text
 }
@@ -65,7 +82,10 @@ export function BeatLayer({ db, beat, human, root, previousRects, useOfficialIma
     const previous = previousRects.current ?? new Map()
     const source = beat.sourceUid === null ? null : locate(el, previous, beat.sourceUid, beat.player)
     const targets = beat.targets.map((t) => locate(el, previous, t, beat.player)).filter((b): b is Box => b !== null)
-    const exit = beat.events.find((e) => e.type === 'cardTrashed' || e.type === 'cardBottomDecked' || e.type === 'cardRemoved')
+    // 'cardRemoved' deliberately excluded: a removed card leaves the game
+    // entirely (docs/rulings.md §31), it never lands in the trash, so it
+    // gets no ghost at all rather than a misleading flight to that pile.
+    const exit = beat.events.find((e) => e.type === 'cardTrashed' || e.type === 'cardBottomDecked')
     let pile: Box | null = null
     if (exit !== undefined && el !== null && 'uid' in exit) {
       const owner = beat.board.cards[exit.uid]?.owner
@@ -118,7 +138,11 @@ export function BeatLayer({ db, beat, human, root, previousRects, useOfficialIma
           data-testid="beat-callout"
           style={boxes.source === null ? undefined : { left: boxes.source.x + boxes.source.w + 8, top: boxes.source.y }}
         >
-          <strong>{db[beat.board.cards[event.sourceUid]?.defId ?? '']?.name ?? 'Effect'}</strong>
+          <strong>{
+            beat.board.cards[event.sourceUid]?.faceUp === false
+              ? 'A face-down card'
+              : db[beat.board.cards[event.sourceUid]?.defId ?? '']?.name ?? 'Effect'
+          }</strong>
           <span>{effectCaption(db, beat.board, event)}</span>
         </div>
       )}
@@ -136,6 +160,7 @@ export function BeatLayer({ db, beat, human, root, previousRects, useOfficialIma
       {boxes.pile !== null && boxes.source !== null && (
         <div
           className="beat-layer__ghost"
+          data-testid="beat-ghost"
           style={{
             left: boxes.source.x, top: boxes.source.y, width: boxes.source.w, height: boxes.source.h,
             '--ghost-x': `${boxes.pile.x - boxes.source.x}px`, '--ghost-y': `${boxes.pile.y - boxes.source.y}px`,

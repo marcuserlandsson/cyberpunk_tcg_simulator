@@ -8,6 +8,22 @@
 // *value* changed between frames. Elements opt in with `data-pulse-id` (a
 // stable id) and `data-pulse-key` (the value) — see Field.tsx's BoardCard
 // root (`power-${uid}`) and ZonePanels.tsx's eddies zone (`eddies-${player}`).
+//
+// WHY THE RETURNED REF IS `current`, NOT `previous` (fix round 1). This hook
+// is called directly inside PlayView, so the `useLayoutEffect` below belongs
+// to PlayView's own fiber. `BeatLayer` is a CHILD of PlayView, and React
+// fires child layout effects before parent ones within the same commit — so
+// BeatLayer's own layout effect (reading the ref this hook returns) always
+// runs BEFORE this hook's effect updates anything for the frame just
+// committed. That means whatever this hook assigns during THIS frame's
+// effect is invisible to BeatLayer until the *next* frame; what BeatLayer
+// actually sees is whatever the ref held at the end of the *previous*
+// frame's effect. `current.current` at that moment holds exactly the rects
+// measured one frame ago — precisely "immediately before the frame now on
+// screen" — which is what a child needs to locate a card that just left.
+// Returning `previous` instead would be a further frame stale: by the time
+// BeatLayer reads it, `previous.current` was last set to what `current`
+// held two frames back.
 
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 
@@ -23,6 +39,11 @@ function pulseKeys(root: HTMLElement): Map<string, string> {
   return keys
 }
 
+/**
+ * Returns a ref holding the rects measured as of immediately before the
+ * frame currently on screen — see the module doc comment above for why that
+ * is `current`, not `previous`, from a child component's own layout effect.
+ */
 export function useFlip(
   root: RefObject<HTMLElement | null>,
   frameKey: unknown,
@@ -60,5 +81,5 @@ export function useFlip(
     lastKeys.current = keys
   }, [frameKey])
 
-  return previous
+  return current
 }

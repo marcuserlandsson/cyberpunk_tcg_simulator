@@ -74,7 +74,10 @@ export function HandStrip(props: HandStripProps): ReactElement {
                 className="board-card board-card--hand-back"
                 key={uid}
                 data-testid="hand-back"
-                data-uid={uid}
+                // No data-uid here (fix round 1, controller ruling): this
+                // branch only ever renders the rival's hidden hand — uids
+                // are assigned in decklist order, so a bare uid on a card
+                // whose identity is hidden would itself leak that identity.
                 style={fanStyle(index, hand.length)}
               >
                 {/* Red-keyed to the rival (`card-frame--rival`, matching every

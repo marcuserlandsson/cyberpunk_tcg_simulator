@@ -58,7 +58,7 @@ export function BoardCard(props: {
   /** Task 8's spotlight: set only by `Field`'s field-zone cards, same as `lungeUid`. */
   spotlitUid?: number | null
 }): ReactElement | null {
-  const { AI } = useBoardPerspective()
+  const { HUMAN, AI } = useBoardPerspective()
   const { db, state, uid, zone, affordances, handlers, useOfficialImages, style } = props
   const instance = state.cards[uid]
   if (instance === undefined) return null
@@ -99,6 +99,14 @@ export function BoardCard(props: {
   // ZonePanels already threads through for eddies/deck/trash piles.
   const owner: CardFrameOwner = controllerOf(state, uid) === AI ? 'rival' : 'you'
 
+  // Fix round 1: a face-down card the human hasn't legitimately seen must not
+  // carry its uid anywhere in the DOM — uids are assigned in decklist order,
+  // so a bare uid on a hidden card is itself an identity leak, independent of
+  // CardFrame's own (already-correct) face-down rendering. The human's own
+  // face-down cards (their own uncalled Legends) are exempt: they already
+  // know their own deck's contents, so there's nothing to leak.
+  const identityHidden = faceDown && owner === 'rival' && !(instance.knownTo?.includes(HUMAN))
+
   // Human attackers lunge up (the keyframe's own default, `-14px`); the
   // rival's lunge down, which needs an explicit override.
   const lungeStyle: LungeVars | undefined =
@@ -111,13 +119,13 @@ export function BoardCard(props: {
       className={classes}
       style={cardStyle}
       data-testid="board-card"
-      data-uid={uid}
+      data-uid={identityHidden ? undefined : uid}
       data-zone={zone}
       data-def-id={faceDown ? undefined : def.id}
       data-playable={playable ? 'true' : undefined}
       data-attacker={attacker ? 'true' : undefined}
       data-target={target ? 'true' : undefined}
-      data-pulse-id={`power-${uid}`}
+      data-pulse-id={identityHidden ? undefined : `power-${uid}`}
       data-pulse-key={power ?? ''}
     >
       {faceDown && instance.knownTo?.length ? (
