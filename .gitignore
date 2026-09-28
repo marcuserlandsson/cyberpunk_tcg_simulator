@@ -11,3 +11,6 @@ data/collection.backup.json
 # over the target). It should never outlive a write, but an orphan left by a
 # crash must not show up as untracked work the owner might mistake for data.
 data/*.tmp
+
+# brainstorming companion mockups
+.superpowers/
