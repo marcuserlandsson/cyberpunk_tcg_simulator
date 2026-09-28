@@ -27,9 +27,14 @@ export interface PresentationApi {
   togglePause: () => void
 }
 
+/** Input types that take typed text; a radio, checkbox or button does not. */
+const TEXT_INPUTS = new Set(['text', 'search', 'number', 'password', 'email', 'tel', 'url',
+  'date', 'datetime-local', 'month', 'time', 'week'])
+
 function typingInto(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+  if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true
+  return target instanceof HTMLInputElement && TEXT_INPUTS.has(target.type)
 }
 
 export function usePresentation({ beats, ackBeat, clearBeats, awaitingHuman, speed }: PresentationInput): PresentationApi {
@@ -72,11 +77,12 @@ export function usePresentation({ beats, ackBeat, clearBeats, awaitingHuman, spe
 
   const skipBeat = useCallback(() => { if (beat !== null) ackBeat(beat.id) }, [beat, ackBeat])
   const skipTurn = useCallback(() => { setFastForward(true); clearBeats() }, [clearBeats])
-  const togglePause = useCallback(() => setPaused((value) => !value), [])
+  // Pausing only means something while a beat plays; idle toggles are ignored.
+  const togglePause = useCallback(() => { if (beat !== null) setPaused((value) => !value) }, [beat])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (typingInto(event.target)) return
+      if (typingInto(event.target) || event.ctrlKey || event.metaKey || event.altKey) return
       if (event.key === ' ' && beat !== null) {
         event.preventDefault()
         if (event.shiftKey) skipTurn()

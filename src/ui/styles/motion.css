@@ -27,8 +27,11 @@
   }
 
   /* Task 8 — showpiece motion (src/ui/presentation/beatAnimations.ts drives
-     all four of these via short-lived classes; every one reverts on its own
-     within ~600ms so no animation here can block input longer than that). */
+     all four of these via short-lived classes). Paced beats may hold input
+     for longer than the old ~600ms limit: the human's decisions wait until
+     the beat queue drains, and the player controls that with speed, pause
+     and skip (docs/superpowers/specs/2026-09-28-effect-pacing-design.md,
+     "Constraints" and §3 "Gating"). */
 
   /* Attack lunge (Field.tsx `.is-lunging`, on the attacker's own
      `.board-card`). `--lunge-dir` is set inline per attacker: the human's own

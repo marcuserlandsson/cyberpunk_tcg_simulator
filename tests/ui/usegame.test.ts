@@ -437,6 +437,46 @@ describe('useGame pacing', () => {
     }
   }
 
+  /**
+   * A record whose next human action pauses for a human intercept, and only
+   * after the pause itself has already emitted at least one event.
+   */
+  function findInterceptPause(): { seed: number; prefix: Action[]; action: Action } {
+    // The pre-pause events must exist, so the tests below can see them. (A
+    // pause with nothing emitted yet, like the very first `callLegend` of a
+    // game, would make their assertions vacuously true.)
+    let found: { seed: number; prefix: Action[]; action: Action } | null = null
+    for (let seed = 1; seed <= 150 && found === null; seed++) {
+      let state = newGame(db, { decks: [arasaka, mercs], seed })
+      const prefix: Action[] = []
+      for (let i = 0; i < 250 && state.phase !== 'gameOver' && found === null; i++) {
+        const actions = legalActions(db, state)
+        if (actions.length === 0) break
+        const action = actions[(seed * 7 + i) % actions.length]
+        const next = applyAction(db, state, action)
+        const pausedAfterEvents = (next.pendingIntercept?.view ?? next).events.length - 1 > state.events.length - 1
+        if (next.phase === 'intercept' && next.pendingIntercept?.player === 0 && actingPlayer(state) === 0 && pausedAfterEvents) {
+          found = { seed, prefix: [...prefix], action }
+        }
+        prefix.push(action)
+        state = next
+      }
+    }
+    expect(found).not.toBeNull()
+    return found!
+  }
+
+  function interceptRecord(found: { seed: number; prefix: Action[] }): GameRecord {
+    return {
+      practiceMode: true,
+      aiDifficulty: 'medium',
+      aiVersion: AI_VERSION,
+      provenance: gameProvenance(db),
+      config: { decks: [arasaka, mercs], seed: found.seed },
+      actions: found.prefix,
+    }
+  }
+
   it('queues beats for an AI action and holds the next AI action until they drain', async () => {
     const hook = mountPaced()
     await act(async () => hook.result.current.start(arasaka, mercs, aiFirstSeed))
@@ -491,40 +531,10 @@ describe('useGame pacing', () => {
   })
 
   it('does not replay presented beats after an intercept answer', async () => {
-    // Find a record whose next human action pauses for a human intercept —
-    // and only after the pause itself has already emitted at least one event,
-    // so the pre-pause beats this test guards against re-showing actually
-    // exist. (A pause with nothing emitted yet, like the very first
-    // `callLegend` of a game, would make the assertions below vacuously true.)
-    let found: { seed: number; prefix: Action[]; action: Action } | null = null
-    for (let seed = 1; seed <= 150 && found === null; seed++) {
-      let state = newGame(db, { decks: [arasaka, mercs], seed })
-      const prefix: Action[] = []
-      for (let i = 0; i < 250 && state.phase !== 'gameOver' && found === null; i++) {
-        const actions = legalActions(db, state)
-        if (actions.length === 0) break
-        const action = actions[(seed * 7 + i) % actions.length]
-        const next = applyAction(db, state, action)
-        const pausedAfterEvents = (next.pendingIntercept?.view ?? next).events.length - 1 > state.events.length - 1
-        if (next.phase === 'intercept' && next.pendingIntercept?.player === 0 && actingPlayer(state) === 0 && pausedAfterEvents) {
-          found = { seed, prefix: [...prefix], action }
-        }
-        prefix.push(action)
-        state = next
-      }
-    }
-    expect(found).not.toBeNull()
+    const found = findInterceptPause()
     const hook = mountPaced()
-    const record: GameRecord = {
-      practiceMode: true,
-      aiDifficulty: 'medium',
-      aiVersion: AI_VERSION,
-      provenance: gameProvenance(db),
-      config: { decks: [arasaka, mercs], seed: found!.seed },
-      actions: found!.prefix,
-    }
-    await act(async () => hook.result.current.load(record))
-    await act(async () => hook.result.current.act(found!.action))
+    await act(async () => hook.result.current.load(interceptRecord(found)))
+    await act(async () => hook.result.current.act(found.action))
     const shown = new Set<number>()
     for (const beat of hook.result.current.beats) for (let i = beat.firstIndex; i <= beat.lastIndex; i++) shown.add(i)
     // The pause itself must have produced beats, or the loop below that checks
@@ -537,5 +547,20 @@ describe('useGame pacing', () => {
     // before" check below would also pass trivially.
     expect(hook.result.current.beats.length).toBeGreaterThan(0)
     for (const beat of hook.result.current.beats) expect(shown.has(beat.firstIndex)).toBe(false)
+  })
+
+  // Final review M5: once the queue drains during an intercept pause, the log
+  // must still show the events that led up to the pause.
+  it('keeps the pre-pause log lines once the queue drains during an intercept', async () => {
+    const found = findInterceptPause()
+    const hook = mountPaced()
+    await act(async () => hook.result.current.load(interceptRecord(found)))
+    await act(async () => hook.result.current.act(found.action))
+    await drain(hook)
+    const state = hook.result.current.state!
+    expect(state.phase).toBe('intercept')
+    const view = state.pendingIntercept!.view!
+    expect(view.events.length).toBeGreaterThan(state.events.length)
+    expect(hook.result.current.eventsForLog).toHaveLength(view.events.length)
   })
 })

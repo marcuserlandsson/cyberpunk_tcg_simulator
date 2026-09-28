@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { PlayView, awaitingAttribute, endReasonLabel, lastGameEnded } from '../../src/ui/PlayView'
+import { PacingControls } from '../../src/ui/presentation/PacingControls'
 import { loadCardDb } from '../../src/engine/cardDb'
 import { newGame } from '../../src/engine/game'
 import { legalActions } from '../../src/engine/legal'
@@ -423,6 +424,16 @@ describe('PlayView pacing wiring', () => {
     expect((screen.getByTestId('pacing-speed-instant') as HTMLInputElement).checked).toBe(true) // aiDelayMs=0 forces Instant
   })
 
+  it('disables Pause while no beat is playing (final review M3)', () => {
+    const props = { speed: 'normal' as const, onSpeed: () => {}, paused: false, onPause: () => {}, onSkipTurn: () => {}, disabled: false }
+    const idle = render(<PacingControls {...props} beat={null} />)
+    expect((idle.getByTestId('pacing-pause') as HTMLButtonElement).disabled).toBe(true)
+    idle.unmount()
+    const board = newGame(db, { decks: [arasaka, mercs], seed: 1 })
+    const playing = render(<PacingControls {...props} beat={{ id: 1, kind: 'effect', events: [], firstIndex: 1, lastIndex: 1, board, baseMs: 1000, player: 1, sourceUid: null, targets: [], step: 1, of: 1 }} />)
+    expect((playing.getByTestId('pacing-pause') as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('data-awaiting reports presenting while beats are queued', () => {
     // A unit test at the hook level already pins the gating (Task 5). Here we
     // only pin the attribute mapping, via the pure helper.
@@ -430,5 +441,38 @@ describe('PlayView pacing wiring', () => {
     expect(awaitingAttribute({ presenting: false, legalCount: 3, over: false })).toBe('human')
     expect(awaitingAttribute({ presenting: false, legalCount: 0, over: true })).toBe('over')
     expect(awaitingAttribute({ presenting: false, legalCount: 0, over: false })).toBe('ai')
+  })
+})
+
+describe('PlayView game-over overlay while presenting (final review M6)', () => {
+  it('holds the overlay back until the gameOver beat has played', () => {
+    // A real record whose next action is the human's own game-ending endTurn.
+    let found: { seed: number; actions: Action[] } | null = null
+    for (let seed = 1; seed <= 40 && found === null; seed++) {
+      const { actions, state } = driveToRecord(seed, (s) => s.phase === 'gameOver')
+      const before = actions.slice(0, -1)
+      const last = actions[actions.length - 1]
+      let prior = newGame(db, { decks: [arasaka, mercs], seed })
+      for (const action of before) prior = applyAction(db, prior, action)
+      if (state.phase === 'gameOver' && last?.type === 'endTurn' && actingPlayer(prior) === HUMAN) found = { seed, actions: before }
+    }
+    expect(found).not.toBeNull()
+    saveGameRecord('ending-slot', { config: { decks: [arasaka, mercs], seed: found!.seed }, actions: found!.actions })
+    // aiDelayMs > 0 and no reduced motion: beats are paced.
+    render(<PlayView db={db} useOfficialImages={false} aiDelayMs={1} />)
+    fireEvent.click(screen.getByTestId('resume-game'))
+    fireEvent.click(screen.getByTestId('end-turn'))
+
+    const board = screen.getByTestId('playmat').querySelector('.playmat__board')!
+    let sawGameOverBeat = false
+    for (let i = 0; i < 40 && screen.getByTestId('playmat').getAttribute('data-awaiting') === 'presenting'; i++) {
+      if (screen.queryByTestId('beat-layer')?.className.includes('beat-layer--gameOver')) {
+        sawGameOverBeat = true
+        expect(screen.queryByTestId('game-over')).toBeNull()
+      }
+      fireEvent.click(board)
+    }
+    expect(sawGameOverBeat).toBe(true)
+    expect(screen.getByTestId('game-over')).not.toBeNull()
   })
 })

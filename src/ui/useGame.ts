@@ -365,7 +365,9 @@ export function useGame(db: CardDb, options: UseGameOptions = {}): UseGameApi {
 
   const eventsForLog = useMemo(() => {
     if (game === null) return []
-    return buildLog(db, game.state)
+    // An intercept pause returns the pre-action state; its view holds the
+    // events already shown, so the log keeps them once the queue drains.
+    return buildLog(db, game.state.pendingIntercept?.view ?? game.state)
   }, [db, game])
 
   const canUndo = game !== null && (game.record.practiceMode ? game.record.actions.length > 0 : game.owners.includes(HUMAN))

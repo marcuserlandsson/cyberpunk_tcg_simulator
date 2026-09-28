@@ -39,7 +39,7 @@ export function PacingControls(props: PacingControlsProps): ReactElement {
         ))}
       </fieldset>
       <div className="pacing-controls__row">
-        <button type="button" className="btn--ghost" data-testid="pacing-pause" aria-pressed={paused} onClick={onPause}>
+        <button type="button" className="btn--ghost" data-testid="pacing-pause" aria-pressed={paused} disabled={beat === null} onClick={onPause}>
           {paused ? 'Resume' : 'Pause'}
         </button>
         <button type="button" className="btn--ghost" data-testid="pacing-skip-turn" disabled={beat === null} onClick={onSkipTurn}>

@@ -98,6 +98,45 @@ describe('BeatLayer', () => {
   })
 })
 
+describe('exit ghost (final review M1)', () => {
+  it("starts an effect's exit ghost at the exiting target's previous rect, not at the source", () => {
+    const owner = board.cards[humanCard].owner
+    const beat = buildBeats([
+      { eventIndex: 0, event: { type: 'effectResolved', sourceUid: rivalCard, description: `bottom-deck ${humanCard}`, targets: [humanCard] }, board },
+      { eventIndex: 1, event: { type: 'cardBottomDecked', uid: humanCard }, board },
+    ], 'ai')[0]
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const left = this.dataset.uid === String(rivalCard) ? 10 : this.dataset.pile === 'deck' ? 700 : 0
+      return { left, top: 0, right: left, bottom: 0, width: 10, height: 10, x: left, y: 0, toJSON: () => ({}) } as DOMRect
+    })
+    const previous = new Map([[String(humanCard), { left: 300, top: 40, width: 10, height: 10 } as DOMRect]])
+
+    const previousRects = { current: previous }
+    // The beat arrives after mount, as in PlayView: the root ref is attached
+    // only after its children's first layout effects.
+    function Harness({ shown }: { shown: boolean }) {
+      const root = useRef<HTMLDivElement | null>(null)
+      return (
+        <div ref={root}>
+          <div className="board-card" data-uid={rivalCard} />
+          <div data-player={owner}><div data-pile="deck" /></div>
+          <BeatLayer db={db} beat={shown ? beat : null} human={0} root={root} previousRects={previousRects} useOfficialImages={false} />
+        </div>
+      )
+    }
+
+    const { rerender } = render(<Harness shown={false} />)
+    rerender(<Harness shown />)
+    const ghost = screen.getByTestId('beat-ghost')
+    expect(ghost.style.left).toBe('300px')
+    expect(ghost.style.top).toBe('40px')
+    expect(ghost.style.getPropertyValue('--ghost-x')).toBe('400px')
+    // The effect's callout still shows, though the beat ends on the exit.
+    expect(screen.getByTestId('beat-callout').textContent).toContain(`bottom-deck ${humanName}`)
+    rectSpy.mockRestore()
+  })
+})
+
 describe('hidden cards never carry an identifying data-uid (fix round 1, controller ruling)', () => {
   it('a hidden rival hand back has no data-uid', () => {
     const { container } = render(

@@ -774,7 +774,9 @@ export function PlayView({ db, useOfficialImages, aiDelayMs, requestedDeck }: Pl
             useOfficialImages={useOfficialImages}
           />
 
-          {gameOver && (
+          {gameOver && beat?.kind !== 'gameOver' && (
+            // Held back while the gameOver beat's glitch plays, so the overlay
+            // (and its New game click) never sits under click-to-skip.
             // Covers the board only (`.playmat__board` is this element's own
             // positioning ancestor) — never the rail, so the feed and the
             // seed chip stay legible right beside it per the brief.

@@ -123,6 +123,57 @@ describe('usePresentation', () => {
   })
 })
 
+describe('usePresentation input rules (final review M3, M4)', () => {
+  it('ignores P and togglePause while no beat is playing', () => {
+    const h = harness([])
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' })) })
+    expect(h.result.current.api.paused).toBe(false)
+    act(() => h.result.current.api.togglePause())
+    expect(h.result.current.api.paused).toBe(false)
+  })
+
+  it.each(['radio', 'checkbox', 'button'])('still takes Space and P while a %s input has focus', (type) => {
+    const h = harness([beat(1), beat(2), beat(3)])
+    const input = document.createElement('input')
+    input.type = type
+    document.body.appendChild(input)
+    act(() => { input.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })) })
+    expect(h.result.current.api.beat?.id).toBe(2)
+    act(() => { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })) })
+    expect(h.result.current.api.paused).toBe(true)
+    input.remove()
+  })
+
+  it.each(['text', 'search', 'number', 'password', 'email'])('ignores keys typed into a %s input', (type) => {
+    const h = harness([beat(1), beat(2)])
+    const input = document.createElement('input')
+    input.type = type
+    document.body.appendChild(input)
+    act(() => { input.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })) })
+    act(() => { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })) })
+    expect(h.result.current.api.beat?.id).toBe(1)
+    expect(h.result.current.api.paused).toBe(false)
+    input.remove()
+  })
+
+  it.each(['textarea', 'select'])('ignores keys typed into a %s', (tag) => {
+    const h = harness([beat(1), beat(2)])
+    const field = document.createElement(tag)
+    document.body.appendChild(field)
+    act(() => { field.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })) })
+    expect(h.result.current.api.beat?.id).toBe(1)
+    field.remove()
+  })
+
+  it.each(['ctrlKey', 'metaKey', 'altKey'])('ignores Space and P with %s held', (modifier) => {
+    const h = harness([beat(1), beat(2)])
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', [modifier]: true })) })
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', [modifier]: true })) })
+    expect(h.result.current.api.beat?.id).toBe(1)
+    expect(h.result.current.api.paused).toBe(false)
+  })
+})
+
 describe('speed storage', () => {
   it('round-trips and defaults to normal', () => {
     localStorage.removeItem('ctcg.pacingSpeed')

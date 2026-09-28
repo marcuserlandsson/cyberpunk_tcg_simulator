@@ -60,7 +60,7 @@ export interface BeatLayerProps {
 }
 
 export function BeatLayer({ db, beat, human, root, previousRects, useOfficialImages }: BeatLayerProps): ReactElement | null {
-  const [boxes, setBoxes] = useState<{ source: Box | null; targets: Box[]; pile: Box | null }>({ source: null, targets: [], pile: null })
+  const [boxes, setBoxes] = useState<{ source: Box | null; targets: Box[]; pile: Box | null; ghost: Box | null }>({ source: null, targets: [], pile: null, ghost: null })
 
   useLayoutEffect(() => {
     if (beat === null) return
@@ -73,18 +73,24 @@ export function BeatLayer({ db, beat, human, root, previousRects, useOfficialIma
     // gets no ghost at all rather than a misleading flight to that pile.
     const exit = beat.events.find((e) => e.type === 'cardTrashed' || e.type === 'cardBottomDecked')
     let pile: Box | null = null
+    let ghost: Box | null = null
     if (exit !== undefined && el !== null && 'uid' in exit) {
       const owner = beat.board.cards[exit.uid]?.owner
       const kind = exit.type === 'cardBottomDecked' ? 'deck' : 'trash'
       const pileEl = el.querySelector(`[data-player="${owner}"] [data-pile="${kind}"]`)
       if (pileEl !== null) pile = boxOf(el, pileEl.getBoundingClientRect())
+      // The ghost is the card that left (the defeated unit, or an effect's
+      // target), flying from where it was: never from the effect's source.
+      ghost = locate(el, previous, exit.uid, beat.player)
     }
-    setBoxes({ source, targets, pile })
+    setBoxes({ source, targets, pile, ghost })
   }, [beat, root, previousRects])
 
   if (beat === null || beat.kind === 'minor' || beat.kind === 'silent') return null
   const side = beat.player === human ? 'you' : 'rival'
-  const event = beat.events[beat.events.length - 1]
+  // The effect a beat captions is its last effectResolved: an effect beat can
+  // end on an absorbed exit event (its target leaving for a pile).
+  const event = [...beat.events].reverse().find((e) => e.type === 'effectResolved') ?? beat.events[beat.events.length - 1]
   const first = beat.events[0]
 
   const lines = (beat.kind === 'effect' || beat.kind === 'attack' || beat.kind === 'block') && boxes.source !== null
@@ -143,13 +149,13 @@ export function BeatLayer({ db, beat, human, root, previousRects, useOfficialIma
         </p>
       )}
 
-      {boxes.pile !== null && boxes.source !== null && (
+      {boxes.pile !== null && boxes.ghost !== null && (
         <div
           className="beat-layer__ghost"
           data-testid="beat-ghost"
           style={{
-            left: boxes.source.x, top: boxes.source.y, width: boxes.source.w, height: boxes.source.h,
-            '--ghost-x': `${boxes.pile.x - boxes.source.x}px`, '--ghost-y': `${boxes.pile.y - boxes.source.y}px`,
+            left: boxes.ghost.x, top: boxes.ghost.y, width: boxes.ghost.w, height: boxes.ghost.h,
+            '--ghost-x': `${boxes.pile.x - boxes.ghost.x}px`, '--ghost-y': `${boxes.pile.y - boxes.ghost.y}px`,
           } as CSSProperties}
         />
       )}
