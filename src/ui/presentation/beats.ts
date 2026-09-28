@@ -79,7 +79,7 @@ function absorbs(beat: Beat, event: GameEvent, player: PlayerId | null): boolean
     return event.sourceUid === last.uid
   if (EXITS.has(event.type) && (beat.kind === 'defeat' || beat.kind === 'effect')) {
     const uid = uidOf(event)
-    return beat.kind === 'defeat' ? uid === beat.sourceUid : beat.targets.includes(uid as number)
+    return beat.kind === 'defeat' ? uid === beat.sourceUid : uid !== null && beat.targets.includes(uid)
   }
   if (beat.kind === 'turnBanner') return kind === 'minor' && player === beat.player
   if (beat.kind === 'minor') return kind === 'minor' && event.type === last.type && player === beat.player
