@@ -75,10 +75,10 @@ export function SellMode({ db, printings, known }: { db: CardDb; printings: Prin
                     <td className="session-name">{names.get(r.id) ?? r.id}</td><td className="num">{r.owned}</td><td className="num">{r.keep}</td><td className="num">{listedFor(r.identity)}</td><td className="num">{r.surplus}</td>
                     <td className="tool-note">{r.split.map(s => `${s.count}× ${where(s.key)}`).join(', ')}</td>
                     <td><span className="collection-view__stepper">
-                      <button type="button" disabled={n <= 1} onClick={() => setWant(w => ({ ...w, [r.identity]: n - 1 }))}>−</button>
+                      <button type="button" aria-label={`Fewer ${names.get(r.id) ?? r.id}`} disabled={n <= 1} onClick={() => setWant(w => ({ ...w, [r.identity]: n - 1 }))}>−</button>
                       <span>{n}</span>
-                      <button type="button" disabled={n >= open(r)} onClick={() => setWant(w => ({ ...w, [r.identity]: n + 1 }))}>+</button>
-                      <button type="button" data-testid={`sell-add-${r.id}`} disabled={n === 0} onClick={() => { addToSellList(pendingSplit(r.split, listed, n)); setWant(w => { const next = { ...w }; delete next[r.identity]; return next }) }}>Add</button>
+                      <button type="button" aria-label={`More ${names.get(r.id) ?? r.id}`} disabled={n >= open(r)} onClick={() => setWant(w => ({ ...w, [r.identity]: n + 1 }))}>+</button>
+                      <button type="button" aria-label={`Add ${names.get(r.id) ?? r.id} to the sell list`} data-testid={`sell-add-${r.id}`} disabled={n === 0} onClick={() => { addToSellList(pendingSplit(r.split, listed, n)); setWant(w => { const next = { ...w }; delete next[r.identity]; return next }) }}>Add</button>
                     </span></td>
                   </tr>) })}</tbody>
               </table></div>

@@ -31,6 +31,18 @@ let memoryList: SellList | undefined
 let storageError = ''
 const listeners = new Set<() => void>()
 
+// A stale snapshot in a second tab must not overwrite what another tab just
+// saved: drop it and notify on any external write to this key (same pattern
+// as `useDecks` in storage.ts).
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event: StorageEvent) => {
+    if (event.key === SELL_KEY || event.key === null) {
+      snapshot = undefined
+      for (const listener of listeners) listener()
+    }
+  })
+}
+
 function read(): SellList {
   let text: string | null
   try { text = localStorage.getItem(SELL_KEY) } catch { return memoryList ?? emptySellList() }
@@ -75,6 +87,12 @@ export function clearSold(keys: string[]): void { const list = getSellList(); wr
 
 export function _resetSellListForTests(): void { snapshot = undefined; memoryList = undefined; storageError = '' }
 
+/** `YYYY-MM-DD` for the viewer's own calendar day, not UTC's. */
+export function localDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 /** What a line can actually sell: never more than is owned right now. */
 export function effectiveLines(list: SellList, counts: Record<string, number>): EffectiveLine[] {
   return list.lines.map(l => ({ key: l.key, requested: l.count, count: Math.min(l.count, counts[l.key] ?? 0), condition: l.condition ?? list.condition }))
@@ -97,7 +115,7 @@ export function markSold(keys: string[], expectedBefore: Record<string, number>,
   const before = getCollection().counts
   if (!sameCounts(before, expectedBefore)) throw new Error('Collection changed; review again.')
   const after = saleCounts(keys, before)
-  replaceCollection({ counts: after }, { kind: 'Sale', date: today.toISOString().slice(0, 10), source: 'Cardmarket' })
+  replaceCollection({ counts: after }, { kind: 'Sale', date: localDate(today), source: 'Cardmarket' })
   if (!sameCounts(getCollection().counts, after)) throw new Error('Could not save the collection; the sell list was kept.')
   clearSold(keys)
 }

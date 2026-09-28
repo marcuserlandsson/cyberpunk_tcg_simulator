@@ -6,7 +6,7 @@ import { loadPrintings, printingsByCard } from '../../src/ui/printings'
 import { _resetCollectionCacheForTests, getCollection, setCount } from '../../src/ui/collection'
 import { CardDrawer } from '../../src/ui/CardDrawer'
 import { artworkGroups } from '../../src/ui/artworks'
-import { _resetSellListForTests, getSellList } from '../../src/ui/sellDraft'
+import { _resetSellListForTests, addToSellList, getSellList } from '../../src/ui/sellDraft'
 
 const db = loadCardDb()
 const printings = loadPrintings()
@@ -71,5 +71,13 @@ describe('CardDrawer', () => {
     fireEvent.click(screen.getByTestId('printing-sell-arasakademodeck/006'))
     fireEvent.click(screen.getByTestId('printing-sell-arasakademodeck/006'))
     expect(getSellList().lines).toEqual([{ key: 'arasakademodeck/006', count: 2 }])
+  })
+  it('disables Sell +1 once every owned copy is already listed', () => {
+    setCount('arasakademodeck/006', 2)
+    addToSellList([{ key: 'arasakademodeck/006', count: 2 }])
+    mount()
+    const button = screen.getByTestId('printing-sell-arasakademodeck/006') as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(button.title).toBe('All owned copies are on the sell list')
   })
 })

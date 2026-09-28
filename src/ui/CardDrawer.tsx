@@ -19,13 +19,16 @@ import { getPrintingImageUrl } from './images'
 import { ramColorVar } from './CardFrame'
 import { PrintingCount } from './PrintingCount'
 import { comparePrintings } from './collectionSort'
-import { addToSellList } from './sellDraft'
+import { addToSellList, useSellList } from './sellDraft'
 
 export function CardDrawer({ def, printings, visible, preferredSet = '', setOrder = [], collection, known, onClose }: {
   def: CardDef; printings: Printing[]; visible?: Printing[]; preferredSet?: string; setOrder?: readonly string[]
   collection: Collection; known: boolean; onClose: () => void
 }): ReactElement {
   const [showAll, setShowAll] = useState(false)
+  const sellList = useSellList()
+  const listedCount = (key: string): number => sellList.lines.find(l => l.key === key)?.count ?? 0
+  const soldOut = (key: string, count: number): boolean => count > 0 && listedCount(key) >= count
   const target = playsetTarget(def)
   const owned = printings.filter(p => p.playable !== false).reduce((n, p) => n + (collection.counts[p.key] ?? 0), 0)
   const groups = artworkGroups(printings)
@@ -77,7 +80,7 @@ export function CardDrawer({ def, printings, visible, preferredSet = '', setOrde
                       <PrintingCount printingKey={p.key} count={count} known={known} />
                       <button type="button" data-testid={`printing-inc-${p.key}`} disabled={!known} onClick={() => adjustCount(p.key, 1)}>+</button>
                     </span>
-                    <button type="button" className="btn--ghost" data-testid={`printing-sell-${p.key}`} disabled={!known || count === 0} title="Add one copy to the sell list" onClick={() => addToSellList([{ key: p.key, count: 1 }])}>Sell +1</button>
+                    <button type="button" className="btn--ghost" data-testid={`printing-sell-${p.key}`} disabled={!known || count === 0 || soldOut(p.key, count)} title={soldOut(p.key, count) ? 'All owned copies are on the sell list' : 'Add one copy to the sell list'} onClick={() => addToSellList([{ key: p.key, count: 1 }])}>Sell +1</button>
                   </span>
                 </div>
               )

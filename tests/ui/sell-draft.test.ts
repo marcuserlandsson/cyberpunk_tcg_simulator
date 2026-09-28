@@ -5,7 +5,7 @@ import { setCollectionAccess } from '../../src/ui/collectionAccess'
 import { readCollectionJournal } from '../../src/ui/collectionJournal'
 import {
   SELL_KEY, _resetSellListForTests, addToSellList, clearSold, effectiveLines, getSellList, getSellListStorageError,
-  markSold, removeSellLine, setLineCondition, setSellCount, setSellDefaults,
+  localDate, markSold, removeSellLine, setLineCondition, setSellCount, setSellDefaults, type SellList,
 } from '../../src/ui/sellDraft'
 
 beforeEach(() => { localStorage.clear(); _resetCollectionCacheForTests(); _resetSellListForTests(); setCollectionAccess('writer') })
@@ -41,6 +41,20 @@ describe('sell list store', () => {
       { key: 'a/1', requested: 3, count: 2, condition: 'NM' },
       { key: 'b/2', requested: 1, count: 0, condition: 'LP' },
     ])
+  })
+  it('drops a stale snapshot when another tab writes the sell list', () => {
+    addToSellList([{ key: 'a/1', count: 1 }])
+    const other: SellList = { version: 1, condition: 'NM', language: 'English', lines: [{ key: 'z/9', count: 3 }] }
+    localStorage.setItem(SELL_KEY, JSON.stringify(other))
+    window.dispatchEvent(new StorageEvent('storage', { key: SELL_KEY }))
+    expect(getSellList()).toEqual(other)
+  })
+})
+
+describe('localDate', () => {
+  it('formats the viewer\'s own calendar day, not UTC\'s', () => {
+    expect(localDate(new Date(2026, 8, 28))).toBe('2026-09-28')
+    expect(localDate(new Date(2026, 0, 5))).toBe('2026-01-05')
   })
 })
 
