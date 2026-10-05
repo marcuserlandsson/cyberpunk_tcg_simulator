@@ -1128,10 +1128,17 @@ Units the turn it's played"), `gunpoint-diplomacy` and `valentino-guerrera`
   (`clearTurnBuffs`, and on any field exit), and `effectiveKeywords` unions it
   in — so a granted {adrenaline} or {blocker} works everywhere the printed one
   does. The node is `{ kind: 'grantKeyword', keyword, target, duration: 'turn' }`;
-- "can attack … the turn it's played" **is** {adrenaline} — that is the printed
-  keyword's own rule — so `johnny-silverhand-rocking-renegade` grants
-  `adrenaline`. "Spent rival Units" in that text is the normal targeting
-  restriction (guide p11), not an extra permission;
+- ~~"can attack … the turn it's played" **is** {adrenaline}~~ — **superseded
+  (2026-10-05):** Johnny's clause names its targets ("can attack spent rival
+  *Units*"), so it is narrower than {adrenaline}, which also unlocks the Gig
+  area. `johnny-silverhand-rocking-renegade` (and
+  `yorinobu-arasaka-steel-dragon`'s "It can attack rival Units this turn")
+  grant the internal keyword `attack-units-when-played`
+  (`query.ATTACK_UNITS_WHEN_PLAYED`), the granted counterpart of the static
+  `attackUnitDespiteLag` node: `canAttackUnitDespiteLag` honors either, so the
+  Unit may attack rival Units despite Lag but never the Gig area. A Unit that
+  could already attack normally is not narrowed. "Spent rival Units" is still
+  the normal targeting restriction (guide p11), not an extra permission;
 - "it may attack ready Units" is a *new* permission with no printed keyword, so
   it gets the internal keyword `attack-ready` (`query.ATTACK_READY`), which
   widens `attackTargets` for that one attacker only. It is never printed on a
@@ -1162,7 +1169,13 @@ Five cards print "for -1 €$ for each friendly Gig with 8+ value"
 - the printed minimum is data, not policy: `carnage-at-the-colosseum` says "to a
   minimum of 1 €$" so its `minimum` is 1, while
   `johnny-silverhand-rocking-renegade` states no floor, so its `minimum` is 0
-  (a free activation is possible with two 8+ Gigs).
+  (a free activation is possible with two 8+ Gigs). The official card
+  database FAQ confirms this: "Can I reduce Johnny Silverhand's effect cost to
+  0 €$? Yes, but you still need to spend Johnny Silverhand to activate it." So
+  `reducedCost` and `firstMatchingPlayDiscount` floor at the printed `minimum`
+  only — no implicit floor of 1 from CR 11.8.3 (which rules audit R14 had
+  added, 2026-09-08). Every card that floors at 1 prints it and carries
+  `minimum: 1`.
 
 ## 45 — "Choose one effect" is a `chooseOne` node whose mode is a slot
 

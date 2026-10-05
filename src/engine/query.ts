@@ -28,6 +28,15 @@ import type {
  */
 export const ATTACK_READY = 'attack-ready'
 
+/**
+ * Granted-only keyword (never printed): "can attack (spent) rival Units the
+ * turn it's played" — `johnny-silverhand-rocking-renegade` and
+ * `yorinobu-arasaka-steel-dragon`. The granted counterpart of the static
+ * `attackUnitDespiteLag` node: a Lag exception for rival Units only, never
+ * the Gig area, so unlike {adrenaline} (docs/rulings.md §43).
+ */
+export const ATTACK_UNITS_WHEN_PLAYED = 'attack-units-when-played'
+
 /** The rival of `player`. */
 export function opponentOf(player: PlayerId): PlayerId {
   return player === 0 ? 1 : 0
@@ -401,6 +410,11 @@ export function conditionHolds(
  * (batch 4) "-1 €$ for each Unit in your trash" — a flat count with no value
  * threshold, hence the second `per` variant rather than an overload of
  * `value`. The trash count needs `db` to tell a Unit from any other card type.
+ *
+ * The floor is the printed `minimum`, never an implicit 1: every card that
+ * floors at 1 prints "to a minimum of 1 €$", and the official FAQ confirms
+ * `johnny-silverhand-rocking-renegade`'s ability (no printed floor) can reach
+ * 0 €$ (docs/rulings.md §44).
  */
 export function reducedCost(
   db: CardDb,
@@ -424,7 +438,7 @@ export function reducedCost(
     // docs/rulings.md §107 ff.).
     matching = state.players[player].legends.filter((uid) => state.cards[uid].faceUp).length
   }
-  return Math.max(1, reduction.minimum, base - matching * reduction.amount)
+  return Math.max(reduction.minimum, base - matching * reduction.amount)
 }
 
 /**
@@ -492,7 +506,7 @@ export function effectiveCardCost(
   for (const { hostUid, index, node } of firstMatchingPlayDiscountSources(db, state, player)) {
     if (def.type !== node.cardType || !def.keywords.includes(node.keyword)) continue
     if (state.oncePerTurnUsed.includes(`${hostUid}:${index}`)) continue
-    cost = Math.max(1, node.minimum, cost - node.amount)
+    cost = Math.max(node.minimum, cost - node.amount)
   }
   return cost
 }
@@ -780,14 +794,19 @@ export function canAttackGigAreaDespiteLag(db: CardDb, state: GameState, uid: nu
  * "This Unit can attack rival Units the turn it's played"
  * (sandayu-oda-hanako-s-guardian, docs/rulings.md §107 ff.) — the mirror
  * image of `canAttackGigAreaDespiteLag`: unlocks ONLY a rival Unit target
- * despite Lag, never the Gig area. Same rival-denial respect as its mirror
+ * despite Lag, never the Gig area. Also true for a Unit granted
+ * `ATTACK_UNITS_WHEN_PLAYED` this turn (johnny-silverhand-rocking-renegade,
+ * yorinobu-arasaka-steel-dragon). Same rival-denial respect as its mirror
  * (docs/rulings.md §81 ff./§106).
  */
 export function canAttackUnitDespiteLag(db: CardDb, state: GameState, uid: number): boolean {
   const card = state.cards[uid]
   if (!card || !card.ready || !card.lag) return false
   if (cantAttack(db, state, uid)) return false
-  if (!activeStaticNodes(db, state, uid).some((node) => node.kind === 'attackUnitDespiteLag')) {
+  if (
+    !hasKeyword(db, state, uid, ATTACK_UNITS_WHEN_PLAYED) &&
+    !activeStaticNodes(db, state, uid).some((node) => node.kind === 'attackUnitDespiteLag')
+  ) {
     return false
   }
   return !rivalDeniesFreshAttacks(db, state, uid)

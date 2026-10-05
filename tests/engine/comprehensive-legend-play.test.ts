@@ -53,9 +53,12 @@ describe('CR 4.5 / 11.25: ordinary Legend play and Go Solo', () => {
     expect(legalActions(cards, state).some(a => a.type === 'playCard' && a.card === legend)).toBe(false)
   })
 
-  it('payment reductions have a minimum of one even if old card metadata says zero', () => {
+  it('payment reductions floor at the printed minimum, which may be zero', () => {
     const { state, cards } = fixture()
     state.players[0].gigArea = [{ size: 8, value: 8 }]
-    expect(reducedCost(cards, state, 0, 2, { per: 'friendlyGigValueAtLeast', value: 8, amount: 5, minimum: 0 })).toBe(1)
+    // "to a minimum of 1 €$" is printed where it applies; Johnny Silverhand's
+    // ability prints none, and the official FAQ confirms it can reach 0 €$.
+    expect(reducedCost(cards, state, 0, 2, { per: 'friendlyGigValueAtLeast', value: 8, amount: 5, minimum: 1 })).toBe(1)
+    expect(reducedCost(cards, state, 0, 2, { per: 'friendlyGigValueAtLeast', value: 8, amount: 5, minimum: 0 })).toBe(0)
   })
 })

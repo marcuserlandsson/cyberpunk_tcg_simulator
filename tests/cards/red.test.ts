@@ -679,7 +679,62 @@ describe('johnny-silverhand-rocking-renegade', () => {
 
     const next = activate(db, state, johnny, 0, { targets: [jonin] })
     expect(next.cards[jonin].tempPower).toBe(0)
-    expect(next.cards[jonin].tempKeywords).toContain('adrenaline')
+    expect(next.cards[jonin].tempKeywords).toContain('attack-units-when-played')
+  })
+
+  it('lets a Unit played this turn attack rival Units only, never the Gig area', () => {
+    const { state } = fixtureWithHand(0, [], { eddies: 2 })
+    state.players[0].legends = []
+    const johnny = mintInto(state, 0, 'legends', 'johnny-silverhand-rocking-renegade')
+    const kerry = fieldCard(state, 0, 'kerry-eurodyne-the-last-rockerboy', { lag: true })
+    const victim = fieldCard(state, 1, 'japantown-jonin', { ready: false })
+    setGigs(state, 1, [{ size: 6, value: 3 }])
+
+    const next = activate(db, state, johnny, 0, { targets: [kerry] })
+    const targets = actionsOfType(db, next, 'attack')
+      .filter((a) => a.attacker === kerry)
+      .map((a) => a.target)
+    expect(targets).toContain(victim)
+    expect(targets).not.toContain('gigArea')
+  })
+
+  it('does not narrow a Unit that could already attack the Gig area', () => {
+    const { state } = fixtureWithHand(0, [], { eddies: 2 })
+    state.players[0].legends = []
+    const johnny = mintInto(state, 0, 'legends', 'johnny-silverhand-rocking-renegade')
+    const kerry = fieldCard(state, 0, 'kerry-eurodyne-the-last-rockerboy') // no Lag
+    setGigs(state, 1, [{ size: 6, value: 3 }])
+
+    const next = activate(db, state, johnny, 0, { targets: [kerry] })
+    expect(
+      actionsOfType(db, next, 'attack').some((a) => a.attacker === kerry && a.target === 'gigArea')
+    ).toBe(true)
+  })
+
+  // Official FAQ: "Can I reduce Johnny Silverhand's effect cost to 0 €$? Yes,
+  // but you still need to spend Johnny Silverhand to activate it."
+  it('costs 0 €$ with two 8+ Gigs, but still spends Johnny', () => {
+    const { state } = fixtureWithHand(0, [], { eddies: 1 })
+    state.players[0].legends = []
+    const johnny = mintInto(state, 0, 'legends', 'johnny-silverhand-rocking-renegade')
+    const kerry = fieldCard(state, 0, 'kerry-eurodyne-the-last-rockerboy', { lag: true })
+    setGigs(state, 0, [{ size: 10, value: 8 }, { size: 12, value: 9 }])
+
+    const next = activate(db, state, johnny, 0, { targets: [kerry] })
+    expect(next.players[0].eddies.filter((uid) => next.cards[uid].ready)).toHaveLength(1)
+    expect(next.cards[johnny].ready).toBe(false)
+  })
+
+  it('is activatable for free with no €$ banked, but not once Johnny is spent', () => {
+    const { state } = fixtureWithHand(0, [], { eddies: 0 })
+    state.players[0].legends = []
+    const johnny = mintInto(state, 0, 'legends', 'johnny-silverhand-rocking-renegade')
+    fieldCard(state, 0, 'kerry-eurodyne-the-last-rockerboy', { lag: true })
+    setGigs(state, 0, [{ size: 10, value: 8 }, { size: 12, value: 9 }])
+    expect(actionsOfType(db, state, 'activateAbility').some((a) => a.card === johnny)).toBe(true)
+
+    state.cards[johnny].ready = false
+    expect(actionsOfType(db, state, 'activateAbility').some((a) => a.card === johnny)).toBe(false)
   })
 
   it('costs 1 €$ less for each friendly Gig with 8+ value', () => {
@@ -1273,12 +1328,17 @@ describe('yorinobu-arasaka-steel-dragon', () => {
   it('plays a cheap Unit from hand for free and lets it attack immediately', () => {
     const { state } = fixtureWithHand(0, ['yorinobu-arasaka-steel-dragon', 'japantown-jonin'])
     setGigs(state, 1, [{ size: 6, value: 2 }])
+    const victim = fieldCard(state, 1, 'japantown-jonin', { ready: false })
     const jonin = findInHand(state, 0, 'japantown-jonin')
 
     const next = playCardByDef(db, state, 0, 'yorinobu-arasaka-steel-dragon', { targets: [jonin] })
     expect(next.players[0].field).toContain(jonin)
-    expect(next.cards[jonin].tempKeywords).toContain('adrenaline')
-    expect(actionsOfType(db, next, 'attack').some((a) => a.attacker === jonin)).toBe(true)
+    expect(next.cards[jonin].tempKeywords).toContain('attack-units-when-played')
+    const targets = actionsOfType(db, next, 'attack')
+      .filter((a) => a.attacker === jonin)
+      .map((a) => a.target)
+    // "It can attack rival Units this turn" — Units only, not the Gig area.
+    expect(targets).toEqual([victim])
   })
 
   it('can also free-play a Unit sitting in the trash', () => {
@@ -1291,7 +1351,7 @@ describe('yorinobu-arasaka-steel-dragon', () => {
     })
     expect(next.players[0].field).toContain(trashedUnit)
     expect(next.players[0].trash).not.toContain(trashedUnit)
-    expect(next.cards[trashedUnit].tempKeywords).toContain('adrenaline')
+    expect(next.cards[trashedUnit].tempKeywords).toContain('attack-units-when-played')
   })
 
   it('never offers a free play for a Unit costing more than 4', () => {

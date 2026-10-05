@@ -5491,7 +5491,7 @@
               },
               {
                 "kind": "grantKeyword",
-                "keyword": "adrenaline",
+                "keyword": "attack-units-when-played",
                 "target": "chosen",
                 "duration": "turn"
               }

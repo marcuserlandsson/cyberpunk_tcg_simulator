@@ -30,6 +30,7 @@ import { bottomDeckCards, defeatGear, defeatUnit, leaveField } from '../../engin
 import { choosePayment } from '../../engine/economy'
 import { readyCardOnDraft, endGame, drawCards, stillLive } from '../../engine/game'
 import {
+  ATTACK_UNITS_WHEN_PLAYED,
   cardTags,
   effectiveCardCost,
   effectivePower,
@@ -226,15 +227,16 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    *
    * Scripted rather than encoded because both halves must land on the *same*
    * chosen Unit, and the second half is conditional on that Unit's tags. The
-   * first half is {adrenaline}: "can attack ... the turn it's played" is exactly
-   * the printed keyword's rule, and attacking *spent* rival Units is the normal
-   * restriction (docs/rulings.md §43).
+   * first half is NOT {adrenaline}: it lets the Unit attack rival Units despite
+   * Lag but never the Gig area, so it grants `ATTACK_UNITS_WHEN_PLAYED`.
+   * Attacking *spent* rival Units is the normal restriction (docs/rulings.md
+   * §43).
    */
   'johnny-silverhand-rocking-renegade': (db, state, ctx) => {
     const target = ctx.targets[0]
     if (target === undefined) return state
     const card = state.cards[target]
-    if (!card.tempKeywords.includes('adrenaline')) card.tempKeywords.push('adrenaline')
+    if (!card.tempKeywords.includes(ATTACK_UNITS_WHEN_PLAYED)) card.tempKeywords.push(ATTACK_UNITS_WHEN_PLAYED)
     if (hasKeyword(db, state, target, 'rocker')) card.tempPower += 2
     return state
   },
@@ -257,8 +259,9 @@ export const scriptedCards: Record<string, ScriptedCard> = {
    * turn." Wrapped in a `sameTarget` (docs/rulings.md §53) whose target spec
    * (`friendlyHandOrTrashUnit`, filtered to cost 4 or less) is the real,
    * enumerated decision — this script only performs the "play it for free"
-   * half; the second child of the `sameTarget` grants {adrenaline} so it can
-   * attack despite the Lag every freshly-played Unit gets (docs/rulings.md §55
+   * half; the second child of the `sameTarget` grants
+   * `ATTACK_UNITS_WHEN_PLAYED` so it can attack rival Units (never the Gig
+   * area) despite the Lag every freshly-played Unit gets (docs/rulings.md §55
    * ff.). "Play" means the full thing: the card's own onPlay effects fire too,
    * auto-targeted per docs/rulings.md §32 (a script-driven play carries no
    * player decision of its own for them).
